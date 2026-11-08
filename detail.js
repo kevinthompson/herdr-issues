@@ -48,20 +48,23 @@ function facts(view, t) {
 }
 
 // Buttons stop the pointer events a list row would otherwise take as the start of a drag or an open.
-function button(id, label, onClick, t, { primary = false, enabled = true } = {}) {
+// `fill` replaces a primary button's solid color with a calmer background under the normal text color.
+function button(id, label, onClick, t, { primary = false, enabled = true, fill = null } = {}) {
   return div().id(id).flex_none().h(26).px(10).flex().items_center().rounded(7).text_size(12)
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
-    .when(enabled, (e) => e.bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground))
+    .when(enabled && Boolean(fill), (e) => e.bg(fill).text_color(t.foreground))
+    .when(enabled && !fill, (e) => e.bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground))
     .when(!enabled, (e) => e.bg(t.raised).text_color(t.dim))
     .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onClick(cx)))
     .child(label);
 }
 
 // Done for an issue in progress, otherwise Start, which is disabled until work can start.
-export function workButton(key, { finishable, startable, awaitingPullRequest, onDone, onStart }, t) {
-  if (finishable) return button(`${key}-done`, awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary: true, enabled: !awaitingPullRequest });
-  return button(`${key}-start`, "Start", onStart, t, { primary: true, enabled: startable });
+// `fills`: optional { start, done } backgrounds for each button in place of the solid primary color.
+export function workButton(key, { finishable, startable, awaitingPullRequest, onDone, onStart }, t, fills = {}) {
+  if (finishable) return button(`${key}-done`, awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary: true, enabled: !awaitingPullRequest, fill: fills.done });
+  return button(`${key}-start`, "Start", onStart, t, { primary: true, enabled: startable, fill: fills.start });
 }
 
 function editActions({ writable, editor, saving, onEdit, onSave, onCancel }, t) {
