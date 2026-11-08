@@ -55,6 +55,12 @@ function button(id, label, onClick, t, { primary = false, enabled = true } = {})
     .child(label);
 }
 
+// Done for an issue in progress, otherwise Start, which is disabled until work can start.
+export function workButton(key, { finishable, startable, awaitingPullRequest, onDone, onStart }, t) {
+  if (finishable) return button(`${key}-done`, awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary: true, enabled: !awaitingPullRequest });
+  return button(`${key}-start`, "Start", onStart, t, { primary: true, enabled: startable });
+}
+
 function editActions({ writable, editor, saving, onEdit, onSave, onCancel }, t) {
   if (!writable) return div();
   if (!editor) return button("issue-edit", "Edit", onEdit, t);
@@ -94,8 +100,7 @@ export function issueDetail(view, t) {
         .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
-      .when(!view.editor && view.finishable, (e) => e.child(button("issue-done", view.awaitingPullRequest ? "Waiting for PR…" : "Done", view.onDone, t, { primary: true, enabled: !view.awaitingPullRequest })))
-      .when(!view.editor && !view.finishable, (e) => e.child(button("issue-start", "Start", view.onStart, t, { primary: true, enabled: view.startable })))
+      .when(!view.editor, (e) => e.child(workButton("issue", view, t)))
       .child(editActions(view, t)))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
