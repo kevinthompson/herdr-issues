@@ -30,8 +30,6 @@ const GROUP_COLORS = {
   done: "#5e6ad2",
   canceled: "#95a2b3",
 };
-// Each row action takes the tint of the group its issue moves into.
-const ROW_ACTION_FILLS = { start: tinted(GROUP_COLORS["in-progress"]), done: tinted(GROUP_COLORS.done) };
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 const offerRemoval = (worktree, warning) => worktree.space && openOverlay({
@@ -381,7 +379,7 @@ export default class Issues extends View {
         .when(Boolean(this.tracker?.writable) && (finishable || startable), (e) => e.child(workButton(`row-${issue.id}`, {
           finishable, startable, awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
           onDone: (cx) => this.finishWork(issue, cx), onStart: (cx) => this.startWork(issue, cx),
-        }, t, ROW_ACTION_FILLS))))
+        }, t, { primary: false }))))
       .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
         .children(issue.labels.slice(0, 3).map((label) => div().flex_none().px(5).rounded(4).border_1().border_color(t.border).text_color(t.muted).child(label)))
