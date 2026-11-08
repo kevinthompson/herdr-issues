@@ -1,4 +1,4 @@
-import { exec, hc, run, spaces, panes, agents } from "herdr";
+import { exec, hc, spaces, panes, agents } from "herdr";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -75,10 +75,14 @@ async function pushedCommit({ root, branch, on }) {
   return upstream.ok ? upstream : git(root, ["rev-parse", `refs/remotes/origin/${branch}`], on);
 }
 
+export async function isPushed({ root, branch, on }) {
+  const [local, pushed] = await Promise.all([git(root, ["rev-parse", `refs/heads/${branch}`], on), pushedCommit({ root, branch, on })]);
+  return local.ok && pushed.ok && local.out === pushed.out;
+}
+
 // The branch's pull request once its latest commit is pushed: { state, url }, else null.
 export async function pullRequestFor({ root, branch, on }) {
-  const [local, pushed] = await Promise.all([git(root, ["rev-parse", `refs/heads/${branch}`], on), pushedCommit({ root, branch, on })]);
-  if (!local.ok || !pushed.ok || local.out !== pushed.out) return null;
+  if (!await isPushed({ root, branch, on })) return null;
   const view = await exec("gh", ["pr", "view", branch, "--json", "state,url"], { cwd: root, on }).catch(() => null);
   const pullRequest = view?.code === 0 ? JSON.parse(view.stdout) : null;
   return ["OPEN", "MERGED"].includes(pullRequest?.state) ? pullRequest : null;
@@ -86,10 +90,8 @@ export async function pullRequestFor({ root, branch, on }) {
 
 const isClaude = (agent) => agent.program?.key === "claude";
 
-// Sends the message to the Claude session in the worktree's space, or starts one there with it.
+// Sends the message to a Claude session already open in the worktree's space. Returns whether it went.
 export async function askClaude(worktree, message) {
   const session = worktree.space && agents().find((agent) => agent.space === worktree.space.id && isClaude(agent));
-  if (session && (await hc(["send", session.address, message]).catch(() => null))?.code === 0) return;
-  if (worktree.space) run("tab.new", { space: worktree.space.id, argv: ["claude"], task: message });
-  else run("space.new", { folder: worktree.path, machine: worktree.on, argv: ["claude"], task: message });
+  return Boolean(session) && (await hc(["send", session.address, message]).catch(() => null))?.code === 0;
 }
