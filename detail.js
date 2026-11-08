@@ -75,22 +75,22 @@ function editActions({ writable, editor, saving, onEdit, onSave, onCancel }, t) 
 const TASK_INDENT_PX = 9;
 const AFTER_TASKS_PX = 14;
 
-function taskItem(task, { issue, writable, onToggleTask }, t) {
+function taskItem(task, { issue, writable, onToggleTask, onLink }, t) {
   const box = div().id(`task-${issue.id}-${task.line}`).flex_none().mt(3).size(14).rounded(4).border_1().flex().items_center().justify_center()
     .text_size(10).border_color(task.checked ? t.accent : t.input).when(task.checked, (e) => e.bg(t.accent).text_color(t.accent_foreground).child("✓"))
     .when(writable, (e) => e.cursor_pointer().hover((s) => s.opacity(0.8)).on_click((_e, cx) => onToggleTask(task.line, cx)));
   return h_flex().flex_none().gap(8).items_start().pl(task.indent * TASK_INDENT_PX)
     .child(box)
     .child(TextView.markdown(`task-text-${issue.id}-${task.line}`, task.text).selectable().flex_1().min_w(0)
-      .text_color(task.checked ? t.muted : t.foreground));
+      .on_link_click(onLink).text_color(task.checked ? t.muted : t.foreground));
 }
 
 function body(view, t) {
-  const { issue, editor } = view;
+  const { issue, editor, onLink } = view;
   if (editor) return Editor.new(editor).size_full();
   return v_flex().id(`issue-body-${issue.id}`).size_full().overflow_y_scrollbar().gap(4)
     .children(bodySegments(issue.body).map((segment, index, segments) => segment.markdown !== undefined
-      ? TextView.markdown(`issue-body-${issue.id}-${index}`, segment.markdown).selectable().flex_none()
+      ? TextView.markdown(`issue-body-${issue.id}-${index}`, segment.markdown).selectable().flex_none().on_link_click(onLink)
         .when(index > 0 && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
       : taskItem(segment, view, t)));
 }

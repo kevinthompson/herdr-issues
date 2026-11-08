@@ -7,7 +7,7 @@
 // changed in a burst of clicks together, once they pause.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
@@ -15,6 +15,7 @@ import { issueDetail, issueLinks, workButton } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, isPushed, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
+import { linkTarget } from "./links.js";
 
 const POLL_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
@@ -183,6 +184,19 @@ export default class Issues extends View {
       } catch (e) {
         if (this.editing === editing) { this.saving = false; this.detailError = `Could not save: ${e.message ?? e}`; }
       }
+      cx.notify();
+    });
+    cx.notify();
+  }
+
+  // Hands the link to macOS `open`, so each file opens in the app made for it and URLs in their own.
+  openLink(issue, url, cx) {
+    const { file, url: address } = linkTarget(url, issue.path);
+    if (file && this.project?.on) { this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`; cx.notify(); return; }
+    this.detailError = null;
+    cx.spawn(async (cx) => {
+      const opened = await exec("open", [file ?? address]).catch((e) => ({ code: 1, stderr: String(e.message ?? e) }));
+      if (opened.code !== 0) this.detailError = `Could not open ${file ?? address}: ${opened.stderr.trim()}`;
       cx.notify();
     });
     cx.notify();
@@ -440,6 +454,7 @@ export default class Issues extends View {
         onMenu: (field) => openMenu(field, issue, this.project),
         onEdit: (cx) => this.edit(issue, cx),
         onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),
+        onLink: (url, cx) => this.openLink(issue, url, cx),
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
