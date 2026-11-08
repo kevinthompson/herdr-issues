@@ -167,7 +167,7 @@ export default class Issues extends View {
       mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
       props: {
         folder: this.project?.root, machine: this.project?.on ?? null, action: "new",
-        branch: issue.branch ?? undefined, argv: ["claude"],
+        branch: issue.branch ?? undefined, name: issue.id, argv: ["claude"],
         task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
       },
     });
