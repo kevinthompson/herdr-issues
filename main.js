@@ -11,7 +11,7 @@ import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
-import { removableWorktreeSpace } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged } from "./worktree.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
@@ -27,6 +27,9 @@ const GROUP_COLORS = {
 };
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
+const offerRemoval = (worktree) => openOverlay({
+  mod: "fast-worktree", kind: "dialog", width: 440, height: 260, props: { space: worktree.space.id, action: "remove" },
+});
 
 export default class Issues extends View {
   init(_props, cx) {
@@ -198,8 +201,8 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try {
         await tracker.finish(issue);
-        const space = project && await removableWorktreeSpace(issue.branch, project);
-        if (space) openOverlay({ mod: "fast-worktree", kind: "dialog", width: 440, height: 260, props: { space: space.id, action: "remove" } });
+        const worktree = project && await worktreeFor(issue.branch, project);
+        if (worktree?.space && !await hasUncommittedChanges(worktree) && await isMerged(worktree)) offerRemoval(worktree);
       } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
       this.refresh(cx);
       cx.notify();

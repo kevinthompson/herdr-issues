@@ -2,7 +2,7 @@ import { exec, spaces, panes } from "herdr";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
-  return { ok: result?.code === 0, out: (result?.stdout ?? "").trim() };
+  return { ok: result?.code === 0, out: (result?.stdout ?? "").trim(), err: (result?.stderr ?? "").trim() };
 }
 
 // Every checkout of the repository, the main one first: { path, branch }.
@@ -27,15 +27,21 @@ function spaceShowing(path, on) {
   }) ?? null;
 }
 
-// The space showing the worktree checked out on `branch`, when removing it loses nothing: the
-// worktree has no uncommitted changes and the branch is merged into what the main checkout has out.
-export async function removableWorktreeSpace(branch, { root, on }) {
+// The linked worktree checked out on `branch`: { path, branch, on, main: the main checkout, space }.
+export async function worktreeFor(branch, { root, on }) {
   if (!branch) return null;
   const [main, ...linked] = await checkouts(root, on);
   const worktree = linked.find((checkout) => checkout.branch === branch);
   if (!main || !worktree) return null;
-  const status = await git(worktree.path, ["--no-optional-locks", "status", "--porcelain"], on);
-  if (!status.ok || status.out) return null;
-  const merged = await git(main.path, ["merge-base", "--is-ancestor", `refs/heads/${branch}`, "HEAD"], on);
-  return merged.ok ? spaceShowing(worktree.path, on) : null;
+  return { ...worktree, on, main, space: spaceShowing(worktree.path, on) };
+}
+
+export async function hasUncommittedChanges({ path, on }) {
+  const status = await git(path, ["--no-optional-locks", "status", "--porcelain"], on);
+  return !status.ok || status.out !== "";
+}
+
+// Whether the branch is already part of what the main checkout has out.
+export async function isMerged({ branch, main, on }) {
+  return (await git(main.path, ["merge-base", "--is-ancestor", `refs/heads/${branch}`, "HEAD"], on)).ok;
 }
