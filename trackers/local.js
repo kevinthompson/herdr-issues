@@ -1,0 +1,104 @@
+// Issues as Markdown files in the project's issues/ folder, one per file, with YAML frontmatter.
+import { exec, readTextFile, writeTextFile, watchFolder } from "herdr";
+
+const ISSUE_FILE = /^[A-Z][A-Z0-9]*-\d+.*\.md$/;
+const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/;
+
+const unquote = (text) => text.trim().replace(/^(["'])(.*)\1$/, "$2");
+const asList = (value) => (Array.isArray(value) ? value : value ? [value] : []);
+
+function parseValue(raw) {
+  const value = raw.replace(/\s+#.*$/, "").trim();
+  if (value.startsWith("[") && value.endsWith("]")) return value.slice(1, -1).split(",").map(unquote).filter(Boolean);
+  return unquote(value);
+}
+
+function parseFields(frontmatter) {
+  const fields = {};
+  for (const line of frontmatter.split("\n")) {
+    const match = /^([A-Za-z_]+):\s*(.*)$/.exec(line);
+    if (match) fields[match[1]] = parseValue(match[2]);
+  }
+  return fields;
+}
+
+export function parseIssue(text, file) {
+  const match = FRONTMATTER.exec(text);
+  const fields = match ? parseFields(match[1]) : {};
+  return {
+    id: fields.id || file.replace(/\.md$/, ""),
+    title: fields.title || file,
+    status: fields.status || "backlog",
+    priority: Number(fields.priority) || 0,
+    order: Number.isFinite(parseFloat(fields.order)) ? parseFloat(fields.order) : null,
+    labels: asList(fields.labels),
+    blockedBy: asList(fields.blocked_by),
+    branch: fields.branch || null,
+    created: fields.created || null,
+    body: (match ? text.slice(match[0].length) : text).trim(),
+    file,
+  };
+}
+
+// Replaces each field's line in the frontmatter, or adds it at the end.
+export function withFields(text, fields) {
+  const match = FRONTMATTER.exec(text);
+  if (!match) throw new Error("The issue has no frontmatter");
+  let frontmatter = match[1];
+  for (const [key, value] of Object.entries(fields)) {
+    const line = `${key}: ${value}`, existing = new RegExp(`^${key}:.*$`, "m");
+    frontmatter = existing.test(frontmatter) ? frontmatter.replace(existing, () => line) : `${frontmatter}\n${line}`;
+  }
+  return `---\n${frontmatter}${text.slice(4 + match[1].length)}`;
+}
+
+// Replaces everything after the frontmatter, leaving one blank line between them.
+export function withBody(text, body) {
+  const match = FRONTMATTER.exec(text);
+  if (!match) throw new Error("The issue has no frontmatter");
+  return `---\n${match[1]}\n---\n\n${body.trim()}\n`;
+}
+
+export async function localTracker({ root, on }) {
+  const folder = `${root}/issues`;
+  const exists = await exec("test", ["-d", folder], { on }).catch(() => null);
+  if (exists?.code !== 0) return null;
+
+  async function issueFiles() {
+    const listing = await exec("ls", ["-1", folder], { on });
+    if (listing.code !== 0) throw new Error(listing.stderr.trim());
+    return listing.stdout.split("\n").filter((name) => ISSUE_FILE.test(name));
+  }
+
+  async function readIssue(file) {
+    const text = await readTextFile(`${folder}/${file}`, { on });
+    return text === null ? null : parseIssue(text, file);
+  }
+
+  async function list() {
+    return (await Promise.all((await issueFiles()).map(readIssue))).filter(Boolean);
+  }
+
+  return {
+    kind: "local",
+    name: "issues/",
+    writable: on == null,
+    list,
+    async get(id) {
+      return (await list()).find((issue) => issue.id === id) ?? null;
+    },
+    // A new body only saves over the body `issue` was read with, so edits made on disk meanwhile
+    // are never overwritten.
+    async update(issue, { body, ...fields }) {
+      const path = `${folder}/${issue.file}`, text = await readTextFile(path);
+      if (text === null) throw new Error(`${issue.file} no longer exists`);
+      let next = Object.keys(fields).length ? withFields(text, fields) : text;
+      if (body !== undefined) {
+        if (parseIssue(text, issue.file).body !== issue.body) throw new Error(`${issue.id} changed on disk while you were editing it`);
+        next = withBody(next, body);
+      }
+      await writeTextFile(path, next, text);
+    },
+    changed: on == null ? () => watchFolder(folder) : null,
+  };
+}
