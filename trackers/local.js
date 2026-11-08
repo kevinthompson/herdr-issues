@@ -79,7 +79,14 @@ export async function localTracker({ root, on }) {
     return (await Promise.all((await issueFiles()).map(readIssue))).filter(Boolean);
   }
 
-  return {
+  async function commitStatus(issue, status, verb) {
+    await tracker.update(issue, { status });
+    const file = `issues/${issue.file}`;
+    const commit = await exec("git", ["commit", "-m", `docs(issues): ${verb} ${issue.id}`, "--", file], { cwd: root });
+    if (commit.code !== 0) throw new Error(commit.stderr.trim() || `git commit failed for ${file}`);
+  }
+
+  const tracker = {
     kind: "local",
     name: "issues/",
     writable: on == null,
@@ -102,11 +109,9 @@ export async function localTracker({ root, on }) {
     // Committed, so the worktree branched next starts with the status too and merging it back
     // never meets an uncommitted change to the issue file.
     async start(issue) {
-      await this.update(issue, { status: "in-progress" });
-      const file = `issues/${issue.file}`;
-      const commit = await exec("git", ["commit", "-m", `docs(issues): start ${issue.id}`, "--", file], { cwd: root });
-      if (commit.code !== 0) throw new Error(commit.stderr.trim() || `git commit failed for ${file}`);
+      await commitStatus(issue, "in-progress", "start");
     },
     changed: on == null ? () => watchFolder(folder) : null,
   };
+  return tracker;
 }
