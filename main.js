@@ -1,8 +1,8 @@
 // The issues of the project in the focused pane: its git repository's root, or its folder outside one.
 // Clicking an issue shows it in the panel in place of the list (detail.js). Dragging an issue onto
-// another in its group, or its hover arrows, changes its order. Status and priority dropdowns are
-// popups of this same mod with props { menu } (menu.js). Edit swaps an open issue's body for a
-// Markdown editor; Save, Cmd-Enter or the issues.save key command writes it back to the tracker.
+// another in its group changes its order. Status and priority dropdowns are popups of this same mod
+// with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
+// Cmd-Enter or the issues.save key command writes it back to the tracker.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, spaces } from "herdr";
@@ -31,7 +31,7 @@ export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = new FieldMenu(); return; }
     this.issues = []; this.generation = 0; this.expanded = {};
-    this.drag = null; this.dropTarget = null; this.hovered = null;
+    this.drag = null; this.dropTarget = null;
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
@@ -196,23 +196,12 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  arrow(id, label, enabled, onMove, t) {
-    return div().id(id).flex_none().size(18).flex().items_center().justify_center().rounded(4).text_size(11)
-      .text_color(enabled ? t.muted : t.border)
-      .when(enabled, (e) => e.cursor_pointer().hover((s) => s.bg(t.raised).text_color(t.foreground)))
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-      .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
-      .on_click((_e, cx) => { cx.stop_propagation(); if (enabled) onMove(cx); })
-      .child(label);
-  }
-
   row(issue, index, group, t) {
     const { issues } = group, blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues);
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
     const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
-    const showArrows = this.hovered === issue.id && !this.drag && this.tracker?.writable && issues.length > 1;
     // The accent line marks where the dragged issue lands: above when it moves up, below when down.
     return v_flex().id(`issue-${issue.id}`).relative().flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
       .when(dropping && fromIndex > index, (e) => e.child(div().absolute().top(0).left(6).right(6).h(2).bg(t.accent)))
@@ -220,9 +209,7 @@ export default class Issues extends View {
       .when(dragging, (e) => e.opacity(0.45))
       .hover((s) => s.bg(t.hover))
       .on_hover((hovered, cx) => {
-        if (hovered) { this.hovered = issue.id; if (this.drag) this.dropTarget = issue.id; }
-        else if (this.hovered === issue.id) this.hovered = null;
-        cx.notify();
+        if (hovered && this.drag) { this.dropTarget = issue.id; cx.notify(); }
       })
       .on_mouse_down("left", (_e, cx) => { cx.stop_propagation(); this.drag = { id: issue.id, group: group.id }; this.dropTarget = null; })
       .on_mouse_up("left", (_e, cx) => {
@@ -235,10 +222,7 @@ export default class Issues extends View {
       })
       .child(h_flex().gap(8).items_start()
         .child(div().flex_none().pt(1).text_size(11).text_color(t.accent).child(issue.id))
-        .child(div().flex_1().min_w(0).whitespace_normal().child(issue.title))
-        .when(showArrows, (e) => e.child(h_flex().flex_none().gap(2)
-          .child(this.arrow(`up-${issue.id}`, "↑", index > 0, (cx) => this.move(group, issue.id, issues[index - 1].id, cx), t))
-          .child(this.arrow(`down-${issue.id}`, "↓", index < issues.length - 1, (cx) => this.move(group, issue.id, issues[index + 1].id, cx), t)))))
+        .child(div().flex_1().min_w(0).whitespace_normal().child(issue.title)))
       .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
         .children(issue.labels.slice(0, 3).map((label) => div().flex_none().px(5).rounded(4).border_1().border_color(t.border).text_color(t.muted).child(label)))
