@@ -21,6 +21,7 @@ const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Linear's workflow state colors, tinted so headers stay calm on dark backgrounds.
 const GROUP_TINT_ALPHA = "30";
+const tinted = (color) => `${color}${GROUP_TINT_ALPHA}`;
 const GROUP_COLORS = {
   "in-progress": "#f2c94c",
   todo: "#e2e2e2",
@@ -393,7 +394,7 @@ export default class Issues extends View {
   group(group, t) {
     const expanded = this.isExpanded(group);
     const color = GROUP_COLORS[group.id];
-    const fill = color ? `${color}${GROUP_TINT_ALPHA}` : t.raised;
+    const fill = color ? tinted(color) : t.raised;
     return v_flex().flex_none().gap(1)
       .child(h_flex().id(`group-${group.id}`).mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
         .bg(fill).text_color(t.foreground)
