@@ -3,7 +3,8 @@
 // another in its group changes its order. Status and priority dropdowns are popups of this same mod
 // with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Clicking a task-list
-// checkbox in the body saves that one change at once.
+// checkbox in the body saves that one change at once, and the tracker records every checkbox
+// changed in a burst of clicks together, once they pause.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify } from "herdr";
@@ -16,6 +17,7 @@ import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeInt
 import { toggleTask } from "./tasks.js";
 
 const POLL_MS = 30000;
+const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Linear's workflow state colors, tinted so headers stay calm on dark backgrounds.
 const GROUP_TINT_ALPHA = "30";
@@ -202,7 +204,43 @@ export default class Issues extends View {
       catch (e) { this.detailError = `Could not save the checkbox: ${e.message ?? e}`; this.refresh(cx); }
       cx.notify();
     });
+    this.scheduleChecklistCommit(tracker, issue, cx);
     cx.notify();
+  }
+
+  // Each click restarts the wait, so a run of clicks becomes one commit. Clicks in another
+  // project's issues commit the earlier project's first.
+  scheduleChecklistCommit(tracker, issue, cx) {
+    if (this.pendingChecklists && this.pendingChecklists.tracker !== tracker) this.commitChecklistsLater(this.takePendingChecklists(), cx);
+    const pending = this.pendingChecklists ??= { tracker, issues: new Map() };
+    pending.issues.set(issue.id, { id: issue.id, file: issue.file });
+    pending.timer?.cancel();
+    pending.timer = cx.timer.after(CHECKLIST_COMMIT_DELAY_MS, (cx) => this.commitChecklistsLater(this.takePendingChecklists(), cx));
+  }
+
+  takePendingChecklists() {
+    const pending = this.pendingChecklists;
+    this.pendingChecklists = null;
+    pending?.timer?.cancel();
+    return pending;
+  }
+
+  commitChecklistsLater(pending, cx) {
+    cx.spawn(async (cx) => {
+      try { await this.commitChecklists(pending); }
+      catch (e) { this.detailError = `Could not commit the checkboxes: ${e.message ?? e}`; cx.notify(); }
+    });
+  }
+
+  async commitChecklists(pending) {
+    if (!pending) return;
+    await this.taskSaves?.catch(() => {});
+    await pending.tracker.commitChecklists?.([...pending.issues.values()]);
+  }
+
+  // Herdr's teardown hook: checkboxes still waiting for their commit get it now.
+  async close() {
+    await this.commitChecklists(this.takePendingChecklists()).catch(() => {});
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, told which issue to work on.
