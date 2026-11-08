@@ -5,7 +5,7 @@
 // Markdown editor; Save, Cmd-Enter or the issues.save key command writes it back to the tracker.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, run } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, unfinishedBlockers, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
@@ -159,12 +159,17 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // A fresh Claude session in a new space for the issue, told which issue to work on.
+  // A fresh Claude session in a new worktree space on the issue's branch, told which issue to work on.
+  // Without a branch, the worktree dialog asks for one.
   startWork(issue) {
     const issueFile = issue.file ? ` (issues/${issue.file})` : "";
-    run("space.new", {
-      name: issue.id, folder: this.project?.root, machine: this.project?.on ?? "", argv: ["claude"],
-      task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
+    openOverlay({
+      mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
+      props: {
+        folder: this.project?.root, machine: this.project?.on ?? null, action: "new",
+        branch: issue.branch ?? undefined, argv: ["claude"],
+        task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
+      },
     });
   }
 
