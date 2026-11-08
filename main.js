@@ -11,7 +11,7 @@ import { theme, props, settings, nextCommand, openOverlay, shared, setShared, sp
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
-import { issueDetail, issueLinks } from "./detail.js";
+import { issueDetail, issueLinks, workButton } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, isPushed, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
@@ -350,6 +350,7 @@ export default class Issues extends View {
   row(issue, index, group, t) {
     const { issues } = group, blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues);
+    const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
     const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
@@ -373,7 +374,11 @@ export default class Issues extends View {
       })
       .child(h_flex().gap(8).items_start()
         .child(div().flex_none().pt(1).text_size(11).text_color(t.accent).child(issue.id))
-        .child(div().flex_1().min_w(0).whitespace_normal().child(issue.title)))
+        .child(div().flex_1().min_w(0).whitespace_normal().child(issue.title))
+        .when(Boolean(this.tracker?.writable) && (finishable || startable), (e) => e.child(workButton(`row-${issue.id}`, {
+          finishable, startable, awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
+          onDone: (cx) => this.finishWork(issue, cx), onStart: (cx) => this.startWork(issue, cx),
+        }, t))))
       .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
         .children(issue.labels.slice(0, 3).map((label) => div().flex_none().px(5).rounded(4).border_1().border_color(t.border).text_color(t.muted).child(label)))
@@ -405,18 +410,19 @@ export default class Issues extends View {
     return "No issues yet";
   }
 
+  // Start and Done in a row report their failures in detailError, so the list shows them too.
   list(t) {
-    const groups = groupIssues(this.issues);
+    const groups = groupIssues(this.issues), error = this.error ?? this.detailError;
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Issues"))
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
         .when(Boolean(this.tracker), (e) => e.child(div().flex_none().text_size(11).text_color(t.dim).child(this.tracker.name))))
-      .when(Boolean(this.error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).child(this.error ?? "")))
+      .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group) => this.group(group, t)))
-        .when(!groups.length && !this.error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
+        .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
   }
 
   render(cx) {
