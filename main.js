@@ -8,7 +8,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, unfinishedBlockers, blockedIssues, reorder, PRIORITIES } from "./issue.js";
+import { groupIssues, unfinishedBlockers, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 
@@ -176,6 +176,7 @@ export default class Issues extends View {
 
   row(issue, index, group, t) {
     const { issues } = group, blockers = issue.status === "todo" ? unfinishedBlockers(issue, this.issues) : [];
+    const waiting = waitingIssues(issue, this.issues);
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
     const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
@@ -206,12 +207,15 @@ export default class Issues extends View {
         .when(showArrows, (e) => e.child(h_flex().flex_none().gap(2)
           .child(this.arrow(`up-${issue.id}`, "↑", index > 0, (cx) => this.move(group, issue.id, issues[index - 1].id, cx), t))
           .child(this.arrow(`down-${issue.id}`, "↓", index < issues.length - 1, (cx) => this.move(group, issue.id, issues[index + 1].id, cx), t)))))
-      .child(h_flex().gap(8).items_center().text_size(11).text_color(t.dim).overflow_hidden()
+      .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
         .children(issue.labels.slice(0, 3).map((label) => div().flex_none().px(5).rounded(4).border_1().border_color(t.border).text_color(t.muted).child(label)))
         .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
           .child(div().flex_none().child("Blocked by"))
-          .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked)))));
+          .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked))))
+        .when(waiting.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center()
+          .child(div().flex_none().child("Blocking"))
+          .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)))));
   }
 
   group(group, t) {

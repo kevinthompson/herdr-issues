@@ -44,6 +44,14 @@ export function blockedIssues(issue, issues) {
   return issues.filter((other) => other.blockedBy.includes(issue.id)).sort(byId).map((other) => other.id);
 }
 
+// The unfinished issues this one still holds up: none once it is done or canceled.
+const FINISHED = ["done", "canceled"];
+export function waitingIssues(issue, issues) {
+  if (FINISHED.includes(issue.status)) return [];
+  const open = new Set(issues.filter((other) => !FINISHED.includes(other.status)).map((other) => other.id));
+  return blockedIssues(issue, issues).filter((id) => open.has(id));
+}
+
 // Moves one issue of a shown group to another's place and numbers the group from 1.
 // Returns only the issues whose order changes.
 export function reorder(groupIssues, movingId, targetId) {
