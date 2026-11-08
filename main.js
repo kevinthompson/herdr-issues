@@ -8,7 +8,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, spaces } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, unfinishedBlockers, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
+import { groupIssues, unfinishedBlockers, canStartWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 
@@ -297,7 +297,7 @@ export default class Issues extends View {
         onBack: (cx) => this.back(cx),
         onMenu: (field) => openMenu(field, issue, this.project),
         onEdit: (cx) => this.edit(issue, cx),
-        onStart: () => this.startWork(issue),
+        onStart: canStartWork(issue, this.issues) ? () => this.startWork(issue) : null,
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t)

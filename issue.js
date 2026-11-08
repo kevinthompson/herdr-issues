@@ -39,6 +39,12 @@ export function unfinishedBlockers(issue, issues) {
   return issue.blockedBy.filter((id) => !done.has(id));
 }
 
+// Work starts only on unblocked issues nobody has picked up yet.
+const STARTABLE_STATUSES = ["backlog", "todo"];
+export function canStartWork(issue, issues) {
+  return STARTABLE_STATUSES.includes(issue.status) && unfinishedBlockers(issue, issues).length === 0;
+}
+
 // The IDs of the issues that name this one in their blocked_by, in number order.
 export function blockedIssues(issue, issues) {
   return issues.filter((other) => other.blockedBy.includes(issue.id)).sort(byId).map((other) => other.id);
