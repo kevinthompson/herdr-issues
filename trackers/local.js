@@ -111,6 +111,9 @@ export async function localTracker({ root, on }) {
     async start(issue) {
       await commitStatus(issue, "in-progress", "start");
     },
+    async finish(issue) {
+      await commitStatus(issue, "done", "finish");
+    },
     changed: on == null ? () => watchFolder(folder) : null,
   };
   return tracker;

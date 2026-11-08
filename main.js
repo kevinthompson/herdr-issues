@@ -5,10 +5,10 @@
 // Cmd-Enter or the issues.save key command writes it back to the tracker.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, spaces } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, spaces, agents, hc } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, holdingBlockers, canStartWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
+import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 
@@ -26,6 +26,14 @@ const GROUP_COLORS = {
 };
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
+
+// The agent in the space Start made for an issue: named after it, or checked out on its branch.
+function issueAgent(issue) {
+  const issueSpaces = new Set(spaces()
+    .filter((space) => (space.named && space.name === issue.id) || (issue.branch && space.branch === issue.branch))
+    .map((space) => space.id));
+  return agents().find((agent) => issueSpaces.has(agent.space)) ?? null;
+}
 
 export default class Issues extends View {
   init(_props, cx) {
@@ -189,6 +197,24 @@ export default class Issues extends View {
     });
   }
 
+  // The issue's agent finishes the work as the person would ask it to: marking the issue done,
+  // finishing the branch and closing its worktree. With no agent, only the status is committed.
+  finishWork(issue, cx) {
+    const tracker = this.tracker, agent = issueAgent(issue);
+    if (!agent && !tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
+    this.detailError = null;
+    cx.spawn(async (cx) => {
+      try {
+        if (agent) {
+          const sent = await hc(["send", agent.address, `Issue ${issue.id} is complete.`]);
+          if (sent.code !== 0) throw new Error(sent.stderr.trim() || `couldn't reach ${agent.address}`);
+        } else await tracker.finish(issue);
+      } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
+      this.refresh(cx);
+      cx.notify();
+    });
+  }
+
   toggle(group, cx) {
     this.expanded[group.id] = !this.isExpanded(group);
     cx.notify();
@@ -291,6 +317,8 @@ export default class Issues extends View {
         onEdit: (cx) => this.edit(issue, cx),
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
+        finishable: canFinishWork(issue),
+        onDone: (cx) => this.finishWork(issue, cx),
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t)

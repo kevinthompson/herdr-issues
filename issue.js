@@ -42,6 +42,8 @@ export function unfinishedBlockers(issue, issues) {
   return issue.blockedBy.filter((id) => !done.has(id));
 }
 
+export const canFinishWork = (issue) => issue.status === "in-progress";
+
 export function canStartWork(issue, issues) {
   return isStartable(issue) && unfinishedBlockers(issue, issues).length === 0;
 }
