@@ -14,15 +14,15 @@ import { FieldMenu, openMenu } from "./menu.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
-// Linear's workflow state colors, with a text color readable on each.
-const DARK_TEXT = "#1f2023", LIGHT_TEXT = "#ffffff";
+// Linear's workflow state colors, tinted so headers stay calm on dark backgrounds.
+const GROUP_TINT_ALPHA = "30";
 const GROUP_COLORS = {
-  "in-progress": { fill: "#f2c94c", text: DARK_TEXT },
-  todo: { fill: "#e2e2e2", text: DARK_TEXT },
-  blocked: { fill: "#eb5757", text: LIGHT_TEXT },
-  backlog: { fill: "#bec2c8", text: DARK_TEXT },
-  done: { fill: "#5e6ad2", text: LIGHT_TEXT },
-  canceled: { fill: "#95a2b3", text: DARK_TEXT },
+  "in-progress": "#f2c94c",
+  todo: "#e2e2e2",
+  blocked: "#eb5757",
+  backlog: "#bec2c8",
+  done: "#5e6ad2",
+  canceled: "#95a2b3",
 };
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
@@ -37,7 +37,7 @@ export default class Issues extends View {
     this.refresh(cx);
     cx.timer.every(POLL_MS, (cx) => this.refresh(cx));
     cx.spawn(async (cx) => {
-      for (;;) {
+      for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
         cx.notify();
       }
@@ -230,10 +230,11 @@ export default class Issues extends View {
 
   group(group, t) {
     const expanded = this.isExpanded(group);
-    const { fill, text } = GROUP_COLORS[group.id] ?? { fill: t.raised, text: t.muted };
+    const color = GROUP_COLORS[group.id];
+    const fill = color ? `${color}${GROUP_TINT_ALPHA}` : t.raised;
     return v_flex().flex_none().gap(1)
       .child(h_flex().id(`group-${group.id}`).mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
-        .bg(fill).text_color(text)
+        .bg(fill).text_color(t.foreground)
         .on_click((_e, cx) => this.toggle(group, cx))
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
         .child(div().font_semibold().child(group.label))
@@ -267,15 +268,15 @@ export default class Issues extends View {
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
     const content = issue
       ? issueDetail({
-          issue, writable: this.tracker?.writable,
-          editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
-          blocking: blockedIssues(issue, this.issues),
-          onBack: (cx) => this.back(cx),
-          onMenu: (field) => openMenu(field, issue, this.project),
-          onEdit: (cx) => this.edit(issue, cx),
-          onSave: (cx) => this.save(cx),
-          onCancel: (cx) => { this.stopEditing(); cx.notify(); },
-        }, t)
+        issue, writable: this.tracker?.writable,
+        editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
+        blocking: blockedIssues(issue, this.issues),
+        onBack: (cx) => this.back(cx),
+        onMenu: (field) => openMenu(field, issue, this.project),
+        onEdit: (cx) => this.edit(issue, cx),
+        onSave: (cx) => this.save(cx),
+        onCancel: (cx) => { this.stopEditing(); cx.notify(); },
+      }, t)
       : this.list(t);
     return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13)
