@@ -15,6 +15,36 @@ function normalized(path) {
   return `/${parts.join("/")}`;
 }
 
+// Issues name files as inline code relative to the repository, such as `src/main.c`. A span counts
+// as a file only once it is found on disk, so code that merely looks like a path stays plain.
+const CODE_SPAN = /(^|[^`[])`([^`\s()]+)`(?!`)/g;
+const FENCE = /^\s*(```|~~~)/;
+const isRelativePath = (text) => !/^[/~]/.test(text) && !SCHEME.test(text);
+
+// Applies `rewrite` to each line outside fenced code.
+function outsideFences(markdown, rewrite) {
+  let inFence = false;
+  return markdown.split("\n").map((line) => {
+    if (FENCE.test(line)) { inFence = !inFence; return line; }
+    return inFence ? line : rewrite(line);
+  }).join("\n");
+}
+
+export function codeSpanPaths(markdown) {
+  const paths = new Set();
+  outsideFences(markdown, (line) => {
+    for (const [, , text] of line.matchAll(CODE_SPAN)) if (isRelativePath(text)) paths.add(text);
+    return line;
+  });
+  return [...paths];
+}
+
+export function linkCodeSpanFiles(markdown, root, files) {
+  if (!files.size) return markdown;
+  return outsideFences(markdown, (line) => line.replace(CODE_SPAN, (span, before, text) =>
+    files.has(text) ? `${before}[\`${text}\`](file://${encodeURI(`${root}/${text}`)})` : span));
+}
+
 export function linkTarget(url, issuePath) {
   if (/^file:\/\//i.test(url)) return { file: decodeURIComponent(url.replace(/^file:\/\/[^/]*/i, "")) };
   if (SCHEME.test(url)) return { url };

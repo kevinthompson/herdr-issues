@@ -15,7 +15,7 @@ import { issueDetail, issueLinks, workButton } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, isPushed, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
-import { linkTarget } from "./links.js";
+import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 
 const POLL_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
@@ -187,6 +187,22 @@ export default class Issues extends View {
       cx.notify();
     });
     cx.notify();
+  }
+
+  // The code spans in the issue's body that name files in the project, found once per body.
+  filesInBody(issue, cx) {
+    const { root, on } = this.project, key = `${root}\n${issue.body}`;
+    if (this.bodyFiles?.key === key) return this.bodyFiles.files;
+    const bodyFiles = this.bodyFiles = { key, files: new Set() }, paths = codeSpanPaths(issue.body);
+    if (!paths.length) return bodyFiles.files;
+    cx.spawn(async (cx) => {
+      const listFiles = 'for path; do [ -f "$path" ] && printf "%s\\n" "$path"; done; true';
+      const found = await exec("sh", ["-c", listFiles, "sh", ...paths], { cwd: root, on }).catch(() => null);
+      if (found?.code !== 0 || this.bodyFiles !== bodyFiles) return;
+      bodyFiles.files = new Set(found.stdout.split("\n").filter(Boolean));
+      cx.notify();
+    });
+    return bodyFiles.files;
   }
 
   // Hands the link to macOS `open`, so each file opens in the app made for it and URLs in their own.
@@ -455,6 +471,7 @@ export default class Issues extends View {
         onEdit: (cx) => this.edit(issue, cx),
         onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),
         onLink: (url, cx) => this.openLink(issue, url, cx),
+        linkFiles: (markdown) => linkCodeSpanFiles(markdown, this.project.root, this.filesInBody(issue, cx)),
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
