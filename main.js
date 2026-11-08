@@ -66,7 +66,7 @@ export default class Issues extends View {
     const context = contextKey();
     if (context !== this.context) {
       this.context = context; this.project = null; this.tracker = null; this.issues = []; this.error = null; this.loaded = false;
-      this.close(); this.focusHandled = null;
+      this.closeIssue(); this.focusHandled = null;
     }
     const generation = ++this.generation;
     cx.spawn(async (cx) => {
@@ -137,7 +137,7 @@ export default class Issues extends View {
     return Boolean(this.editing) && this.editing.state.value().trim() !== this.editing.issue.body;
   }
 
-  close() {
+  closeIssue() {
     this.stopEditing();
     this.openId = null;
   }
@@ -163,7 +163,7 @@ export default class Issues extends View {
 
   back(cx) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
-    else this.close();
+    else this.closeIssue();
     cx.notify();
   }
 
