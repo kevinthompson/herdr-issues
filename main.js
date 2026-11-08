@@ -5,7 +5,7 @@
 // Markdown editor; Save, Cmd-Enter or the issues.save key command writes it back to the tracker.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, spaces } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, unfinishedBlockers, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
@@ -48,7 +48,7 @@ export default class Issues extends View {
     const context = contextKey();
     if (context !== this.context) {
       this.context = context; this.project = null; this.tracker = null; this.issues = []; this.error = null; this.loaded = false;
-      this.close();
+      this.close(); this.focusHandled = null;
     }
     const generation = ++this.generation;
     cx.spawn(async (cx) => {
@@ -129,6 +129,14 @@ export default class Issues extends View {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
     else { this.stopEditing(); this.openId = id; }
     cx.notify();
+  }
+
+  // Opens the issue the tabs bar asked for when its space was shown, once this space's issues have loaded.
+  openRequestedIssue() {
+    const request = shared("issues.focus"), space = spaces().find((each) => each.active);
+    if (!request || !this.loaded || request.at === this.focusHandled || request.space !== space?.id) return;
+    this.focusHandled = request.at;
+    if (this.hasIssue(request.id) && !this.hasUnsavedEdits()) { this.stopEditing(); this.openId = request.id; }
   }
 
   hasIssue(id) {
@@ -279,6 +287,7 @@ export default class Issues extends View {
   render(cx) {
     if (this.menu) return this.menu.render();
     if (contextKey() !== this.context) this.refresh(cx);
+    this.openRequestedIssue();
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
     const content = issue
       ? issueDetail({
