@@ -75,7 +75,7 @@ export function issueDetail(view, t) {
         .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
-      .when(!view.editor && view.finishable, (e) => e.child(button("issue-done", "Done", view.onDone, t, { primary: true })))
+      .when(!view.editor && view.finishable, (e) => e.child(button("issue-done", view.awaitingPullRequest ? "Waiting for PR…" : "Done", view.onDone, t, { primary: true, enabled: !view.awaitingPullRequest })))
       .when(!view.editor && !view.finishable, (e) => e.child(button("issue-start", "Start", view.onStart, t, { primary: true, enabled: view.startable })))
       .child(editActions(view, t)))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))

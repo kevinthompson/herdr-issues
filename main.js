@@ -5,13 +5,13 @@
 // Cmd-Enter or the issues.save key command writes it back to the tracker.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, spaces } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
@@ -31,6 +31,13 @@ const offerRemoval = (worktree) => worktree.space && openOverlay({
   mod: "fast-worktree", kind: "dialog", width: 440, height: 260, props: { space: worktree.space.id, action: "remove" },
 });
 
+// Issues whose Done waits for their branch's pull request: { id, branch, root, on }. Shared, so every
+// copy of the panel shows the wait and it outlives a reload.
+const AWAITING = "issues.awaitingPullRequest";
+const awaitingPullRequests = () => shared(AWAITING) ?? [];
+const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
+const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
+
 export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = new FieldMenu(); return; }
@@ -40,6 +47,8 @@ export default class Issues extends View {
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
     cx.timer.every(POLL_MS, (cx) => this.refresh(cx));
+    this.checkPullRequests(cx);
+    cx.timer.every(POLL_MS, (cx) => this.checkPullRequests(cx));
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
@@ -194,7 +203,8 @@ export default class Issues extends View {
   }
 
   // A clean worktree's branch is merged into main first in a personal project, then the worktree is
-  // offered for removal. Anything else (no worktree, uncommitted changes) just marks the issue done.
+  // offered for removal. In a collaborative project, Done waits for the branch's pull request instead.
+  // Anything else (no worktree, uncommitted changes) just marks the issue done.
   finishWork(issue, cx) {
     const tracker = this.tracker, project = this.project;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
@@ -202,9 +212,9 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try {
         const worktree = project && await worktreeFor(issue.branch, project);
-        const finished = worktree && !await hasUncommittedChanges(worktree) ? await this.landBranch(worktree) : false;
-        await tracker.finish(issue);
-        if (finished) offerRemoval(worktree);
+        if (!worktree || await hasUncommittedChanges(worktree)) await tracker.finish(issue);
+        else if (await this.landBranch(worktree)) { await tracker.finish(issue); offerRemoval(worktree); }
+        else await this.awaitPullRequest(issue, worktree, cx);
       } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
       this.refresh(cx);
       cx.notify();
@@ -217,6 +227,39 @@ export default class Issues extends View {
     if (await isCollaborative(worktree)) return false;
     await mergeIntoMain(worktree);
     return true;
+  }
+
+  // Asks the worktree's Claude session for a pull request, unless one is already open for the pushed branch.
+  async awaitPullRequest(issue, worktree, cx) {
+    const request = { id: issue.id, branch: worktree.branch, root: worktree.main.path, on: worktree.on };
+    setShared(AWAITING, [...awaitingPullRequests().filter((each) => !sameRequest(each, request)), request]);
+    if (!await pullRequestFor(request)) await askClaude(worktree, pullRequestAsk(issue));
+    this.checkPullRequests(cx);
+  }
+
+  checkPullRequests(cx) {
+    if (this.checkingPullRequests || !awaitingPullRequests().length) return;
+    this.checkingPullRequests = true;
+    cx.spawn(async (cx) => {
+      for (const request of awaitingPullRequests()) {
+        try { await this.finishOnPullRequest(request); }
+        catch (e) { notify({ title: `Could not finish ${request.id}`, body: String(e.message ?? e), level: "error" }); }
+      }
+      this.checkingPullRequests = false;
+      cx.notify();
+    });
+  }
+
+  // Once the branch is pushed and its pull request is open: marks the issue done and offers its worktree for removal.
+  async finishOnPullRequest(request) {
+    const pullRequest = await pullRequestFor(request);
+    if (!pullRequest || !awaitingPullRequests().some((each) => sameRequest(each, request))) return;
+    setShared(AWAITING, awaitingPullRequests().filter((each) => !sameRequest(each, request)));
+    const tracker = await trackerFor(request), issue = await tracker?.get(request.id);
+    if (issue && issue.status !== "done") await tracker.finish(issue);
+    const worktree = await worktreeFor(request.branch, request);
+    if (worktree && !await hasUncommittedChanges(worktree)) offerRemoval(worktree);
+    notify({ title: `${request.id} is done`, body: `Pull request: ${pullRequest.url}` });
   }
 
   toggle(group, cx) {
@@ -322,6 +365,7 @@ export default class Issues extends View {
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
+        awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
         onDone: (cx) => this.finishWork(issue, cx),
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
