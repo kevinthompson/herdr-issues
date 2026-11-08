@@ -2,13 +2,16 @@ export const STATUSES = ["backlog", "todo", "in-progress", "done", "canceled"];
 export const STATUS_LABELS = { backlog: "Backlog", todo: "Todo", "in-progress": "In progress", done: "Done", canceled: "Canceled" };
 export const PRIORITIES = ["None", "Urgent", "High", "Medium", "Low"];
 
-const isReady = (issue, done) => issue.status === "todo" && issue.blockedBy.every((id) => done.has(id));
+// Work starts only on issues nobody has picked up yet, and waits while any of their blockers is unfinished.
+const STARTABLE_STATUSES = ["backlog", "todo"];
+const isStartable = (issue) => STARTABLE_STATUSES.includes(issue.status);
+const isUnblocked = (issue, done) => issue.blockedBy.every((id) => done.has(id));
 
 const GROUPS = [
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
-  { id: "todo", label: "Todo", has: (issue, done) => isReady(issue, done) },
-  { id: "blocked", label: "Blocked", has: (issue, done) => issue.status === "todo" && !isReady(issue, done) },
-  { id: "backlog", label: "Backlog", has: (issue) => issue.status === "backlog" },
+  { id: "todo", label: "Todo", has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
+  { id: "blocked", label: "Blocked", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
+  { id: "backlog", label: "Backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
   { id: "done", label: "Done", collapsed: true, has: (issue) => issue.status === "done" },
   { id: "canceled", label: "Canceled", collapsed: true, has: (issue) => issue.status === "canceled" },
@@ -39,10 +42,13 @@ export function unfinishedBlockers(issue, issues) {
   return issue.blockedBy.filter((id) => !done.has(id));
 }
 
-// Work starts only on unblocked issues nobody has picked up yet.
-const STARTABLE_STATUSES = ["backlog", "todo"];
 export function canStartWork(issue, issues) {
-  return STARTABLE_STATUSES.includes(issue.status) && unfinishedBlockers(issue, issues).length === 0;
+  return isStartable(issue) && unfinishedBlockers(issue, issues).length === 0;
+}
+
+// The unfinished blockers that keep an issue in the Blocked group: none once work could have started.
+export function holdingBlockers(issue, issues) {
+  return isStartable(issue) ? unfinishedBlockers(issue, issues) : [];
 }
 
 // The IDs of the issues that name this one in their blocked_by, in number order.

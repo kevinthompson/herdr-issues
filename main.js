@@ -8,7 +8,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, spaces } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, unfinishedBlockers, canStartWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
+import { groupIssues, holdingBlockers, canStartWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 
@@ -207,7 +207,7 @@ export default class Issues extends View {
   }
 
   row(issue, index, group, t) {
-    const { issues } = group, blockers = issue.status === "todo" ? unfinishedBlockers(issue, this.issues) : [];
+    const { issues } = group, blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues);
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
