@@ -14,6 +14,16 @@ import { FieldMenu, openMenu } from "./menu.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
+// Linear's workflow state colors, with a text color readable on each.
+const DARK_TEXT = "#1f2023", LIGHT_TEXT = "#ffffff";
+const GROUP_COLORS = {
+  "in-progress": { fill: "#f2c94c", text: DARK_TEXT },
+  todo: { fill: "#e2e2e2", text: DARK_TEXT },
+  blocked: { fill: "#eb5757", text: LIGHT_TEXT },
+  backlog: { fill: "#bec2c8", text: DARK_TEXT },
+  done: { fill: "#5e6ad2", text: LIGHT_TEXT },
+  canceled: { fill: "#95a2b3", text: DARK_TEXT },
+};
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
@@ -220,12 +230,14 @@ export default class Issues extends View {
 
   group(group, t) {
     const expanded = this.isExpanded(group);
+    const { fill, text } = GROUP_COLORS[group.id] ?? { fill: t.raised, text: t.muted };
     return v_flex().flex_none().gap(1)
-      .child(h_flex().id(`group-${group.id}`).px(10).pt(8).pb(2).gap(6).items_center().cursor_pointer().text_size(11)
+      .child(h_flex().id(`group-${group.id}`).mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
+        .bg(fill).text_color(text)
         .on_click((_e, cx) => this.toggle(group, cx))
-        .child(div().text_color(t.dim).child(expanded ? "▾" : "▸"))
-        .child(div().text_color(t.muted).font_semibold().child(group.label))
-        .child(div().text_color(t.dim).child(String(group.issues.length))))
+        .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
+        .child(div().font_semibold().child(group.label))
+        .child(div().opacity(0.7).child(String(group.issues.length))))
       .when(expanded, (e) => e.children(group.issues.map((issue, index) => this.row(issue, index, group, t))));
   }
 

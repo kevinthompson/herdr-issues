@@ -6,7 +6,7 @@ const isReady = (issue, done) => issue.status === "todo" && issue.blockedBy.ever
 
 const GROUPS = [
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
-  { id: "ready", label: "Ready", has: (issue, done) => isReady(issue, done) },
+  { id: "todo", label: "Todo", has: (issue, done) => isReady(issue, done) },
   { id: "blocked", label: "Blocked", has: (issue, done) => issue.status === "todo" && !isReady(issue, done) },
   { id: "backlog", label: "Backlog", has: (issue) => issue.status === "backlog" },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
