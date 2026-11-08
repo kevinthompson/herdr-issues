@@ -5,7 +5,7 @@
 // Markdown editor; Save, Cmd-Enter or the issues.save key command writes it back to the tracker.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, spaces, run } from "herdr";
+import { theme, props, settings, nextCommand, run } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, unfinishedBlockers, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
@@ -159,12 +159,11 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // A fresh Claude session in its own tab of the active space, told which issue to work on.
+  // A fresh Claude session in a new space for the issue, told which issue to work on.
   startWork(issue) {
-    const space = spaces().find((each) => each.active);
     const issueFile = issue.file ? ` (issues/${issue.file})` : "";
-    run("tab.new", {
-      name: issue.id, space: space?.id, folder: this.project?.root, argv: ["claude"],
+    run("space.new", {
+      name: issue.id, folder: this.project?.root, machine: this.project?.on ?? "", argv: ["claude"],
       task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
     });
   }
