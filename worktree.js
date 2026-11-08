@@ -45,3 +45,26 @@ export async function hasUncommittedChanges({ path, on }) {
 export async function isMerged({ branch, main, on }) {
   return (await git(main.path, ["merge-base", "--is-ancestor", `refs/heads/${branch}`, "HEAD"], on)).ok;
 }
+
+// Shared work goes through pull requests: the repository has a remote and someone else has committed to it.
+export async function isCollaborative({ main, on }) {
+  const remotes = await git(main.path, ["remote"], on);
+  if (!remotes.out) return false;
+  const [me, authors] = await Promise.all([
+    git(main.path, ["config", "user.email"], on),
+    git(main.path, ["log", "--format=%ae", "--max-count=1000", "HEAD"], on),
+  ]);
+  const myEmail = me.out.toLowerCase();
+  return authors.out.split("\n").some((email) => email && email.toLowerCase() !== myEmail);
+}
+
+const MAIN_BRANCHES = ["main", "master"];
+
+// Leaves the main checkout as it was when the merge can't finish on its own.
+export async function mergeIntoMain({ branch, main, on }) {
+  if (!MAIN_BRANCHES.includes(main.branch)) throw new Error(`The main checkout is on ${main.branch ?? "a detached HEAD"}, not main`);
+  const merge = await git(main.path, ["merge", "--no-edit", branch], on);
+  if (merge.ok) return;
+  await git(main.path, ["merge", "--abort"], on);
+  throw new Error(`Could not merge ${branch} into ${main.branch}: ${merge.err || merge.out}`);
+}

@@ -11,7 +11,7 @@ import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain } from "./worktree.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
@@ -27,7 +27,7 @@ const GROUP_COLORS = {
 };
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
-const offerRemoval = (worktree) => openOverlay({
+const offerRemoval = (worktree) => worktree.space && openOverlay({
   mod: "fast-worktree", kind: "dialog", width: 440, height: 260, props: { space: worktree.space.id, action: "remove" },
 });
 
@@ -193,20 +193,30 @@ export default class Issues extends View {
     });
   }
 
-  // Once the issue is done, offers to remove its worktree when that loses nothing.
+  // A clean worktree's branch is merged into main first in a personal project, then the worktree is
+  // offered for removal. Anything else (no worktree, uncommitted changes) just marks the issue done.
   finishWork(issue, cx) {
     const tracker = this.tracker, project = this.project;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
       try {
-        await tracker.finish(issue);
         const worktree = project && await worktreeFor(issue.branch, project);
-        if (worktree?.space && !await hasUncommittedChanges(worktree) && await isMerged(worktree)) offerRemoval(worktree);
+        const finished = worktree && !await hasUncommittedChanges(worktree) ? await this.landBranch(worktree) : false;
+        await tracker.finish(issue);
+        if (finished) offerRemoval(worktree);
       } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
       this.refresh(cx);
       cx.notify();
     });
+  }
+
+  // Whether the worktree's branch is in main now, so removing the worktree loses nothing.
+  async landBranch(worktree) {
+    if (await isMerged(worktree)) return true;
+    if (await isCollaborative(worktree)) return false;
+    await mergeIntoMain(worktree);
+    return true;
   }
 
   toggle(group, cx) {
