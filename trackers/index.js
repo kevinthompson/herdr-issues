@@ -8,6 +8,8 @@
 //   tracker.get(id)             → Issue, or null
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
+//   tracker.start(issue)        → marks the issue in progress where new work branches from, before its
+//                                 worktree is made
 //   tracker.changed             → a function that resolves when issues may have changed,
 //                                 or null when the backend can't tell and the panel polls
 //

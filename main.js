@@ -169,15 +169,23 @@ export default class Issues extends View {
 
   // A fresh Claude session in a new worktree space on the issue's branch, told which issue to work on.
   // Without a branch, the worktree dialog asks for one.
-  startWork(issue) {
-    const issueFile = issue.file ? ` (issues/${issue.file})` : "";
-    openOverlay({
-      mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
-      props: {
-        folder: this.project?.root, machine: this.project?.on ?? null, action: "new",
-        branch: issue.branch ?? undefined, name: issue.id, argv: ["claude"],
-        task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
-      },
+  startWork(issue, cx) {
+    const tracker = this.tracker, project = this.project;
+    if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
+    this.detailError = null;
+    cx.spawn(async (cx) => {
+      try { await tracker.start(issue); }
+      catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; cx.notify(); return; }
+      const issueFile = issue.file ? ` (issues/${issue.file})` : "";
+      openOverlay({
+        mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
+        props: {
+          folder: project?.root, machine: project?.on ?? null, action: "new",
+          branch: issue.branch ?? undefined, name: issue.id, argv: ["claude"],
+          task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
+        },
+      });
+      this.refresh(cx);
     });
   }
 
@@ -282,7 +290,7 @@ export default class Issues extends View {
         onMenu: (field) => openMenu(field, issue, this.project),
         onEdit: (cx) => this.edit(issue, cx),
         startable: canStartWork(issue, this.issues),
-        onStart: () => this.startWork(issue),
+        onStart: (cx) => this.startWork(issue, cx),
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t)

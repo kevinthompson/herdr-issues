@@ -99,6 +99,14 @@ export async function localTracker({ root, on }) {
       }
       await writeTextFile(path, next, text);
     },
+    // Committed, so the worktree branched next starts with the status too and merging it back
+    // never meets an uncommitted change to the issue file.
+    async start(issue) {
+      await this.update(issue, { status: "in-progress" });
+      const file = `issues/${issue.file}`;
+      const commit = await exec("git", ["commit", "-m", `docs(issues): start ${issue.id}`, "--", file], { cwd: root });
+      if (commit.code !== 0) throw new Error(commit.stderr.trim() || `git commit failed for ${file}`);
+    },
     changed: on == null ? () => watchFolder(folder) : null,
   };
 }
