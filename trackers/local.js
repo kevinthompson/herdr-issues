@@ -59,7 +59,15 @@ export function withBody(text, body) {
   return `---\n${match[1]}\n---\n\n${body.trim()}\n`;
 }
 
-export async function localTracker({ root, on }) {
+// Every worktree of a repository shares its main checkout's issues/ (the first `git worktree list`
+// entry), so all of them show the same state and issue changes are committed on main.
+async function mainCheckout(projectRoot, on) {
+  const listing = await exec("git", ["worktree", "list", "--porcelain"], { cwd: projectRoot, on }).catch(() => null);
+  return (listing?.code === 0 && /^worktree (.*)$/m.exec(listing.stdout)?.[1]) || projectRoot;
+}
+
+export async function localTracker({ root: projectRoot, on }) {
+  const root = await mainCheckout(projectRoot, on);
   const folder = `${root}/issues`;
   const exists = await exec("test", ["-d", folder], { on }).catch(() => null);
   if (exists?.code !== 0) return null;
@@ -72,25 +80,11 @@ export async function localTracker({ root, on }) {
 
   async function readIssue(file) {
     const text = await readTextFile(`${folder}/${file}`, { on });
-    return text === null ? null : parseIssue(text, file);
+    return text === null ? null : { ...parseIssue(text, file), path: `${folder}/${file}` };
   }
 
   async function list() {
     return (await Promise.all((await issueFiles()).map(readIssue))).filter(Boolean);
-  }
-
-  // Where an issue's status should agree: this checkout, the repository's main checkout, and the
-  // worktree on the issue's branch. Committing the same change on both sides lets the branch merge
-  // back without a conflict.
-  async function issueCheckouts(issue) {
-    const listing = await exec("git", ["worktree", "list", "--porcelain"], { cwd: root, on }).catch(() => null);
-    if (listing?.code !== 0) return [root];
-    const worktrees = listing.stdout.split("\n\n").filter(Boolean).map((entry) => ({
-      path: /^worktree (.*)$/m.exec(entry)?.[1],
-      branch: /^branch refs\/heads\/(.*)$/m.exec(entry)?.[1],
-    }));
-    const onIssueBranch = worktrees.find((worktree) => issue.branch && worktree.branch === issue.branch);
-    return [...new Set([root, onIssueBranch?.path, worktrees[0]?.path].filter(Boolean))];
   }
 
   async function commitStatus(issue, status, verb) {
@@ -126,15 +120,8 @@ export async function localTracker({ root, on }) {
       await commitStatus(issue, "in-progress", "start");
     },
     async finish(issue) {
-      for (const path of await issueCheckouts(issue)) {
-        const checkout = path === root ? tracker : await localTracker({ root: path, on });
-        const copy = await checkout?.get(issue.id);
-        if (!copy || copy.status === "done") continue;
-        try { await checkout.commitStatus(copy, "done", "finish"); }
-        catch (e) { throw new Error(`${path}: ${e.message ?? e}`); }
-      }
+      await commitStatus(issue, "done", "finish");
     },
-    commitStatus,
     changed: on == null ? () => watchFolder(folder) : null,
   };
   return tracker;

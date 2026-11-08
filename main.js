@@ -176,7 +176,7 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try { await tracker.start(issue); }
       catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; cx.notify(); return; }
-      const issueFile = issue.file ? ` (issues/${issue.file})` : "";
+      const issueFile = issue.path ? ` (${issue.path})` : "";
       openOverlay({
         mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
         props: {

@@ -10,13 +10,12 @@
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
 //   tracker.start(issue)        → marks the issue in progress where new work branches from, before its
 //                                 worktree is made
-//   tracker.finish(issue)       → marks the issue done everywhere it's being worked on (for local
-//                                 issues: the main checkout and the issue branch's worktree)
+//   tracker.finish(issue)       → marks the issue done
 //   tracker.changed             → a function that resolves when issues may have changed,
 //                                 or null when the backend can't tell and the panel polls
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
-//          branch, created, body }
+//          branch, created, body, path (where to edit it, for local issues) }
 // A Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order.
 import { localTracker } from "./local.js";
