@@ -2,7 +2,8 @@
 // Clicking an issue shows it in the panel in place of the list (detail.js). Dragging an issue onto
 // another in its group changes its order. Status and priority dropdowns are popups of this same mod
 // with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
-// Cmd-Enter or the issues.save key command writes it back to the tracker.
+// Cmd-Enter or the issues.save key command writes it back to the tracker. Clicking a task-list
+// checkbox in the body saves that one change at once.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify } from "herdr";
@@ -12,6 +13,7 @@ import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssue
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, isPushed, askClaude } from "./worktree.js";
+import { toggleTask } from "./tasks.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
@@ -178,6 +180,26 @@ export default class Issues extends View {
       } catch (e) {
         if (this.editing === editing) { this.saving = false; this.detailError = `Could not save: ${e.message ?? e}`; }
       }
+      cx.notify();
+    });
+    cx.notify();
+  }
+
+  // Shows the checkbox's new state at once. Saves run one after another, each over the body the
+  // previous one wrote, so quick clicks never look like an edit made on disk meanwhile.
+  toggleTask(issue, line, cx) {
+    const tracker = this.tracker;
+    if (!tracker?.writable || this.editing) return;
+    const before = { ...issue };
+    try { issue.body = toggleTask(issue.body, line); }
+    catch (e) { this.detailError = String(e.message ?? e); cx.notify(); return; }
+    const body = issue.body;
+    this.detailError = null;
+    const saved = (this.taskSaves ?? Promise.resolve()).catch(() => {}).then(() => tracker.update(before, { body }));
+    this.taskSaves = saved;
+    cx.spawn(async (cx) => {
+      try { await saved; }
+      catch (e) { this.detailError = `Could not save the checkbox: ${e.message ?? e}`; this.refresh(cx); }
       cx.notify();
     });
     cx.notify();
@@ -372,6 +394,7 @@ export default class Issues extends View {
         onBack: (cx) => this.back(cx),
         onMenu: (field) => openMenu(field, issue, this.project),
         onEdit: (cx) => this.edit(issue, cx),
+        onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),

@@ -1,8 +1,10 @@
 // One issue, drawn inside the panel in place of the list: a way back, its status and priority
 // (each a dropdown), its other details and its Markdown body, which Edit swaps for an editor.
+// Task-list items in the body are checkboxes that check off in place.
 import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
+import { bodySegments } from "./tasks.js";
 
 function dropdown(field, label, { issue, writable, onMenu }, t) {
   return h_flex().gap(6).items_center().text_size(11)
@@ -61,10 +63,27 @@ function editActions({ writable, editor, saving, onEdit, onSave, onCancel }, t) 
     .child(button("issue-save", saving ? "Saving…" : "Save", onSave, t, { primary: true, enabled: !saving }));
 }
 
-function body({ issue, editor }) {
-  return editor
-    ? Editor.new(editor).size_full()
-    : TextView.markdown(`issue-body-${issue.id}`, issue.body).selectable().scrollable().size_full();
+const TASK_INDENT_PX = 9;
+const AFTER_TASKS_PX = 14;
+
+function taskItem(task, { issue, writable, onToggleTask }, t) {
+  const box = div().id(`task-${issue.id}-${task.line}`).flex_none().mt(3).size(14).rounded(4).border_1().flex().items_center().justify_center()
+    .text_size(10).border_color(task.checked ? t.accent : t.input).when(task.checked, (e) => e.bg(t.accent).text_color(t.accent_foreground).child("✓"))
+    .when(writable, (e) => e.cursor_pointer().hover((s) => s.opacity(0.8)).on_click((_e, cx) => onToggleTask(task.line, cx)));
+  return h_flex().flex_none().gap(8).items_start().pl(task.indent * TASK_INDENT_PX)
+    .child(box)
+    .child(TextView.markdown(`task-text-${issue.id}-${task.line}`, task.text).selectable().flex_1().min_w(0)
+      .text_color(task.checked ? t.muted : t.foreground));
+}
+
+function body(view, t) {
+  const { issue, editor } = view;
+  if (editor) return Editor.new(editor).size_full();
+  return v_flex().id(`issue-body-${issue.id}`).size_full().overflow_y_scrollbar().gap(4)
+    .children(bodySegments(issue.body).map((segment, index, segments) => segment.markdown !== undefined
+      ? TextView.markdown(`issue-body-${issue.id}-${index}`, segment.markdown).selectable().flex_none()
+        .when(index > 0 && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
+      : taskItem(segment, view, t)));
 }
 
 export function issueDetail(view, t) {
@@ -85,5 +104,5 @@ export function issueDetail(view, t) {
         .child(dropdown("status", "Status", view, t))
         .child(dropdown("priority", "Priority", view, t)))
       .child(facts(view, t)))
-    .child(div().flex_1().min_h(0).px(14).py(10).child(body(view)));
+    .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)));
 }
