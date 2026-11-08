@@ -297,7 +297,8 @@ export default class Issues extends View {
         onBack: (cx) => this.back(cx),
         onMenu: (field) => openMenu(field, issue, this.project),
         onEdit: (cx) => this.edit(issue, cx),
-        onStart: canStartWork(issue, this.issues) ? () => this.startWork(issue) : null,
+        startable: canStartWork(issue, this.issues),
+        onStart: () => this.startWork(issue),
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t)

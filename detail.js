@@ -47,8 +47,8 @@ function facts(view, t) {
 
 function button(id, label, onClick, t, { primary = false, enabled = true } = {}) {
   return div().id(id).flex_none().h(26).px(10).flex().items_center().rounded(7).text_size(12)
-    .bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground)
-    .when(!enabled, (e) => e.opacity(0.5))
+    .when(enabled, (e) => e.bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground))
+    .when(!enabled, (e) => e.bg(t.raised).text_color(t.dim))
     .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onClick(cx)))
     .child(label);
 }
@@ -75,7 +75,7 @@ export function issueDetail(view, t) {
         .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
-      .when(!view.editor && Boolean(view.onStart), (e) => e.child(button("issue-start", "Start work", view.onStart, t, { primary: true })))
+      .when(!view.editor, (e) => e.child(button("issue-start", "Start", view.onStart, t, { primary: true, enabled: view.startable })))
       .child(editActions(view, t)))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
