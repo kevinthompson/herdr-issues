@@ -11,6 +11,7 @@ import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
+import { removableWorktreeSpace } from "./worktree.js";
 
 const POLL_MS = 30000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
@@ -189,13 +190,17 @@ export default class Issues extends View {
     });
   }
 
+  // Once the issue is done, offers to remove its worktree when that loses nothing.
   finishWork(issue, cx) {
-    const tracker = this.tracker;
+    const tracker = this.tracker, project = this.project;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
-      try { await tracker.finish(issue); }
-      catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
+      try {
+        await tracker.finish(issue);
+        const space = project && await removableWorktreeSpace(issue.branch, project);
+        if (space) openOverlay({ mod: "fast-worktree", kind: "dialog", width: 440, height: 260, props: { space: space.id, action: "remove" } });
+      } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
       this.refresh(cx);
       cx.notify();
     });
