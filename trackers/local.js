@@ -87,11 +87,15 @@ export async function localTracker({ root: projectRoot, on }) {
     return (await Promise.all((await issueFiles()).map(readIssue))).filter(Boolean);
   }
 
+  async function commitIssues(issues, message) {
+    const files = issues.map((issue) => `issues/${issue.file}`);
+    const commit = await exec("git", ["commit", "-m", message, "--", ...files], { cwd: root });
+    if (commit.code !== 0) throw new Error(commit.stderr.trim() || `git commit failed for ${files.join(", ")}`);
+  }
+
   async function commitStatus(issue, status, verb) {
     await tracker.update(issue, { status });
-    const file = `issues/${issue.file}`;
-    const commit = await exec("git", ["commit", "-m", `docs(issues): ${verb} ${issue.id}`, "--", file], { cwd: root });
-    if (commit.code !== 0) throw new Error(commit.stderr.trim() || `git commit failed for ${file}`);
+    await commitIssues([issue], `docs(issues): ${verb} ${issue.id}`);
   }
 
   const tracker = {
