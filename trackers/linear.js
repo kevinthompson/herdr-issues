@@ -14,7 +14,7 @@ const MAX_PAGES = 20;
 const RECENTLY_COMPLETED = 10;
 
 const ISSUE_FIELDS = `id identifier title description priority sortOrder branchName createdAt url
-  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name }
+  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }`;
@@ -104,6 +104,7 @@ function toIssue(node) {
       .map((relation) => relation.issue.identifier),
     branch: node.branchName || null,
     assignee: node.assignee?.name ?? "Unassigned",
+    assigneeAvatar: node.assignee?.avatarUrl ?? null,
     sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
     body: (node.description ?? "").trim(),

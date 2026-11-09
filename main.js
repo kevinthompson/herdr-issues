@@ -6,7 +6,7 @@
 // Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once, and the tracker records every checkbox
 // changed in a burst of clicks together, once they pause.
-import { View, div } from "gpui-kit";
+import { View, div, image } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
@@ -17,10 +17,12 @@ import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
+import { avatarImage } from "./avatars.js";
 
 const POLL_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
+const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
@@ -429,7 +431,7 @@ export default class Issues extends View {
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child(sla?.text ?? ""))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
-          .when(Boolean(issue.assignee), (e) => e.child(div().truncate().text_size(11).text_color(t.dim).child(issue.assignee ?? "")))
+          .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t)))
           .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
             .children(labelChips(issue, t).slice(0, 3))
             .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
@@ -442,6 +444,14 @@ export default class Issues extends View {
           .when(finishable || startable, (e) => e.child(workButton(`row-${issue.id}`, {
             finishable, startable, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
           }, t, { primary: false, compact: true }))))));
+  }
+
+  // The assignee's name, after their avatar once it is cached.
+  assignee(issue, t) {
+    const avatar = avatarImage(issue.assigneeAvatar, (loading) => this.avatarLoads.push(loading));
+    return h_flex().min_w(0).gap(5).items_center().text_size(11).text_color(t.dim)
+      .when(Boolean(avatar), (e) => e.child(image(avatar ?? "").flex_none().size(AVATAR_PX).rounded(AVATAR_PX / 2)))
+      .child(div().min_w(0).truncate().child(issue.assignee ?? ""));
   }
 
   group(group, t) {
@@ -497,6 +507,7 @@ export default class Issues extends View {
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.refresh(cx); }
     this.openRequestedIssue();
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
+    this.avatarLoads = [];
     const content = issue
       ? issueDetail({
         issue, writable: this.tracker?.writable,
@@ -518,6 +529,8 @@ export default class Issues extends View {
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t)
       : this.list(t);
+    const avatarLoads = this.avatarLoads;
+    if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });
     return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13)
       .on_mouse_up("left", (_e, cx) => this.endDrag(cx))
