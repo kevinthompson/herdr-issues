@@ -9,11 +9,11 @@
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
-import { location, projectRoot } from "./location.js";
+import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
-import { FieldMenu, openMenu } from "./menu.js";
+import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
@@ -45,7 +45,7 @@ const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull reques
 
 export default class Issues extends View {
   init(_props, cx) {
-    if (props()?.menu) { this.menu = new FieldMenu(); return; }
+    if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
     this.issues = []; this.generation = 0; this.expanded = {};
     this.drag = null; this.dropTarget = null;
     this.editing = null; this.saving = false; this.detailError = null;
@@ -66,6 +66,7 @@ export default class Issues extends View {
     const context = contextKey();
     if (context !== this.context) {
       this.context = context; this.project = null; this.tracker = null; this.issues = []; this.error = null; this.loaded = false;
+      this.scopeKey = null; this.listedScope = undefined;
       this.closeIssue(); this.focusHandled = null;
     }
     const generation = ++this.generation;
@@ -75,9 +76,11 @@ export default class Issues extends View {
         if (!where.cwd) throw new Error("No folder in focus");
         const root = await projectRoot(where);
         const tracker = await trackerFor({ root, on: where.on });
-        const issues = tracker ? await tracker.list() : [];
+        const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
+        this.listedScope = scope;
+        const issues = tracker ? await tracker.list(scope) : [];
         if (generation !== this.generation) return;
-        Object.assign(this, { project: { root, on: where.on }, tracker, issues, error: null });
+        Object.assign(this, { project: { root, on: where.on }, tracker, scopeKey, issues, error: null });
         this.watch(tracker, cx);
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
       finally { if (generation === this.generation) { this.loaded = true; cx.notify(); } }
@@ -450,6 +453,18 @@ export default class Issues extends View {
     return "No issues yet";
   }
 
+  // The tracker's name, or a dropdown of the scopes it can list, showing the one listed now.
+  trackerLabel(t) {
+    const { scopes, name } = this.tracker;
+    if (!scopes) return div().flex_none().text_size(11).text_color(t.dim).child(name);
+    const current = scopes.find((scope) => scope.id === this.listedScope) ?? scopes[0];
+    return h_flex().id("issues-scope").flex_none().min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
+      .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
+      .on_click(() => openScopeMenu(scopes, current.id, this.scopeKey))
+      .child(div().min_w(0).truncate().child(current.label))
+      .child(div().flex_none().text_color(t.dim).child("▾"));
+  }
+
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     const groups = groupIssues(this.issues), error = this.error ?? this.detailError;
@@ -458,7 +473,7 @@ export default class Issues extends View {
         .child(div().font_semibold().child("Issues"))
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
-        .when(Boolean(this.tracker), (e) => e.child(div().flex_none().text_size(11).text_color(t.dim).child(this.tracker.name))))
+        .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group) => this.group(group, t)))
@@ -468,6 +483,7 @@ export default class Issues extends View {
   render(cx) {
     if (this.menu) return this.menu.render();
     if (contextKey() !== this.context) this.refresh(cx);
+    else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.refresh(cx); }
     this.openRequestedIssue();
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
     const content = issue

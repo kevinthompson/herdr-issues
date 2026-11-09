@@ -1,8 +1,9 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
 // this same mod with props { menu: field, root, on, id, current }; picking an option saves it.
+// The panel's scope dropdown is a popup too, with props { menu: "scope", scopes, current, key }.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { props, openOverlay, closeOverlay, theme, notify } from "herdr";
+import { props, openOverlay, closeOverlay, theme, notify, shared, setShared } from "herdr";
 import { trackerFor } from "./trackers/index.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
 
@@ -22,6 +23,41 @@ export function openMenu(field, issue, project) {
     mod: "issues", kind: "popup", at: "pointer", width: WIDTH, height: OPTIONS[field].length * ROW + PADDING * 2,
     props: { menu: field, ...project, id: issue.id, current: issue[field] },
   });
+}
+
+function optionList(options, current, busy, onPick) {
+  const t = theme();
+  return v_flex().id("issue-field-menu").size_full().p(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
+    .children(options.map((option) => h_flex().id(`option-${option.value}`).h(ROW).px(9).gap(9).flex_none().items_center()
+      .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
+      .child(div().flex_1().truncate().child(option.label))
+      .child(div().flex_none().text_color(t.muted).child(busy === option.value ? "…" : option.value === current ? "✓" : ""))));
+}
+
+// The scope each repository lists, by its main checkout: { "<path>": "<scope id>" }. Shared, so every
+// copy of the panel lists the same issues and the choice outlives a reload.
+const SCOPES = "issues.scopes";
+const selections = () => /** @type {Record<string, string>} */ (shared(SCOPES) ?? {});
+export const selectedScope = (key) => selections()[key];
+
+const SCOPE_MENU_WIDTH = 220;
+
+export function openScopeMenu(scopes, current, key) {
+  openOverlay({
+    mod: "issues", kind: "popup", at: "pointer", width: SCOPE_MENU_WIDTH, height: scopes.length * ROW + PADDING * 2,
+    props: { menu: "scope", scopes, current, key },
+  });
+}
+
+export class ScopeMenu {
+  render() {
+    const { scopes, current, key, overlay } = props();
+    const options = scopes.map((scope) => ({ value: scope.id, label: scope.label }));
+    return optionList(options, current, null, (option) => {
+      setShared(SCOPES, { ...selections(), [key]: option.value });
+      closeOverlay(overlay);
+    });
+  }
 }
 
 export class FieldMenu {
@@ -44,11 +80,7 @@ export class FieldMenu {
   }
 
   render() {
-    const t = theme(), { menu: field, current } = props();
-    return v_flex().id("issue-field-menu").size_full().p(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
-      .children(OPTIONS[field].map((option) => h_flex().id(`option-${option.value}`).h(ROW).px(9).gap(9).flex_none().items_center()
-        .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => this.pick(option, cx))
-        .child(div().flex_1().child(option.label))
-        .child(div().flex_none().text_color(t.muted).child(this.busy === option.value ? "…" : option.value === current ? "✓" : ""))));
+    const { menu: field, current } = props();
+    return optionList(OPTIONS[field], current, this.busy, (option, cx) => this.pick(option, cx));
   }
 }
