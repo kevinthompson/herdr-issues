@@ -21,7 +21,8 @@ import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 
-const POLL_MS = 30000;
+const POLL_MS = 5 * 60 * 1000;
+const PULL_REQUEST_CHECK_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 const AVATAR_PX = 14;
@@ -73,7 +74,7 @@ export default class Issues extends View {
     this.refresh(cx);
     cx.timer.every(POLL_MS, (cx) => this.refresh(cx));
     this.checkPullRequests(cx);
-    cx.timer.every(POLL_MS, (cx) => this.checkPullRequests(cx));
+    cx.timer.every(PULL_REQUEST_CHECK_MS, (cx) => this.checkPullRequests(cx));
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
