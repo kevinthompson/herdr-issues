@@ -30,8 +30,9 @@ const TEAM_OPEN_ISSUES = `query($team: String!, $first: Int!, $after: String) {
   issues(first: $first, after: $after, filter: { team: { key: { eq: $team } }, ${OPEN} }) { ${PAGE} } }`;
 const TEAM_COMPLETED_ISSUES = `query($team: String!, $first: Int!) {
   issues(first: $first, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, ${COMPLETED} }) { ${PAGE} } }`;
-const VIEW_ISSUES = `query($view: String!, $first: Int!, $after: String) { customView(id: $view) {
-  issues(first: $first, after: $after) { ${PAGE} } } }`;
+const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData } }`;
+const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
+  issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
@@ -132,10 +133,18 @@ export async function linearTracker({ root: projectRoot, on }) {
     return [...open, ...completed];
   }
 
-  // A view's own filter decides which issues it holds, finished ones included.
+  // A view's saved filter decides which issues it holds, finished ones included. Running the filter
+  // ourselves, rather than asking for the view's issues, keeps a view filed under one team from
+  // limiting another team's issues to that team.
+  async function viewIssues(viewId) {
+    const { customView } = await linear(VIEW_FILTER, { view: viewId });
+    if (!customView) throw new Error(`Linear has no view ${viewId}`);
+    return allPages(FILTERED_ISSUES, { filter: customView.filterData }, (data) => data.issues);
+  }
+
   function issuesIn(scopeId) {
     if (scopeId === "team") return openAndRecentlyCompleted(TEAM_OPEN_ISSUES, TEAM_COMPLETED_ISSUES, { team: repo.teamKey }, (data) => data.issues);
-    if (scopeId.startsWith("view:")) return allPages(VIEW_ISSUES, { view: scopeId.slice(5) }, (data) => data.customView.issues);
+    if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5));
     return openAndRecentlyCompleted(MY_OPEN_ISSUES, MY_COMPLETED_ISSUES, {}, (data) => data.viewer.assignedIssues);
   }
 
