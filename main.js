@@ -431,7 +431,6 @@ export default class Issues extends View {
           .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority]))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
-          .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t)))
           .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
             .children(labelChips(issue, t).slice(0, 3))
             .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
@@ -439,7 +438,8 @@ export default class Issues extends View {
               .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked))))
             .when(waiting.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center()
               .child(div().flex_none().child("Blocking"))
-              .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)))))))
+              .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent))))))
+          .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))))
         .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
           .when(finishable || startable, (e) => e.child(workButton(`row-${issue.id}`, {
             finishable, startable, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
