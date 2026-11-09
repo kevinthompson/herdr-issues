@@ -274,7 +274,7 @@ export default class Issues extends View {
     await this.commitChecklists(this.takePendingChecklists()).catch(() => {});
   }
 
-  // A fresh Claude session in a new worktree space on the issue's branch, told which issue to work on.
+  // A fresh Claude session in a new worktree space on the issue's branch, working the issue with the work-issue skill.
   // Without a branch, the worktree dialog asks for one.
   startWork(issue, cx) {
     const tracker = this.tracker, project = this.project;
@@ -283,13 +283,12 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try { await tracker.start(issue); }
       catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; cx.notify(); return; }
-      const issueFile = issue.path ? ` (${issue.path})` : "";
       openOverlay({
         mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
         props: {
           folder: project?.root, machine: project?.on ?? null, action: "new",
           branch: issue.branch ?? undefined, name: issue.id, argv: ["claude"],
-          task: `Start work on issue ${issue.id}: ${issue.title}${issueFile}`,
+          task: `/work-issue ${issue.id}`,
         },
       });
       this.refresh(cx);
