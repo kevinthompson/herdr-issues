@@ -201,7 +201,7 @@ export default class Issues extends View {
 
   // Hands the link to macOS `open`, so each file opens in the app made for it and URLs in their own.
   openLink(issue, url, cx) {
-    const { file, url: address } = linkTarget(url, issue.path);
+    const { file, url: address } = linkTarget(url, issue.path ?? `${this.project.root}/`);
     if (file && this.project?.on) { this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
@@ -425,7 +425,7 @@ export default class Issues extends View {
 
   emptyText() {
     if (!this.loaded) return "Loading…";
-    if (!this.tracker) return `No issues/ folder in ${this.project?.root ?? "this folder"}`;
+    if (!this.tracker) return `No issues/ folder or Linear mapping for ${this.project?.root ?? "this folder"}`;
     return "No issues yet";
   }
 
