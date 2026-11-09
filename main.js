@@ -417,10 +417,8 @@ export default class Issues extends View {
         .child(div().flex_none().pt(1).text_size(11).text_color(t.accent).child(issue.id))
         .child(div().flex_1().min_w(0).whitespace_normal().child(issue.title))
         .when(Boolean(this.tracker?.writable) && (finishable || startable), (e) => e.child(workButton(`row-${issue.id}`, {
-          finishable, startable, awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
-          onDone: (cx) => this.finishWork(issue, cx), onStart: (cx) => this.startWork(issue, cx),
-          onContinue: (cx) => this.continueWork(issue, cx),
-        }, t, { primary: false }))))
+          finishable, startable, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
+        }, t, { primary: false, compact: true }))))
       .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
         .children(issue.labels.slice(0, 3).map((label) => div().flex_none().px(5).rounded(4).border_1().border_color(t.border).text_color(t.muted).child(label)))
@@ -452,7 +450,7 @@ export default class Issues extends View {
     return "No issues yet";
   }
 
-  // Start and Done in a row report their failures in detailError, so the list shows them too.
+  // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     const groups = groupIssues(this.issues), error = this.error ?? this.detailError;
     return v_flex().size_full().min_h(0)

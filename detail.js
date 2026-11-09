@@ -58,12 +58,21 @@ function button(id, label, onClick, t, { primary = false, enabled = true } = {})
     .child(label);
 }
 
-// Continue and Done for an issue in progress, otherwise Start, which is disabled until work can start.
-export function workButton(key, { finishable, startable, awaitingPullRequest, onDone, onStart, onContinue }, t, { primary = true } = {}) {
-  if (finishable) return h_flex().flex_none().gap(6)
-    .child(button(`${key}-continue`, "Continue", onContinue, t))
-    .child(button(`${key}-done`, awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary, enabled: !awaitingPullRequest }));
-  return button(`${key}-start`, "Start", onStart, t, { primary, enabled: startable });
+// Continue for an issue in progress, otherwise Start, which is disabled until work can start.
+// The list's compact button says neither, so it fits beside a title.
+export function workButton(key, { finishable, startable, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
+  const label = compact ? "▶" : finishable ? "Continue" : "Start";
+  if (finishable) return button(`${key}-continue`, label, onContinue, t, { primary });
+  return button(`${key}-start`, label, onStart, t, { primary, enabled: startable });
+}
+
+// Continue and Done for an issue in progress, otherwise Start.
+function workActions(view, t) {
+  if (!view.finishable) return workButton("issue", view, t);
+  const { awaitingPullRequest, onDone } = view;
+  return h_flex().flex_none().gap(6)
+    .child(workButton("issue", view, t, { primary: false }))
+    .child(button("issue-done", awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary: true, enabled: !awaitingPullRequest }));
 }
 
 function editActions({ writable, editor, saving, onEdit, onSave, onCancel }, t) {
@@ -105,7 +114,7 @@ export function issueDetail(view, t) {
         .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
-      .when(!view.editor, (e) => e.child(workButton("issue", view, t)))
+      .when(!view.editor, (e) => e.child(workActions(view, t)))
       .child(editActions(view, t)))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
