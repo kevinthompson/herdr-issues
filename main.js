@@ -23,6 +23,8 @@ const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
+// The row's ▶ button, kept on rows without one so every title wraps at the same edge.
+const ACTION_COLUMN_PX = 32;
 // Linear's workflow state colors, tinted so headers stay calm on dark backgrounds.
 const GROUP_TINT_ALPHA = "30";
 const tinted = (color) => `${color}${GROUP_TINT_ALPHA}`;
@@ -432,9 +434,10 @@ export default class Issues extends View {
             .when(waiting.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center()
               .child(div().flex_none().child("Blocking"))
               .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)))))))
-        .when(Boolean(this.tracker?.writable) && (finishable || startable), (e) => e.child(workButton(`row-${issue.id}`, {
-          finishable, startable, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
-        }, t, { primary: false, compact: true }))));
+        .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
+          .when(finishable || startable, (e) => e.child(workButton(`row-${issue.id}`, {
+            finishable, startable, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
+          }, t, { primary: false, compact: true }))))));
   }
 
   group(group, t) {
