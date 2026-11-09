@@ -12,7 +12,7 @@ import { theme, props, settings, nextCommand, openOverlay, shared, setShared, sp
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
-import { issueDetail, issueLinks, workButton } from "./detail.js";
+import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
@@ -421,7 +421,7 @@ export default class Issues extends View {
         }, t, { primary: false, compact: true }))))
       .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
-        .children(issue.labels.slice(0, 3).map((label) => div().flex_none().px(5).rounded(4).border_1().border_color(t.border).text_color(t.muted).child(label)))
+        .children(labelChips(issue, t).slice(0, 3))
         .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
           .child(div().flex_none().child("Blocked by"))
           .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked))))

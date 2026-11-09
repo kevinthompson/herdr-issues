@@ -37,11 +37,20 @@ function linkedFact(key, label, ids, view, t) {
     .child(issueLinks(key, ids, view, t, t.accent));
 }
 
+// A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
+function labelChip(label, color, t) {
+  return h_flex().flex_none().px(5).gap(4).items_center().rounded(4).border_1().border_color(t.border).text_color(t.muted)
+    .when(Boolean(color), (e) => e.child(div().flex_none().size(6).rounded(3).bg(color)))
+    .child(label);
+}
+
+export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => labelChip(label, labelColors?.[label], t));
+
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
-  const { issue: { labels, blockedBy, branch }, blocking } = view;
+  const { issue, issue: { labels, blockedBy, branch }, blocking } = view;
   return h_flex().flex_wrap().gap_x(14).gap_y(2).text_size(11).text_color(t.dim)
-    .when(labels.length > 0, (e) => e.child(div().child(`Labels: ${labels.join(", ")}`)))
+    .when(labels.length > 0, (e) => e.child(h_flex().flex_wrap().gap(4).items_center().child(div().child("Labels:")).children(labelChips(issue, t))))
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
     .when(Boolean(branch), (e) => e.child(div().child(`Branch: ${branch}`)));

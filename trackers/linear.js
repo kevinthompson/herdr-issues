@@ -13,7 +13,7 @@ const RECENTLY_COMPLETED = 10;
 
 const ISSUE_FIELDS = `id identifier title description priority sortOrder branchName createdAt url
   state { type name } team { id }
-  labels(first: 10) { nodes { name } }
+  labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }`;
 
 const OPEN_ISSUES = `query($first: Int!, $after: String) { viewer { assignedIssues(first: $first, after: $after,
@@ -65,6 +65,7 @@ function toIssue(node) {
     priority: node.priority ?? 0,
     order: node.sortOrder ?? null,
     labels: node.labels.nodes.map((label) => label.name),
+    labelColors: Object.fromEntries(node.labels.nodes.map((label) => [label.name, label.color])),
     // Linear keeps finished blockers as relations; only the unfinished ones still block.
     blockedBy: node.inverseRelations.nodes
       .filter((relation) => relation.type === "blocks" && !FINISHED_TYPES.includes(relation.issue.state.type))

@@ -17,7 +17,8 @@
 //                                 or null when the backend can't tell and the panel polls
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
-//          branch, created, body, path (where to edit it, for local issues) }
+//          branch, created, body, path (where to edit it, for local issues),
+//          labelColors ({ label: "#rrggbb" }, for Linear issues) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order.
 import { localTracker } from "./local.js";
