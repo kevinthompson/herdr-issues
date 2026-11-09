@@ -12,6 +12,8 @@ const API_URL = "https://api.linear.app/graphql";
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const RECENTLY_COMPLETED = 10;
+// How long a view's saved filter is reused before it is read again, to pick up edits made in Linear.
+const VIEW_FILTER_TTL_MS = 10 * 60 * 1000;
 
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt url
@@ -114,6 +116,9 @@ function toIssue(node) {
   };
 }
 
+// view ID → { filter, at }. Outlives each tracker, since the panel makes a new one every refresh.
+const viewFilters = new Map();
+
 export async function linearTracker({ root: projectRoot, on }) {
   if (on != null) return null;
   const config = await loadConfig(), root = await mainCheckout(projectRoot, on);
@@ -147,10 +152,17 @@ export async function linearTracker({ root: projectRoot, on }) {
   // A view's saved filter decides which issues it holds, finished ones included. Running the filter
   // ourselves, rather than asking for the view's issues, keeps a view filed under one team from
   // limiting another team's issues to that team.
-  async function viewIssues(viewId) {
+  async function viewFilter(viewId) {
+    const cached = viewFilters.get(viewId);
+    if (cached && Date.now() - cached.at < VIEW_FILTER_TTL_MS) return cached.filter;
     const { customView } = await linear(VIEW_FILTER, { view: viewId });
     if (!customView) throw new Error(`Linear has no view ${viewId}`);
-    return allPages(FILTERED_ISSUES, { filter: customView.filterData }, (data) => data.issues);
+    viewFilters.set(viewId, { filter: customView.filterData, at: Date.now() });
+    return customView.filterData;
+  }
+
+  async function viewIssues(viewId) {
+    return allPages(FILTERED_ISSUES, { filter: await viewFilter(viewId) }, (data) => data.issues);
   }
 
   function issuesIn(scopeId) {
