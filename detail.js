@@ -58,9 +58,11 @@ function button(id, label, onClick, t, { primary = false, enabled = true } = {})
     .child(label);
 }
 
-// Done for an issue in progress, otherwise Start, which is disabled until work can start.
-export function workButton(key, { finishable, startable, awaitingPullRequest, onDone, onStart }, t, { primary = true } = {}) {
-  if (finishable) return button(`${key}-done`, awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary, enabled: !awaitingPullRequest });
+// Continue and Done for an issue in progress, otherwise Start, which is disabled until work can start.
+export function workButton(key, { finishable, startable, awaitingPullRequest, onDone, onStart, onContinue }, t, { primary = true } = {}) {
+  if (finishable) return h_flex().flex_none().gap(6)
+    .child(button(`${key}-continue`, "Continue", onContinue, t))
+    .child(button(`${key}-done`, awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary, enabled: !awaitingPullRequest }));
   return button(`${key}-start`, "Start", onStart, t, { primary, enabled: startable });
 }
 

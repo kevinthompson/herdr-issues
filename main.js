@@ -2,12 +2,13 @@
 // Clicking an issue shows it in the panel in place of the list (detail.js). Dragging an issue onto
 // another in its group changes its order. Status and priority dropdowns are popups of this same mod
 // with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
-// Cmd-Enter or the issues.save key command writes it back to the tracker. Clicking a task-list
+// Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
+// Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once, and the tracker records every checkbox
 // changed in a burst of clicks together, once they pause.
 import { View, div } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
@@ -39,6 +40,7 @@ const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 const AWAITING = "issues.awaitingPullRequest";
 const awaitingPullRequests = () => shared(AWAITING) ?? [];
 const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
+const workIssueSession = (issue) => ({ argv: ["claude"], task: `/work-issue ${issue.id}` });
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
 
 export default class Issues extends View {
@@ -271,21 +273,41 @@ export default class Issues extends View {
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with the work-issue skill.
   // Without a branch, the worktree dialog asks for one.
   startWork(issue, cx) {
-    const tracker = this.tracker, project = this.project;
+    const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
       try { await tracker.start(issue); }
       catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; cx.notify(); return; }
-      openOverlay({
-        mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
-        props: {
-          folder: project?.root, machine: project?.on ?? null, action: "new",
-          branch: issue.branch ?? undefined, name: issue.id, argv: ["claude"],
-          task: `/work-issue ${issue.id}`,
-        },
-      });
+      this.openWorktree(issue);
       this.refresh(cx);
+    });
+  }
+
+  // Picks up an issue already in progress: its space when one is open, else a new space on its worktree,
+  // else a new worktree on its branch, fetched from origin when the work began elsewhere.
+  continueWork(issue, cx) {
+    const project = this.project;
+    this.detailError = null;
+    cx.spawn(async (cx) => {
+      try {
+        const worktree = project && await worktreeFor(issue.branch, project);
+        if (worktree?.space) run("space.select", { id: worktree.space.id });
+        else if (worktree) run("space.new", { name: issue.id, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
+        else this.openWorktree(issue);
+      } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
+      cx.notify();
+    });
+  }
+
+  openWorktree(issue) {
+    const project = this.project;
+    openOverlay({
+      mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
+      props: {
+        folder: project?.root, machine: project?.on ?? null, action: "new",
+        branch: issue.branch ?? undefined, name: issue.id, ...workIssueSession(issue),
+      },
     });
   }
 
@@ -397,6 +419,7 @@ export default class Issues extends View {
         .when(Boolean(this.tracker?.writable) && (finishable || startable), (e) => e.child(workButton(`row-${issue.id}`, {
           finishable, startable, awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
           onDone: (cx) => this.finishWork(issue, cx), onStart: (cx) => this.startWork(issue, cx),
+          onContinue: (cx) => this.continueWork(issue, cx),
         }, t, { primary: false }))))
       .child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
         .when(issue.priority > 0, (e) => e.child(div().flex_none().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
@@ -465,6 +488,7 @@ export default class Issues extends View {
         finishable: canFinishWork(issue),
         awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
         onDone: (cx) => this.finishWork(issue, cx),
+        onContinue: (cx) => this.continueWork(issue, cx),
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t)
