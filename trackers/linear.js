@@ -1,6 +1,8 @@
 // Issues in Linear, for repositories named in ~/.config/herdr-app/linear.json:
-// { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }. The panel lists every open
-// issue assigned to you, across teams, and the ones you completed most recently.
+// { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
+// { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
+// A repository lists one scope of issues at a time: its first view, else every open issue assigned to
+// you, across teams. Scopes other than a view add the issues completed most recently.
 import { home, appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { STATUS_LABELS } from "../issue.js";
@@ -16,12 +18,20 @@ const ISSUE_FIELDS = `id identifier title description priority sortOrder branchN
   labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }`;
 
-const OPEN_ISSUES = `query($first: Int!, $after: String) { viewer { assignedIssues(first: $first, after: $after,
-  filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
-  pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} } } } }`;
+const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
+const OPEN = `state: { type: { nin: ["completed", "canceled"] } }`;
+const COMPLETED = `state: { type: { eq: "completed" } }`;
 
-const COMPLETED_ISSUES = `query($first: Int!) { viewer { assignedIssues(first: $first, orderBy: updatedAt,
-  filter: { state: { type: { eq: "completed" } } }) { nodes { ${ISSUE_FIELDS} } } } }`;
+const MY_OPEN_ISSUES = `query($first: Int!, $after: String) { viewer {
+  assignedIssues(first: $first, after: $after, filter: { ${OPEN} }) { ${PAGE} } } }`;
+const MY_COMPLETED_ISSUES = `query($first: Int!) { viewer {
+  assignedIssues(first: $first, orderBy: updatedAt, filter: { ${COMPLETED} }) { ${PAGE} } } }`;
+const TEAM_OPEN_ISSUES = `query($team: String!, $first: Int!, $after: String) {
+  issues(first: $first, after: $after, filter: { team: { key: { eq: $team } }, ${OPEN} }) { ${PAGE} } }`;
+const TEAM_COMPLETED_ISSUES = `query($team: String!, $first: Int!) {
+  issues(first: $first, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, ${COMPLETED} }) { ${PAGE} } }`;
+const VIEW_ISSUES = `query($view: String!, $first: Int!, $after: String) { customView(id: $view) {
+  issues(first: $first, after: $after) { ${PAGE} } } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
@@ -34,11 +44,26 @@ const FINISHED_TYPES = ["completed", "canceled"];
 
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
 
+// A view's URL ends in its name and its ID, which the API takes in place of the view's UUID:
+// …/view/calendar-core-a8875271fcf5 is a8875271fcf5.
+const viewId = (url) => url.replace(/[?#].*$/, "").replace(/\/+$/, "").split("/").pop().split("-").pop();
+
+function repoConfig(teamKey, entry) {
+  const { path, views = {} } = typeof entry === "string" ? { path: entry } : entry;
+  return { teamKey, path: expandHome(path), views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
+}
+
 async function loadConfig() {
   const text = await readTextFile(`${appHome()}/linear.json`).catch(() => null);
   if (text === null) return null;
   const config = JSON.parse(text);
-  return { apiKey: config.apiKey, repos: Object.values(config.repos ?? {}).map(expandHome) };
+  return { apiKey: config.apiKey, repos: Object.entries(config.repos ?? {}).map(([teamKey, entry]) => repoConfig(teamKey, entry)) };
+}
+
+// The issue lists a repository can show: { id, label }, its default first.
+function scopesFor({ views }) {
+  const viewScopes = views.map((view) => ({ id: `view:${view.id}`, label: view.name }));
+  return [...viewScopes, { id: "mine", label: "My issues" }, { id: "team", label: "Team issues" }];
 }
 
 async function request(apiKey, query, variables) {
@@ -79,21 +104,39 @@ function toIssue(node) {
 
 export async function linearTracker({ root: projectRoot, on }) {
   if (on != null) return null;
-  const config = await loadConfig();
-  if (!config || !config.repos.includes(await mainCheckout(projectRoot, on))) return null;
+  const config = await loadConfig(), root = await mainCheckout(projectRoot, on);
+  const repo = config?.repos.find((each) => each.path === root);
+  if (!repo) return null;
   if (!config.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
   const linear = (query, variables = {}) => request(config.apiKey, query, variables);
+  const scopes = scopesFor(repo);
 
-  async function openIssues() {
+  // Every page of the connection `connectionOf` picks out of each answer.
+  async function allPages(query, variables, connectionOf) {
     const nodes = [];
     let after = null;
     for (let page = 0; page < MAX_PAGES; page++) {
-      const { assignedIssues } = (await linear(OPEN_ISSUES, { first: PAGE_SIZE, after })).viewer;
-      nodes.push(...assignedIssues.nodes);
-      if (!assignedIssues.pageInfo.hasNextPage) break;
-      after = assignedIssues.pageInfo.endCursor;
+      const connection = connectionOf(await linear(query, { ...variables, first: PAGE_SIZE, after }));
+      nodes.push(...connection.nodes);
+      if (!connection.pageInfo.hasNextPage) break;
+      after = connection.pageInfo.endCursor;
     }
     return nodes;
+  }
+
+  async function openAndRecentlyCompleted(openQuery, completedQuery, variables, connectionOf) {
+    const [open, completed] = await Promise.all([
+      allPages(openQuery, variables, connectionOf),
+      linear(completedQuery, { ...variables, first: RECENTLY_COMPLETED }).then((data) => connectionOf(data).nodes),
+    ]);
+    return [...open, ...completed];
+  }
+
+  // A view's own filter decides which issues it holds, finished ones included.
+  function issuesIn(scopeId) {
+    if (scopeId === "team") return openAndRecentlyCompleted(TEAM_OPEN_ISSUES, TEAM_COMPLETED_ISSUES, { team: repo.teamKey }, (data) => data.issues);
+    if (scopeId.startsWith("view:")) return allPages(VIEW_ISSUES, { view: scopeId.slice(5) }, (data) => data.customView.issues);
+    return openAndRecentlyCompleted(MY_OPEN_ISSUES, MY_COMPLETED_ISSUES, {}, (data) => data.viewer.assignedIssues);
   }
 
   const teamStates = new Map();
@@ -121,9 +164,11 @@ export async function linearTracker({ root: projectRoot, on }) {
     kind: "linear",
     name: "Linear",
     writable: true,
-    async list() {
-      const [open, completed] = await Promise.all([openIssues(), linear(COMPLETED_ISSUES, { first: RECENTLY_COMPLETED })]);
-      return [...open, ...completed.viewer.assignedIssues.nodes].map(toIssue);
+    scopes,
+    // An unknown scope, such as a view since removed from the config, lists the default.
+    async list(scopeId) {
+      const scope = scopes.find((each) => each.id === scopeId) ?? scopes[0];
+      return (await issuesIn(scope.id)).map(toIssue);
     },
     get,
     // A new body only saves over the description `issue` was read with, so edits made in Linear

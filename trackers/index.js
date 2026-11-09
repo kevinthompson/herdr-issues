@@ -4,7 +4,9 @@
 //   tracker.kind                "local" or "linear"
 //   tracker.name                shown in the panel's header
 //   tracker.writable            whether update can save
-//   tracker.list()              → Issue[]
+//   tracker.scopes              the issue lists the tracker can show, { id, label }, its default first;
+//                                 absent when it has only one
+//   tracker.list(scopeId)       → Issue[] in that scope, or the default one
 //   tracker.get(id)             → Issue, or null
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
