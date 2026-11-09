@@ -1,5 +1,5 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
-// this same mod with props { menu: field, root, on, id, current }; picking an option saves it.
+// this same mod with props { menu: field, root, on, id, current, statuses }; picking an option saves it.
 // The panel's scope dropdown is a popup too, with props { menu: "scope", scopes, current, key }.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -18,10 +18,13 @@ export function optionLabel(field, value) {
   return OPTIONS[field].find((option) => option.value === value)?.label ?? String(value);
 }
 
-export function openMenu(field, issue, project) {
+// The tracker's statuses, in the menu's order.
+const optionsFor = (field, statuses) => (field === "status" && statuses ? OPTIONS.status.filter((option) => statuses.includes(option.value)) : OPTIONS[field]);
+
+export function openMenu(field, issue, project, statuses) {
   openOverlay({
-    mod: "issues", kind: "popup", at: "pointer", width: WIDTH, height: OPTIONS[field].length * ROW + PADDING * 2,
-    props: { menu: field, ...project, id: issue.id, current: issue[field] },
+    mod: "issues", kind: "popup", at: "pointer", width: WIDTH, height: optionsFor(field, statuses).length * ROW + PADDING * 2,
+    props: { menu: field, ...project, id: issue.id, current: issue[field], statuses },
   });
 }
 
@@ -80,7 +83,7 @@ export class FieldMenu {
   }
 
   render() {
-    const { menu: field, current } = props();
-    return optionList(OPTIONS[field], current, this.busy, (option, cx) => this.pick(option, cx));
+    const { menu: field, current, statuses } = props();
+    return optionList(optionsFor(field, statuses), current, this.busy, (option, cx) => this.pick(option, cx));
   }
 }

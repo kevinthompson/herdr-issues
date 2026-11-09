@@ -5,7 +5,7 @@
 // you, across teams. Scopes other than a view add the issues completed most recently.
 import { home, appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
-import { STATUS_LABELS } from "../issue.js";
+import { STATUSES, STATUS_LABELS } from "../issue.js";
 
 const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
@@ -39,9 +39,14 @@ const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
-// Linear's workflow state types, as the panel's statuses.
-const STATUS_TYPES = { backlog: ["triage", "backlog"], todo: ["unstarted"], "in-progress": ["started"], done: ["completed"], canceled: ["canceled"] };
-const statusOf = (stateType) => Object.keys(STATUS_TYPES).find((status) => STATUS_TYPES[status].includes(stateType)) ?? stateType;
+// Linear's workflow state types, as the panel's statuses. Started states split in two: one named for
+// review is In review, and the rest are In progress.
+const STATUS_TYPES = { backlog: ["triage", "backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled"] };
+const isReviewState = (state) => /review/i.test(state.name);
+function statusOf(state) {
+  if (state.type === "started") return isReviewState(state) ? "in-review" : "in-progress";
+  return Object.keys(STATUS_TYPES).find((status) => STATUS_TYPES[status].includes(state.type)) ?? state.type;
+}
 const FINISHED_TYPES = ["completed", "canceled"];
 
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
@@ -88,7 +93,7 @@ function toIssue(node) {
     linearId: node.id,
     teamId: node.team.id,
     title: node.title,
-    status: statusOf(node.state.type),
+    status: statusOf(node.state),
     priority: node.priority ?? 0,
     order: node.sortOrder ?? null,
     labels: node.labels.nodes.map((label) => label.name),
@@ -157,10 +162,11 @@ export async function linearTracker({ root: projectRoot, on }) {
     return teamStates.get(teamId);
   }
 
-  // The team's state named like the status (In Progress rather than In Review), else its first of that type.
+  // The team's state named like the status (In Progress rather than In Review), else its first of that
+  // type that maps back to the same status.
   async function stateFor(issue, status) {
     const candidates = (await statesOf(issue.teamId))
-      .filter((state) => STATUS_TYPES[status]?.includes(state.type))
+      .filter((state) => STATUS_TYPES[status]?.includes(state.type) && statusOf(state) === status)
       .sort((a, b) => a.position - b.position);
     const state = candidates.find((each) => each.name.toLowerCase() === STATUS_LABELS[status]?.toLowerCase()) ?? candidates[0];
     if (!state) throw new Error(`${issue.id}'s team has no ${STATUS_LABELS[status] ?? status} state`);
@@ -176,6 +182,7 @@ export async function linearTracker({ root: projectRoot, on }) {
     kind: "linear",
     name: "Linear",
     writable: true,
+    statuses: STATUSES,
     scopes,
     // An unknown scope, such as a view since removed from the config, lists the default.
     async list(scopeId) {

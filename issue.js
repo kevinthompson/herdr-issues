@@ -1,5 +1,5 @@
-export const STATUSES = ["backlog", "todo", "in-progress", "done", "canceled"];
-export const STATUS_LABELS = { backlog: "Backlog", todo: "Todo", "in-progress": "In progress", done: "Done", canceled: "Canceled" };
+export const STATUSES = ["backlog", "todo", "in-progress", "in-review", "done", "canceled"];
+export const STATUS_LABELS = { backlog: "Backlog", todo: "Todo", "in-progress": "In progress", "in-review": "In review", done: "Done", canceled: "Canceled" };
 export const PRIORITIES = ["None", "Urgent", "High", "Medium", "Low"];
 
 // Work starts only on issues nobody has picked up yet, and waits while any of their blockers is unfinished.
@@ -9,6 +9,7 @@ const isUnblocked = (issue, done) => issue.blockedBy.every((id) => done.has(id))
 
 const GROUPS = [
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
+  { id: "in-review", label: "In review", has: (issue) => issue.status === "in-review" },
   { id: "todo", label: "Todo", has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
   { id: "blocked", label: "Blocked", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
   { id: "backlog", label: "Backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
@@ -42,7 +43,9 @@ export function unfinishedBlockers(issue, issues) {
   return issue.blockedBy.filter((id) => !done.has(id));
 }
 
-export const canFinishWork = (issue) => issue.status === "in-progress";
+// Work underway, being written or waiting on review, continues and finishes the same way.
+const UNDERWAY_STATUSES = ["in-progress", "in-review"];
+export const canFinishWork = (issue) => UNDERWAY_STATUSES.includes(issue.status);
 
 export function canStartWork(issue, issues) {
   return isStartable(issue) && unfinishedBlockers(issue, issues).length === 0;

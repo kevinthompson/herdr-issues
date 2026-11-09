@@ -1,6 +1,7 @@
 // Issues as Markdown files in the project's issues/ folder, one per file, with YAML frontmatter.
 import { exec, readTextFile, writeTextFile, watchFolder } from "herdr";
 import { mainCheckout } from "../location.js";
+import { STATUSES } from "../issue.js";
 
 const ISSUE_FILE = /^[A-Z][A-Z0-9]*-\d+.*\.md$/;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/;
@@ -98,6 +99,8 @@ export async function localTracker({ root: projectRoot, on }) {
     kind: "local",
     name: "issues/",
     writable: on == null,
+    // issues/ files have no review state: review happens on the branch.
+    statuses: STATUSES.filter((status) => status !== "in-review"),
     list,
     async get(id) {
       return (await list()).find((issue) => issue.id === id) ?? null;

@@ -31,6 +31,7 @@ const GROUP_TINT_ALPHA = "30";
 const tinted = (color) => `${color}${GROUP_TINT_ALPHA}`;
 const GROUP_COLORS = {
   "in-progress": "#f2c94c",
+  "in-review": "#4cb782",
   todo: "#e2e2e2",
   blocked: "#eb5757",
   backlog: "#bec2c8",
@@ -502,7 +503,7 @@ export default class Issues extends View {
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
-        onMenu: (field) => openMenu(field, issue, this.project),
+        onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),
         onEdit: (cx) => this.edit(issue, cx),
         onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),
         onLink: (url, cx) => this.openLink(issue, url, cx),
