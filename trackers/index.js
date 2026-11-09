@@ -24,7 +24,9 @@
 //          can say), path (where to edit it, for local issues),
 //          labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
-//          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA) }
+//          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
+//          pullRequests ([{ url, title, repo, number, status }] attached to Linear issues, null until
+//          tracker.get loads them) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order.
 import { localTracker } from "./local.js";

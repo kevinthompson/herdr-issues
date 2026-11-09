@@ -56,6 +56,27 @@ function facts(view, t) {
     .when(Boolean(branch), (e) => e.child(div().child(`Branch: ${branch}`)));
 }
 
+const PULL_REQUEST_STATUSES = {
+  draft: ["Draft", "dim"], open: ["Open", "ansi2"], inReview: ["In review", "ansi2"], approved: ["Approved", "ansi2"],
+  merged: ["Merged", "ansi5"], closed: ["Closed", "ansi1"],
+};
+
+// Each pull request attached to the issue, opened in the browser when clicked.
+function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
+  return v_flex().gap(3).text_size(11)
+    .child(div().text_color(t.dim).child("Pull requests:"))
+    .children(pullRequests.map((pullRequest) => {
+      const [status, color] = PULL_REQUEST_STATUSES[pullRequest.status] ?? [pullRequest.status, "dim"];
+      const reference = pullRequest.number ? `${pullRequest.repo ?? ""}#${pullRequest.number}` : "";
+      return h_flex().id(`pull-request-${id}-${pullRequest.url}`).gap(6).items_start().cursor_pointer()
+        .hover((s) => s.underline())
+        .on_click((_e, cx) => onLink(pullRequest.url, cx))
+        .child(div().flex_none().text_color(t[color]).child(status))
+        .child(div().flex_none().text_color(t.accent).child(reference))
+        .child(div().flex_1().min_w(0).whitespace_normal().child(pullRequest.title));
+    }));
+}
+
 // Buttons stop the pointer events a list row would otherwise take as the start of a drag or an open.
 function button(id, label, onClick, t, { primary = false, enabled = true } = {}) {
   return div().id(id).flex_none().h(26).px(10).flex().items_center().rounded(7).text_size(12)
@@ -132,6 +153,7 @@ export function issueDetail(view, t) {
       .child(h_flex().flex_wrap().gap(14).items_center()
         .child(dropdown("status", "Status", view, t))
         .child(dropdown("priority", "Priority", view, t)))
-      .child(facts(view, t)))
+      .child(facts(view, t))
+      .when(issue.pullRequests?.length > 0, (e) => e.child(pullRequests(view, t))))
     .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)));
 }

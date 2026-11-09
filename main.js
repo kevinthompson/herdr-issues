@@ -42,12 +42,12 @@ const GROUP_COLORS = {
   canceled: "#95a2b3",
 };
 const contextKey = () => JSON.stringify(location());
-// The new list, keeping each body already loaded for an issue that hasn't changed since.
+// The new list, keeping each body and pull request list already loaded for an issue that hasn't changed since.
 function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
   return issues.map((issue) => {
     const before = issue.body === null && loaded.get(issue.id);
-    return before && before.updated === issue.updated ? { ...issue, body: before.body } : issue;
+    return before && before.updated === issue.updated ? { ...issue, body: before.body, pullRequests: before.pullRequests } : issue;
   });
 }
 
@@ -198,7 +198,7 @@ export default class Issues extends View {
       try {
         const full = await tracker.get(issue.id);
         if (!full) throw new Error(`${issue.id} was not found`);
-        Object.assign(issue, { body: full.body, updated: full.updated });
+        Object.assign(issue, { body: full.body, pullRequests: full.pullRequests, updated: full.updated });
       } catch (e) { this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`; }
       this.loadingBody = null;
       cx.notify();

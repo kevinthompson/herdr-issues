@@ -38,7 +38,8 @@ const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData 
 const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
 
-const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
+const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description
+  attachments(first: 50) { nodes { url title sourceType metadata } } } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
@@ -52,6 +53,20 @@ function statusOf(state) {
   return Object.keys(STATUS_TYPES).find((status) => STATUS_TYPES[status].includes(state.type)) ?? state.type;
 }
 const FINISHED_TYPES = ["completed", "canceled"];
+
+// GitHub's pull requests attached to an issue: { url, title, repo, number, status }, where status is
+// Linear's, such as "open", "draft", "inReview", "approved", "merged" or "closed".
+function pullRequestsOf(attachments) {
+  return attachments.nodes
+    .filter((attachment) => attachment.sourceType === "github" && /\/pull\/\d+/.test(attachment.url))
+    .map(({ url, title, metadata }) => ({
+      url,
+      title: metadata.title ?? title,
+      repo: metadata.repoName ?? null,
+      number: metadata.number ?? null,
+      status: metadata.draft && !["merged", "closed"].includes(metadata.status) ? "draft" : (metadata.status ?? "open"),
+    }));
+}
 
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
 
@@ -112,6 +127,7 @@ function toIssue(node) {
     sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
     body: node.description === undefined ? null : (node.description ?? "").trim(),
+    pullRequests: node.attachments ? pullRequestsOf(node.attachments) : null,
     updated: node.updatedAt,
     url: node.url,
   };
