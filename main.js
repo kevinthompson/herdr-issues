@@ -25,6 +25,7 @@ const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
+const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
 // The row's ▶ button, kept on rows without one so every title wraps at the same edge.
@@ -465,7 +466,7 @@ export default class Issues extends View {
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)
           .child(div().text_color(t.accent).child(issue.id))
-          .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child(sla?.text ?? "")))
+          .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
           .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority]))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
