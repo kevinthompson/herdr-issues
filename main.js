@@ -18,6 +18,7 @@ import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeInt
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { avatarImage } from "./avatars.js";
+import { lastList, rememberList } from "./lists.js";
 
 const POLL_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
@@ -83,7 +84,7 @@ export default class Issues extends View {
     const context = contextKey();
     if (context !== this.context) {
       this.context = context; this.project = null; this.tracker = null; this.issues = []; this.error = null; this.loaded = false;
-      this.scopeKey = null; this.listedScope = undefined;
+      this.scopeKey = null; this.listedScope = undefined; this.listKey = null;
       this.closeIssue(); this.focusHandled = null;
     }
     const generation = ++this.generation;
@@ -94,10 +95,21 @@ export default class Issues extends View {
         const root = await projectRoot(where);
         const tracker = await trackerFor({ root, on: where.on });
         const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
+        const project = { root, on: where.on }, listKey = `${scopeKey}\n${scope ?? ""}`;
+        // A polled tracker is slow to list, so a scope not shown yet starts from its last list.
+        const polled = Boolean(tracker) && !tracker.changed;
         this.listedScope = scope;
+        if (polled && this.listKey !== listKey) {
+          const last = await lastList(listKey);
+          if (last && generation === this.generation) {
+            Object.assign(this, { project, tracker, scopeKey, listKey, issues: last, loaded: true });
+            cx.notify();
+          }
+        }
         const issues = tracker ? await tracker.list(scope) : [];
         if (generation !== this.generation) return;
-        Object.assign(this, { project: { root, on: where.on }, tracker, scopeKey, issues: withLoadedBodies(issues, this.issues), error: null });
+        Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), error: null });
+        if (polled) rememberList(listKey, issues).catch(() => {});
         this.watch(tracker, cx);
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
       finally { if (generation === this.generation) { this.loaded = true; cx.notify(); } }
