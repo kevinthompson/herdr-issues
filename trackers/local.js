@@ -1,5 +1,6 @@
 // Issues as Markdown files in the project's issues/ folder, one per file, with YAML frontmatter.
 import { exec, readTextFile, writeTextFile, watchFolder } from "herdr";
+import { mainCheckout } from "../location.js";
 
 const ISSUE_FILE = /^[A-Z][A-Z0-9]*-\d+.*\.md$/;
 const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/;
@@ -59,13 +60,8 @@ export function withBody(text, body) {
   return `---\n${match[1]}\n---\n\n${body.trim()}\n`;
 }
 
-// Every worktree of a repository shares its main checkout's issues/ (the first `git worktree list`
-// entry), so all of them show the same state and issue changes are committed on main.
-async function mainCheckout(projectRoot, on) {
-  const listing = await exec("git", ["worktree", "list", "--porcelain"], { cwd: projectRoot, on }).catch(() => null);
-  return (listing?.code === 0 && /^worktree (.*)$/m.exec(listing.stdout)?.[1]) || projectRoot;
-}
-
+// Every worktree of a repository shares its main checkout's issues/, so all of them show the same
+// state and issue changes are committed on main.
 export async function localTracker({ root: projectRoot, on }) {
   const root = await mainCheckout(projectRoot, on);
   const folder = `${root}/issues`;

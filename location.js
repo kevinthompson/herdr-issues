@@ -14,3 +14,9 @@ export async function projectRoot({ cwd, on }) {
   const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(() => null);
   return top?.code === 0 ? top.stdout.trim() : cwd;
 }
+
+// The repository's main checkout: the first `git worktree list` entry, which a linked worktree is not.
+export async function mainCheckout(projectRoot, on) {
+  const listing = await exec("git", ["worktree", "list", "--porcelain"], { cwd: projectRoot, on }).catch(() => null);
+  return (listing?.code === 0 && /^worktree (.*)$/m.exec(listing.stdout)?.[1]) || projectRoot;
+}
