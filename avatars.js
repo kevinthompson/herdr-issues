@@ -2,16 +2,10 @@
 // the app's own folder, never a URL. Each file is named for the avatar's URL, so a changed avatar is
 // fetched again. A row shows an avatar only once its file is on disk.
 import { appHome, exec } from "herdr";
+import { fileKey } from "./file-key.js";
 
 const FOLDER = "data/issues/avatars";
 const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg" };
-
-// A short, stable file name for a URL (FNV-1a).
-function fileKey(url) {
-  let hash = 0x811c9dc5;
-  for (let index = 0; index < url.length; index++) hash = Math.imul(hash ^ url.charCodeAt(index), 0x01000193) >>> 0;
-  return hash.toString(16).padStart(8, "0");
-}
 
 // key → the image's path from the app folder, or null while it downloads or after it failed.
 const avatars = new Map();
