@@ -20,7 +20,8 @@ const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdA
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
-  inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }`;
+  inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }
+  attachments(first: 10) { nodes { url title sourceType metadata } }`;
 
 const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
 const OPEN = `state: { type: { nin: ["completed", "canceled"] } }`;
@@ -38,8 +39,7 @@ const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData 
 const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
 
-const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description
-  attachments(first: 50) { nodes { url title sourceType metadata } } } }`;
+const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
@@ -127,7 +127,7 @@ function toIssue(node) {
     sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
     body: node.description === undefined ? null : (node.description ?? "").trim(),
-    pullRequests: node.attachments ? pullRequestsOf(node.attachments) : null,
+    pullRequests: pullRequestsOf(node.attachments),
     updated: node.updatedAt,
     url: node.url,
   };

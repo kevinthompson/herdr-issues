@@ -6,7 +6,7 @@
 // Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once, and the tracker records every checkbox
 // changed in a burst of clicks together, once they pause.
-import { View, div, image } from "gpui-kit";
+import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
@@ -42,12 +42,12 @@ const GROUP_COLORS = {
   canceled: "#95a2b3",
 };
 const contextKey = () => JSON.stringify(location());
-// The new list, keeping each body and pull request list already loaded for an issue that hasn't changed since.
+// The new list, keeping each body already loaded for an issue that hasn't changed since.
 function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
   return issues.map((issue) => {
     const before = issue.body === null && loaded.get(issue.id);
-    return before && before.updated === issue.updated ? { ...issue, body: before.body, pullRequests: before.pullRequests } : issue;
+    return before && before.updated === issue.updated ? { ...issue, body: before.body } : issue;
   });
 }
 
@@ -198,7 +198,7 @@ export default class Issues extends View {
       try {
         const full = await tracker.get(issue.id);
         if (!full) throw new Error(`${issue.id} was not found`);
-        Object.assign(issue, { body: full.body, pullRequests: full.pullRequests, updated: full.updated });
+        Object.assign(issue, { body: full.body, updated: full.updated });
       } catch (e) { this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`; }
       this.loadingBody = null;
       cx.notify();
@@ -439,7 +439,7 @@ export default class Issues extends View {
 
   row(issue, index, group, t) {
     const { issues } = group, blockers = holdingBlockers(issue, this.issues);
-    const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue);
+    const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
@@ -469,7 +469,10 @@ export default class Issues extends View {
           .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority]))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
-          .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
+          .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0 || pullRequestCount > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
+            .when(pullRequestCount > 0, (e) => e.child(h_flex().flex_none().gap(3).items_center()
+              .child(svg("mods/issues/pull-request.svg").flex_none().size(11))
+              .child(div().child(String(pullRequestCount)))))
             .children(labelChips(issue, t).slice(0, 3))
             .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
               .child(div().flex_none().child("Blocked by"))
