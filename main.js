@@ -91,6 +91,7 @@ export default class Issues extends View {
     }
     const generation = ++this.generation;
     this.seenChangeAt = issuesChangedAt();
+    this.refreshing = true;
     cx.spawn(async (cx) => {
       try {
         const where = location();
@@ -115,7 +116,7 @@ export default class Issues extends View {
         if (polled) rememberList(listKey, issues).catch(() => {});
         this.watch(tracker, cx);
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
-      finally { if (generation === this.generation) { this.loaded = true; cx.notify(); } }
+      finally { if (generation === this.generation) { this.loaded = true; this.refreshing = false; cx.notify(); } }
     });
   }
 
@@ -531,6 +532,15 @@ export default class Issues extends View {
       .child(div().flex_none().text_color(t.dim).child("▾"));
   }
 
+  refreshButton(t) {
+    return div().id("issues-refresh").flex_none().size(24).flex().items_center().justify_center().rounded(6)
+      .border_1().border_color(t.border).bg(t.raised).text_size(13)
+      .when(this.refreshing, (e) => e.text_color(t.dim))
+      .when(!this.refreshing, (e) => e.text_color(t.foreground).cursor_pointer().hover((s) => s.bg(t.hover))
+        .on_click((_e, cx) => { this.refresh(cx); cx.notify(); }))
+      .child("↻");
+  }
+
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     const groups = groupIssues(this.issues), error = this.error ?? this.detailError;
@@ -539,7 +549,8 @@ export default class Issues extends View {
         .child(div().font_semibold().child("Issues"))
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
-        .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
+        .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t)))
+        .child(this.refreshButton(t)))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group) => this.group(group, t)))
