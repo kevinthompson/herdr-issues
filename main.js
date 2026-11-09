@@ -13,7 +13,7 @@ import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton } from "./detail.js";
 import { FieldMenu, openMenu } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, isPushed, askClaude } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 
@@ -33,18 +33,12 @@ const GROUP_COLORS = {
 };
 const contextKey = () => JSON.stringify(location());
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
-const offerRemoval = (worktree, warning) => worktree.space && openOverlay({
-  mod: "fast-worktree", kind: "dialog", width: 440, height: 260, props: { space: worktree.space.id, action: "remove", warning },
-});
 
 // Issues whose Done waits for their branch's pull request: { id, branch, root, on }. Shared, so every
 // copy of the panel shows the wait and it outlives a reload.
 const AWAITING = "issues.awaitingPullRequest";
 const awaitingPullRequests = () => shared(AWAITING) ?? [];
 const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
-const unpublishedWarning = async (request) => await isPushed(request)
-  ? `No pull request has been opened for ${request.branch}.`
-  : `${request.branch} has not been pushed and no pull request has been opened for it.`;
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
 
 export default class Issues extends View {
@@ -295,9 +289,8 @@ export default class Issues extends View {
     });
   }
 
-  // A clean worktree's branch is merged into main first in a personal project, then the worktree is
-  // offered for removal. In a collaborative project, Done waits for the branch's pull request instead,
-  // or warns that there is none when no Claude session is open to make one.
+  // A clean worktree's branch is merged into main first in a personal project. In a collaborative
+  // project, Done waits for the branch's pull request instead, unless no Claude session is open to make one.
   // Anything else (no worktree, uncommitted changes) just marks the issue done.
   finishWork(issue, cx) {
     const tracker = this.tracker, project = this.project;
@@ -307,7 +300,7 @@ export default class Issues extends View {
       try {
         const worktree = project && await worktreeFor(issue.branch, project);
         if (!worktree || await hasUncommittedChanges(worktree)) await tracker.finish(issue);
-        else if (await this.landBranch(worktree)) { await tracker.finish(issue); offerRemoval(worktree); }
+        else if (await this.landBranch(worktree)) await tracker.finish(issue);
         else await this.awaitPullRequest(issue, worktree, tracker, cx);
       } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
       this.refresh(cx);
@@ -315,7 +308,7 @@ export default class Issues extends View {
     });
   }
 
-  // Whether the worktree's branch is in main now, so removing the worktree loses nothing.
+  // Whether the worktree's branch is in main now.
   async landBranch(worktree) {
     if (await isMerged(worktree)) return true;
     if (await isCollaborative(worktree)) return false;
@@ -324,13 +317,11 @@ export default class Issues extends View {
   }
 
   // Asks the Claude session open in the worktree's space for a pull request, unless one is already open
-  // for the pushed branch. With neither, the issue is done and removing the worktree needs a confirmation
-  // that names what it leaves behind.
+  // for the pushed branch. With neither, the issue is just marked done.
   async awaitPullRequest(issue, worktree, tracker, cx) {
     const request = { id: issue.id, branch: worktree.branch, root: worktree.main.path, on: worktree.on };
     if (!await pullRequestFor(request) && !await askClaude(worktree, pullRequestAsk(issue))) {
       await tracker.finish(issue);
-      offerRemoval(worktree, await unpublishedWarning(request));
       return;
     }
     setShared(AWAITING, [...awaitingPullRequests().filter((each) => !sameRequest(each, request)), request]);
@@ -350,15 +341,13 @@ export default class Issues extends View {
     });
   }
 
-  // Once the branch is pushed and its pull request is open: marks the issue done and offers its worktree for removal.
+  // Once the branch is pushed and its pull request is open: marks the issue done.
   async finishOnPullRequest(request) {
     const pullRequest = await pullRequestFor(request);
     if (!pullRequest || !awaitingPullRequests().some((each) => sameRequest(each, request))) return;
     setShared(AWAITING, awaitingPullRequests().filter((each) => !sameRequest(each, request)));
     const tracker = await trackerFor(request), issue = await tracker?.get(request.id);
     if (issue && issue.status !== "done") await tracker.finish(issue);
-    const worktree = await worktreeFor(request.branch, request);
-    if (worktree && !await hasUncommittedChanges(worktree)) offerRemoval(worktree);
     notify({ title: `${request.id} is done`, body: `Pull request: ${pullRequest.url}` });
   }
 
