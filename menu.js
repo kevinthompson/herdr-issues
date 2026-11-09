@@ -5,6 +5,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, notify, shared, setShared } from "herdr";
 import { trackerFor } from "./trackers/index.js";
+import { announceIssueChange } from "./changes.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
 
 const ROW = 28, PADDING = 5, WIDTH = 170;
@@ -74,6 +75,7 @@ export class FieldMenu {
         const tracker = await trackerFor({ root, on }), issue = await tracker?.get(id);
         if (!issue) throw new Error(`${id} was not found`);
         await tracker.update(issue, { [field]: option.value });
+        announceIssueChange();
       } catch (e) {
         notify({ title: `Could not change ${field}`, body: String(e.message ?? e), level: "error" });
       }

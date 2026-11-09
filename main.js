@@ -19,6 +19,7 @@ import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
+import { issuesChangedAt, announceIssueChange } from "./changes.js";
 
 const POLL_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
@@ -89,6 +90,7 @@ export default class Issues extends View {
       this.closeIssue(); this.focusHandled = null;
     }
     const generation = ++this.generation;
+    this.seenChangeAt = issuesChangedAt();
     cx.spawn(async (cx) => {
       try {
         const where = location();
@@ -420,6 +422,7 @@ export default class Issues extends View {
     setShared(AWAITING, awaitingPullRequests().filter((each) => !sameRequest(each, request)));
     const tracker = await trackerFor(request), issue = await tracker?.get(request.id);
     if (issue && issue.status !== "done") await tracker.finish(issue);
+    announceIssueChange();
     notify({ title: `${request.id} is done`, body: `Pull request: ${pullRequest.url}` });
   }
 
@@ -546,6 +549,7 @@ export default class Issues extends View {
   render(cx) {
     if (this.menu) return this.menu.render();
     if (contextKey() !== this.context) this.refresh(cx);
+    else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.refresh(cx); }
     this.openRequestedIssue();
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
