@@ -14,6 +14,7 @@ const MAX_PAGES = 20;
 const RECENTLY_COMPLETED = 10;
 
 const ISSUE_FIELDS = `id identifier title description priority sortOrder branchName createdAt url
+  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { displayName }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }`;
@@ -97,6 +98,8 @@ function toIssue(node) {
       .filter((relation) => relation.type === "blocks" && !FINISHED_TYPES.includes(relation.issue.state.type))
       .map((relation) => relation.issue.identifier),
     branch: node.branchName || null,
+    assignee: node.assignee?.displayName ?? "Unassigned",
+    sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
     body: (node.description ?? "").trim(),
     url: node.url,

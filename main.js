@@ -11,7 +11,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, PRIORITIES } from "./issue.js";
+import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
@@ -21,6 +21,7 @@ import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 const POLL_MS = 30000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
+const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
 // The row's ▶ button, kept on rows without one so every title wraps at the same edge.
@@ -397,7 +398,7 @@ export default class Issues extends View {
 
   row(issue, index, group, t) {
     const { issues } = group, blockers = holdingBlockers(issue, this.issues);
-    const waiting = waitingIssues(issue, this.issues);
+    const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue);
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
@@ -423,9 +424,11 @@ export default class Issues extends View {
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)
           .child(div().text_color(t.accent).child(issue.id))
-          .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority]))))
+          .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority])))
+          .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child(sla?.text ?? ""))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
+          .when(Boolean(issue.assignee), (e) => e.child(div().truncate().text_size(11).text_color(t.dim).child(issue.assignee ?? "")))
           .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
             .children(labelChips(issue, t).slice(0, 3))
             .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)

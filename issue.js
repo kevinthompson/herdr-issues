@@ -66,6 +66,19 @@ export function waitingIssues(issue, issues) {
   return blockedIssues(issue, issues).filter((id) => open.has(id));
 }
 
+// How long an unfinished issue has left on its SLA, as Linear shows it: { text, risk }, where risk is
+// "low", "medium", "high" or "breached". null without an SLA or once the issue is finished.
+const HOUR_MS = 3600000, DAY_MS = 24 * HOUR_MS;
+const duration = (ms) => (ms >= DAY_MS ? `${Math.floor(ms / DAY_MS)}d` : ms >= HOUR_MS ? `${Math.floor(ms / HOUR_MS)}h` : `${Math.max(1, Math.floor(ms / 60000))}m`);
+
+export function slaStatus(issue, now = Date.now()) {
+  if (!issue.sla || FINISHED.includes(issue.status)) return null;
+  const { breachesAt, mediumRiskAt, highRiskAt } = issue.sla, left = Date.parse(breachesAt) - now;
+  if (left <= 0) return { text: `SLA −${duration(-left)}`, risk: "breached" };
+  const risk = highRiskAt && now >= Date.parse(highRiskAt) ? "high" : mediumRiskAt && now >= Date.parse(mediumRiskAt) ? "medium" : "low";
+  return { text: `SLA ${duration(left)}`, risk };
+}
+
 // Moves one issue of a shown group to another's place and numbers the group from 1.
 // Returns only the issues whose order changes.
 export function reorder(groupIssues, movingId, targetId) {
