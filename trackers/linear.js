@@ -6,14 +6,15 @@ import { mainCheckout } from "../location.js";
 import { STATUS_LABELS } from "../issue.js";
 
 const API_URL = "https://api.linear.app/graphql";
-const PAGE_SIZE = 100;
-const MAX_PAGES = 10;
+// Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
+const PAGE_SIZE = 50;
+const MAX_PAGES = 20;
 const RECENTLY_COMPLETED = 10;
 
 const ISSUE_FIELDS = `id identifier title description priority sortOrder branchName createdAt url
   state { type name } team { id }
-  labels { nodes { name } }
-  inverseRelations { nodes { type issue { identifier state { type } } } }`;
+  labels(first: 10) { nodes { name } }
+  inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }`;
 
 const OPEN_ISSUES = `query($first: Int!, $after: String) { viewer { assignedIssues(first: $first, after: $after,
   filter: { state: { type: { nin: ["completed", "canceled"] } } }) {
