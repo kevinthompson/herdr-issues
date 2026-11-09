@@ -40,6 +40,7 @@ const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: Strin
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
+const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
 // Linear's workflow state types, as the panel's statuses. Started states split in two: one named for
@@ -220,8 +221,14 @@ export async function linearTracker({ root: projectRoot, on }) {
       }
       await linear(UPDATE, { id: issue.linearId, input });
     },
+    // Claims an unassigned issue in the same save. The assignee is read fresh from Linear, since a list
+    // shown from the cache may be out of date and someone else may have claimed it since.
     async start(issue) {
-      await tracker.update(issue, { status: "in-progress" });
+      const input = { stateId: await stateFor(issue, "in-progress") };
+      const { viewer, issue: current } = await linear(ASSIGNEE_AND_VIEWER, { id: issue.linearId });
+      if (!current) throw new Error(`${issue.id} no longer exists`);
+      if (!current.assignee) input.assigneeId = viewer.id;
+      await linear(UPDATE, { id: issue.linearId, input });
     },
     async finish(issue) {
       await tracker.update(issue, { status: "done" });
