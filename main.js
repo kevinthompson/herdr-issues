@@ -22,7 +22,7 @@ import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 
 const POLL_MS = 5 * 60 * 1000;
-const PULL_REQUEST_CHECK_MS = 30000;
+const PULL_REQUEST_CHECK_MS = 2 * 60 * 1000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 const AVATAR_PX = 14;
@@ -538,7 +538,7 @@ export default class Issues extends View {
       .border_1().border_color(t.border).bg(t.raised).text_size(13)
       .when(this.refreshing, (e) => e.text_color(t.dim))
       .when(!this.refreshing, (e) => e.text_color(t.foreground).cursor_pointer().hover((s) => s.bg(t.hover))
-        .on_click((_e, cx) => { this.refresh(cx); cx.notify(); }))
+        .on_click((_e, cx) => { this.refresh(cx); this.checkPullRequests(cx); cx.notify(); }))
       .child("↻");
   }
 
