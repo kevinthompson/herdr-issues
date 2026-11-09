@@ -41,6 +41,15 @@ const GROUP_COLORS = {
   canceled: "#95a2b3",
 };
 const contextKey = () => JSON.stringify(location());
+// The new list, keeping each body already loaded for an issue that hasn't changed since.
+function withLoadedBodies(issues, previous) {
+  const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
+  return issues.map((issue) => {
+    const before = issue.body === null && loaded.get(issue.id);
+    return before && before.updated === issue.updated ? { ...issue, body: before.body } : issue;
+  });
+}
+
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
 // Issues whose Done waits for their branch's pull request: { id, branch, root, on }. Shared, so every
@@ -88,7 +97,7 @@ export default class Issues extends View {
         this.listedScope = scope;
         const issues = tracker ? await tracker.list(scope) : [];
         if (generation !== this.generation) return;
-        Object.assign(this, { project: { root, on: where.on }, tracker, scopeKey, issues, error: null });
+        Object.assign(this, { project: { root, on: where.on }, tracker, scopeKey, issues: withLoadedBodies(issues, this.issues), error: null });
         this.watch(tracker, cx);
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
       finally { if (generation === this.generation) { this.loaded = true; cx.notify(); } }
@@ -168,6 +177,22 @@ export default class Issues extends View {
     if (this.hasIssue(request.id) && !this.hasUnsavedEdits()) { this.stopEditing(); this.openId = request.id; }
   }
 
+  // Fetches the open issue's body when its list left it out.
+  loadBody(issue, cx) {
+    const tracker = this.tracker;
+    if (issue.body !== null || this.loadingBody === issue.id || !tracker) return;
+    this.loadingBody = issue.id;
+    cx.spawn(async (cx) => {
+      try {
+        const full = await tracker.get(issue.id);
+        if (!full) throw new Error(`${issue.id} was not found`);
+        Object.assign(issue, { body: full.body, updated: full.updated });
+      } catch (e) { this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`; }
+      this.loadingBody = null;
+      cx.notify();
+    });
+  }
+
   hasIssue(id) {
     return this.issues.some((issue) => issue.id === id);
   }
@@ -199,6 +224,7 @@ export default class Issues extends View {
   // The code spans in the issue's body that name files in the project, found once per body.
   filesInBody(issue, cx) {
     const { root, on } = this.project, key = `${root}\n${issue.body}`;
+    if (issue.body === null) return new Set();
     if (this.bodyFiles?.key === key) return this.bodyFiles.files;
     const bodyFiles = this.bodyFiles = { key, files: new Set() }, paths = codeSpanPaths(issue.body);
     if (!paths.length) return bodyFiles.files;
@@ -509,7 +535,7 @@ export default class Issues extends View {
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
     this.avatarLoads = [];
     const content = issue
-      ? issueDetail({
+      ? (this.loadBody(issue, cx), issueDetail({
         issue, writable: this.tracker?.writable,
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         blocking: blockedIssues(issue, this.issues),
@@ -527,7 +553,7 @@ export default class Issues extends View {
         onContinue: (cx) => this.continueWork(issue, cx),
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
-      }, t)
+      }, t))
       : this.list(t);
     const avatarLoads = this.avatarLoads;
     if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });

@@ -84,8 +84,8 @@ function workActions(view, t) {
     .child(button("issue-done", awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary: true, enabled: !awaitingPullRequest }));
 }
 
-function editActions({ writable, editor, saving, onEdit, onSave, onCancel }, t) {
-  if (!writable) return div();
+function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
+  if (!writable || issue.body === null) return div();
   if (!editor) return button("issue-edit", "Edit", onEdit, t);
   return h_flex().flex_none().gap(6)
     .child(button("issue-cancel", "Cancel", onCancel, t, { enabled: !saving }))
@@ -108,6 +108,7 @@ function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t)
 function body(view, t) {
   const { issue, editor, onLink, linkFiles } = view;
   if (editor) return Editor.new(editor).size_full();
+  if (issue.body === null) return div().text_color(t.dim).child("Loading…");
   return v_flex().id(`issue-body-${issue.id}`).size_full().overflow_y_scrollbar().gap(4)
     .children(bodySegments(issue.body).map((segment, index, segments) => segment.markdown !== undefined
       ? TextView.markdown(`issue-body-${issue.id}-${index}`, linkFiles(segment.markdown)).selectable().flex_none().on_link_click(onLink)

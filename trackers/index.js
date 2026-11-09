@@ -20,7 +20,8 @@
 //                                 or null when the backend can't tell and the panel polls
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
-//          branch, created, body, path (where to edit it, for local issues),
+//          branch, created, body (null until loaded: tracker.get loads it), updated (when the tracker
+//          can say), path (where to edit it, for local issues),
 //          labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA) }

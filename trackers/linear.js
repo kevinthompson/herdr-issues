@@ -13,7 +13,8 @@ const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const RECENTLY_COMPLETED = 10;
 
-const ISSUE_FIELDS = `id identifier title description priority sortOrder branchName createdAt url
+// Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
+const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt url
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
@@ -35,7 +36,7 @@ const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData 
 const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
 
-const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} } }`;
+const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
@@ -107,7 +108,8 @@ function toIssue(node) {
     assigneeAvatar: node.assignee?.avatarUrl ?? null,
     sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
-    body: (node.description ?? "").trim(),
+    body: node.description === undefined ? null : (node.description ?? "").trim(),
+    updated: node.updatedAt,
     url: node.url,
   };
 }
