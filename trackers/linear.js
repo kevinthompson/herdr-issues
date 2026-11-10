@@ -20,7 +20,7 @@ const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdA
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
-  inverseRelations(first: 20) { nodes { type issue { identifier state { type } } } }
+  inverseRelations(first: 20) { nodes { type issue { identifier state { type name } } } }
   attachments(first: 10) { nodes { url title sourceType metadata } }`;
 
 const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
@@ -44,15 +44,17 @@ const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id n
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
-// Linear's workflow state types, as the panel's statuses. Started states split in two: one named for
-// review is In review, and the rest are In progress.
+// Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
+// review is In review, one named Merged is Done, and the rest are In progress.
 const STATUS_TYPES = { backlog: ["triage", "backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled"] };
 const isReviewState = (state) => /review/i.test(state.name);
+const isMergedState = (state) => /merged/i.test(state.name);
 function statusOf(state) {
+  if (state.type === "started" && isMergedState(state)) return "done";
   if (state.type === "started") return isReviewState(state) ? "in-review" : "in-progress";
   return Object.keys(STATUS_TYPES).find((status) => STATUS_TYPES[status].includes(state.type)) ?? state.type;
 }
-const FINISHED_TYPES = ["completed", "canceled"];
+const isFinished = (state) => ["done", "canceled"].includes(statusOf(state));
 
 // GitHub's pull requests attached to an issue: { url, title, repo, number, status }, where status is
 // Linear's, such as "open", "draft", "inReview", "approved", "merged" or "closed".
@@ -119,7 +121,7 @@ function toIssue(node) {
     labelColors: Object.fromEntries(node.labels.nodes.map((label) => [label.name, label.color])),
     // Linear keeps finished blockers as relations; only the unfinished ones still block.
     blockedBy: node.inverseRelations.nodes
-      .filter((relation) => relation.type === "blocks" && !FINISHED_TYPES.includes(relation.issue.state.type))
+      .filter((relation) => relation.type === "blocks" && !isFinished(relation.issue.state))
       .map((relation) => relation.issue.identifier),
     branch: node.branchName || null,
     assignee: node.assignee?.name ?? "Unassigned",
