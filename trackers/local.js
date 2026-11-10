@@ -143,6 +143,14 @@ export async function localTracker({ root: projectRoot, on }) {
       const ids = sortedIds(changed);
       await commitIssues(changed, `docs(issues): update the ${ids.join(", ")} checklist${ids.length > 1 ? "s" : ""}`);
     },
+    async commitStatuses(issues) {
+      const changed = await changedIssues(issues);
+      if (!changed.length) return;
+      const [only] = changed;
+      await commitIssues(changed, changed.length === 1
+        ? `docs(issues): move ${only.id} to ${only.status}`
+        : `docs(issues): update the ${sortedIds(changed).join(", ")} statuses`);
+    },
     changed: on == null ? () => watchFolder(folder) : null,
   };
   return tracker;

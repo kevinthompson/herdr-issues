@@ -5,7 +5,8 @@
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once, and the tracker records every checkbox
-// changed in a burst of clicks together, once they pause.
+// changed in a burst of clicks together, once they pause. Statuses picked in the status menu are
+// committed the same way.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
@@ -20,10 +21,12 @@ import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
+import { pendingStatusCommits, takePendingStatusCommits, commitStatuses } from "./status-commits.js";
 
 const POLL_MS = 5 * 60 * 1000;
 const PULL_REQUEST_CHECK_MS = 2 * 60 * 1000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
+const STATUS_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
@@ -319,9 +322,22 @@ export default class Issues extends View {
     await pending.tracker.commitChecklists?.([...pending.issues.values()]);
   }
 
-  // Herdr's teardown hook: checkboxes still waiting for their commit get it now.
+  // Each status change restarts the wait, so a run of changes becomes one commit.
+  scheduleStatusCommits(cx) {
+    const changedAt = pendingStatusCommits()?.changedAt;
+    if (!changedAt || changedAt === this.statusChangeScheduled) return;
+    this.statusChangeScheduled = changedAt;
+    this.statusCommitTimer?.cancel();
+    this.statusCommitTimer = cx.timer.after(STATUS_COMMIT_DELAY_MS, (cx) => cx.spawn(async () => {
+      try { await commitStatuses(takePendingStatusCommits()); }
+      catch (e) { notify({ title: "Could not commit the status change", body: String(e.message ?? e), level: "error" }); }
+    }));
+  }
+
+  // Herdr's teardown hook: checkboxes and statuses still waiting for their commit get it now.
   async close() {
     await this.commitChecklists(this.takePendingChecklists()).catch(() => {});
+    if (!this.menu) await commitStatuses(takePendingStatusCommits()).catch(() => {});
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with the work-issue skill.
@@ -566,6 +582,7 @@ export default class Issues extends View {
     if (contextKey() !== this.context) this.refresh(cx);
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.refresh(cx); }
+    this.scheduleStatusCommits(cx);
     this.openRequestedIssue();
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
     this.avatarLoads = [];

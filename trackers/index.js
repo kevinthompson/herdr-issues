@@ -16,6 +16,8 @@
 //   tracker.finish(issue)       → marks the issue done
 //   tracker.commitChecklists(issues) → records checkbox changes saved with update where the tracker
 //                                 keeps history; nothing to do when every save is already final
+//   tracker.commitStatuses(issues) → records status changes saved with update the same way; issues are
+//                                 { id, file, status }
 //   tracker.changed             → a function that resolves when issues may have changed,
 //                                 or null when the backend can't tell and the panel polls
 //
