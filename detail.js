@@ -99,10 +99,11 @@ export function workButton(key, { finishable, startable, onStart, onContinue }, 
 // Continue and Done for an issue in progress, otherwise Start.
 function workActions(view, t) {
   if (!view.finishable) return workButton("issue", view, t);
-  const { awaitingPullRequest, onDone } = view;
+  const { awaitingPullRequest, hasUnmergedPullRequests, onDone } = view;
+  const label = awaitingPullRequest ? "Waiting for PR…" : hasUnmergedPullRequests ? "PR not merged" : "Done";
   return h_flex().flex_none().gap(6)
     .child(workButton("issue", view, t, { primary: false }))
-    .child(button("issue-done", awaitingPullRequest ? "Waiting for PR…" : "Done", onDone, t, { primary: true, enabled: !awaitingPullRequest }));
+    .child(button("issue-done", label, onDone, t, { primary: true, enabled: !awaitingPullRequest && !hasUnmergedPullRequests }));
 }
 
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {

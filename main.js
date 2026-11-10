@@ -11,7 +11,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude } from "./worktree.js";
@@ -367,10 +367,12 @@ export default class Issues extends View {
 
   // A clean worktree's branch is merged into main first in a personal project. In a collaborative
   // project, Done waits for the branch's pull request instead, unless no Claude session is open to make one.
-  // Anything else (no worktree, uncommitted changes) just marks the issue done.
+  // Anything else (no worktree, uncommitted changes) just marks the issue done. An issue with an
+  // unmerged pull request attached is never marked done.
   finishWork(issue, cx) {
     const tracker = this.tracker, project = this.project;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
+    if (unmergedPullRequests(issue).length) { this.detailError = "Merge or close its pull requests first"; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
       try {
@@ -581,6 +583,7 @@ export default class Issues extends View {
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
         awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
+        hasUnmergedPullRequests: unmergedPullRequests(issue).length > 0,
         onDone: (cx) => this.finishWork(issue, cx),
         onContinue: (cx) => this.continueWork(issue, cx),
         onSave: (cx) => this.save(cx),
