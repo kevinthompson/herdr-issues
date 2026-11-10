@@ -90,6 +90,18 @@ export async function localTracker({ root: projectRoot, on }) {
     if (commit.code !== 0) throw new Error(commit.stderr.trim() || `git commit failed for ${files.join(", ")}`);
   }
 
+  // Changes undone before their commit leave nothing to commit, so only changed files go in.
+  async function changedIssues(issues) {
+    const changed = [];
+    for (const issue of issues) {
+      const diff = await exec("git", ["diff", "--quiet", "HEAD", "--", `issues/${issue.file}`], { cwd: root });
+      if (diff.code === 1) changed.push(issue);
+    }
+    return changed;
+  }
+
+  const sortedIds = (issues) => issues.map((issue) => issue.id).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
   async function commitStatus(issue, status, verb) {
     await tracker.update(issue, { status });
     await commitIssues([issue], `docs(issues): ${verb} ${issue.id}`);
@@ -125,15 +137,10 @@ export async function localTracker({ root: projectRoot, on }) {
     async finish(issue) {
       await commitStatus(issue, "done", "finish");
     },
-    // Boxes checked and then unchecked again leave nothing to commit, so only changed files go in.
     async commitChecklists(issues) {
-      const changed = [];
-      for (const issue of issues) {
-        const diff = await exec("git", ["diff", "--quiet", "HEAD", "--", `issues/${issue.file}`], { cwd: root });
-        if (diff.code === 1) changed.push(issue);
-      }
+      const changed = await changedIssues(issues);
       if (!changed.length) return;
-      const ids = changed.map((issue) => issue.id).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      const ids = sortedIds(changed);
       await commitIssues(changed, `docs(issues): update the ${ids.join(", ")} checklist${ids.length > 1 ? "s" : ""}`);
     },
     changed: on == null ? () => watchFolder(folder) : null,
