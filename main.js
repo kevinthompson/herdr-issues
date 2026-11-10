@@ -372,7 +372,7 @@ export default class Issues extends View {
   finishWork(issue, cx) {
     const tracker = this.tracker, project = this.project;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
-    if (unmergedPullRequests(issue).length) { this.detailError = "Merge or close its pull requests first"; cx.notify(); return; }
+    if (unmergedPullRequests(issue).length) { this.detailError = "Merge its pull requests first"; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
       try {
