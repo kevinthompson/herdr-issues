@@ -100,7 +100,7 @@ export function workButton(key, { finishable, startable, onStart, onContinue }, 
 function workActions(view, t) {
   if (!view.finishable) return workButton("issue", view, t);
   const { awaitingPullRequest, hasUnmergedPullRequests, onDone } = view;
-  const label = awaitingPullRequest ? "Waiting for PR…" : hasUnmergedPullRequests ? "PR not merged" : "Done";
+  const label = awaitingPullRequest ? "Waiting for merge…" : hasUnmergedPullRequests ? "PR not merged" : "Done";
   return h_flex().flex_none().gap(6)
     .child(workButton("issue", view, t, { primary: false }))
     .child(button("issue-done", label, onDone, t, { primary: true, enabled: !awaitingPullRequest && !hasUnmergedPullRequests }));

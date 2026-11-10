@@ -56,7 +56,7 @@ function withLoadedBodies(issues, previous) {
 
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
-// Issues whose Done waits for their branch's pull request: { id, branch, root, on }. Shared, so every
+// Issues whose Done waits for their branch's pull request to merge: { id, branch, root, on }. Shared, so every
 // copy of the panel shows the wait and it outlives a reload.
 const AWAITING = "issues.awaitingPullRequest";
 const awaitingPullRequests = () => shared(AWAITING) ?? [];
@@ -366,7 +366,7 @@ export default class Issues extends View {
   }
 
   // A clean worktree's branch is merged into main first in a personal project. In a collaborative
-  // project, Done waits for the branch's pull request instead, unless no Claude session is open to make one.
+  // project, Done waits for the branch's pull request to merge instead, unless no Claude session is open to make one.
   // Anything else (no worktree, uncommitted changes) just marks the issue done. An issue with an
   // unmerged pull request attached is never marked done.
   finishWork(issue, cx) {
@@ -419,12 +419,13 @@ export default class Issues extends View {
     });
   }
 
-  // Once the branch is pushed and its pull request is open: marks the issue done.
+  // Once the branch's pull request has merged and no other attached one is unmerged: marks the issue done.
   async finishOnPullRequest(request) {
     const pullRequest = await pullRequestFor(request);
-    if (!pullRequest || !awaitingPullRequests().some((each) => sameRequest(each, request))) return;
-    setShared(AWAITING, awaitingPullRequests().filter((each) => !sameRequest(each, request)));
+    if (pullRequest?.state !== "MERGED" || !awaitingPullRequests().some((each) => sameRequest(each, request))) return;
     const tracker = await trackerFor(request), issue = await tracker?.get(request.id);
+    if (issue && unmergedPullRequests(issue).length) return;
+    setShared(AWAITING, awaitingPullRequests().filter((each) => !sameRequest(each, request)));
     if (issue && issue.status !== "done") await tracker.finish(issue);
     announceIssueChange();
     notify({ title: `${request.id} is done`, body: `Pull request: ${pullRequest.url}` });
