@@ -2,7 +2,7 @@
 // { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time: its first view, else every open issue assigned to
-// you, across teams. Scopes other than a view add the issues completed most recently.
+// you, across teams. Scopes other than a view add the issues completed or merged most recently.
 import { home, appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { STATUSES, STATUS_LABELS } from "../issue.js";
@@ -11,7 +11,7 @@ const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
-const RECENTLY_COMPLETED = 10;
+const RECENTLY_FINISHED = 10;
 // How long a view's saved filter is reused before it is read again, to pick up edits made in Linear.
 const VIEW_FILTER_TTL_MS = 10 * 60 * 1000;
 
@@ -24,17 +24,15 @@ const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdA
   attachments(first: 10) { nodes { url title sourceType metadata } }`;
 
 const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
-const OPEN = `state: { type: { nin: ["completed", "canceled"] } }`;
-const COMPLETED = `state: { type: { eq: "completed" } }`;
+// Started states named Merged count as done, so they are listed with the finished issues instead.
+const MERGED_STATE = { type: { eq: "started" }, name: { containsIgnoreCase: "merged" } };
+const OPEN_STATE = { type: { nin: ["completed", "canceled"] }, name: { notContainsIgnoreCase: "merged" } };
+const FINISHED_STATES = [{ type: { eq: "completed" } }, MERGED_STATE];
 
-const MY_OPEN_ISSUES = `query($first: Int!, $after: String) { viewer {
-  assignedIssues(first: $first, after: $after, filter: { ${OPEN} }) { ${PAGE} } } }`;
-const MY_COMPLETED_ISSUES = `query($first: Int!) { viewer {
-  assignedIssues(first: $first, orderBy: updatedAt, filter: { ${COMPLETED} }) { ${PAGE} } } }`;
-const TEAM_OPEN_ISSUES = `query($team: String!, $first: Int!, $after: String) {
-  issues(first: $first, after: $after, filter: { team: { key: { eq: $team } }, ${OPEN} }) { ${PAGE} } }`;
-const TEAM_COMPLETED_ISSUES = `query($team: String!, $first: Int!) {
-  issues(first: $first, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, ${COMPLETED} }) { ${PAGE} } }`;
+const MY_ISSUES = `query($state: WorkflowStateFilter, $first: Int!, $after: String) { viewer {
+  assignedIssues(first: $first, after: $after, orderBy: updatedAt, filter: { state: $state }) { ${PAGE} } } }`;
+const TEAM_ISSUES = `query($team: String!, $state: WorkflowStateFilter, $first: Int!, $after: String) {
+  issues(first: $first, after: $after, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, state: $state }) { ${PAGE} } }`;
 const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData } }`;
 const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
@@ -160,12 +158,15 @@ export async function linearTracker({ root: projectRoot, on }) {
     return nodes;
   }
 
-  async function openAndRecentlyCompleted(openQuery, completedQuery, variables, connectionOf) {
-    const [open, completed] = await Promise.all([
-      allPages(openQuery, variables, connectionOf),
-      linear(completedQuery, { ...variables, first: RECENTLY_COMPLETED }).then((data) => connectionOf(data).nodes),
+  // Each finished state, completed and merged, adds its own most recent issues.
+  async function openAndRecentlyFinished(query, variables, connectionOf) {
+    const recentlyFinished = (state) =>
+      linear(query, { ...variables, state, first: RECENTLY_FINISHED }).then((data) => connectionOf(data).nodes);
+    const [open, ...finished] = await Promise.all([
+      allPages(query, { ...variables, state: OPEN_STATE }, connectionOf),
+      ...FINISHED_STATES.map(recentlyFinished),
     ]);
-    return [...open, ...completed];
+    return [...open, ...finished.flat()];
   }
 
   // A view's saved filter decides which issues it holds, finished ones included. Running the filter
@@ -185,9 +186,9 @@ export async function linearTracker({ root: projectRoot, on }) {
   }
 
   function issuesIn(scopeId) {
-    if (scopeId === "team") return openAndRecentlyCompleted(TEAM_OPEN_ISSUES, TEAM_COMPLETED_ISSUES, { team: repo.teamKey }, (data) => data.issues);
+    if (scopeId === "team") return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues);
     if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5));
-    return openAndRecentlyCompleted(MY_OPEN_ISSUES, MY_COMPLETED_ISSUES, {}, (data) => data.viewer.assignedIssues);
+    return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues);
   }
 
   const teamStates = new Map();
