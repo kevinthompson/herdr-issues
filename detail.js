@@ -78,14 +78,17 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
 }
 
 // Buttons stop the pointer events a list row would otherwise take as the start of a drag or an open.
-function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null } = {}) {
+function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {}) {
+  const hoverStyle = primaryOnHover && !primary
+    ? (s) => s.bg(t.solid).text_color(t.solid_foreground)
+    : (s) => s.opacity(0.85);
   return div().id(id).flex_none().h(26).px(10).flex().items_center().rounded(7).text_size(12)
     .when(tooltip, (e) => e.tooltip(tooltip))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
     .when(enabled, (e) => e.bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground))
     .when(!enabled, (e) => e.bg(t.raised).text_color(t.dim))
-    .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onClick(cx)))
+    .when(enabled, (e) => e.cursor_pointer().hover(hoverStyle).on_click((_e, cx) => onClick(cx)))
     .child(label);
 }
 
@@ -93,8 +96,9 @@ function button(id, label, onClick, t, { primary = false, enabled = true, toolti
 // The list's compact button says neither, so it fits beside a title.
 export function workButton(key, { finishable, startable, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
   const label = compact ? "▶" : finishable ? "Continue" : "Start";
-  if (finishable) return button(`${key}-continue`, label, onContinue, t, { primary });
-  return button(`${key}-start`, label, onStart, t, { primary, enabled: startable });
+  const style = { primary, primaryOnHover: compact };
+  if (finishable) return button(`${key}-continue`, label, onContinue, t, style);
+  return button(`${key}-start`, label, onStart, t, { ...style, enabled: startable });
 }
 
 // Continue and Done for an issue in progress, otherwise Start.
