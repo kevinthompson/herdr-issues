@@ -1,7 +1,7 @@
 // One issue, drawn inside the panel in place of the list: a way back, its status and priority
 // (each a dropdown), its other details and its Markdown body, which Edit swaps for an editor.
 // Task-list items in the body are checkboxes that check off in place.
-import { div } from "gpui-kit";
+import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
@@ -101,6 +101,16 @@ export function workButton(key, { finishable, startable, onStart, onContinue }, 
   return button(`${key}-start`, label, onStart, t, { ...style, enabled: startable });
 }
 
+// Hands the issue to the Cloud Agent, disabled once it has the issue or while the handoff saves.
+function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
+  const enabled = !delegated && !delegating;
+  const tooltip = delegated ? "Delegated to Cloud Agent" : delegating ? "Delegating…" : "Delegate to Cloud Agent";
+  return div().id("issue-delegate").flex_none().size(26).flex().items_center().justify_center().rounded(7).bg(t.raised)
+    .tooltip(tooltip)
+    .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onDelegate(cx)))
+    .child(svg("mods/issues/cloud.svg").size(14).text_color(enabled ? t.foreground : t.dim));
+}
+
 // Continue and Done for an issue in progress, otherwise Start.
 function workActions(view, t) {
   if (!view.finishable) return workButton("issue", view, t);
@@ -152,6 +162,7 @@ export function issueDetail(view, t) {
         .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
+      .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
       .when(!view.editor, (e) => e.child(workActions(view, t)))
       .child(editActions(view, t)))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))

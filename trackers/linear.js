@@ -3,7 +3,7 @@
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time: its first view, else every open issue assigned to
 // you, across teams. Scopes other than a view add the issues completed or merged most recently.
-import { home, appHome, readTextFile } from "herdr";
+import { home, appHome, readTextFile, exec } from "herdr";
 import { mainCheckout } from "../location.js";
 import { STATUSES, STATUS_LABELS } from "../issue.js";
 
@@ -17,7 +17,7 @@ const VIEW_FILTER_TTL_MS = 10 * 60 * 1000;
 
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt url
-  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl }
+  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl } delegate { id }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type name } } } }
@@ -40,6 +40,11 @@ const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: Strin
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
+// The cloud-agent > one-shot label marks an issue as ready for Planning Center's Cloud Agent, which
+// works the issues delegated to it.
+const CLOUD_AGENT = `query { users(filter: { app: { eq: true }, name: { eq: "Cloud Agent" } }) { nodes { id } }
+  issueLabels(filter: { name: { eq: "one-shot" }, parent: { name: { eq: "cloud-agent" } } }) { nodes { id } } }`;
+const PLANNING_CENTER_REMOTE = /github\.com[:/]planningcenter\//;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
@@ -130,7 +135,23 @@ function toIssue(node) {
     pullRequests: pullRequestsOf(node.attachments),
     updated: node.updatedAt,
     url: node.url,
+    delegateId: node.delegate?.id ?? null,
   };
+}
+
+async function isPlanningCenterRepo(root) {
+  const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: root }).catch(() => null);
+  return origin?.code === 0 && PLANNING_CENTER_REMOTE.test(origin.stdout);
+}
+
+// { agentId, labelId } once read, shared by every tracker since neither changes.
+let cloudAgent = null;
+async function cloudAgentIds(linear) {
+  if (cloudAgent) return cloudAgent;
+  const { users, issueLabels } = await linear(CLOUD_AGENT);
+  const agentId = users.nodes[0]?.id, labelId = issueLabels.nodes[0]?.id;
+  if (agentId && labelId) cloudAgent = { agentId, labelId };
+  return cloudAgent;
 }
 
 // view ID → { filter, at }. Outlives each tracker, since the panel makes a new one every refresh.
@@ -144,6 +165,7 @@ export async function linearTracker({ root: projectRoot, on }) {
   if (!config.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
   const linear = (query, variables = {}) => request(config.apiKey, query, variables);
   const scopes = scopesFor(repo);
+  const agent = (await isPlanningCenterRepo(root)) ? await cloudAgentIds(linear) : null;
 
   // Every page of the connection `connectionOf` picks out of each answer.
   async function allPages(query, variables, connectionOf) {
@@ -249,6 +271,11 @@ export async function linearTracker({ root: projectRoot, on }) {
       if (!current.assignee) input.assigneeId = viewer.id;
       await linear(UPDATE, { id: issue.linearId, input });
     },
+    isDelegated: agent && ((issue) => issue.delegateId === agent.agentId),
+    delegate: agent && (async (issue) => {
+      await linear(UPDATE, { id: issue.linearId, input: { delegateId: agent.agentId, addedLabelIds: [agent.labelId] } });
+      issue.delegateId = agent.agentId;
+    }),
     async finish(issue) {
       await tracker.update(issue, { status: "done" });
     },

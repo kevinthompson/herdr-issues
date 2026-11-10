@@ -354,6 +354,19 @@ export default class Issues extends View {
     });
   }
 
+  delegateToCloudAgent(issue, cx) {
+    const tracker = this.tracker;
+    this.delegating = issue.id; this.detailError = null;
+    cx.spawn(async (cx) => {
+      try { await tracker.delegate(issue); }
+      catch (e) { this.detailError = `Could not delegate: ${e.message ?? e}`; }
+      this.delegating = null;
+      this.refresh(cx);
+      cx.notify();
+    });
+    cx.notify();
+  }
+
   // Picks up an issue already in progress: its space when one is open, else a new space on its worktree,
   // else a new worktree on its branch, fetched from origin when the work began elsewhere.
   continueWork(issue, cx) {
@@ -604,6 +617,9 @@ export default class Issues extends View {
         hasUnmergedPullRequests: unmergedPullRequests(issue).length > 0,
         onDone: (cx) => this.finishWork(issue, cx),
         onContinue: (cx) => this.continueWork(issue, cx),
+        onDelegate: this.tracker?.delegate && ((cx) => this.delegateToCloudAgent(issue, cx)),
+        delegated: Boolean(this.tracker?.isDelegated?.(issue)),
+        delegating: this.delegating === issue.id,
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t))

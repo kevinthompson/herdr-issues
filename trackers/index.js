@@ -14,6 +14,9 @@
 //   tracker.start(issue)        → marks the issue in progress where new work branches from, before its
 //                                 worktree is made
 //   tracker.finish(issue)       → marks the issue done
+//   tracker.delegate(issue)     → hands the issue to Planning Center's Cloud Agent to work; null where
+//                                 the project can't
+//   tracker.isDelegated(issue)  → whether the Cloud Agent has the issue already; null with delegate
 //   tracker.commitChecklists(issues) → records checkbox changes saved with update where the tracker
 //                                 keeps history; nothing to do when every save is already final
 //   tracker.commitStatuses(issues) → records status changes saved with update the same way; issues are
@@ -27,7 +30,8 @@
 //          labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
-//          pullRequests ([{ url, title, repo, number, status }] attached to Linear issues) }
+//          pullRequests ([{ url, title, repo, number, status }] attached to Linear issues),
+//          delegateId (the agent working it, or null, for Linear issues) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order.
 import { localTracker } from "./local.js";
