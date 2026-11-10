@@ -78,8 +78,9 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
 }
 
 // Buttons stop the pointer events a list row would otherwise take as the start of a drag or an open.
-function button(id, label, onClick, t, { primary = false, enabled = true } = {}) {
+function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null } = {}) {
   return div().id(id).flex_none().h(26).px(10).flex().items_center().rounded(7).text_size(12)
+    .when(tooltip, (e) => e.tooltip(tooltip))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
     .when(enabled, (e) => e.bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground))
@@ -100,10 +101,11 @@ export function workButton(key, { finishable, startable, onStart, onContinue }, 
 function workActions(view, t) {
   if (!view.finishable) return workButton("issue", view, t);
   const { awaitingPullRequest, hasUnmergedPullRequests, onDone } = view;
-  const label = awaitingPullRequest ? "Waiting for merge…" : hasUnmergedPullRequests ? "PR not merged" : "Done";
+  const blockedReason = awaitingPullRequest ? "Waiting for this branch's pull request to merge"
+    : hasUnmergedPullRequests ? "This issue has pull requests that haven't merged" : null;
   return h_flex().flex_none().gap(6)
     .child(workButton("issue", view, t, { primary: false }))
-    .child(button("issue-done", label, onDone, t, { primary: true, enabled: !awaitingPullRequest && !hasUnmergedPullRequests }));
+    .child(button("issue-done", "Done", onDone, t, { primary: true, enabled: !blockedReason, tooltip: blockedReason }));
 }
 
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
