@@ -68,20 +68,6 @@ const workIssueSession = (issue) => ({ argv: ["claude"], task: `/issues:work ${i
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
-// Where an underway issue's work lives and what main doesn't have yet, as [text, color] chips.
-// "Merged" with no worktree left is work that has landed on an issue nobody marked done.
-function workChips(state) {
-  if (!state) return [];
-  const { worktree, branchExists, merged, uncommitted, unmerged } = state;
-  if (!worktree && !branchExists) return [["No branch", "dim"]];
-  const chips = [[worktree ? (worktree.space ? "Worktree open" : "Worktree") : "No worktree", "dim"]];
-  if (uncommitted) chips.push([`${plural(uncommitted, "file")} uncommitted`, "working"]);
-  if (unmerged) chips.push([`${plural(unmerged, "commit")} unmerged`, "dim"]);
-  else if (!worktree && merged) chips.push(["Merged", "ansi2"]);
-  else if (!uncommitted) chips.push(["Nothing to merge", "dim"]);
-  return chips;
-}
-
 // Why a worktree has no open issue, then what it still holds that main doesn't.
 function orphanChips({ issue, uncommitted, unmerged }) {
   const chips = [[issue ? `${issue.id} is ${STATUS_LABELS[issue.status].toLowerCase()}` : "No issue in this list", "dim"]];
@@ -148,8 +134,8 @@ export default class Issues extends View {
     });
   }
 
-  // Reads what the repository holds for the issues just listed, after the list shows, and deletes the
-  // branches of done issues that have landed in main, so finished work leaves nothing behind.
+  // Reads the repository's worktrees and branches for the issues just listed, after the list shows, and
+  // deletes the branches of done issues that have landed in main, so finished work leaves nothing behind.
   scanRepository(project, generation, cx) {
     cx.spawn(async (cx) => {
       const repository = await repositoryState(this.issues, project).catch(() => null);
@@ -517,7 +503,6 @@ export default class Issues extends View {
     const { issues } = group, blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
-    const work = workChips(this.repository?.work.get(issue.id));
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
     const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
@@ -546,8 +531,7 @@ export default class Issues extends View {
           .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority]))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
-          .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0 || pullRequestCount > 0 || work.length > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
-            .children(work.map(([text, color]) => div().flex_none().text_color(t[color]).child(text)))
+          .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0 || pullRequestCount > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
             .children(labelChips(issue, t).slice(0, 3))
             .when(pullRequestCount > 0, (e) => e.child(h_flex().flex_none().gap(3).items_center()
               .child(svg("mods/issues/pull-request.svg").flex_none().size(11))
