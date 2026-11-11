@@ -16,7 +16,7 @@ const RECENTLY_FINISHED = 10;
 const VIEW_FILTER_TTL_MS = 10 * 60 * 1000;
 
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
-const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt url
+const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt url
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl } delegate { id }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
@@ -131,6 +131,7 @@ function toIssue(node) {
     assigneeAvatar: node.assignee?.avatarUrl ?? null,
     sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
+    completed: node.completedAt ?? null,
     body: node.description === undefined ? null : (node.description ?? "").trim(),
     pullRequests: pullRequestsOf(node.attachments),
     updated: node.updatedAt,

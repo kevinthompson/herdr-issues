@@ -37,18 +37,21 @@ export function parseIssue(text, file) {
     blockedBy: asList(fields.blocked_by),
     branch: fields.branch || null,
     created: fields.created || null,
+    completed: fields.completed || null,
     body: (match ? text.slice(match[0].length) : text).trim(),
     file,
   };
 }
 
-// Replaces each field's line in the frontmatter, or adds it at the end.
+// Replaces each field's line in the frontmatter, or adds it at the end. A null value removes the line.
 export function withFields(text, fields) {
   const match = FRONTMATTER.exec(text);
   if (!match) throw new Error("The issue has no frontmatter");
   let frontmatter = match[1];
   for (const [key, value] of Object.entries(fields)) {
-    const line = `${key}: ${value}`, existing = new RegExp(`^${key}:.*$`, "m");
+    const existing = new RegExp(`^${key}:.*$`, "m");
+    if (value === null) { frontmatter = frontmatter.replace(new RegExp(`\n?^${key}:.*$`, "m"), ""); continue; }
+    const line = `${key}: ${value}`;
     frontmatter = existing.test(frontmatter) ? frontmatter.replace(existing, () => line) : `${frontmatter}\n${line}`;
   }
   return `---\n${frontmatter}${text.slice(4 + match[1].length)}`;
@@ -59,6 +62,13 @@ export function withBody(text, body) {
   const match = FRONTMATTER.exec(text);
   if (!match) throw new Error("The issue has no frontmatter");
   return `---\n${match[1]}\n---\n\n${body.trim()}\n`;
+}
+
+// When an issue moving to `status` was completed, as Linear's completedAt records it: the moment it
+// became done, kept while it stays done, and cleared once it leaves done.
+function completedAfter(issue, status) {
+  if (status !== "done") return null;
+  return issue.status === "done" && issue.completed ? issue.completed : new Date().toISOString();
 }
 
 // Every worktree of a repository shares its main checkout's issues/, so all of them show the same
@@ -122,6 +132,7 @@ export async function localTracker({ root: projectRoot, on }) {
     async update(issue, { body, ...fields }) {
       const path = `${folder}/${issue.file}`, text = await readTextFile(path);
       if (text === null) throw new Error(`${issue.file} no longer exists`);
+      if (fields.status !== undefined) fields.completed = completedAfter(parseIssue(text, issue.file), fields.status);
       let next = Object.keys(fields).length ? withFields(text, fields) : text;
       if (body !== undefined) {
         if (parseIssue(text, issue.file).body !== issue.body) throw new Error(`${issue.id} changed on disk while you were editing it`);

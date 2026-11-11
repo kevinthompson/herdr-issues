@@ -497,7 +497,7 @@ export default class Issues extends View {
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const inSpace = finishable && Boolean(worktreeSpace(this.repository, issue.branch));
     const dragging = this.drag?.id === issue.id;
-    const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
+    const dropping = this.drag && !dragging && group.ordered !== false && this.drag.group === group.id && this.dropTarget === issue.id;
     const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
     // The accent line marks where the dragged issue lands: above when it moves up, below when down.
     return v_flex().id(`issue-${issue.id}`).relative().flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
@@ -515,7 +515,7 @@ export default class Issues extends View {
         this.endDrag(cx);
         if (!drag) return;
         if (drag.id === issue.id) { this.openId = issue.id; cx.notify(); }
-        else if (drag.group === group.id) this.move(group, drag.id, issue.id, cx);
+        else if (drag.group === group.id && group.ordered !== false) this.move(group, drag.id, issue.id, cx);
       })
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)

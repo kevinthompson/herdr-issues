@@ -14,7 +14,7 @@ const GROUPS = [
   { id: "blocked", label: "Blocked", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
   { id: "backlog", label: "Backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
-  { id: "done", label: "Done", collapsed: true, has: (issue) => issue.status === "done" },
+  { id: "done", label: "Done", collapsed: true, ordered: false, sort: byRecentlyCompleted, has: (issue) => issue.status === "done" },
   { id: "canceled", label: "Canceled", collapsed: true, has: (issue) => issue.status === "canceled" },
 ];
 
@@ -32,9 +32,16 @@ function byPosition(a, b) {
   return priorityRank(a) - priorityRank(b) || byId(a, b);
 }
 
+// Most recently completed first. Issues done before completion was recorded follow, newest ID first.
+function byRecentlyCompleted(a, b) {
+  if (a.completed && b.completed) return b.completed.localeCompare(a.completed);
+  if (a.completed || b.completed) return a.completed ? -1 : 1;
+  return byId(b, a);
+}
+
 export function groupIssues(issues) {
   const done = new Set(issues.filter((issue) => issue.status === "done").map((issue) => issue.id));
-  return GROUPS.map((group) => ({ ...group, issues: issues.filter((issue) => group.has(issue, done)).sort(byPosition) }))
+  return GROUPS.map((group) => ({ ...group, issues: issues.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) }))
     .filter((group) => group.issues.length);
 }
 
