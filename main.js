@@ -15,7 +15,7 @@ import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES, STATUS_LABELS } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, showWorktree } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, showWorktree, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { avatarImage } from "./avatars.js";
@@ -503,6 +503,7 @@ export default class Issues extends View {
     const { issues } = group, blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
+    const inSpace = finishable && Boolean(worktreeSpace(this.repository, issue.branch));
     const dragging = this.drag?.id === issue.id;
     const dropping = this.drag && !dragging && this.drag.group === group.id && this.dropTarget === issue.id;
     const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
@@ -545,7 +546,7 @@ export default class Issues extends View {
           .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))))
         .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
           .when(finishable || startable, (e) => e.child(workButton(`row-${issue.id}`, {
-            finishable, startable, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
+            finishable, startable, inSpace, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
           }, t, { primary: false, compact: true }))))));
   }
 
@@ -659,6 +660,7 @@ export default class Issues extends View {
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
+        inSpace: canFinishWork(issue) && Boolean(worktreeSpace(this.repository, issue.branch)),
         awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
         hasUnmergedPullRequests: unmergedPullRequests(issue).length > 0,
         onDone: (cx) => this.finishWork(issue, cx),

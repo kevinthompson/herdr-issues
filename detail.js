@@ -92,9 +92,13 @@ function button(id, label, onClick, t, { primary = false, enabled = true, toolti
     .child(label);
 }
 
-// Continue for an issue in progress, otherwise Start, which is disabled until work can start.
+// Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
+// whose worktree a space already shows switches to that space instead, and the button stands out to say so.
 // The list's compact button says neither, so it fits beside a title.
-export function workButton(key, { finishable, startable, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
+export function workButton(key, { finishable, startable, inSpace, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
+  if (finishable && inSpace) {
+    return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, { primary: true, tooltip: "Switch to this issue's worktree space" });
+  }
   const label = compact ? "▶" : finishable ? "Continue" : "Start";
   const style = { primary, primaryOnHover: compact };
   if (finishable) return button(`${key}-continue`, label, onContinue, t, style);

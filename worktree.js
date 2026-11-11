@@ -112,6 +112,7 @@ async function worktreeStates(main, linked, on) {
 }
 
 // What the repository holds for the listed issues:
+// - worktrees: its linked worktrees;
 // - orphans: linked worktrees no unfinished issue in the list claims, each with the finished issue it belonged to, if any;
 // - mergedFinished: done issues' local branches already in main that no checkout has out.
 // null outside a repository, or when the main checkout isn't on main, since "merged" means merged into main.
@@ -131,7 +132,7 @@ export async function repositoryState(issues, { root, on }) {
   const mergedFinished = issues
     .filter((issue) => issue.status === "done" && merged.has(issue.branch) && !checkedOut.has(issue.branch))
     .map((issue) => issue.branch);
-  return { main, on, orphans, mergedFinished };
+  return { main, on, worktrees, orphans, mergedFinished };
 }
 
 // Deletes local branches already merged into the main checkout's HEAD; git refuses any that aren't.
@@ -142,6 +143,12 @@ export async function deleteMergedBranches(branches, { main, on }) {
   return deleted;
 }
 
+
+// The space showing the branch's worktree right now, or null.
+export function worktreeSpace(repository, branch) {
+  const worktree = branch && repository?.worktrees.find((each) => each.branch === branch);
+  return worktree ? spaceShowing(worktree.path, worktree.on) : null;
+}
 
 // Shows the worktree's space, opening one on its folder when none shows it.
 export function showWorktree({ path, branch, on }) {
