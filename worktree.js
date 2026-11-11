@@ -111,8 +111,9 @@ async function worktreeStates(main, linked, on) {
   }));
 }
 
-// What the repository holds for the listed issues. work: the state of each underway issue's branch,
-// by issue ID: { worktree, branchExists, merged, uncommitted, unmerged }.
+// What the repository holds for the listed issues:
+// - work: the state of each underway issue's branch, by issue ID: { worktree, branchExists, merged, uncommitted, unmerged };
+// - mergedFinished: done issues' local branches already in main that no checkout has out.
 // null outside a repository, or when the main checkout isn't on main, since "merged" means merged into main.
 export async function repositoryState(issues, { root, on }) {
   const [main, ...linked] = await checkouts(root, on);
@@ -123,6 +124,7 @@ export async function repositoryState(issues, { root, on }) {
     git(main.path, ["branch", "--merged", "HEAD", "--format=%(refname:short)"], on),
   ]);
   const branches = new Set(lines(localBranches.out)), merged = new Set(lines(mergedBranches.out));
+  const checkedOut = new Set([main.branch, ...linked.map((checkout) => checkout.branch)]);
 
   const work = new Map();
   for (const issue of issues.filter((each) => each.branch && UNDERWAY_STATUSES.includes(each.status))) {
@@ -135,6 +137,17 @@ export async function repositoryState(issues, { root, on }) {
     });
   }
 
-  return { main, on, work };
+  const mergedFinished = issues
+    .filter((issue) => issue.status === "done" && merged.has(issue.branch) && !checkedOut.has(issue.branch))
+    .map((issue) => issue.branch);
+  return { main, on, work, mergedFinished };
+}
+
+// Deletes local branches already merged into the main checkout's HEAD; git refuses any that aren't.
+// Returns the ones deleted.
+export async function deleteMergedBranches(branches, { main, on }) {
+  const deleted = [];
+  for (const branch of branches) if ((await git(main.path, ["branch", "-d", branch], on)).ok) deleted.push(branch);
+  return deleted;
 }
 

@@ -15,7 +15,7 @@ import { trackerFor } from "./trackers/index.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { avatarImage } from "./avatars.js";
@@ -66,7 +66,7 @@ const awaitingPullRequests = () => shared(AWAITING) ?? [];
 const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
 const workIssueSession = (issue) => ({ argv: ["claude"], task: `/issues:work ${issue.id}` });
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
-const plural = (count, noun) => `${count} ${noun}${count === 1 ? "" : "s"}`;
+const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
 // Where an underway issue's work lives and what main doesn't have yet, as [text, color] chips.
 // "Merged" with no worktree left is work that has landed on an issue nobody marked done.
@@ -140,13 +140,17 @@ export default class Issues extends View {
     });
   }
 
-  // Reads what the repository holds for the issues just listed, after the list shows.
+  // Reads what the repository holds for the issues just listed, after the list shows, and deletes the
+  // branches of done issues that have landed in main, so finished work leaves nothing behind.
   scanRepository(project, generation, cx) {
     cx.spawn(async (cx) => {
       const repository = await repositoryState(this.issues, project).catch(() => null);
       if (generation !== this.generation) return;
       this.repository = repository;
       cx.notify();
+      if (!repository?.mergedFinished.length) return;
+      const deleted = await deleteMergedBranches(repository.mergedFinished, repository).catch(() => []);
+      if (deleted.length) notify({ title: `Deleted ${plural(deleted.length, "merged branch", "merged branches")}`, body: deleted.join(", ") });
     });
   }
 
