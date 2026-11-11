@@ -95,3 +95,46 @@ export async function askClaude(worktree, message) {
   const session = worktree.space && agents().find((agent) => agent.space === worktree.space.id && isClaude(agent));
   return Boolean(session) && (await hc(["send", session.address, message]).catch(() => null))?.code === 0;
 }
+
+const lines = (text) => text.split("\n").filter(Boolean);
+const UNDERWAY_STATUSES = ["in-progress", "in-review"];
+
+// Each linked worktree with what it holds that main doesn't: { path, branch, on, main, space, uncommitted, unmerged },
+// counted in files and commits.
+async function worktreeStates(main, linked, on) {
+  return Promise.all(linked.map(async (checkout) => {
+    const [status, ahead] = await Promise.all([
+      git(checkout.path, ["--no-optional-locks", "status", "--porcelain"], on),
+      checkout.branch ? git(main.path, ["rev-list", "--count", `HEAD..refs/heads/${checkout.branch}`], on) : null,
+    ]);
+    return { ...checkout, on, main, space: spaceShowing(checkout.path, on), uncommitted: lines(status.out).length, unmerged: Number(ahead?.out) || 0 };
+  }));
+}
+
+// What the repository holds for the listed issues. work: the state of each underway issue's branch,
+// by issue ID: { worktree, branchExists, merged, uncommitted, unmerged }.
+// null outside a repository, or when the main checkout isn't on main, since "merged" means merged into main.
+export async function repositoryState(issues, { root, on }) {
+  const [main, ...linked] = await checkouts(root, on);
+  if (!main || !MAIN_BRANCHES.includes(main.branch)) return null;
+  const [worktrees, localBranches, mergedBranches] = await Promise.all([
+    worktreeStates(main, linked, on),
+    git(main.path, ["branch", "--format=%(refname:short)"], on),
+    git(main.path, ["branch", "--merged", "HEAD", "--format=%(refname:short)"], on),
+  ]);
+  const branches = new Set(lines(localBranches.out)), merged = new Set(lines(mergedBranches.out));
+
+  const work = new Map();
+  for (const issue of issues.filter((each) => each.branch && UNDERWAY_STATUSES.includes(each.status))) {
+    const worktree = worktrees.find((each) => each.branch === issue.branch) ?? null;
+    const unmerged = worktree?.unmerged ?? (branches.has(issue.branch)
+      ? Number((await git(main.path, ["rev-list", "--count", `HEAD..refs/heads/${issue.branch}`], on)).out) || 0 : 0);
+    work.set(issue.id, {
+      worktree, branchExists: branches.has(issue.branch), merged: merged.has(issue.branch),
+      uncommitted: worktree?.uncommitted ?? 0, unmerged,
+    });
+  }
+
+  return { main, on, work };
+}
+
