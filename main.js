@@ -12,10 +12,10 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
+import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES, STATUS_LABELS } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches } from "./worktree.js";
+import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, showWorktree } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { avatarImage } from "./avatars.js";
@@ -79,6 +79,14 @@ function workChips(state) {
   if (unmerged) chips.push([`${plural(unmerged, "commit")} unmerged`, "dim"]);
   else if (!worktree && merged) chips.push(["Merged", "ansi2"]);
   else if (!uncommitted) chips.push(["Nothing to merge", "dim"]);
+  return chips;
+}
+
+// Why a worktree has no open issue, then what it still holds that main doesn't.
+function orphanChips({ issue, uncommitted, unmerged }) {
+  const chips = [[issue ? `${issue.id} is ${STATUS_LABELS[issue.status].toLowerCase()}` : "No issue in this list", "dim"]];
+  if (uncommitted) chips.push([`${plural(uncommitted, "file")} uncommitted`, "working"]);
+  if (unmerged) chips.push([`${plural(unmerged, "commit")} unmerged`, "working"]);
   return chips;
 }
 
@@ -579,6 +587,27 @@ export default class Issues extends View {
       .when(expanded, (e) => e.children(group.issues.map((issue, index) => this.row(issue, index, group, t))));
   }
 
+  // Worktrees whose issue is finished or missing, to open and close. Uncommitted or unmerged work in
+  // one is shown, since closing the worktree would leave it behind.
+  orphanGroup(t) {
+    const orphans = this.repository?.orphans ?? [], group = { id: "orphans" };
+    if (!orphans.length) return null;
+    const expanded = this.isExpanded(group);
+    return v_flex().flex_none().gap(1)
+      .child(h_flex().id("group-orphans").mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
+        .bg(tinted(GROUP_COLORS.canceled)).text_color(t.foreground)
+        .on_click((_e, cx) => this.toggle(group, cx))
+        .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
+        .child(div().font_semibold().child("Worktrees to close"))
+        .child(div().opacity(0.7).child(String(orphans.length))))
+      .when(expanded, (e) => e.children(orphans.map((orphan) => v_flex().id(`orphan-${orphan.path}`).flex_none().px(10).py(6).gap(3)
+        .rounded(7).cursor_pointer().hover((s) => s.bg(t.hover))
+        .on_click(() => showWorktree(orphan))
+        .child(div().min_w(0).truncate().child(orphan.branch ?? folderName(orphan.path)))
+        .child(h_flex().flex_wrap().gap_x(8).gap_y(2).text_size(11)
+          .children(orphanChips(orphan).map(([text, color]) => div().flex_none().text_color(t[color]).child(text)))))));
+  }
+
   emptyText() {
     if (!this.loaded) return "Loading…";
     if (!this.tracker) return `No issues/ folder or Linear mapping for ${this.project?.root ?? "this folder"}`;
@@ -619,6 +648,7 @@ export default class Issues extends View {
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group) => this.group(group, t)))
+        .when(Boolean(this.repository?.orphans.length), (e) => e.child(this.orphanGroup(t)))
         .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
   }
 

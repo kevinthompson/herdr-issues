@@ -1,4 +1,4 @@
-import { exec, hc, spaces, panes, agents } from "herdr";
+import { exec, hc, spaces, panes, agents, run } from "herdr";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -98,6 +98,7 @@ export async function askClaude(worktree, message) {
 
 const lines = (text) => text.split("\n").filter(Boolean);
 const UNDERWAY_STATUSES = ["in-progress", "in-review"];
+const FINISHED_STATUSES = ["done", "canceled"];
 
 // Each linked worktree with what it holds that main doesn't: { path, branch, on, main, space, uncommitted, unmerged },
 // counted in files and commits.
@@ -113,6 +114,7 @@ async function worktreeStates(main, linked, on) {
 
 // What the repository holds for the listed issues:
 // - work: the state of each underway issue's branch, by issue ID: { worktree, branchExists, merged, uncommitted, unmerged };
+// - orphans: linked worktrees no unfinished issue in the list claims, each with the finished issue it belonged to, if any;
 // - mergedFinished: done issues' local branches already in main that no checkout has out.
 // null outside a repository, or when the main checkout isn't on main, since "merged" means merged into main.
 export async function repositoryState(issues, { root, on }) {
@@ -125,6 +127,7 @@ export async function repositoryState(issues, { root, on }) {
   ]);
   const branches = new Set(lines(localBranches.out)), merged = new Set(lines(mergedBranches.out));
   const checkedOut = new Set([main.branch, ...linked.map((checkout) => checkout.branch)]);
+  const issueByBranch = new Map(issues.filter((issue) => issue.branch).map((issue) => [issue.branch, issue]));
 
   const work = new Map();
   for (const issue of issues.filter((each) => each.branch && UNDERWAY_STATUSES.includes(each.status))) {
@@ -137,10 +140,13 @@ export async function repositoryState(issues, { root, on }) {
     });
   }
 
+  const orphans = worktrees
+    .map((worktree) => ({ ...worktree, issue: issueByBranch.get(worktree.branch) ?? null }))
+    .filter(({ issue }) => !issue || FINISHED_STATUSES.includes(issue.status));
   const mergedFinished = issues
     .filter((issue) => issue.status === "done" && merged.has(issue.branch) && !checkedOut.has(issue.branch))
     .map((issue) => issue.branch);
-  return { main, on, work, mergedFinished };
+  return { main, on, work, orphans, mergedFinished };
 }
 
 // Deletes local branches already merged into the main checkout's HEAD; git refuses any that aren't.
@@ -151,3 +157,10 @@ export async function deleteMergedBranches(branches, { main, on }) {
   return deleted;
 }
 
+
+// Shows the worktree's space, opening one on its folder when none shows it.
+export function showWorktree({ path, branch, on }) {
+  const space = spaceShowing(path, on);
+  if (space) run("space.select", { id: space.id });
+  else run("space.new", { name: branch ?? path.split("/").pop(), folder: path, machine: on });
+}
