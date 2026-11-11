@@ -64,7 +64,7 @@ const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 const AWAITING = "issues.awaitingPullRequest";
 const awaitingPullRequests = () => shared(AWAITING) ?? [];
 const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
-const workIssueSession = (issue) => ({ argv: ["claude"], task: `/work-issue ${issue.id}` });
+const workIssueSession = (issue) => ({ argv: ["claude"], task: `/issues:work ${issue.id}` });
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
 
 export default class Issues extends View {
@@ -340,7 +340,7 @@ export default class Issues extends View {
     if (!this.menu) await commitStatuses(takePendingStatusCommits()).catch(() => {});
   }
 
-  // A fresh Claude session in a new worktree space on the issue's branch, working the issue with the work-issue skill.
+  // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
   // Without a branch, the worktree dialog asks for one.
   startWork(issue, cx) {
     const tracker = this.tracker;
