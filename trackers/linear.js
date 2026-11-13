@@ -3,7 +3,7 @@
 // { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
-// default. The team's issues waiting in triage, all its issues and its saved views are scopes, and its
+// default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
 // open projects are scopes too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
 // completed or merged most recently.
 import { home, appHome, readTextFile } from "herdr";
@@ -34,6 +34,8 @@ const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
 const MERGED_STATE = { type: { eq: "started" }, name: { containsIgnoreCase: "merged" } };
 const TRIAGE_STATE = { type: { eq: "triage" } };
 const OPEN_STATE = { type: { nin: ["completed", "canceled"] }, name: { notContainsIgnoreCase: "merged" } };
+// The team's Issues list leaves out triage, which has a list of its own.
+const OPEN_OUTSIDE_TRIAGE_STATE = { ...OPEN_STATE, type: { nin: ["completed", "canceled", "triage"] } };
 const FINISHED_STATES = [{ type: { eq: "completed" } }, MERGED_STATE];
 
 const MY_ISSUES = `query($state: WorkflowStateFilter, $first: Int!, $after: String) { viewer {
@@ -247,11 +249,11 @@ export async function linearTracker({ root: projectRoot, on }) {
   }
 
   // Each finished state, completed and merged, adds its own most recent issues.
-  async function openAndRecentlyFinished(query, variables, connectionOf) {
+  async function openAndRecentlyFinished(query, variables, connectionOf, openState = OPEN_STATE) {
     const recentlyFinished = (state) =>
       linear(query, { ...variables, state, first: RECENTLY_FINISHED }).then((data) => connectionOf(data).nodes);
     const [open, ...finished] = await Promise.all([
-      allPages(query, { ...variables, state: OPEN_STATE }, connectionOf),
+      allPages(query, { ...variables, state: openState }, connectionOf),
       ...FINISHED_STATES.map(recentlyFinished),
     ]);
     return [...open, ...finished.flat()];
@@ -280,7 +282,9 @@ export async function linearTracker({ root: projectRoot, on }) {
       return openAndRecentlyFinished(FILTERED_ISSUES_IN_STATE, { filter }, (data) => data.issues);
     }
     if (scopeId === "triage") return allPages(TEAM_ISSUES, { team: repo.teamKey, state: TRIAGE_STATE }, (data) => data.issues);
-    if (scopeId === "team") return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues);
+    if (scopeId === "team") {
+      return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues, OPEN_OUTSIDE_TRIAGE_STATE);
+    }
     if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5));
     return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues);
   }
