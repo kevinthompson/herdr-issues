@@ -1,0 +1,47 @@
+---
+name: triage
+description: Triage issues in a repository's issues/ folder or in Linear, making each one small and actionable enough to hand to an agent. Use when asked to triage, groom, refine or review issues, the backlog or Linear's triage queue, for example "triage <issue ID>", "triage the backlog" or "let's triage".
+argument-hint: [issue IDs, a status, or what to triage]
+---
+
+Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issues:create` sets: each one is a self-contained hand-off, scoped to one branch and one pull request, that an agent holding only the issue and the repository could finish and know it had finished. Triage never adds labels to sort issues; the bar is the same for every issue.
+
+1. **Find the tracker.** Use the main checkout (the first path `git worktree list` prints) and detect the tracker as `/issues:create` step 1 does.
+   - **Markdown**: read `issues/README.md` and `issues/TEMPLATE.md` in the main checkout; they define the format. Every change is made and committed there on main, scoped `issues`, after checking the main checkout is on main and the issue file has no unrelated uncommitted edits.
+   - **Linear**: load `list_issues`, `get_issue`, `save_issue`, `list_issue_statuses`, `list_issue_labels` and the comment tools (`list_comments`, `save_comment` or `create_comment`) with ToolSearch, prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`. Use the team that owns the repository. If the tools aren't available, stop and say so.
+   - Read `../create/SKILL.md` beside this skill: its step 4 is what an issue must contain, and this skill doesn't restate it.
+
+2. **Pick the issues.** With issue IDs or a scope in the arguments, triage those. Otherwise confirm the scope before reading any issue. Triaging is this skill's job, not a list: never assume the person means Linear's Triage state.
+   - **A list is in context**, such as the one the Herdr issues panel shows, which the session's context names: count that list's issues exactly as it defines them. For My issues that is every open issue assigned to the person across all teams (`list_issues` with `assignee: "me"` and no team), where open means not completed, canceled, a duplicate or in a state named Merged; In Review counts as open. Ask "There are <n> issues in <list>. What would you like to triage?" with the options **All issues** and **A different list**, and let the person type which issues they mean in the free-text answer.
+   - **No list is in context**, or the person picks **A different list**: ask "Which issues would you like to triage?" with the lists as options, each with its count: for Linear, My issues, the team's Triage state and the team's other open issues by status; for Markdown, the tracker's statuses (for example Backlog, Todo, In progress).
+   - Triage the chosen issues oldest first.
+
+   Work through the issues one at a time: finish each (steps 3 to 8) before starting the next.
+
+3. **Read it in full.** The whole issue, its Notes or Linear comments, its blockers and the issues it blocks. Note whether anyone has worked it yet: it has been worked when its status is in progress or later, its branch exists locally or on origin, or someone other than the person has commented on it or is assigned to it.
+
+4. **Check it against the code.** Read the code its Context names, then:
+   - **Already implemented**: search the code for the behavior it asks for, by concept, not only by its wording. If it's there, recommend canceling and say where it lives.
+   - **Duplicates**: search the tracker's other open issues for the same work. If one exists, recommend which to keep and cancel the other with a link to it.
+   - **Stale context**: check that every file, function, command and issue ID it names still exists, and find where moved ones went.
+
+   Report what you found in a few sentences before going on.
+
+5. **Settle what only the person can.** When the issue waits on a decision, content, or intent the code can't answer, interview the person now with focused multiple-choice questions (AskUserQuestion), a round at a time, until the issue can be written. Never invent creative or product content; when the person wants to leave it for later, name what's missing in the issue.
+
+6. **Size it.** When the issue needs more than one branch or pull request, or has separable outcomes, propose a split: list each slice's title, goal and blockers, and ask the person to approve or adjust it before writing anything. Once approved, rewrite the original as the first slice and create the others with `/issues:create`'s format, blocked by it where they depend on it.
+
+7. **Rewrite it.** Bring the issue to the bar: testable acceptance criteria, Out of scope, Verification commands that exist, Context naming real code and the reason for the work, and correct blockers (add or remove `blocked_by` entries or Linear blocking relations the work reveals). For a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after.
+   - Also suggest a priority with a one-line reason, and ask the person to confirm or change it.
+   - Ask which status to leave it in, Todo or Backlog, offering Todo first when nothing blocks it. An issue in Linear's Triage state always leaves Triage.
+   - **Not yet worked** (step 3): rewrite the description itself.
+   - **Already worked**, or others have commented: ask whether to revise the description or add a comment, since rewriting could erase what others rely on. A Markdown comment goes under **Notes**.
+   - Show the person a summary of what changes and why, and save only once they approve, adjusting it first if they ask.
+   - When you show the rewritten issue itself, write it straight into your reply as Markdown so the terminal renders it, never inside a code block or an HTML tag such as `<details>`, and set it off with horizontal rules.
+
+8. **Save.**
+   - **Markdown**: write the issue file and commit it on main in the main checkout, one commit per triaged issue (with any new issues from a split), scoped `issues`.
+   - **Linear**: save with `save_issue`, which replaces the whole description, so send the full rewritten text; set the state and priority the person chose, and the blocking relations. Post comments with the comment tool.
+   - **Canceling** (already implemented, duplicate, or the person decides against it): set `status: canceled` or Linear's Canceled state and record why, with a link to where it lives or the issue it duplicates, under **Notes** or as a Linear comment.
+
+9. **Report** when the queue is done: each issue triaged, with its ID, what changed, its status and priority, and any new or canceled issues.
