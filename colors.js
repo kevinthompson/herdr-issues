@@ -22,5 +22,5 @@ export const STATUS_COLORS = {
   done: "#5e6ad2",
   canceled: "#95a2b3",
 };
-const TINT_ALPHA = "30";
-export const tinted = (color) => `${color}${TINT_ALPHA}`;
+// `alpha` is two hex digits of opacity.
+export const tinted = (color, alpha = "30") => `${color}${alpha}`;

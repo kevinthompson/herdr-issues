@@ -5,14 +5,19 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
-import { mixColors } from "./colors.js";
+import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 
+// The status dropdown takes the status's color, as the list's status headers do.
 function dropdown(field, label, { issue, writable, onMenu }, t) {
+  const statusColor = field === "status" ? STATUS_COLORS[issue.status] : null;
+  const [fill, border, hoverFill] = statusColor
+    ? [tinted(statusColor), tinted(statusColor, "60"), tinted(statusColor, "48")]
+    : [t.raised, t.border, t.hover];
   return h_flex().gap(6).items_center().text_size(11)
     .child(div().text_color(t.dim).child(label))
-    .child(h_flex().id(`field-${field}`).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
-      .text_color(t.foreground).bg(t.raised)
-      .when(writable, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => onMenu(field, cx)))
+    .child(h_flex().id(`field-${field}`).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(border)
+      .text_color(t.foreground).bg(fill)
+      .when(writable, (e) => e.cursor_pointer().hover((s) => s.bg(hoverFill)).on_click((_e, cx) => onMenu(field, cx)))
       .child(optionLabel(field, issue[field]))
       .when(writable, (e) => e.child(div().text_color(t.dim).child("▾"))));
 }
