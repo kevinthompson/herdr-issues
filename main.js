@@ -1,7 +1,8 @@
 // The issues of the project in the focused pane: its git repository's root, or its folder outside one.
 // Clicking an issue shows it in the panel in place of the list (detail.js). The list draws a limited
 // number of rows, and Show more draws more. Status and priority dropdowns are popups of this same mod
-// with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
+// with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
+// (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once, and the tracker records every checkbox
@@ -28,6 +29,7 @@ import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueStatusCommit } from "./status-commits.js";
 import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
+import { WorktreeDialog } from "./worktree-dialog.js";
 
 const POLL_MS = 60 * 1000;
 // A local issues/ folder on a remote host can't be watched, but reading it is cheap.
@@ -92,6 +94,7 @@ const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? no
 export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
+    if (props()?.action) { this.worktreeDialog = new WorktreeDialog(cx); return; }
     this.issues = []; this.unloaded = new Set(); this.generation = 0; this.expanded = {};
     this.rowLimit = ROW_LIMIT;
     this.editing = null; this.saving = false; this.detailError = null;
@@ -396,7 +399,7 @@ export default class Issues extends View {
   // Herdr's teardown hook: checkboxes and statuses still waiting for their commit get it now.
   async close() {
     await this.commitChecklists(this.takePendingChecklists()).catch(() => {});
-    if (!this.menu) await commitStatuses(takePendingStatusCommits()).catch(() => {});
+    if (!this.menu && !this.worktreeDialog) await commitStatuses(takePendingStatusCommits()).catch(() => {});
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
@@ -548,7 +551,7 @@ export default class Issues extends View {
   openWorktreeDialog(issue) {
     const project = this.project;
     openOverlay({
-      mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
+      mod: "issues", kind: "dialog", width: 440, height: 260,
       props: {
         folder: project?.root, machine: project?.on ?? null, action: "new",
         branch: issue.branch ?? undefined, name: issue.id, ...workIssueSession(issue),
@@ -706,6 +709,7 @@ export default class Issues extends View {
 
   render(cx) {
     if (this.menu) return this.menu.render();
+    if (this.worktreeDialog) return this.worktreeDialog.render(cx);
     if (contextKey() !== this.context) this.refresh(cx);
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
