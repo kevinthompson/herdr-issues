@@ -34,6 +34,9 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
 
 const FACT_ROW_PX = 18;
 
+// The bar of fields you can change, a shade lighter than the panel so it reads apart from the issue's details.
+const fieldBar = (t) => mixColors(t.background, t.raised, 0.35) ?? t.surface;
+
 // One of the issue's facts on a line of its own: its name dimmed, then its value.
 function fact(label, value) {
   return h_flex().min_h(FACT_ROW_PX).gap(4).items_center()
@@ -191,10 +194,10 @@ export function issueDetail(view, t) {
       .child(v_flex().gap(2)
         .child(div().text_size(11).text_color(t.accent).child(issue.id))
         .child(div().whitespace_normal().font_semibold().child(issue.title)))
-      .child(h_flex().flex_wrap().gap(14).items_center()
-        .child(dropdown("status", "Status", view, t))
-        .child(dropdown("priority", "Priority", view, t)))
       .child(facts(view, t))
       .when(issue.pullRequests?.length > 0, (e) => e.child(pullRequests(view, t))))
+    .child(h_flex().flex_none().flex_wrap().px(14).py(8).gap(14).items_center().border_b(1).border_color(t.border).bg(fieldBar(t))
+      .child(dropdown("status", "Status", view, t))
+      .child(dropdown("priority", "Priority", view, t)))
     .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)));
 }
