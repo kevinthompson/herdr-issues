@@ -43,7 +43,7 @@ const FILTERED_ISSUES_IN_STATE = `query($filter: IssueFilter!, $state: WorkflowS
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { and: [$filter, { state: $state }] }) { ${PAGE} } }`;
 const TEAM_PROJECTS = `query($team: String!) { team(id: $team) {
   projects(first: 50, filter: { status: { type: { nin: ["completed", "canceled"] } } }) { nodes {
-    id name url projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
+    id name url status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
@@ -99,12 +99,21 @@ async function loadConfig() {
   return { apiKey: config.apiKey, repos: Object.entries(config.repos ?? {}).map(([teamKey, entry]) => repoConfig(teamKey, entry)) };
 }
 
-// The issue lists a repository can show: { id, label, group?, milestones? }, its default first. A project
-// scope lists its milestones as scopes of their own: { id, label, url }.
+// Projects in the scope menu, by status: in progress, then planned, paused and backlog.
+const PROJECT_STATUS_ORDER = ["started", "planned", "paused", "backlog"];
+const statusRank = (project) => {
+  const rank = PROJECT_STATUS_ORDER.indexOf(project.status?.type);
+  return rank === -1 ? PROJECT_STATUS_ORDER.length : rank;
+};
+
+// The issue lists a repository can show: { id, label, group?, subgroup?, milestones? }, its default first.
+// Projects are grouped under their status. A project scope lists its milestones as scopes of their own:
+// { id, label }.
 function scopesFor({ views }, projects) {
   const viewScopes = views.map((view) => ({ id: `view:${view.id}`, label: view.name, group: "Views" }));
-  const projectScopes = projects.map((project) => ({
-    id: `project:${project.id}`, label: project.name, group: "Projects", url: project.url,
+  const byStatus = [...projects].sort((a, b) => statusRank(a) - statusRank(b));
+  const projectScopes = byStatus.map((project) => ({
+    id: `project:${project.id}`, label: project.name, group: "Projects", subgroup: project.status?.name, url: project.url,
     milestones: [...project.projectMilestones.nodes].sort((a, b) => a.sortOrder - b.sortOrder)
       .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
   }));

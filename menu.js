@@ -1,7 +1,7 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
 // this same mod with props { menu: field, root, on, id, current, statuses }; picking an option saves it.
 // The panel's scope and milestone dropdowns are popups too, with props { menu: "scope", scopes, current, key }:
-// scopes are { id, label, group? }, and a heading names each group where it starts.
+// scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, notify, shared, setShared } from "herdr";
@@ -11,7 +11,8 @@ import { queueStatusCommit } from "./status-commits.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
 
 const ROW = 28, PADDING = 5, WIDTH = 170;
-// Group headings in a menu, filled like the issue list's status headings but in a neutral gray.
+// Group headings in a menu, filled like the issue list's status headings but in a neutral gray;
+// subgroup headings are dimmed text under them.
 const HEADING_HEIGHT = 22, HEADING_FILL = "#e2e2e230";
 
 const OPTIONS = {
@@ -40,6 +41,9 @@ function optionList(options, current, busy, onPick) {
       ? h_flex().id(`heading-${option.heading}`).h(ROW).flex_none().items_center()
         .child(div().w_full().h(HEADING_HEIGHT).px(9).flex().items_center().rounded(6).bg(HEADING_FILL)
           .text_size(11).font_semibold().text_color(t.foreground).child(option.heading))
+      : option.subheading
+      ? div().id(`subheading-${option.subheading}`).h(ROW).px(9).flex_none().flex().items_end().pb(4)
+        .text_size(11).text_color(t.dim).child(option.subheading)
       : h_flex().id(`option-${option.value}`).h(ROW).px(9).gap(9).flex_none().items_center()
       .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
       .child(div().flex_1().truncate().child(option.label))
@@ -55,16 +59,22 @@ export const selectedScope = (key) => selections()[key];
 const SCOPE_MENU_WIDTH = 280;
 const SCOPE_MENU_MAX_HEIGHT = 440;
 
-// The scopes as menu options, with a heading before each group.
+// The scopes as menu options, with a heading before each group and a subheading before each subgroup.
 function scopeOptions(scopes) {
   return scopes.flatMap((scope, index) => {
-    const option = { value: scope.id, label: scope.label };
-    return scope.group && scope.group !== scopes[index - 1]?.group ? [{ heading: scope.group }, option] : [option];
+    const previous = scopes[index - 1];
+    const startsGroup = scope.group && scope.group !== previous?.group;
+    const startsSubgroup = scope.subgroup && (startsGroup || scope.subgroup !== previous?.subgroup);
+    return [
+      ...(startsGroup ? [{ heading: scope.group }] : []),
+      ...(startsSubgroup ? [{ subheading: scope.subgroup }] : []),
+      { value: scope.id, label: scope.label },
+    ];
   });
 }
 
 export function openScopeMenu(scopes, current, key) {
-  const listed = scopes.map(({ id, label, group }) => ({ id, label, group }));
+  const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
   openOverlay({
     mod: "issues", kind: "popup", at: "pointer", width: SCOPE_MENU_WIDTH,
     height: Math.min(scopeOptions(listed).length * ROW + PADDING * 2, SCOPE_MENU_MAX_HEIGHT),
