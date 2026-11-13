@@ -25,7 +25,7 @@ import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueStatusCommit } from "./status-commits.js";
-import { mixColors } from "./colors.js";
+import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 
 const POLL_MS = 60 * 1000;
@@ -47,19 +47,6 @@ const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
 const ID_COLUMN_PX = 68;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
-// Linear's workflow state colors, tinted so headers stay calm on dark backgrounds.
-const GROUP_TINT_ALPHA = "30";
-const tinted = (color) => `${color}${GROUP_TINT_ALPHA}`;
-const GROUP_COLORS = {
-  triage: "#fc7840",
-  "in-progress": "#f2c94c",
-  "in-review": "#4cb782",
-  todo: "#e2e2e2",
-  blocked: "#eb5757",
-  backlog: "#bec2c8",
-  done: "#5e6ad2",
-  canceled: "#95a2b3",
-};
 const contextKey = () => JSON.stringify(location());
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
 function withLoadedBodies(issues, previous) {
@@ -599,7 +586,7 @@ export default class Issues extends View {
   // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
   group(group, shown, t) {
     const expanded = this.isExpanded(group), hidden = group.issues.length - shown;
-    const color = GROUP_COLORS[group.id];
+    const color = STATUS_COLORS[group.id];
     const fill = color ? tinted(color) : t.raised;
     return v_flex().flex_none().gap(1)
       .child(h_flex().id(`group-${group.id}`).mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
