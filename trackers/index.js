@@ -5,8 +5,9 @@
 //   tracker.name                shown in the panel's header
 //   tracker.writable            whether update can save
 //   tracker.statuses            the STATUSES (issue.js) its issues can be set to
-//   tracker.scopes              the issue lists the tracker can show, { id, label }, its default first;
-//                                 absent when it has only one
+//   tracker.scopes              the issue lists the tracker can show, { id, label, group? }, its default
+//                                 first, a project's milestones under it as { milestones }; absent when
+//                                 it has only one
 //   tracker.list(scopeId)       → Issue[] in that scope, or the default one
 //   tracker.get(id)             → Issue, or null
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES

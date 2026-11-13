@@ -12,6 +12,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
+import { findScope } from "./trackers/linear.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
@@ -57,6 +58,15 @@ function withLoadedBodies(issues, previous) {
   });
 }
 
+function scopeDropdown(id, label, onClick, t) {
+  return h_flex().id(id).min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
+    .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
+    .on_click(() => onClick())
+    .child(div().min_w(0).truncate().child(label))
+    .child(div().flex_none().text_color(t.dim).child("▾"));
+}
+
+const SCOPE_DROPDOWN_MAX_PX = 260;
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
 // Issues whose Done waits for their branch's pull request to merge: { id, branch, root, on }. Shared, so every
@@ -591,16 +601,30 @@ export default class Issues extends View {
     return "No issues yet";
   }
 
-  // The tracker's name, or a dropdown of the scopes it can list, showing the one listed now.
+  // The scope listed now: { scope, project, milestone }, a milestone's under its project.
+  currentScope() {
+    const { scopes } = this.tracker;
+    return findScope(scopes, this.listedScope) ?? { scope: scopes[0], project: null, milestone: null };
+  }
+
+  // The tracker's name, or a dropdown of the scopes it can list, showing the one listed now: a milestone
+  // shows its project, and the milestone bar below narrows it.
   trackerLabel(t) {
     const { scopes, name } = this.tracker;
     if (!scopes) return div().flex_none().text_size(11).text_color(t.dim).child(name);
-    const current = scopes.find((scope) => scope.id === this.listedScope) ?? scopes[0];
-    return h_flex().id("issues-scope").flex_none().min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
-      .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
-      .on_click(() => openScopeMenu(scopes, current.id, this.scopeKey))
-      .child(div().min_w(0).truncate().child(current.label))
-      .child(div().flex_none().text_color(t.dim).child("▾"));
+    const { scope, project } = this.currentScope(), shown = project ?? scope;
+    return scopeDropdown("issues-scope", shown.label, () => openScopeMenu(scopes, shown.id, this.scopeKey), t).flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX);
+  }
+
+  // Under a project with milestones, a dropdown that narrows the list to one of them.
+  milestoneBar(t) {
+    const { project, milestone } = this.tracker?.scopes ? this.currentScope() : {};
+    if (!project?.milestones.length) return null;
+    const options = [{ id: project.id, label: "All milestones" }, ...project.milestones];
+    return h_flex().h(38).flex_none().px(14).gap(8).items_center().justify_end().border_b(1).border_color(t.border)
+      .child(div().flex_none().text_size(11).text_color(t.dim).child("Milestone"))
+      .child(scopeDropdown("issues-milestone", milestone?.label ?? "All milestones",
+        () => openScopeMenu(options, milestone?.id ?? project.id, this.scopeKey), t).flex_shrink(1));
   }
 
   refreshButton(t) {
@@ -614,7 +638,7 @@ export default class Issues extends View {
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
-    const groups = groupIssues(this.issues), error = this.error ?? this.detailError;
+    const groups = groupIssues(this.issues), error = this.error ?? this.detailError, milestoneBar = this.milestoneBar(t);
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Issues"))
@@ -622,6 +646,7 @@ export default class Issues extends View {
         .child(div().flex_1())
         .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t)))
         .child(this.refreshButton(t)))
+      .when(Boolean(milestoneBar), (e) => e.child(milestoneBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group) => this.group(group, t)))

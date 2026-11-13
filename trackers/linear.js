@@ -2,7 +2,8 @@
 // { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time: its first view, else every open issue assigned to
-// you, across teams. Scopes other than a view add the issues completed or merged most recently.
+// you, across teams. The team's open projects are scopes too, each narrowed further to one of its
+// milestones. Scopes other than a view add the issues completed or merged most recently.
 import { home, appHome, readTextFile, exec } from "herdr";
 import { mainCheckout } from "../location.js";
 import { STATUSES, STATUS_LABELS } from "../issue.js";
@@ -12,8 +13,10 @@ const API_URL = "https://api.linear.app/graphql";
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const RECENTLY_FINISHED = 10;
-// How long a view's saved filter is reused before it is read again, to pick up edits made in Linear.
+// How long a view's saved filter, or a team's projects, is reused before it is read again, to pick up
+// edits made in Linear.
 const VIEW_FILTER_TTL_MS = 10 * 60 * 1000;
+const PROJECTS_TTL_MS = 10 * 60 * 1000;
 
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt url
@@ -36,6 +39,11 @@ const TEAM_ISSUES = `query($team: String!, $state: WorkflowStateFilter, $first: 
 const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData } }`;
 const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
+const FILTERED_ISSUES_IN_STATE = `query($filter: IssueFilter!, $state: WorkflowStateFilter, $first: Int!, $after: String) {
+  issues(first: $first, after: $after, orderBy: updatedAt, filter: { and: [$filter, { state: $state }] }) { ${PAGE} } }`;
+const TEAM_PROJECTS = `query($team: String!) { team(id: $team) {
+  projects(first: 50, filter: { status: { type: { nin: ["completed", "canceled"] } } }) { nodes {
+    id name url projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
@@ -91,10 +99,27 @@ async function loadConfig() {
   return { apiKey: config.apiKey, repos: Object.entries(config.repos ?? {}).map(([teamKey, entry]) => repoConfig(teamKey, entry)) };
 }
 
-// The issue lists a repository can show: { id, label }, its default first.
-function scopesFor({ views }) {
-  const viewScopes = views.map((view) => ({ id: `view:${view.id}`, label: view.name }));
-  return [...viewScopes, { id: "mine", label: "My issues" }, { id: "team", label: "Team issues" }];
+// The issue lists a repository can show: { id, label, group?, milestones? }, its default first. A project
+// scope lists its milestones as scopes of their own: { id, label, url }.
+function scopesFor({ views }, projects) {
+  const viewScopes = views.map((view) => ({ id: `view:${view.id}`, label: view.name, group: "Views" }));
+  const projectScopes = projects.map((project) => ({
+    id: `project:${project.id}`, label: project.name, group: "Projects", url: project.url,
+    milestones: [...project.projectMilestones.nodes].sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
+  }));
+  const listScopes = [{ id: "mine", label: "My issues", group: "Views" }, { id: "team", label: "Team issues", group: "Views" }];
+  return [...viewScopes, ...listScopes, ...projectScopes];
+}
+
+// The scope with this ID, a milestone's under its project: { scope, project, milestone }, or null.
+export function findScope(scopes, scopeId) {
+  for (const scope of scopes) {
+    if (scope.id === scopeId) return { scope, project: scope.milestones ? scope : null, milestone: null };
+    const milestone = scope.milestones?.find((each) => each.id === scopeId);
+    if (milestone) return { scope: milestone, project: scope, milestone };
+  }
+  return null;
 }
 
 async function request(apiKey, query, variables) {
@@ -155,8 +180,24 @@ async function cloudAgentIds(linear) {
   return cloudAgent;
 }
 
-// view ID → { filter, at }. Outlives each tracker, since the panel makes a new one every refresh.
+// view ID → { filter, at }, and team key → { projects, at }. Outlive each tracker, since the panel
+// makes a new one every refresh.
 const viewFilters = new Map();
+const teamProjects = new Map();
+
+// The team's projects that aren't completed or canceled, with their milestones. A failure lists none,
+// so the panel's other scopes still work.
+async function projectsOf(teamKey, linear) {
+  const cached = teamProjects.get(teamKey);
+  if (cached && Date.now() - cached.at < PROJECTS_TTL_MS) return cached.projects;
+  try {
+    const projects = (await linear(TEAM_PROJECTS, { team: teamKey })).team?.projects.nodes ?? [];
+    teamProjects.set(teamKey, { projects, at: Date.now() });
+    return projects;
+  } catch {
+    return cached?.projects ?? [];
+  }
+}
 
 export async function linearTracker({ root: projectRoot, on }) {
   if (on != null) return null;
@@ -165,7 +206,7 @@ export async function linearTracker({ root: projectRoot, on }) {
   if (!repo) return null;
   if (!config.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
   const linear = (query, variables = {}) => request(config.apiKey, query, variables);
-  const scopes = scopesFor(repo);
+  const scopes = scopesFor(repo, await projectsOf(repo.teamKey, linear));
   const agent = (await isPlanningCenterRepo(root)) ? await cloudAgentIds(linear) : null;
 
   // Every page of the connection `connectionOf` picks out of each answer.
@@ -209,6 +250,11 @@ export async function linearTracker({ root: projectRoot, on }) {
   }
 
   function issuesIn(scopeId) {
+    const [kind, projectId, milestoneId] = scopeId.split(":");
+    if (kind === "project") {
+      const filter = milestoneId ? { projectMilestone: { id: { eq: milestoneId } } } : { project: { id: { eq: projectId } } };
+      return openAndRecentlyFinished(FILTERED_ISSUES_IN_STATE, { filter }, (data) => data.issues);
+    }
     if (scopeId === "team") return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues);
     if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5));
     return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues);
@@ -244,7 +290,7 @@ export async function linearTracker({ root: projectRoot, on }) {
     scopes,
     // An unknown scope, such as a view since removed from the config, lists the default.
     async list(scopeId) {
-      const scope = scopes.find((each) => each.id === scopeId) ?? scopes[0];
+      const scope = findScope(scopes, scopeId)?.scope ?? scopes[0];
       return (await issuesIn(scope.id)).map(toIssue);
     },
     get,

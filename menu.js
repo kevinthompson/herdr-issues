@@ -1,6 +1,7 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
 // this same mod with props { menu: field, root, on, id, current, statuses }; picking an option saves it.
-// The panel's scope dropdown is a popup too, with props { menu: "scope", scopes, current, key }.
+// The panel's scope and milestone dropdowns are popups too, with props { menu: "scope", scopes, current, key }:
+// scopes are { id, label, group? }, and a heading names each group where it starts.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, notify, shared, setShared } from "herdr";
@@ -10,6 +11,8 @@ import { queueStatusCommit } from "./status-commits.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
 
 const ROW = 28, PADDING = 5, WIDTH = 170;
+// Group headings in a menu, filled like the issue list's status headings but in a neutral gray.
+const HEADING_HEIGHT = 22, HEADING_FILL = "#e2e2e230";
 
 const OPTIONS = {
   status: STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] })),
@@ -32,8 +35,12 @@ export function openMenu(field, issue, project, statuses) {
 
 function optionList(options, current, busy, onPick) {
   const t = theme();
-  return v_flex().id("issue-field-menu").size_full().p(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
-    .children(options.map((option) => h_flex().id(`option-${option.value}`).h(ROW).px(9).gap(9).flex_none().items_center()
+  return v_flex().id("issue-field-menu").size_full().overflow_y_scroll().p(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
+    .children(options.map((option) => option.heading
+      ? h_flex().id(`heading-${option.heading}`).h(ROW).flex_none().items_center()
+        .child(div().w_full().h(HEADING_HEIGHT).px(9).flex().items_center().rounded(6).bg(HEADING_FILL)
+          .text_size(11).font_semibold().text_color(t.foreground).child(option.heading))
+      : h_flex().id(`option-${option.value}`).h(ROW).px(9).gap(9).flex_none().items_center()
       .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
       .child(div().flex_1().truncate().child(option.label))
       .child(div().flex_none().text_color(t.muted).child(busy === option.value ? "…" : option.value === current ? "✓" : ""))));
@@ -45,20 +52,30 @@ const SCOPES = "issues.scopes";
 const selections = () => /** @type {Record<string, string>} */ (shared(SCOPES) ?? {});
 export const selectedScope = (key) => selections()[key];
 
-const SCOPE_MENU_WIDTH = 220;
+const SCOPE_MENU_WIDTH = 280;
+const SCOPE_MENU_MAX_HEIGHT = 440;
+
+// The scopes as menu options, with a heading before each group.
+function scopeOptions(scopes) {
+  return scopes.flatMap((scope, index) => {
+    const option = { value: scope.id, label: scope.label };
+    return scope.group && scope.group !== scopes[index - 1]?.group ? [{ heading: scope.group }, option] : [option];
+  });
+}
 
 export function openScopeMenu(scopes, current, key) {
+  const listed = scopes.map(({ id, label, group }) => ({ id, label, group }));
   openOverlay({
-    mod: "issues", kind: "popup", at: "pointer", width: SCOPE_MENU_WIDTH, height: scopes.length * ROW + PADDING * 2,
-    props: { menu: "scope", scopes, current, key },
+    mod: "issues", kind: "popup", at: "pointer", width: SCOPE_MENU_WIDTH,
+    height: Math.min(scopeOptions(listed).length * ROW + PADDING * 2, SCOPE_MENU_MAX_HEIGHT),
+    props: { menu: "scope", scopes: listed, current, key },
   });
 }
 
 export class ScopeMenu {
   render() {
     const { scopes, current, key, overlay } = props();
-    const options = scopes.map((scope) => ({ value: scope.id, label: scope.label }));
-    return optionList(options, current, null, (option) => {
+    return optionList(scopeOptions(scopes), current, null, (option) => {
       setShared(SCOPES, { ...selections(), [key]: option.value });
       closeOverlay(overlay);
     });
