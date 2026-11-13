@@ -1,13 +1,12 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
-// this same mod with props { menu: field, root, on, id, current, statuses }; picking an option saves it.
+// this same mod with props { menu: field, root, on, id, current, statuses }; picking an option hands the
+// edit to the panel, which shows it at once and saves it.
 // The panel's scope and milestone dropdowns are popups too, with props { menu: "scope", scopes, current, key }:
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
-import { props, openOverlay, closeOverlay, theme, notify, shared, setShared } from "herdr";
-import { trackerFor } from "./trackers/index.js";
-import { announceIssueChange } from "./changes.js";
-import { queueStatusCommit } from "./status-commits.js";
+import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herdr";
+import { requestFieldEdit } from "./edits.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
 
 const ROW = 28, PADDING = 5, WIDTH = 170;
@@ -34,7 +33,7 @@ export function openMenu(field, issue, project, statuses) {
   });
 }
 
-function optionList(options, current, busy, onPick) {
+function optionList(options, current, onPick) {
   const t = theme();
   return v_flex().id("issue-field-menu").size_full().overflow_y_scroll().p(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
     .children(options.map((option) => option.heading
@@ -47,7 +46,7 @@ function optionList(options, current, busy, onPick) {
       : h_flex().id(`option-${option.value}`).h(ROW).px(9).gap(9).flex_none().items_center()
       .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
       .child(div().flex_1().truncate().child(option.label))
-      .child(div().flex_none().text_color(t.muted).child(busy === option.value ? "…" : option.value === current ? "✓" : ""))));
+      .child(div().flex_none().text_color(t.muted).child(option.value === current ? "✓" : ""))));
 }
 
 // The scope each repository lists, by its main checkout: { "<path>": "<scope id>" }. Shared, so every
@@ -85,7 +84,7 @@ export function openScopeMenu(scopes, current, key) {
 export class ScopeMenu {
   render() {
     const { scopes, current, key, overlay } = props();
-    return optionList(scopeOptions(scopes), current, null, (option) => {
+    return optionList(scopeOptions(scopes), current, (option) => {
       setShared(SCOPES, { ...selections(), [key]: option.value });
       closeOverlay(overlay);
     });
@@ -93,28 +92,14 @@ export class ScopeMenu {
 }
 
 export class FieldMenu {
-  pick(option, cx) {
+  pick(option) {
     const { menu: field, root, on, id, current, overlay } = props();
-    if (this.busy) return;
-    if (option.value === current) return closeOverlay(overlay);
-    this.busy = option.value; cx.notify();
-    cx.spawn(async (cx) => {
-      try {
-        const tracker = await trackerFor({ root, on }), issue = await tracker?.get(id);
-        if (!issue) throw new Error(`${id} was not found`);
-        await tracker.update(issue, { [field]: option.value });
-        if (field === "status" && tracker.commitStatuses) queueStatusCommit(root, issue, option.value);
-        announceIssueChange();
-      } catch (e) {
-        notify({ title: `Could not change ${field}`, body: String(e.message ?? e), level: "error" });
-      }
-      closeOverlay(overlay);
-      cx.notify();
-    });
+    if (option.value !== current) requestFieldEdit({ root, on: on ?? null, issueId: id, field, value: option.value, previous: current });
+    closeOverlay(overlay);
   }
 
   render() {
     const { menu: field, current, statuses } = props();
-    return optionList(optionsFor(field, statuses), current, this.busy, (option, cx) => this.pick(option, cx));
+    return optionList(optionsFor(field, statuses), current, (option) => this.pick(option));
   }
 }

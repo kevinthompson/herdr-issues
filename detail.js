@@ -175,6 +175,7 @@ export function issueDetail(view, t) {
       .child(div().id("issue-back").flex_none().h(26).px(8).flex().items_center().rounded(7).cursor_pointer().text_color(t.muted)
         .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
+      .when(Boolean(view.syncIndicator), (e) => e.child(view.syncIndicator))
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
       .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
       .when(!view.editor, (e) => e.child(workActions(view, t)))

@@ -24,7 +24,8 @@ import { openInNeovim, opensInNeovim } from "./neovim.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
-import { pendingStatusCommits, takePendingStatusCommits, commitStatuses } from "./status-commits.js";
+import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueStatusCommit } from "./status-commits.js";
+import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 
 const POLL_MS = 60 * 1000;
 // A local issues/ folder on a remote host can't be watched, but reading it is cheap.
@@ -79,6 +80,9 @@ function scopeDropdown(id, label, onClick, t) {
 
 const SCOPE_DROPDOWN_MAX_PX = 260;
 const REFRESH_ICON_PX = 15;
+const SYNC_ICON_PX = 15;
+// A saved edit's sync icon fades out over this long, a step at a time.
+const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
 // Issues whose Done waits for their branch's pull request to merge: { id, branch, root, on }. Shared, so every
@@ -414,6 +418,68 @@ export default class Issues extends View {
     });
   }
 
+  // This project's field edits that haven't saved yet, or whose save failed: [[id, edit]].
+  projectEdits() {
+    const project = this.project;
+    if (!project) return [];
+    return Object.entries(fieldEdits()).filter(([, edit]) => edit.root === project.root && edit.on === (project.on ?? null));
+  }
+
+  // Shows each edit on its issue, puts a failed one's field back, and saves the edits no copy has claimed.
+  applyFieldEdits(cx) {
+    for (const [id, edit] of this.projectEdits()) {
+      const issue = this.issues.find((each) => each.id === edit.issueId);
+      if (edit.failed) { if (issue?.[edit.field] === edit.value) issue[edit.field] = edit.previous; continue; }
+      if (issue) issue[edit.field] = edit.value;
+      if (this.tracker && claimEdit(id)) this.saveFieldEdit(id, edit, cx);
+    }
+  }
+
+  saveFieldEdit(id, edit, cx) {
+    const tracker = this.tracker;
+    cx.spawn(async (cx) => {
+      try {
+        const issue = this.issues.find((each) => each.id === edit.issueId) ?? await tracker.get(edit.issueId);
+        if (!issue) throw new Error(`${edit.issueId} was not found`);
+        await tracker.update(issue, { [edit.field]: edit.value });
+        if (edit.field === "status" && tracker.commitStatuses) queueStatusCommit(edit.root, issue, edit.value);
+        forgetEdits([id]);
+        this.fadeSyncIcon(cx);
+        announceIssueChange();
+      } catch (e) {
+        markEditFailed(id, `Could not change the ${edit.field} of ${edit.issueId}: ${e.message ?? e}`);
+      }
+      cx.notify();
+    });
+  }
+
+  fadeSyncIcon(cx) {
+    this.syncFade?.task.cancel();
+    const started = Date.now();
+    const task = cx.timer.every(SYNC_FADE_STEP_MS, (cx) => {
+      const opacity = 1 - (Date.now() - started) / SYNC_FADE_MS;
+      if (opacity > 0) this.syncFade = { task, opacity };
+      else { task.cancel(); this.syncFade = null; }
+      cx.notify();
+    });
+    this.syncFade = { task, opacity: 1 };
+  }
+
+  // Syncing while edits save, then fading out; an alert while any failed, which a click dismisses.
+  syncIndicator(t) {
+    const edits = this.projectEdits(), failed = edits.filter(([, edit]) => edit.failed);
+    const icon = (name, color) => svg(`mods/issues/${name}.svg`).size(SYNC_ICON_PX).text_color(color);
+    const slot = div().id("issues-sync").flex_none().size(24).flex().items_center().justify_center();
+    if (failed.length) {
+      return slot.cursor_pointer().tooltip(`${failed.map(([, edit]) => edit.failed).join("\n")}\nClick to dismiss.`)
+        .on_click((_e, cx) => { forgetEdits(failed.map(([id]) => id)); cx.notify(); })
+        .child(icon("circle-alert", t.ansi1));
+    }
+    if (edits.length) return slot.tooltip("Saving to the tracker…").child(icon("cloud-upload", t.dim));
+    if (this.syncFade) return slot.opacity(this.syncFade.opacity).child(icon("cloud-upload", t.dim));
+    return null;
+  }
+
   // Starting and continuing work wait on the tracker and wt, so the footer says what they're doing meanwhile.
   showOpening(issue, status, cx) {
     this.opening = { id: issue.id, status };
@@ -674,12 +740,13 @@ export default class Issues extends View {
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     const groups = groupIssues(this.issues, this.unloaded), error = this.error ?? this.detailError, milestoneBar = this.milestoneBar(t);
-    const shown = this.shownCounts(groups);
+    const shown = this.shownCounts(groups), syncIndicator = this.syncIndicator(t);
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Issues"))
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
+        .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
         .when(Boolean(this.tracker) && this.tracker.kind !== "local", (e) => e.child(this.refreshButton(t)))
         .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
       .when(Boolean(milestoneBar), (e) => e.child(milestoneBar))
@@ -696,12 +763,14 @@ export default class Issues extends View {
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     this.scheduleStatusCommits(cx);
     this.openRequestedIssue();
+    this.applyFieldEdits(cx);
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
     this.avatarLoads = [];
     const content = issue
       ? (this.loadBody(issue, cx), issueDetail({
         issue, writable: this.tracker?.writable,
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
+        syncIndicator: this.syncIndicator(t),
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
         onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),
