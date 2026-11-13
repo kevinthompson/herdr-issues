@@ -92,6 +92,17 @@ const WT_TIMEOUT_MS = 10 * 60 * 1000;
 // wt works on this computer's checkouts and needs the issue's branch.
 const opensWithWt = (issue, project) => Boolean(issue.branch && project && !project.on);
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
+// A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
+// otherwise halfway back to the panel's background.
+function rowHover(t) {
+  const hover = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(t.hover), background = /^#([0-9a-f]{6})$/i.exec(t.background);
+  if (!hover) return t.hover;
+  if (hover[2]) return `#${hover[1]}${Math.round(parseInt(hover[2], 16) / 2).toString(16).padStart(2, "0")}`;
+  if (!background) return t.hover;
+  const channels = (hex) => [0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16));
+  const [from, to] = [channels(background[1]), channels(hover[1])];
+  return `#${from.map((each, index) => Math.round((each + to[index]) / 2).toString(16).padStart(2, "0")).join("")}`;
+}
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
 export default class Issues extends View {
@@ -554,7 +565,7 @@ export default class Issues extends View {
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const inSpace = Boolean(worktreeSpace(this.repository, issue.branch));
     return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
-      .hover((s) => s.bg(t.hover))
+      .hover((s) => s.bg(rowHover(t)))
       .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)
