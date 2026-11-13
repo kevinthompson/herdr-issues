@@ -2,7 +2,8 @@
 // this same mod with props { menu: field, root, on, id, current, statuses }; picking an option hands the
 // edit to the panel, which shows it at once and saves it.
 // The panel's scope and milestone dropdowns are popups too, with props { menu: "scope", scopes, current, key }:
-// scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts.
+// scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
+// a group's in capitals after a divider, and a subgroup's dimmed, so neither looks like an option to pick.
 import { div } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herdr";
@@ -10,9 +11,6 @@ import { requestFieldEdit } from "./edits.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
 
 const ROW = 28, PADDING = 5, WIDTH = 170;
-// Group headings in a menu, filled like the issue list's status headings but in a neutral gray;
-// subgroup headings are dimmed text under them.
-const HEADING_HEIGHT = 22, HEADING_FILL = "#e2e2e230";
 
 const OPTIONS = {
   status: STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] })),
@@ -36,10 +34,10 @@ export function openMenu(field, issue, project, statuses) {
 function optionList(options, current, onPick) {
   const t = theme();
   return v_flex().id("issue-field-menu").size_full().overflow_y_scroll().p(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
-    .children(options.map((option) => option.heading
-      ? h_flex().id(`heading-${option.heading}`).h(ROW).flex_none().items_center()
-        .child(div().w_full().h(HEADING_HEIGHT).px(9).flex().items_center().rounded(6).bg(HEADING_FILL)
-          .text_size(11).font_semibold().text_color(t.foreground).child(option.heading))
+    .children(options.map((option, index) => option.heading
+      ? div().id(`heading-${option.heading}`).h(ROW).px(9).flex_none().flex().items_end().pb(4)
+        .when(index > 0, (e) => e.border_t(1).border_color(t.border))
+        .text_size(10.5).font_semibold().text_color(t.muted).child(option.heading.toUpperCase())
       : option.subheading
       ? div().id(`subheading-${option.subheading}`).h(ROW).px(9).flex_none().flex().items_end().pb(4)
         .text_size(11).text_color(t.dim).child(option.subheading)
