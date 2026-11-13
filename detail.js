@@ -136,8 +136,8 @@ const icon = (name) => (color) => svg(`mods/issues/${name}.svg`).size(14).text_c
 const workActions = (view, t) => workButton("issue", view, t, { compact: true });
 
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
-  if (!writable || issue.body === null) return div();
-  if (!editor) return button("issue-edit", icon("pencil"), onEdit, t, { tooltip: "Edit" });
+  if (!writable) return div();
+  if (!editor) return button("issue-edit", icon("pencil"), onEdit, t, { enabled: issue.body !== null, tooltip: "Edit" });
   return h_flex().flex_none().gap(6)
     .child(button("issue-cancel", "Cancel", onCancel, t, { enabled: !saving }))
     .child(button("issue-save", saving ? "Saving…" : "Save", onSave, t, { primary: true, enabled: !saving }));
