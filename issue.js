@@ -4,6 +4,7 @@ export const PRIORITIES = ["None", "Urgent", "High", "Medium", "Low"];
 
 // Work starts only on issues nobody has picked up yet, and waits while any of their blockers is unfinished.
 const STARTABLE_STATUSES = ["backlog", "todo"];
+const FINISHED = ["done", "canceled"];
 const isStartable = (issue) => STARTABLE_STATUSES.includes(issue.status);
 const isUnblocked = (issue, done) => issue.blockedBy.every((id) => done.has(id));
 
@@ -45,8 +46,25 @@ export function groupIssues(issues) {
     .filter((group) => group.issues.length);
 }
 
+// Which issues are done or still open, and which issues each one blocks, read once per list: every row
+// asks, and scanning the whole list for each row is too slow to render a team's hundreds of issues.
+const relationsByList = new WeakMap();
+function relations(issues) {
+  if (!relationsByList.has(issues)) {
+    const done = new Set(), open = new Set(), blocking = new Map();
+    for (const issue of issues) {
+      if (issue.status === "done") done.add(issue.id);
+      if (!FINISHED.includes(issue.status)) open.add(issue.id);
+      for (const blockerId of issue.blockedBy) blocking.set(blockerId, [...(blocking.get(blockerId) ?? []), issue]);
+    }
+    for (const [blockerId, blocked] of blocking) blocking.set(blockerId, blocked.sort(byId).map((issue) => issue.id));
+    relationsByList.set(issues, { done, open, blocking });
+  }
+  return relationsByList.get(issues);
+}
+
 export function unfinishedBlockers(issue, issues) {
-  const done = new Set(issues.filter((other) => other.status === "done").map((other) => other.id));
+  const { done } = relations(issues);
   return issue.blockedBy.filter((id) => !done.has(id));
 }
 
@@ -65,14 +83,13 @@ export function holdingBlockers(issue, issues) {
 
 // The IDs of the issues that name this one in their blocked_by, in number order.
 export function blockedIssues(issue, issues) {
-  return issues.filter((other) => other.blockedBy.includes(issue.id)).sort(byId).map((other) => other.id);
+  return relations(issues).blocking.get(issue.id) ?? [];
 }
 
 // The unfinished issues this one still holds up: none once it is done or canceled.
-const FINISHED = ["done", "canceled"];
 export function waitingIssues(issue, issues) {
   if (FINISHED.includes(issue.status)) return [];
-  const open = new Set(issues.filter((other) => !FINISHED.includes(other.status)).map((other) => other.id));
+  const { open } = relations(issues);
   return blockedIssues(issue, issues).filter((id) => open.has(id));
 }
 
