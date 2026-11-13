@@ -26,7 +26,7 @@ import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses } from "./status-commits.js";
 
-const POLL_MS = 5 * 60 * 1000;
+const POLL_MS = 60 * 1000;
 // A local issues/ folder on a remote host can't be watched, but reading it is cheap.
 const LOCAL_POLL_MS = 10 * 1000;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
