@@ -45,7 +45,7 @@ import { linearTracker } from "./linear.js";
 import { githubTracker } from "./github.js";
 import { trackerSetting } from "./setting.js";
 
-// The repository's .issues.json (setting.js) decides; without one, its own issues/ folder wins over Linear.
+// The repository's entry in issues.json (setting.js) decides; without one, its own issues/ folder wins over Linear.
 export async function trackerFor(project) {
   const setting = await trackerSetting(project);
   if (setting?.tracker === "local") return localTracker(project);

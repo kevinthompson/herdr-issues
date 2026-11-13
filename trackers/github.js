@@ -1,4 +1,4 @@
-// Issues in a GitHub repository, for repositories whose .issues.json says { "tracker": "github" } (setting.js),
+// Issues in a GitHub repository, for repositories whose entry in issues.json says { "tracker": "github" } (setting.js),
 // with an optional "repo": "owner/name" in place of origin's. Every request goes through the GitHub CLI, so
 // `gh auth login` is the only credential.
 //

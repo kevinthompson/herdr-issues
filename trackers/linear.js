@@ -1,13 +1,11 @@
-// Issues in Linear, for repositories whose .issues.json names a team (setting.js), Planning Center
-// repositories (their team found by linear-team.js) and those named in ~/.config/herdr-app/linear.json,
-// whose entries win over detection:
-// { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
-// { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
+// Issues in Linear, for repositories whose entry in issues.json names a team (setting.js) and Planning Center
+// repositories, whose team linear-team.js finds. The API key is the one secret, kept apart from issues.json in
+// ~/.config/herdr-app/linear.json: { "apiKey": "lin_api_…" }.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
 // default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
 // open projects are scopes too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
 // completed or merged most recently.
-import { home, appHome, readTextFile } from "herdr";
+import { appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
@@ -89,22 +87,17 @@ function pullRequestsOf(attachments) {
     }));
 }
 
-const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
-
 // A view's URL ends in its name and its ID, which the API takes in place of the view's UUID:
 // …/view/calendar-core-a8875271fcf5 is a8875271fcf5.
 const viewId = (url) => url.replace(/[?#].*$/, "").replace(/\/+$/, "").split("/").pop().split("-").pop();
 
-function repoConfig(teamKey, entry) {
-  const { path, views = {} } = typeof entry === "string" ? { path: entry } : entry;
-  return { teamKey, path: expandHome(path), views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
+function repoConfig(root, { team, views = {} }) {
+  return { teamKey: team, path: root, views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
 }
 
-async function loadConfig() {
+async function readApiKey() {
   const text = await readTextFile(`${appHome()}/linear.json`).catch(() => null);
-  if (text === null) return null;
-  const config = JSON.parse(text);
-  return { apiKey: config.apiKey, repos: Object.entries(config.repos ?? {}).map(([teamKey, entry]) => repoConfig(teamKey, entry)) };
+  return text === null ? null : JSON.parse(text).apiKey ?? null;
 }
 
 // Projects in the scope menu, by status: in progress, then planned, paused and backlog. Within a status, by
@@ -228,14 +221,13 @@ async function teamOf(teamKey, linear) {
 
 export async function linearTracker({ root: projectRoot, on }, setting = null) {
   if (on != null) return null;
-  const config = await loadConfig(), root = await mainCheckout(projectRoot, on);
-  const configured = setting
-    ? repoConfig(setting.team, { path: root, views: setting.views })
-    : config?.repos.find((each) => each.path === root);
+  const root = await mainCheckout(projectRoot, on);
+  const configured = setting && repoConfig(root, setting);
   const repoName = await planningCenterRepoName(root);
   if (!configured && !repoName) return null;
-  if (!config?.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
-  const linear = (query, variables = {}) => request(config.apiKey, query, variables);
+  const apiKey = await readApiKey();
+  if (!apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
+  const linear = (query, variables = {}) => request(apiKey, query, variables);
   const teamKey = configured?.teamKey ?? (await detectedTeam(root, repoName, linear));
   if (!teamKey) return null;
   const repo = configured ?? { teamKey, path: root, views: [] };

@@ -1,23 +1,30 @@
-// A repository's own choice of tracker: .issues.json in its main checkout, which /issues:config writes and
-// keeps out of git through .git/info/exclude, since the choice belongs to this machine's checkout.
-//   { "tracker": "local" }                      its issues/ folder
-//   { "tracker": "linear", "team": "CAL", "views": { "<name>": "https://linear.app/…/view/…" } }
-//   { "tracker": "github", "repo": "owner/name" }  its GitHub issues; repo defaults to origin's
-// Without one, a repository's issues/ folder wins, then Linear.
-import { readTextFile } from "herdr";
+// Each repository's choice of tracker, in ~/.config/herdr-app/issues.json, which /issues:config writes. Repositories
+// are keyed by their main checkout's path, ~ for the home folder, so worktrees share their repository's choice:
+// { "repos": {
+//     "~/Code/game":     { "tracker": "local" },                    its issues/ folder
+//     "~/Code/calendar": { "tracker": "linear", "team": "CAL",      a Linear team, with saved views as extra lists
+//                          "views": { "<name>": "https://linear.app/…/view/…" } },
+//     "~/Code/app":      { "tracker": "github", "repo": "owner/name" } } }   its GitHub issues; repo defaults to origin's
+// The file holds no secrets, so it can be shared between machines; Linear's API key stays in linear.json.
+// Without an entry, a repository's issues/ folder wins, then Linear. Only this computer's repositories have entries.
+import { appHome, home, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 
-export const SETTING_FILE = ".issues.json";
+export const settingsPath = () => `${appHome()}/issues.json`;
 const TRACKERS = ["local", "linear", "github"];
+const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
 
-// The setting, or null when the repository has none.
+// The repository's entry, or null when it has none.
 export async function trackerSetting({ root, on }) {
-  const main = await mainCheckout(root, on);
-  const text = await readTextFile(`${main}/${SETTING_FILE}`, { on }).catch(() => null);
+  if (on != null) return null;
+  const text = await readTextFile(settingsPath()).catch(() => null);
   if (text === null) return null;
-  let setting;
-  try { setting = JSON.parse(text); } catch (e) { throw new Error(`${SETTING_FILE} isn't valid JSON: ${e.message ?? e}`); }
-  if (!TRACKERS.includes(setting?.tracker)) throw new Error(`${SETTING_FILE} needs a tracker: ${TRACKERS.join(", ")}`);
-  if (setting.tracker === "linear" && !setting.team) throw new Error(`${SETTING_FILE} needs the Linear team's key`);
+  let settings;
+  try { settings = JSON.parse(text); } catch (e) { throw new Error(`issues.json isn't valid JSON: ${e.message ?? e}`); }
+  const main = await mainCheckout(root, on);
+  const [key, setting] = Object.entries(settings?.repos ?? {}).find(([path]) => expandHome(path) === main) ?? [];
+  if (!setting) return null;
+  if (!TRACKERS.includes(setting.tracker)) throw new Error(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
+  if (setting.tracker === "linear" && !setting.team) throw new Error(`issues.json's ${key} needs the Linear team's key`);
   return setting;
 }

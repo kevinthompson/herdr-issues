@@ -9,10 +9,10 @@
 // committed the same way.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { SETTING_FILE } from "./trackers/setting.js";
+import { settingsPath } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
@@ -123,7 +123,7 @@ export default class Issues extends View {
         if (!where.cwd) throw new Error("No folder in focus");
         const root = await projectRoot(where);
         const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
-        this.watchSetting(scopeKey, where.on, cx);
+        this.watchSettings(cx);
         const tracker = await trackerFor({ root, on: where.on });
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
         const loads = loadsFor((group) => this.isExpanded(group));
@@ -188,20 +188,22 @@ export default class Issues extends View {
     });
   }
 
-  // A repository's .issues.json picks its tracker, so changing it refreshes the panel at once rather than
-  // at the next poll. Only this computer's checkouts can be watched.
-  watchSetting(mainCheckoutPath, on, cx) {
-    if (on != null || this.watchingSetting === mainCheckoutPath) return;
-    this.watchingSetting = mainCheckoutPath;
-    const settingPath = `${mainCheckoutPath}/${SETTING_FILE}`;
+  // issues.json picks each repository's tracker, so changing it refreshes the panel at once rather than at the
+  // next poll. The app's folder holds more than the file, so other changes there are ignored.
+  watchSettings(cx) {
+    if (this.watchingSettings) return;
+    this.watchingSettings = true;
+    const folder = appHome(), file = settingsPath();
     cx.spawn(async (cx) => {
       try {
-        while (this.watchingSetting === mainCheckoutPath) {
-          const paths = await watchFolder(mainCheckoutPath);
-          const settingChanged = paths.some((path) => path === settingPath || path === mainCheckoutPath);
-          if (settingChanged && this.watchingSetting === mainCheckoutPath) this.refresh(cx);
+        // Changes arrive under the folder's real path when the app's folder is reached through a symlink.
+        const realFolder = (await exec("pwd", ["-P"], { cwd: folder })).stdout.trim();
+        const watched = new Set([folder, file, realFolder, `${realFolder}${file.slice(folder.length)}`]);
+        for (;;) {
+          const paths = await watchFolder(folder);
+          if (paths.some((path) => watched.has(path))) this.refresh(cx);
         }
-      } catch { if (this.watchingSetting === mainCheckoutPath) this.watchingSetting = null; }
+      } catch { this.watchingSettings = false; }
     });
   }
 

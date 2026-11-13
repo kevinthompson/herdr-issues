@@ -1,4 +1,4 @@
-// The Linear team that owns a Planning Center repository with no entry in linear.json: the team of most
+// The Linear team that owns a Planning Center repository with no entry in issues.json: the team of most
 // of the issues its recent pull requests are attached to. Saved per repository in the app's data
 // folder, so a new space finds it at once; a repository with no answer is asked again a day later.
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
