@@ -132,16 +132,8 @@ function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
 
 const icon = (name) => (color) => svg(`mods/issues/${name}.svg`).size(14).text_color(color);
 
-// Continue and Done for an issue in progress, otherwise Start, as icons with the primary action last.
-function workActions(view, t) {
-  if (!view.finishable) return workButton("issue", view, t, { compact: true });
-  const { awaitingPullRequest, hasUnmergedPullRequests, onDone } = view;
-  const blockedReason = awaitingPullRequest ? "Waiting for this branch's pull request to merge"
-    : hasUnmergedPullRequests ? "This issue has pull requests that haven't merged" : null;
-  return h_flex().flex_none().gap(6)
-    .child(workButton("issue", view, t, { primary: false, compact: true }))
-    .child(button("issue-done", icon("square-check"), onDone, t, { primary: true, enabled: !blockedReason, tooltip: blockedReason ?? "Mark done" }));
-}
+// Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
+const workActions = (view, t) => workButton("issue", view, t, { compact: true });
 
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
   if (!writable || issue.body === null) return div();

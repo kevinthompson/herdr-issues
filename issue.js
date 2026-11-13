@@ -109,10 +109,6 @@ export function waitingIssues(issue, issues) {
   return blockedIssues(issue, issues).filter((id) => open.has(id));
 }
 
-// The attached pull requests that haven't merged, closed ones included.
-export const unmergedPullRequests = (issue) =>
-  (issue.pullRequests ?? []).filter((pullRequest) => pullRequest.status !== "merged");
-
 // How long an unfinished issue has left on its SLA, as Linear shows it: { text, risk }, where risk is
 // "low", "medium", "high" or "breached". null without an SLA or once the issue is finished.
 const HOUR_MS = 3600000, DAY_MS = 24 * HOUR_MS;

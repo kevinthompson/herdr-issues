@@ -9,15 +9,15 @@
 // committed the same way.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, setShared, spaces, notify, exec, run } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
-import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
+import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { openInNeovim, opensInNeovim } from "./neovim.js";
@@ -33,7 +33,6 @@ const LOCAL_POLL_MS = 10 * 1000;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
 // team at once is too slow.
 const ROW_LIMIT = 100;
-const PULL_REQUEST_CHECK_MS = 2 * 60 * 1000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const STATUS_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
@@ -86,17 +85,11 @@ const SYNC_ICON_PX = 15;
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
-// Issues whose Done waits for their branch's pull request to merge: { id, branch, root, on }. Shared, so every
-// copy of the panel shows the wait and it outlives a reload.
-const AWAITING = "issues.awaitingPullRequest";
-const awaitingPullRequests = () => shared(AWAITING) ?? [];
-const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
 const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/issues:work ${issue.id}` });
 // wt sets up new checkouts, which can take minutes in a box app.
 const WT_TIMEOUT_MS = 10 * 60 * 1000;
 // wt works on this computer's checkouts and needs the issue's branch.
 const opensWithWt = (issue, project) => Boolean(issue.branch && project && !project.on);
-const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
 // A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
 // otherwise halfway back to the panel's background.
 function rowHover(t) {
@@ -119,8 +112,6 @@ export default class Issues extends View {
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
     cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); });
-    this.checkPullRequests(cx);
-    cx.timer.every(PULL_REQUEST_CHECK_MS, (cx) => this.checkPullRequests(cx));
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
@@ -548,73 +539,6 @@ export default class Issues extends View {
       },
     });
   }
-
-  // A clean worktree's branch is merged into main first in a personal project. In a collaborative
-  // project, Done waits for the branch's pull request to merge instead, unless no Claude session is open to make one.
-  // Anything else (no worktree, uncommitted changes) just marks the issue done. An issue with an
-  // unmerged pull request attached is never marked done.
-  finishWork(issue, cx) {
-    const tracker = this.tracker, project = this.project;
-    if (!tracker?.writable) { this.detailError = "Can't mark this issue done here"; cx.notify(); return; }
-    if (unmergedPullRequests(issue).length) { this.detailError = "Merge its pull requests first"; cx.notify(); return; }
-    this.detailError = null;
-    cx.spawn(async (cx) => {
-      try {
-        const worktree = project && await worktreeFor(issue.branch, project);
-        if (!worktree || await hasUncommittedChanges(worktree)) await tracker.finish(issue);
-        else if (await this.landBranch(worktree)) await tracker.finish(issue);
-        else await this.awaitPullRequest(issue, worktree, tracker, cx);
-      } catch (e) { this.detailError = `Could not finish: ${e.message ?? e}`; }
-      this.refresh(cx);
-      cx.notify();
-    });
-  }
-
-  // Whether the worktree's branch is in main now.
-  async landBranch(worktree) {
-    if (await isMerged(worktree)) return true;
-    if (await isCollaborative(worktree)) return false;
-    await mergeIntoMain(worktree);
-    return true;
-  }
-
-  // Asks the Claude session open in the worktree's space for a pull request, unless one is already open
-  // for the pushed branch. With neither, the issue is just marked done.
-  async awaitPullRequest(issue, worktree, tracker, cx) {
-    const request = { id: issue.id, branch: worktree.branch, root: worktree.main.path, on: worktree.on };
-    if (!await pullRequestFor(request) && !await askClaude(worktree, pullRequestAsk(issue))) {
-      await tracker.finish(issue);
-      return;
-    }
-    setShared(AWAITING, [...awaitingPullRequests().filter((each) => !sameRequest(each, request)), request]);
-    this.checkPullRequests(cx);
-  }
-
-  checkPullRequests(cx) {
-    if (this.checkingPullRequests || !awaitingPullRequests().length) return;
-    this.checkingPullRequests = true;
-    cx.spawn(async (cx) => {
-      for (const request of awaitingPullRequests()) {
-        try { await this.finishOnPullRequest(request); }
-        catch (e) { notify({ title: `Could not finish ${request.id}`, body: String(e.message ?? e), level: "error" }); }
-      }
-      this.checkingPullRequests = false;
-      cx.notify();
-    });
-  }
-
-  // Once the branch's pull request has merged and no other attached one is unmerged: marks the issue done.
-  async finishOnPullRequest(request) {
-    const pullRequest = await pullRequestFor(request);
-    if (pullRequest?.state !== "MERGED" || !awaitingPullRequests().some((each) => sameRequest(each, request))) return;
-    const tracker = await trackerFor(request), issue = await tracker?.get(request.id);
-    if (issue && unmergedPullRequests(issue).length) return;
-    setShared(AWAITING, awaitingPullRequests().filter((each) => !sameRequest(each, request)));
-    if (issue && issue.status !== "done") await tracker.finish(issue);
-    announceIssueChange();
-    notify({ title: `${request.id} is done`, body: `Pull request: ${pullRequest.url}` });
-  }
-
   // Expanding a group whose issues weren't listed lists them.
   toggle(group, cx) {
     this.expanded[group.id] = !this.isExpanded(group);
@@ -734,7 +658,7 @@ export default class Issues extends View {
     return div().id("issues-refresh").flex_none().size(24).flex().items_center().justify_center().rounded(6)
       .border_1().border_color(t.border).bg(t.raised)
       .when(!this.refreshing, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover))
-        .on_click((_e, cx) => { this.refresh(cx); this.checkPullRequests(cx); cx.notify(); }))
+        .on_click((_e, cx) => { this.refresh(cx); cx.notify(); }))
       .child(svg("mods/issues/rotate-cw.svg").size(REFRESH_ICON_PX).text_color(this.refreshing ? t.dim : t.foreground));
   }
 
@@ -784,9 +708,6 @@ export default class Issues extends View {
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
         inSpace: Boolean(worktreeSpace(this.repository, issue.branch)),
-        awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
-        hasUnmergedPullRequests: unmergedPullRequests(issue).length > 0,
-        onDone: (cx) => this.finishWork(issue, cx),
         onContinue: (cx) => this.continueWork(issue, cx),
         onDelegate: this.tracker?.delegate && ((cx) => this.delegateToCloudAgent(issue, cx)),
         delegated: Boolean(this.tracker?.isDelegated?.(issue)),

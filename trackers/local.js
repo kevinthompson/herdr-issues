@@ -145,9 +145,6 @@ export async function localTracker({ root: projectRoot, on }) {
     async start(issue) {
       await commitStatus(issue, "in-progress", "start");
     },
-    async finish(issue) {
-      await commitStatus(issue, "done", "finish");
-    },
     async commitChecklists(issues) {
       const changed = await changedIssues(issues);
       if (!changed.length) return;

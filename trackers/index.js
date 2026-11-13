@@ -15,7 +15,6 @@
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
 //   tracker.start(issue)        → marks the issue in progress where new work branches from, before its
 //                                 worktree is made
-//   tracker.finish(issue)       → marks the issue done
 //   tracker.delegate(issue)     → hands the issue to Planning Center's Cloud Agent to work; null where
 //                                 the project can't
 //   tracker.isDelegated(issue)  → whether the Cloud Agent has the issue already; null with delegate
