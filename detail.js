@@ -152,7 +152,7 @@ const AFTER_TASKS_PX = 14;
 // A heading on its own loses the margins it has inside a block of Markdown.
 const BEFORE_HEADING_PX = 16, AFTER_HEADING_PX = 2;
 // Description text sits this far from the foreground toward muted, so headings stand out above it.
-const BODY_TEXT_MUTING = 1 / 3;
+const BODY_TEXT_MUTING = 0.5;
 const bodyText = (t) => mixColors(t.foreground, t.muted, BODY_TEXT_MUTING) ?? t.foreground;
 
 function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t) {
