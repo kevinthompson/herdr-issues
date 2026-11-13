@@ -38,7 +38,7 @@ const STATUS_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
-const PRIORITY_ICON_PX = 14;
+const PRIORITY_ICON_PX = 18;
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
