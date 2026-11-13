@@ -15,7 +15,7 @@ const GROUPS = [
   { id: "blocked", label: "Blocked", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
   { id: "backlog", label: "Backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
-  { id: "done", label: "Done", collapsed: true, ordered: false, sort: byRecentlyCompleted, has: (issue) => issue.status === "done" },
+  { id: "done", label: "Done", collapsed: true, sort: byRecentlyCompleted, has: (issue) => issue.status === "done" },
   { id: "canceled", label: "Canceled", collapsed: true, has: (issue) => issue.status === "canceled" },
 ];
 
@@ -108,14 +108,4 @@ export function slaStatus(issue, now = Date.now()) {
   if (left <= 0) return { text: `SLA −${duration(-left)}`, risk: "breached" };
   const risk = highRiskAt && now >= Date.parse(highRiskAt) ? "high" : mediumRiskAt && now >= Date.parse(mediumRiskAt) ? "medium" : "low";
   return { text: `SLA ${duration(left)}`, risk };
-}
-
-// Moves one issue of a shown group to another's place and numbers the group from 1.
-// Returns only the issues whose order changes.
-export function reorder(groupIssues, movingId, targetId) {
-  const ordered = [...groupIssues];
-  const from = ordered.findIndex((issue) => issue.id === movingId), to = ordered.findIndex((issue) => issue.id === targetId);
-  if (from < 0 || to < 0 || from === to) return [];
-  ordered.splice(to, 0, ...ordered.splice(from, 1));
-  return ordered.map((issue, index) => ({ issue, order: index + 1 })).filter(({ issue, order }) => issue.order !== order);
 }

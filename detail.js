@@ -17,7 +17,7 @@ function dropdown(field, label, { issue, writable, onMenu }, t) {
 }
 
 // Issue IDs, each a link that opens that issue when the panel has it, separated by commas. Links
-// stop the pointer events a list row would otherwise take as the start of a drag or an open.
+// stop the pointer events a list row would otherwise take as an open.
 export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
   return h_flex().flex_none().flex_wrap().gap_x(4).items_center().children(ids.map((id, index) => {
     const label = index < ids.length - 1 ? `${id},` : id;
@@ -77,7 +77,7 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
     }));
 }
 
-// Buttons stop the pointer events a list row would otherwise take as the start of a drag or an open.
+// Buttons stop the pointer events a list row would otherwise take as an open.
 function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {}) {
   const hoverStyle = primaryOnHover && !primary
     ? (s) => s.bg(t.solid).text_color(t.solid_foreground)

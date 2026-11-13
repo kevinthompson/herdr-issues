@@ -1,6 +1,6 @@
 // The issues of the project in the focused pane: its git repository's root, or its folder outside one.
-// Clicking an issue shows it in the panel in place of the list (detail.js). Dragging an issue onto
-// another in its group changes its order. Status and priority dropdowns are popups of this same mod
+// Clicking an issue shows it in the panel in place of the list (detail.js). Status and priority
+// dropdowns are popups of this same mod
 // with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
@@ -14,7 +14,7 @@ import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope } from "./scope-context.js";
-import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
+import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
@@ -88,7 +88,6 @@ export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
     this.issues = []; this.generation = 0; this.expanded = {};
-    this.drag = null; this.dropTarget = null;
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
@@ -169,20 +168,6 @@ export default class Issues extends View {
         }
       } catch { if (this.watching === context) this.watching = null; }
     });
-  }
-
-  // Shows the new order at once, then saves every issue whose number changed.
-  move(group, movingId, targetId, cx) {
-    const tracker = this.tracker, changes = reorder(group.issues, movingId, targetId);
-    if (!tracker?.writable || !changes.length) return;
-    for (const { issue, order } of changes) issue.order = order;
-    this.error = null;
-    cx.spawn(async (cx) => {
-      try { await Promise.all(changes.map(({ issue, order }) => tracker.update(issue, { order }))); }
-      catch (e) { this.error = `Could not save the order: ${e.message ?? e}`; }
-      this.refresh(cx);
-    });
-    cx.notify();
   }
 
   // Keeps the issue as it was read, so saving can tell whether its file changed underneath the edit.
@@ -519,38 +504,14 @@ export default class Issues extends View {
     return this.expanded[group.id] ?? !group.collapsed;
   }
 
-  endDrag(cx) {
-    if (!this.drag) return;
-    this.drag = null; this.dropTarget = null;
-    cx.notify();
-  }
-
-  row(issue, index, group, t) {
-    const { issues } = group, blockers = holdingBlockers(issue, this.issues);
+  row(issue, t) {
+    const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const inSpace = finishable && Boolean(worktreeSpace(this.repository, issue.branch));
-    const dragging = this.drag?.id === issue.id;
-    const dropping = this.drag && !dragging && group.ordered !== false && this.drag.group === group.id && this.dropTarget === issue.id;
-    const fromIndex = dropping ? issues.findIndex((each) => each.id === this.drag.id) : -1;
-    // The accent line marks where the dragged issue lands: above when it moves up, below when down.
-    return v_flex().id(`issue-${issue.id}`).relative().flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
-      .when(dropping && fromIndex > index, (e) => e.child(div().absolute().top(0).left(6).right(6).h(2).bg(t.accent)))
-      .when(dropping && fromIndex < index, (e) => e.child(div().absolute().bottom(0).left(6).right(6).h(2).bg(t.accent)))
-      .when(dragging, (e) => e.opacity(0.45))
+    return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
       .hover((s) => s.bg(t.hover))
-      .on_hover((hovered, cx) => {
-        if (hovered && this.drag) { this.dropTarget = issue.id; cx.notify(); }
-      })
-      .on_mouse_down("left", (_e, cx) => { cx.stop_propagation(); this.drag = { id: issue.id, group: group.id }; this.dropTarget = null; })
-      .on_mouse_up("left", (_e, cx) => {
-        cx.stop_propagation();
-        const drag = this.drag;
-        this.endDrag(cx);
-        if (!drag) return;
-        if (drag.id === issue.id) { this.openId = issue.id; cx.notify(); }
-        else if (drag.group === group.id && group.ordered !== false) this.move(group, drag.id, issue.id, cx);
-      })
+      .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)
           .child(div().text_color(t.accent).child(issue.id))
@@ -595,7 +556,7 @@ export default class Issues extends View {
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
         .child(div().font_semibold().child(group.label))
         .child(div().opacity(0.7).child(String(group.issues.length))))
-      .when(expanded, (e) => e.children(group.issues.map((issue, index) => this.row(issue, index, group, t))));
+      .when(expanded, (e) => e.children(group.issues.map((issue) => this.row(issue, t))));
   }
 
   emptyText() {
@@ -694,7 +655,6 @@ export default class Issues extends View {
     if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });
     return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13)
-      .on_mouse_up("left", (_e, cx) => this.endDrag(cx))
       .child(content);
   }
 }
