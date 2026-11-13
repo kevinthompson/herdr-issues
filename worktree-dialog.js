@@ -397,9 +397,8 @@ export class WorktreeDialog {
     const t = theme();
     if (this.opening) return this.renderOpen(t);
     const remove = props()?.action === "remove";
-    const s = this.space();
     const r = this.repo;
-    const title = remove ? `Remove worktree ${s?.name ?? ""}?` : `New worktree${r ? ` of ${r.name}` : ""}`;
+    const title = remove ? "Remove this worktree?" : `New worktree${r ? ` of ${r.name}` : ""}`;
     const detail =
       r === undefined
         ? "…"
@@ -408,7 +407,7 @@ export class WorktreeDialog {
           : remove
             ? !r.linked
               ? "This is the repository's main checkout, not a worktree."
-              : `Closes the space and deletes ${tilde(r.top, this.userHome)}. The branch stays.`
+              : "Closes the space and deletes this worktree. The branch stays."
             : `A new space on a checkout in ${tilde(ROOT(this.userHome), this.userHome)}/${r.name}/. A branch that exists here or on origin is checked out; a new one starts from origin's default branch, fetched first.`;
     const blocked = !r || (remove && !r.linked);
     return v_flex()
