@@ -390,14 +390,28 @@ export default class Issues extends View {
     const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
     this.detailError = null;
+    this.showOpening(issue, `Marking ${issue.id} in progress…`, cx);
     cx.spawn(async (cx) => {
-      try { await tracker.start(issue); }
-      catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; cx.notify(); return; }
-      if (opensWithWt(issue, this.project)) this.detailError = await this.openWithWt(issue);
-      else this.openWorktreeDialog(issue);
-      this.refresh(cx);
-      cx.notify();
+      try {
+        try { await tracker.start(issue); }
+        catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; return; }
+        this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
+        if (opensWithWt(issue, this.project)) this.detailError = await this.openWithWt(issue);
+        else this.openWorktreeDialog(issue);
+        this.refresh(cx);
+      } finally { this.opening = null; cx.notify(); }
     });
+  }
+
+  // Starting and continuing work wait on the tracker and wt, so the footer says what they're doing meanwhile.
+  showOpening(issue, status, cx) {
+    this.opening = { id: issue.id, status };
+    cx.notify();
+  }
+
+  openingFooter(t) {
+    return h_flex().flex_none().h(30).px(14).items_center().border_t(1).border_color(t.border)
+      .text_size(11).text_color(t.dim).child(div().min_w(0).truncate().child(this.opening.status));
   }
 
   delegateToCloudAgent(issue, cx) {
@@ -418,6 +432,7 @@ export default class Issues extends View {
   continueWork(issue, cx) {
     const project = this.project;
     this.detailError = null;
+    this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
         if (opensWithWt(issue, project)) this.detailError = await this.openWithWt(issue);
@@ -428,6 +443,7 @@ export default class Issues extends View {
           else this.openWorktreeDialog(issue);
         }
       } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
+      this.opening = null;
       cx.notify();
     });
   }
@@ -562,7 +578,7 @@ export default class Issues extends View {
           .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))))
         .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
           .when(finishable || startable || inSpace, (e) => e.child(workButton(`row-${issue.id}`, {
-            finishable, startable, inSpace, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
+            finishable, startable, inSpace, opening: this.opening?.id === issue.id, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
           }, t, { primary: false, compact: true }))))));
   }
 
@@ -683,6 +699,7 @@ export default class Issues extends View {
         onLink: (url, cx) => this.openLink(issue, url, cx),
         linkFiles: (markdown) => linkCodeSpanFiles(markdown, this.project.root, this.filesInBody(issue, cx)),
         startable: canStartWork(issue, this.issues),
+        opening: this.opening?.id === issue.id,
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
         inSpace: Boolean(worktreeSpace(this.repository, issue.branch)),
@@ -701,6 +718,7 @@ export default class Issues extends View {
     if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });
     return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13)
-      .child(content);
+      .child(v_flex().flex_1().min_h(0).child(content))
+      .when(Boolean(this.opening), (e) => e.child(this.openingFooter(t)));
   }
 }

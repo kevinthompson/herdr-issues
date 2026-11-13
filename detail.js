@@ -103,15 +103,16 @@ function button(id, label, onClick, t, { primary = false, enabled = true, toolti
 
 // Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
 // whose worktree a space already shows switches to that space instead, and the button stands out to say so.
-// The list's compact button shows the issue's branch for both, so it fits beside a title.
-export function workButton(key, { finishable, startable, inSpace, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
+// The list's compact button shows the issue's branch for both, so it fits beside a title. Each is disabled
+// while the issue's worktree is opening.
+export function workButton(key, { finishable, startable, inSpace, opening, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
   if (inSpace) {
-    return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, { primary: true, tooltip: "Switch to this issue's worktree space" });
+    return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, { primary: true, enabled: !opening, tooltip: "Switch to this issue's worktree space" });
   }
-  const style = { primary, primaryOnHover: compact };
+  const style = { primary, primaryOnHover: compact, enabled: !opening };
   const branchIcon = (color) => svg("mods/issues/git-branch-plus.svg").size(14).text_color(color);
   if (finishable) return button(`${key}-continue`, compact ? branchIcon : "Continue", onContinue, t, { ...style, tooltip: compact ? "Continue work" : null });
-  return button(`${key}-start`, compact ? branchIcon : "Start", onStart, t, { ...style, enabled: startable, tooltip: compact ? "Start work" : null });
+  return button(`${key}-start`, compact ? branchIcon : "Start", onStart, t, { ...style, enabled: startable && !opening, tooltip: compact ? "Start work" : null });
 }
 
 // Hands the issue to the Cloud Agent, disabled once it has the issue or while the handoff saves.
