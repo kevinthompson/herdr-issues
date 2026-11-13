@@ -27,6 +27,15 @@ async function serversOf(terminal) {
   return found?.code === 0 ? found.stdout.split("\n").filter(Boolean) : [];
 }
 
+// Binary files such as images go to their own application; text, empty files, folders and files not
+// made yet stay in Neovim.
+export async function opensInNeovim(file) {
+  const described = await exec("file", ["-b", "--mime", file]).catch(() => null);
+  if (described?.code !== 0) return true;
+  const [type, charset] = described.stdout.trim().split("; charset=");
+  return charset !== "binary" || type.startsWith("inode/");
+}
+
 async function editIn(server, file) {
   const edit = `execute('edit ' . fnameescape(${vimString(file)}))`;
   return (await exec("nvim", ["--server", server, "--remote-expr", edit]).catch(() => null))?.code === 0;
