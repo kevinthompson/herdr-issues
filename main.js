@@ -15,7 +15,7 @@ import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
-import { publishScope } from "./scope-context.js";
+import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
@@ -717,6 +717,7 @@ export default class Issues extends View {
     this.openRequestedIssue();
     this.applyFieldEdits(cx);
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
+    publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue);
     this.avatarLoads = [];
     const content = issue
       ? (this.loadBody(issue, cx), issueDetail({
