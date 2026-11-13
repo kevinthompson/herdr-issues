@@ -44,7 +44,7 @@ const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
-// The row's ▶ button, kept on rows without one so every title wraps at the same edge.
+// The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
 // Linear's workflow state colors, tinted so headers stay calm on dark backgrounds.
 const GROUP_TINT_ALPHA = "30";
@@ -536,7 +536,7 @@ export default class Issues extends View {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
-    const inSpace = finishable && Boolean(worktreeSpace(this.repository, issue.branch));
+    const inSpace = Boolean(worktreeSpace(this.repository, issue.branch));
     return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
       .hover((s) => s.bg(t.hover))
       .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
@@ -561,7 +561,7 @@ export default class Issues extends View {
               .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent))))))
           .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))))
         .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
-          .when(finishable || startable, (e) => e.child(workButton(`row-${issue.id}`, {
+          .when(finishable || startable || inSpace, (e) => e.child(workButton(`row-${issue.id}`, {
             finishable, startable, inSpace, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
           }, t, { primary: false, compact: true }))))));
   }
@@ -685,7 +685,7 @@ export default class Issues extends View {
         startable: canStartWork(issue, this.issues),
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
-        inSpace: canFinishWork(issue) && Boolean(worktreeSpace(this.repository, issue.branch)),
+        inSpace: Boolean(worktreeSpace(this.repository, issue.branch)),
         awaitingPullRequest: awaitingPullRequests().some((each) => sameRequest(each, issue)),
         hasUnmergedPullRequests: unmergedPullRequests(issue).length > 0,
         onDone: (cx) => this.finishWork(issue, cx),

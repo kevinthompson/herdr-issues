@@ -77,33 +77,41 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
     }));
 }
 
-// Buttons stop the pointer events a list row would otherwise take as an open.
+// An icon has its own color, so a button whose label is an icon redraws it in the hover color.
+let hoveredButton = null;
+
+// Buttons stop the pointer events a list row would otherwise take as an open. A label may be a
+// function of the button's text color, for an icon.
 function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {}) {
-  const hoverStyle = primaryOnHover && !primary
-    ? (s) => s.bg(t.solid).text_color(t.solid_foreground)
-    : (s) => s.opacity(0.85);
+  const solidOnHover = primaryOnHover && !primary;
+  const hoverStyle = solidOnHover ? (s) => s.bg(t.solid).text_color(t.solid_foreground) : (s) => s.opacity(0.85);
+  const textColor = !enabled ? t.dim
+    : primary || (solidOnHover && hoveredButton === id) ? t.solid_foreground : t.foreground;
   return div().id(id).flex_none().h(26).px(10).flex().items_center().rounded(7).text_size(12)
     .when(tooltip, (e) => e.tooltip(tooltip))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
-    .when(enabled, (e) => e.bg(primary ? t.solid : t.raised).text_color(primary ? t.solid_foreground : t.foreground))
-    .when(!enabled, (e) => e.bg(t.raised).text_color(t.dim))
+    .bg(enabled && primary ? t.solid : t.raised).text_color(textColor)
     .when(enabled, (e) => e.cursor_pointer().hover(hoverStyle).on_click((_e, cx) => onClick(cx)))
-    .child(label);
+    .when(enabled && typeof label === "function", (e) => e.on_hover((hovered, cx) => {
+      if (hovered) hoveredButton = id;
+      else if (hoveredButton === id) hoveredButton = null;
+      cx.notify();
+    }))
+    .child(typeof label === "function" ? label(textColor) : label);
 }
 
 // Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
 // whose worktree a space already shows switches to that space instead, and the button stands out to say so.
-// The list's compact button says neither, so it fits beside a title.
+// The list's compact button shows the issue's branch for both, so it fits beside a title.
 export function workButton(key, { finishable, startable, inSpace, onStart, onContinue }, t, { primary = true, compact = false } = {}) {
-  if (finishable && inSpace) {
+  if (inSpace) {
     return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, { primary: true, tooltip: "Switch to this issue's worktree space" });
   }
   const style = { primary, primaryOnHover: compact };
-  if (finishable) return button(`${key}-continue`, compact ? "▶" : "Continue", onContinue, t, style);
-  // Starting work creates the issue's branch, so the compact button shows a new branch.
-  const startLabel = compact ? svg("mods/issues/git-branch-plus.svg").size(14) : "Start";
-  return button(`${key}-start`, startLabel, onStart, t, { ...style, enabled: startable, tooltip: compact ? "Start work" : null });
+  const branchIcon = (color) => svg("mods/issues/git-branch-plus.svg").size(14).text_color(color);
+  if (finishable) return button(`${key}-continue`, compact ? branchIcon : "Continue", onContinue, t, { ...style, tooltip: compact ? "Continue work" : null });
+  return button(`${key}-start`, compact ? branchIcon : "Start", onStart, t, { ...style, enabled: startable, tooltip: compact ? "Start work" : null });
 }
 
 // Hands the issue to the Cloud Agent, disabled once it has the issue or while the handoff saves.
