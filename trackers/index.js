@@ -40,8 +40,12 @@
 // else the one Linear suggests.
 import { localTracker } from "./local.js";
 import { linearTracker } from "./linear.js";
+import { trackerSetting } from "./setting.js";
 
-// A repository's own issues/ folder wins over a Linear mapping.
+// The repository's .issues.json (setting.js) decides; without one, its own issues/ folder wins over Linear.
 export async function trackerFor(project) {
+  const setting = await trackerSetting(project);
+  if (setting?.tracker === "local") return localTracker(project);
+  if (setting?.tracker === "linear") return linearTracker(project, setting);
   return (await localTracker(project)) ?? linearTracker(project);
 }

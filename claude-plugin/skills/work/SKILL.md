@@ -21,6 +21,7 @@ Work the issue named in `$ARGUMENTS` or the conversation until it is done, or un
 Then summarize as step 4 says. Read the full diff, review comments or the code only once the summary or the person's direction needs them.
 
 1. **Find the issue.** Get the repository's main checkout: the first path `git worktree list` prints, which is not the current folder when you're in a worktree.
+   - **The repository's setting comes first.** When the main checkout has `.issues.json`, which `/issues:config` writes, its `tracker` decides: `local` means Markdown, and `linear` means Linear with its `team` as the team. Without one, find the tracker as below.
    - **Markdown**: the main checkout has an `issues/` folder. Read the issue's file there, never a worktree's copy, along with `issues/README.md` and `issues/TEMPLATE.md`, which define its fields, sections and branch name.
    - **Linear**: the argument is a Linear URL or ID, or `git remote get-url origin` points to the `planningcenter` GitHub organization. Load `get_issue`, `list_comments`, `save_issue`, `list_issue_statuses` and the comment tool (`save_comment` or `create_comment`) with one ToolSearch, under the prefix the session's list of available tools shows (`mcp__claude_ai_Linear__` or `mcp__linear__`); don't guess it. If the Linear tools are not available, stop and say so. Call `get_issue` with `fields: ["title", "description", "status", "gitBranchName", "relations"]` so it leaves out the state history.
    - If no issue matches, stop and say so.

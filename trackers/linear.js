@@ -1,5 +1,6 @@
-// Issues in Linear, for Planning Center repositories (their team found by linear-team.js) and those named in
-// ~/.config/herdr-app/linear.json, whose entries win:
+// Issues in Linear, for repositories whose .issues.json names a team (setting.js), Planning Center
+// repositories (their team found by linear-team.js) and those named in ~/.config/herdr-app/linear.json,
+// whose entries win over detection:
 // { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
@@ -225,10 +226,12 @@ async function teamOf(teamKey, linear) {
   }
 }
 
-export async function linearTracker({ root: projectRoot, on }) {
+export async function linearTracker({ root: projectRoot, on }, setting = null) {
   if (on != null) return null;
   const config = await loadConfig(), root = await mainCheckout(projectRoot, on);
-  const configured = config?.repos.find((each) => each.path === root);
+  const configured = setting
+    ? repoConfig(setting.team, { path: root, views: setting.views })
+    : config?.repos.find((each) => each.path === root);
   const repoName = await planningCenterRepoName(root);
   if (!configured && !repoName) return null;
   if (!config?.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
