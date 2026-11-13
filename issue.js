@@ -54,11 +54,13 @@ export function loadsFor(isExpanded) {
 }
 
 // The groups holding issues, each with its sorted issues. A group whose issues weren't listed (its `loads`
-// is in `unloaded`) shows as unloaded, with no issues, whether or not it holds any.
-export function groupIssues(issues, unloaded = new Set()) {
+// is in `unloaded`) shows as unloaded, with no issues, whether or not it holds any. With a `label`, groups
+// hold only the issues carrying it, while blockers are still read from every issue.
+export function groupIssues(issues, unloaded = new Set(), label = null) {
   const done = new Set(issues.filter((issue) => issue.status === "done").map((issue) => issue.id));
+  const shown = label ? issues.filter((issue) => issue.labels.includes(label)) : issues;
   return GROUPS.map((group) => unloaded.has(group.loads) ? { ...group, unloaded: true, issues: [] }
-    : { ...group, issues: issues.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) })
+    : { ...group, issues: shown.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) })
     .filter((group) => group.unloaded || group.issues.length);
 }
 

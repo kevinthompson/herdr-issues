@@ -18,7 +18,7 @@ import { findScope } from "./trackers/linear.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
-import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
+import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
@@ -661,7 +661,7 @@ export default class Issues extends View {
   }
 
   // The tracker's name, or a dropdown of the scopes it can list, showing the one listed now: a milestone
-  // shows its project, and the milestone bar below narrows it.
+  // shows its project, and the filter bar below narrows it.
   trackerLabel(t) {
     const { scopes, name } = this.tracker;
     if (!scopes) return div().flex_none().text_size(11).text_color(t.dim).child(name);
@@ -669,15 +669,30 @@ export default class Issues extends View {
     return scopeDropdown("issues-scope", shown.label, () => openScopeMenu(scopes, shown.id, this.scopeKey), t).flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX);
   }
 
-  // Under a project with milestones, a dropdown that narrows the list to one of them.
-  milestoneBar(t) {
+  // Every label on the listed issues, by name.
+  listedLabels() {
+    return [...new Set(this.issues.flatMap((issue) => issue.labels))].sort((a, b) => a.localeCompare(b));
+  }
+
+  // The label the list is narrowed to: the one picked, unless no listed issue carries it any more.
+  shownLabel(labels) {
+    const label = this.scopeKey ? selectedLabel(this.scopeKey) : null;
+    return labels.includes(label) ? label : null;
+  }
+
+  // Under a project with milestones, a dropdown that narrows the list to one of them; when the listed
+  // issues carry labels, a dropdown that narrows it to one label.
+  filterBar(labels, label, t) {
     const { project, milestone } = this.tracker?.scopes ? this.currentScope() : {};
-    if (!project?.milestones.length) return null;
-    const options = [{ id: project.id, label: "All milestones" }, ...project.milestones];
+    const hasMilestones = Boolean(project?.milestones.length);
+    if (!hasMilestones && !labels.length) return null;
+    const filterName = (name) => div().flex_none().text_size(11).text_color(t.dim).child(name);
     return h_flex().h(38).flex_none().px(14).gap(8).items_center().justify_end().border_b(1).border_color(t.border)
-      .child(div().flex_none().text_size(11).text_color(t.dim).child("Milestone"))
-      .child(scopeDropdown("issues-milestone", milestone?.label ?? "All milestones",
-        () => openScopeMenu(options, milestone?.id ?? project.id, this.scopeKey), t).flex_shrink(1));
+      .when(hasMilestones, (e) => e.child(filterName("Milestone"))
+        .child(scopeDropdown("issues-milestone", milestone?.label ?? "All milestones",
+          () => openScopeMenu([{ id: project.id, label: "All milestones" }, ...project.milestones], milestone?.id ?? project.id, this.scopeKey), t).flex_shrink(1)))
+      .when(labels.length > 0, (e) => e.child(filterName("Label"))
+        .child(scopeDropdown("issues-label", label ?? "All labels", () => openLabelMenu(labels, label, this.scopeKey), t).flex_shrink(1)));
   }
 
   refreshButton(t) {
@@ -690,7 +705,8 @@ export default class Issues extends View {
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
-    const groups = groupIssues(this.issues, this.unloaded), error = this.error ?? this.detailError, milestoneBar = this.milestoneBar(t);
+    const labels = this.listedLabels(), label = this.shownLabel(labels);
+    const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), syncIndicator = this.syncIndicator(t);
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
@@ -700,7 +716,7 @@ export default class Issues extends View {
         .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
         .when(Boolean(this.tracker) && this.tracker.kind !== "local", (e) => e.child(this.refreshButton(t)))
         .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
-      .when(Boolean(milestoneBar), (e) => e.child(milestoneBar))
+      .when(Boolean(filterBar), (e) => e.child(filterBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group, index) => this.group(group, shown[index], t)))
