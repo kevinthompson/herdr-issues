@@ -9,9 +9,10 @@
 // committed the same way.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder } from "herdr";
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
+import { SETTING_FILE } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
@@ -121,8 +122,9 @@ export default class Issues extends View {
         const where = location();
         if (!where.cwd) throw new Error("No folder in focus");
         const root = await projectRoot(where);
-        const tracker = await trackerFor({ root, on: where.on });
         const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
+        this.watchSetting(scopeKey, where.on, cx);
+        const tracker = await trackerFor({ root, on: where.on });
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
         const loads = loadsFor((group) => this.isExpanded(group));
         const unloaded = new Set((tracker?.deferred?.(scope) ?? []).filter((each) => !loads.has(each)));
@@ -165,22 +167,41 @@ export default class Issues extends View {
 
   // A watched tracker refreshes when it changes, so only unwatched ones poll.
   pollDue() {
-    if (this.tracker?.changed && this.watching === this.context) return false;
+    if (this.tracker?.changed && this.watching) return false;
     const interval = this.tracker?.kind === "local" ? LOCAL_POLL_MS : POLL_MS;
     return Date.now() - this.refreshedAt >= interval;
   }
 
+  // Keyed by the tracker's kind too, so a repository that switches trackers stops watching the old one.
   watch(tracker, cx) {
-    const context = this.context;
-    if (!tracker?.changed || this.watching === context) return;
-    this.watching = context;
+    const key = tracker?.changed ? `${this.context}\n${tracker.kind}` : null;
+    if (this.watching === key) return;
+    this.watching = key;
+    if (!key) return;
     cx.spawn(async (cx) => {
       try {
-        while (this.watching === context) {
+        while (this.watching === key) {
           await tracker.changed();
-          if (this.watching === context) this.refresh(cx);
+          if (this.watching === key) this.refresh(cx);
         }
-      } catch { if (this.watching === context) this.watching = null; }
+      } catch { if (this.watching === key) this.watching = null; }
+    });
+  }
+
+  // A repository's .issues.json picks its tracker, so changing it refreshes the panel at once rather than
+  // at the next poll. Only this computer's checkouts can be watched.
+  watchSetting(mainCheckoutPath, on, cx) {
+    if (on != null || this.watchingSetting === mainCheckoutPath) return;
+    this.watchingSetting = mainCheckoutPath;
+    const settingPath = `${mainCheckoutPath}/${SETTING_FILE}`;
+    cx.spawn(async (cx) => {
+      try {
+        while (this.watchingSetting === mainCheckoutPath) {
+          const paths = await watchFolder(mainCheckoutPath);
+          const settingChanged = paths.some((path) => path === settingPath || path === mainCheckoutPath);
+          if (settingChanged && this.watchingSetting === mainCheckoutPath) this.refresh(cx);
+        }
+      } catch { if (this.watchingSetting === mainCheckoutPath) this.watchingSetting = null; }
     });
   }
 
