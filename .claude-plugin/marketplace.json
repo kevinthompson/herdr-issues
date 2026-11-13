@@ -1,0 +1,17 @@
+{
+  "name": "herdr-issues",
+  "owner": {
+    "name": "Kevin Thompson",
+    "email": "email@kevinthompson.info"
+  },
+  "metadata": {
+    "description": "The Claude plugin that pairs with the Herdr issues mod"
+  },
+  "plugins": [
+    {
+      "name": "issues",
+      "source": "./claude-plugin",
+      "description": "Plan, write, work and delegate issues tracked in a repository's issues/ folder, in Linear or in GitHub Issues."
+    }
+  ]
+}
