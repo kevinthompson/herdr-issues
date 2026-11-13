@@ -8,16 +8,18 @@ const FINISHED = ["done", "canceled"];
 const isStartable = (issue) => STARTABLE_STATUSES.includes(issue.status);
 const isUnblocked = (issue, done) => issue.blockedBy.every((id) => done.has(id));
 
+// A group with `loads` starts collapsed, and a tracker may skip listing its issues until it is expanded:
+// backlog issues (which Blocked is built from too), done issues, or canceled ones.
 const GROUPS = [
   { id: "triage", label: "Triage", has: (issue) => issue.status === "triage" },
   { id: "in-review", label: "In review", has: (issue) => issue.status === "in-review" },
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
   { id: "todo", label: "Todo", has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
-  { id: "blocked", label: "Blocked", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
-  { id: "backlog", label: "Backlog", collapsed: true, has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
+  { id: "blocked", label: "Blocked", collapsed: true, loads: "backlog", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
+  { id: "backlog", label: "Backlog", collapsed: true, loads: "backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
-  { id: "done", label: "Done", collapsed: true, sort: byRecentlyCompleted, has: (issue) => issue.status === "done" },
-  { id: "canceled", label: "Canceled", collapsed: true, has: (issue) => issue.status === "canceled" },
+  { id: "done", label: "Done", collapsed: true, loads: "done", sort: byRecentlyCompleted, has: (issue) => issue.status === "done" },
+  { id: "canceled", label: "Canceled", collapsed: true, loads: "canceled", has: (issue) => issue.status === "canceled" },
 ];
 
 // Issues with an order come first, by that number. The rest follow by priority (urgent first,
@@ -41,10 +43,18 @@ function byRecentlyCompleted(a, b) {
   return byId(b, a);
 }
 
-export function groupIssues(issues) {
+// The issues a tracker must list for the groups `isExpanded` says are open.
+export function loadsFor(isExpanded) {
+  return new Set(GROUPS.filter((group) => group.loads && isExpanded(group)).map((group) => group.loads));
+}
+
+// The groups holding issues, each with its sorted issues. A group whose issues weren't listed (its `loads`
+// is in `unloaded`) shows as unloaded, with no issues, whether or not it holds any.
+export function groupIssues(issues, unloaded = new Set()) {
   const done = new Set(issues.filter((issue) => issue.status === "done").map((issue) => issue.id));
-  return GROUPS.map((group) => ({ ...group, issues: issues.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) }))
-    .filter((group) => group.issues.length);
+  return GROUPS.map((group) => unloaded.has(group.loads) ? { ...group, unloaded: true, issues: [] }
+    : { ...group, issues: issues.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) })
+    .filter((group) => group.unloaded || group.issues.length);
 }
 
 // Which issues are done or still open, and which issues each one blocks, read once per list: every row

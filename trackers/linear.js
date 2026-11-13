@@ -33,10 +33,11 @@ const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
 // Started states named Merged count as done, so they are listed with the finished issues instead.
 const MERGED_STATE = { type: { eq: "started" }, name: { containsIgnoreCase: "merged" } };
 const TRIAGE_STATE = { type: { eq: "triage" } };
-const OPEN_STATE = { type: { nin: ["completed", "canceled", "duplicate"] }, name: { notContainsIgnoreCase: "merged" } };
-// The team's Issues list leaves out triage, which has a list of its own.
-const OPEN_OUTSIDE_TRIAGE_STATE = { ...OPEN_STATE, type: { nin: ["completed", "canceled", "duplicate", "triage"] } };
+// Open states, leaving out the state types named too, such as backlog until its group is expanded.
+const openState = (...without) =>
+  ({ type: { nin: ["completed", "canceled", "duplicate", ...without] }, name: { notContainsIgnoreCase: "merged" } });
 const FINISHED_STATES = [{ type: { eq: "completed" } }, MERGED_STATE];
+const CANCELED_STATE = { type: { in: ["canceled", "duplicate"] } };
 
 const MY_ISSUES = `query($state: WorkflowStateFilter, $first: Int!, $after: String) { viewer {
   assignedIssues(first: $first, after: $after, orderBy: updatedAt, filter: { state: $state }) { ${PAGE} } } }`;
@@ -248,15 +249,16 @@ export async function linearTracker({ root: projectRoot, on }) {
     return nodes;
   }
 
-  // Each finished state, completed and merged, adds its own most recent issues.
-  async function openAndRecentlyFinished(query, variables, connectionOf, openState = OPEN_STATE) {
+  // The open issues in `open`, and once Done is expanded, each finished state's most recent issues,
+  // completed and merged.
+  async function openAndRecentlyFinished(query, variables, connectionOf, open, loads) {
     const recentlyFinished = (state) =>
       linear(query, { ...variables, state, first: RECENTLY_FINISHED }).then((data) => connectionOf(data).nodes);
-    const [open, ...finished] = await Promise.all([
-      allPages(query, { ...variables, state: openState }, connectionOf),
-      ...FINISHED_STATES.map(recentlyFinished),
+    const lists = await Promise.all([
+      allPages(query, { ...variables, state: open }, connectionOf),
+      ...(loads.has("done") ? FINISHED_STATES.map(recentlyFinished) : []),
     ]);
-    return [...open, ...finished.flat()];
+    return lists.flat();
   }
 
   // A view's saved filter decides which issues it holds, finished ones included. Running the filter
@@ -271,22 +273,32 @@ export async function linearTracker({ root: projectRoot, on }) {
     return customView.filterData;
   }
 
-  async function viewIssues(viewId) {
-    return allPages(FILTERED_ISSUES, { filter: await viewFilter(viewId) }, (data) => data.issues);
+  // Every issue the view holds in the states listed: open ones, and finished ones whose group is expanded.
+  async function viewIssues(viewId, open, loads) {
+    const filter = await viewFilter(viewId);
+    const states = [open, ...(loads.has("done") ? FINISHED_STATES : []), ...(loads.has("canceled") ? [CANCELED_STATE] : [])];
+    const lists = await Promise.all(states.map((state) => allPages(FILTERED_ISSUES_IN_STATE, { filter, state }, (data) => data.issues)));
+    return lists.flat();
   }
 
-  function issuesIn(scopeId) {
+  // The groups a scope lists only once they are expanded: none for triage, which lists one state.
+  function deferredGroups(scopeId) {
+    if (scopeId === "triage") return [];
+    return scopeId.startsWith("view:") ? ["backlog", "done", "canceled"] : ["backlog", "done"];
+  }
+
+  function issuesIn(scopeId, loads) {
+    const open = openState(...(scopeId === "team" ? ["triage"] : []), ...(loads.has("backlog") ? [] : ["backlog"]));
     const [kind, projectId, milestoneId] = scopeId.split(":");
     if (kind === "project") {
       const filter = milestoneId ? { projectMilestone: { id: { eq: milestoneId } } } : { project: { id: { eq: projectId } } };
-      return openAndRecentlyFinished(FILTERED_ISSUES_IN_STATE, { filter }, (data) => data.issues);
+      return openAndRecentlyFinished(FILTERED_ISSUES_IN_STATE, { filter }, (data) => data.issues, open, loads);
     }
     if (scopeId === "triage") return allPages(TEAM_ISSUES, { team: repo.teamKey, state: TRIAGE_STATE }, (data) => data.issues);
-    if (scopeId === "team") {
-      return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues, OPEN_OUTSIDE_TRIAGE_STATE);
-    }
-    if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5));
-    return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues);
+    // The team's Issues list leaves out triage, which has a list of its own.
+    if (scopeId === "team") return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues, open, loads);
+    if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5), open, loads);
+    return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues, open, loads);
   }
 
   const teamStates = new Map();
@@ -319,10 +331,12 @@ export async function linearTracker({ root: projectRoot, on }) {
     statuses: STATUSES,
     scopes,
     // An unknown scope, such as a view since removed from the config, lists the default.
-    async list(scopeId) {
+    // `loads` names the deferred groups to list too, those expanded in the panel.
+    async list(scopeId, loads = new Set()) {
       const scope = findScope(scopes, scopeId)?.scope ?? scopes[0];
-      return (await issuesIn(scope.id)).map((node) => toIssue(node, repoName));
+      return (await issuesIn(scope.id, loads)).map((node) => toIssue(node, repoName));
     },
+    deferred: (scopeId) => deferredGroups((findScope(scopes, scopeId)?.scope ?? scopes[0]).id),
     get,
     // A new body only saves over the description `issue` was read with, so edits made in Linear
     // meanwhile are never overwritten.

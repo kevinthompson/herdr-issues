@@ -14,7 +14,7 @@ import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope } from "./scope-context.js";
-import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
@@ -94,7 +94,7 @@ const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? no
 export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
-    this.issues = []; this.generation = 0; this.expanded = {};
+    this.issues = []; this.unloaded = new Set(); this.generation = 0; this.expanded = {};
     this.rowLimit = ROW_LIMIT;
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
@@ -113,7 +113,7 @@ export default class Issues extends View {
   refresh(cx) {
     const context = contextKey();
     if (context !== this.context) {
-      this.context = context; this.project = null; this.tracker = null; this.issues = []; this.error = null; this.loaded = false; this.repository = null;
+      this.context = context; this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.error = null; this.loaded = false; this.repository = null;
       this.scopeKey = null; this.listedScope = undefined; this.listKey = null;
       this.closeIssue(); this.focusHandled = null; this.rowLimit = ROW_LIMIT;
     }
@@ -128,20 +128,23 @@ export default class Issues extends View {
         const root = await projectRoot(where);
         const tracker = await trackerFor({ root, on: where.on });
         const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
-        const project = { root, on: where.on }, listKey = `${scopeKey}\n${scope ?? ""}`;
+        // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
+        const loads = loadsFor((group) => this.isExpanded(group));
+        const unloaded = new Set((tracker?.deferred?.(scope) ?? []).filter((each) => !loads.has(each)));
+        const project = { root, on: where.on }, listKey = `${scopeKey}\n${scope ?? ""}\n${[...loads].sort()}`;
         // A polled tracker is slow to list, so a scope not shown yet starts from its last list.
         const polled = Boolean(tracker) && !tracker.changed;
         this.listedScope = scope;
         if (polled && this.listKey !== listKey) {
           const last = await lastList(listKey);
           if (last && generation === this.generation) {
-            Object.assign(this, { project, tracker, scopeKey, listKey, issues: last, loaded: true });
+            Object.assign(this, { project, tracker, scopeKey, listKey, issues: last, unloaded, loaded: true });
             cx.notify();
           }
         }
-        const issues = tracker ? await tracker.list(scope) : [];
+        const issues = tracker ? await tracker.list(scope, loads) : [];
         if (generation !== this.generation) return;
-        Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), error: null });
+        Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null });
         if (polled) rememberList(listKey, issues).catch(() => {});
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.watch(tracker, cx);
@@ -515,8 +518,10 @@ export default class Issues extends View {
     notify({ title: `${request.id} is done`, body: `Pull request: ${pullRequest.url}` });
   }
 
+  // Expanding a group whose issues weren't listed lists them.
   toggle(group, cx) {
     this.expanded[group.id] = !this.isExpanded(group);
+    if (group.unloaded && this.isExpanded(group)) this.refresh(cx);
     cx.notify();
   }
 
@@ -576,7 +581,7 @@ export default class Issues extends View {
         .on_click((_e, cx) => this.toggle(group, cx))
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
         .child(div().font_semibold().child(group.label))
-        .child(div().opacity(0.7).child(String(group.issues.length))))
+        .when(!group.unloaded || expanded, (e) => e.child(div().opacity(0.7).child(group.unloaded ? "…" : String(group.issues.length)))))
       .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, t))))
       .when(expanded && hidden > 0, (e) => e.child(div().id(`show-more-${group.id}`).flex_none().px(10).py(6).rounded(7)
         .cursor_pointer().text_size(12).text_color(t.accent).hover((s) => s.bg(t.hover))
@@ -637,7 +642,7 @@ export default class Issues extends View {
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
-    const groups = groupIssues(this.issues), error = this.error ?? this.detailError, milestoneBar = this.milestoneBar(t);
+    const groups = groupIssues(this.issues, this.unloaded), error = this.error ?? this.detailError, milestoneBar = this.milestoneBar(t);
     const shown = this.shownCounts(groups);
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
