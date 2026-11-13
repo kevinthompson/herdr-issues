@@ -66,7 +66,8 @@ function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
   return issues.map((issue) => {
     const before = issue.body === null && loaded.get(issue.id);
-    return before && before.updated === issue.updated ? { ...issue, body: before.body } : issue;
+    if (!before) return issue;
+    return { ...issue, body: before.body, bodyStale: before.bodyStale || before.updated !== issue.updated };
   });
 }
 
@@ -255,13 +256,13 @@ export default class Issues extends View {
   // Fetches the open issue's body when its list left it out.
   loadBody(issue, cx) {
     const tracker = this.tracker;
-    if (issue.body !== null || this.loadingBody === issue.id || !tracker) return;
+    if ((issue.body !== null && !issue.bodyStale) || this.loadingBody === issue.id || !tracker) return;
     this.loadingBody = issue.id;
     cx.spawn(async (cx) => {
       try {
         const full = await tracker.get(issue.id);
         if (!full) throw new Error(`${issue.id} was not found`);
-        Object.assign(issue, { body: full.body, updated: full.updated });
+        Object.assign(issue, { body: full.body, updated: full.updated, bodyStale: false });
       } catch (e) { this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`; }
       this.loadingBody = null;
       cx.notify();
