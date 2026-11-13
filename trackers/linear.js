@@ -33,9 +33,9 @@ const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
 // Started states named Merged count as done, so they are listed with the finished issues instead.
 const MERGED_STATE = { type: { eq: "started" }, name: { containsIgnoreCase: "merged" } };
 const TRIAGE_STATE = { type: { eq: "triage" } };
-const OPEN_STATE = { type: { nin: ["completed", "canceled"] }, name: { notContainsIgnoreCase: "merged" } };
+const OPEN_STATE = { type: { nin: ["completed", "canceled", "duplicate"] }, name: { notContainsIgnoreCase: "merged" } };
 // The team's Issues list leaves out triage, which has a list of its own.
-const OPEN_OUTSIDE_TRIAGE_STATE = { ...OPEN_STATE, type: { nin: ["completed", "canceled", "triage"] } };
+const OPEN_OUTSIDE_TRIAGE_STATE = { ...OPEN_STATE, type: { nin: ["completed", "canceled", "duplicate", "triage"] } };
 const FINISHED_STATES = [{ type: { eq: "completed" } }, MERGED_STATE];
 
 const MY_ISSUES = `query($state: WorkflowStateFilter, $first: Int!, $after: String) { viewer {
@@ -62,7 +62,7 @@ const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
 // review is In review, one named Merged is Done, and the rest are In progress.
-const STATUS_TYPES = { triage: ["triage"], backlog: ["backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled"] };
+const STATUS_TYPES = { triage: ["triage"], backlog: ["backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled", "duplicate"] };
 const isReviewState = (state) => /review/i.test(state.name);
 const isMergedState = (state) => /merged/i.test(state.name);
 function statusOf(state) {
