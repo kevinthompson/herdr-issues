@@ -3,6 +3,7 @@
 //
 //   tracker.kind                "local" or "linear"
 //   tracker.name                shown in the panel's header
+//   tracker.team                the Linear team's key, for Linear
 //   tracker.writable            whether update can save
 //   tracker.statuses            the STATUSES (issue.js) its issues can be set to
 //   tracker.scopes              the issue lists the tracker can show, { id, label, group? }, its default

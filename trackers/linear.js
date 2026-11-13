@@ -285,6 +285,7 @@ export async function linearTracker({ root: projectRoot, on }) {
   const tracker = {
     kind: "linear",
     name: "Linear",
+    team: repo.teamKey,
     writable: true,
     statuses: STATUSES,
     scopes,

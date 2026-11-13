@@ -13,6 +13,7 @@ import { theme, props, settings, nextCommand, openOverlay, shared, setShared, sp
 import { location, projectRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { findScope } from "./trackers/linear.js";
+import { publishScope } from "./scope-context.js";
 import { groupIssues, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, reorder, slaStatus, unmergedPullRequests, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./menu.js";
@@ -133,6 +134,7 @@ export default class Issues extends View {
         if (generation !== this.generation) return;
         Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), error: null });
         if (polled) rememberList(listKey, issues).catch(() => {});
+        publishScope(scopeKey, tracker, scope).catch(() => {});
         this.watch(tracker, cx);
         this.scanRepository(project, generation, cx);
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
