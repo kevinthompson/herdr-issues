@@ -99,10 +99,11 @@ export function workButton(key, { finishable, startable, inSpace, onStart, onCon
   if (finishable && inSpace) {
     return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, { primary: true, tooltip: "Switch to this issue's worktree space" });
   }
-  const label = compact ? "▶" : finishable ? "Continue" : "Start";
   const style = { primary, primaryOnHover: compact };
-  if (finishable) return button(`${key}-continue`, label, onContinue, t, style);
-  return button(`${key}-start`, label, onStart, t, { ...style, enabled: startable });
+  if (finishable) return button(`${key}-continue`, compact ? "▶" : "Continue", onContinue, t, style);
+  // Starting work creates the issue's branch, so the compact button shows a new branch.
+  const startLabel = compact ? svg("mods/issues/git-branch-plus.svg").size(14) : "Start";
+  return button(`${key}-start`, startLabel, onStart, t, { ...style, enabled: startable, tooltip: compact ? "Start work" : null });
 }
 
 // Hands the issue to the Cloud Agent, disabled once it has the issue or while the handoff saves.

@@ -36,6 +36,9 @@ const PULL_REQUEST_CHECK_MS = 2 * 60 * 1000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const STATUS_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
+// Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
+const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
+const PRIORITY_ICON_PX = 14;
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
@@ -541,7 +544,8 @@ export default class Issues extends View {
         .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)
           .child(div().text_color(t.accent).child(issue.id))
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
-          .when(issue.priority > 0, (e) => e.child(div().text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim).child(PRIORITIES[issue.priority]))))
+          .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
+            .child(svg(`mods/issues/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
           .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0 || pullRequestCount > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
