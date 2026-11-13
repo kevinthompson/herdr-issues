@@ -1,6 +1,6 @@
 // Tells Claude sessions which issues the panel lists for a repository. Each repository's scope is a JSON
 // file in the app's data folder, keyed by its main checkout, which a Claude hook
-// (~/.dotfiles/claude/hooks/herdr-issues-scope.sh) adds to the context of sessions working in it:
+// (hooks/herdr-issues-scope.sh) adds to the context of sessions working in it:
 // { repo, tracker, team, scope: { kind, label, project: { name, url }, milestone: { name } } }.
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
 import { fileKey } from "./file-key.js";
