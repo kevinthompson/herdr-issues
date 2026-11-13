@@ -476,8 +476,8 @@ export default class Issues extends View {
         .on_click((_e, cx) => { forgetEdits(failed.map(([id]) => id)); cx.notify(); })
         .child(icon("circle-alert", t.ansi1));
     }
-    if (edits.length) return slot.tooltip("Saving to the tracker…").child(icon("cloud-upload", t.dim));
-    if (this.syncFade) return slot.opacity(this.syncFade.opacity).child(icon("cloud-upload", t.dim));
+    if (edits.length) return slot.tooltip("Saving to the tracker…").child(icon("loader-circle", t.dim));
+    if (this.syncFade) return slot.opacity(this.syncFade.opacity).child(icon("loader-circle", t.dim));
     return null;
   }
 

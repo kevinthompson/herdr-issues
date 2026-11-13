@@ -127,7 +127,7 @@ function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
   return div().id("issue-delegate").flex_none().size(26).flex().items_center().justify_center().rounded(7).bg(t.raised)
     .tooltip(tooltip)
     .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onDelegate(cx)))
-    .child(svg("mods/issues/cloud.svg").size(14).text_color(enabled ? t.foreground : t.dim));
+    .child(svg("mods/issues/cloud-upload.svg").size(14).text_color(enabled ? t.foreground : t.dim));
 }
 
 const icon = (name) => (color) => svg(`mods/issues/${name}.svg`).size(14).text_color(color);
