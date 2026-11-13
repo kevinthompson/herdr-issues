@@ -24,7 +24,7 @@ const GROUPS = [
 
 // By priority (urgent first, "None" last), then by SLA (the soonest breach first, issues without one
 // after), then issues with an order by that number, then by ID in number order.
-const priorityRank = (issue) => issue.priority || PRIORITIES.length;
+export const priorityRank = (issue) => issue.priority || PRIORITIES.length;
 const slaBreachTime = (issue) => (issue.sla ? Date.parse(issue.sla.breachesAt) : Infinity);
 const byId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
 

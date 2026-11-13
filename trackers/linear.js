@@ -9,7 +9,7 @@
 import { home, appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
-import { STATUSES, STATUS_LABELS } from "../issue.js";
+import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
 
 const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
@@ -50,7 +50,7 @@ const FILTERED_ISSUES_IN_STATE = `query($filter: IssueFilter!, $state: WorkflowS
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { and: [$filter, { state: $state }] }) { ${PAGE} } }`;
 const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
   projects(first: 50, filter: { status: { type: { nin: ["completed", "canceled"] } } }) { nodes {
-    id name url status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
+    id name url priority status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
@@ -106,7 +106,8 @@ async function loadConfig() {
   return { apiKey: config.apiKey, repos: Object.entries(config.repos ?? {}).map(([teamKey, entry]) => repoConfig(teamKey, entry)) };
 }
 
-// Projects in the scope menu, by status: in progress, then planned, paused and backlog.
+// Projects in the scope menu, by status: in progress, then planned, paused and backlog. Within a status, by
+// priority (urgent first, "None" last).
 const PROJECT_STATUS_ORDER = ["started", "planned", "paused", "backlog"];
 const statusRank = (project) => {
   const rank = PROJECT_STATUS_ORDER.indexOf(project.status?.type);
@@ -120,8 +121,8 @@ function scopesFor({ views }, { name: teamName, projects }) {
   const mine = { id: "mine", label: "My issues" };
   const teamScopes = [{ id: "triage", label: "Triage" }, { id: "team", label: "Issues" },
     ...views.map((view) => ({ id: `view:${view.id}`, label: view.name }))].map((scope) => ({ ...scope, group: teamName }));
-  const byStatus = [...projects].sort((a, b) => statusRank(a) - statusRank(b));
-  const projectScopes = byStatus.map((project) => ({
+  const byStatusAndPriority = [...projects].sort((a, b) => statusRank(a) - statusRank(b) || priorityRank(a) - priorityRank(b));
+  const projectScopes = byStatusAndPriority.map((project) => ({
     id: `project:${project.id}`, label: project.name, group: `${teamName} Projects`, subgroup: project.status?.name, url: project.url,
     milestones: [...project.projectMilestones.nodes].sort((a, b) => a.sortOrder - b.sortOrder)
       .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
