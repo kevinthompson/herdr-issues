@@ -31,11 +31,16 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
   }));
 }
 
-function linkedFact(key, label, ids, view, t) {
-  return h_flex().gap(4).items_center()
+const FACT_ROW_PX = 18;
+
+// One of the issue's facts on a line of its own: its name dimmed, then its value.
+function fact(label, value) {
+  return h_flex().min_h(FACT_ROW_PX).gap(4).items_center()
     .child(div().flex_none().child(label))
-    .child(issueLinks(key, ids, view, t, t.accent));
+    .child(value);
 }
+
+const linkedFact = (key, label, ids, view, t) => fact(label, issueLinks(key, ids, view, t, t.accent));
 
 // A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
 function labelChip(label, color, t) {
@@ -49,11 +54,11 @@ export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => 
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
   const { issue, issue: { labels, blockedBy, branch }, blocking } = view;
-  return h_flex().flex_wrap().gap_x(14).gap_y(2).text_size(11).text_color(t.dim)
-    .when(labels.length > 0, (e) => e.child(h_flex().flex_wrap().gap(4).items_center().child(div().child("Labels:")).children(labelChips(issue, t))))
+  return v_flex().gap(2).text_size(11).text_color(t.dim)
+    .when(labels.length > 0, (e) => e.child(fact("Labels:", h_flex().flex_wrap().gap(4).items_center().children(labelChips(issue, t)))))
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
-    .when(Boolean(branch), (e) => e.child(div().child(`Branch: ${branch}`)));
+    .when(Boolean(branch), (e) => e.child(fact("Branch:", div().flex_1().min_w(0).truncate().text_color(t.muted).child(branch))));
 }
 
 const PULL_REQUEST_STATUSES = {
@@ -174,11 +179,8 @@ export function issueDetail(view, t) {
   const { issue, error, onBack } = view;
   return v_flex().id("issue-detail").size_full().min_h(0)
     .child(h_flex().h(42).flex_none().px(10).gap(8).items_center().border_b(1).border_color(t.border)
-      .child(h_flex().flex_none().gap(4).items_center()
-        .child(div().id("issue-back").flex_none().h(26).px(4).flex().items_center().rounded(7).cursor_pointer().font_semibold()
-          .hover((s) => s.bg(t.hover)).on_click((_e, cx) => onBack(cx)).child("Issues"))
-        .child(div().flex_none().text_size(11).text_color(t.dim).child("›"))
-        .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id)))
+      .child(div().id("issue-back").flex_none().h(26).px(8).flex().items_center().rounded(7).cursor_pointer().text_color(t.muted)
+        .hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => onBack(cx)).child("‹ Issues"))
       .child(div().flex_1())
       .when(Boolean(view.syncIndicator), (e) => e.child(view.syncIndicator))
       .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
@@ -186,7 +188,9 @@ export function issueDetail(view, t) {
       .when(!view.editor, (e) => e.child(workActions(view, t))))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
-      .child(div().whitespace_normal().font_semibold().child(issue.title))
+      .child(v_flex().gap(2)
+        .child(div().text_size(11).text_color(t.accent).child(issue.id))
+        .child(div().whitespace_normal().font_semibold().child(issue.title)))
       .child(h_flex().flex_wrap().gap(14).items_center()
         .child(dropdown("status", "Status", view, t))
         .child(dropdown("priority", "Priority", view, t)))
