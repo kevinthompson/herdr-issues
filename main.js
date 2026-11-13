@@ -86,7 +86,7 @@ const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 const AWAITING = "issues.awaitingPullRequest";
 const awaitingPullRequests = () => shared(AWAITING) ?? [];
 const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
-const workIssueSession = (issue) => ({ argv: ["claude"], task: `/issues:work ${issue.id}` });
+const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/issues:work ${issue.id}` });
 // wt sets up new checkouts, which can take minutes in a box app.
 const WT_TIMEOUT_MS = 10 * 60 * 1000;
 // wt works on this computer's checkouts and needs the issue's branch.
