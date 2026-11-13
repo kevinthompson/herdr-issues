@@ -57,10 +57,9 @@ export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => 
 
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
-  const { issue, issue: { labels, blockedBy, branch }, blocking, assignee } = view;
+  const { issue: { blockedBy, branch }, blocking, assignee } = view;
   return v_flex().gap(2).text_size(11).text_color(t.dim)
     .when(Boolean(assignee), (e) => e.child(fact("Assignee:", assignee)))
-    .when(labels.length > 0, (e) => e.child(fact("Labels:", h_flex().flex_wrap().gap(4).items_center().children(labelChips(issue, t)))))
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
     .when(Boolean(branch), (e) => e.child(fact("Branch:", div().flex_1().min_w(0).truncate().text_color(t.muted).child(branch))));
@@ -71,19 +70,21 @@ const PULL_REQUEST_STATUSES = {
   merged: ["Merged", "ansi5"], closed: ["Closed", "ansi1"],
 };
 
-// Each pull request attached to the issue, opened in the browser when clicked.
+// The pull requests attached to the issue as a bulleted list, each opened in the browser by clicking
+// its number or title.
 function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
   return v_flex().gap(3).text_size(11)
     .child(div().text_color(t.dim).child("Pull requests:"))
     .children(pullRequests.map((pullRequest) => {
       const [status, color] = PULL_REQUEST_STATUSES[pullRequest.status] ?? [pullRequest.status, "dim"];
       const reference = pullRequest.number ? `${pullRequest.repo ?? ""}#${pullRequest.number}` : "";
-      return h_flex().id(`pull-request-${id}-${pullRequest.url}`).gap(6).items_start().cursor_pointer()
-        .hover((s) => s.underline())
-        .on_click((_e, cx) => onLink(pullRequest.url, cx))
+      return h_flex().gap(6).items_start()
+        .child(div().flex_none().text_color(t.dim).child("•"))
         .child(div().flex_none().text_color(t[color]).child(status))
-        .child(div().flex_none().text_color(t.accent).child(reference))
-        .child(div().flex_1().min_w(0).whitespace_normal().child(pullRequest.title));
+        .child(h_flex().id(`pull-request-${id}-${pullRequest.url}`).flex_1().min_w(0).gap(6).items_start().cursor_pointer()
+          .on_click((_e, cx) => onLink(pullRequest.url, cx))
+          .child(div().flex_none().text_color(t.accent).child(reference))
+          .child(div().flex_1().min_w(0).whitespace_normal().child(pullRequest.title)));
     }));
 }
 
@@ -186,7 +187,10 @@ export function issueDetail(view, t) {
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
       .child(v_flex().gap(2)
-        .child(div().text_size(11).text_color(t.accent).child(issue.id))
+        .child(h_flex().gap(8).items_start()
+          .child(div().flex_1().text_size(11).text_color(t.accent).child(issue.id))
+          .when(issue.labels.length > 0, (e) => e.child(h_flex().flex_wrap().justify_end().gap(4).items_center().text_size(11)
+            .children(labelChips(issue, t)))))
         .child(div().whitespace_normal().font_semibold().child(issue.title)))
       .child(facts(view, t))
       .when(issue.pullRequests?.length > 0, (e) => e.child(pullRequests(view, t))))
