@@ -27,6 +27,8 @@ import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses } from "./status-commits.js";
 
 const POLL_MS = 5 * 60 * 1000;
+// A local issues/ folder on a remote host can't be watched, but reading it is cheap.
+const LOCAL_POLL_MS = 10 * 1000;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
 // team at once is too slow.
 const ROW_LIMIT = 100;
@@ -97,7 +99,7 @@ export default class Issues extends View {
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
-    cx.timer.every(POLL_MS, (cx) => this.refresh(cx));
+    cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); });
     this.checkPullRequests(cx);
     cx.timer.every(PULL_REQUEST_CHECK_MS, (cx) => this.checkPullRequests(cx));
     cx.spawn(async (cx) => {
@@ -116,6 +118,7 @@ export default class Issues extends View {
       this.closeIssue(); this.focusHandled = null; this.rowLimit = ROW_LIMIT;
     }
     const generation = ++this.generation;
+    this.refreshedAt = Date.now();
     this.seenChangeAt = issuesChangedAt();
     this.refreshing = true;
     cx.spawn(async (cx) => {
@@ -160,6 +163,13 @@ export default class Issues extends View {
       const deleted = await deleteMergedBranches(repository.mergedFinished, repository).catch(() => []);
       if (deleted.length) notify({ title: `Deleted ${plural(deleted.length, "merged branch", "merged branches")}`, body: deleted.join(", ") });
     });
+  }
+
+  // A watched tracker refreshes when it changes, so only unwatched ones poll.
+  pollDue() {
+    if (this.tracker?.changed && this.watching === this.context) return false;
+    const interval = this.tracker?.kind === "local" ? LOCAL_POLL_MS : POLL_MS;
+    return Date.now() - this.refreshedAt >= interval;
   }
 
   watch(tracker, cx) {
