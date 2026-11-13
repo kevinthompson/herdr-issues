@@ -693,7 +693,7 @@ export default class Issues extends View {
     this.avatarLoads = [];
     const content = issue
       ? (this.loadBody(issue, cx), issueDetail({
-        issue, writable: this.tracker?.writable,
+        issue, writable: this.tracker?.writable, prioritized: this.tracker?.prioritized !== false,
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         syncIndicator: this.syncIndicator(t),
         assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,

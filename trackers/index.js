@@ -1,10 +1,11 @@
 // A tracker is where a project's issues live. Every backend returns the same shapes, so the
 // panel never knows which one it is showing.
 //
-//   tracker.kind                "local" or "linear"
+//   tracker.kind                "local", "linear" or "github"
 //   tracker.name                shown in the panel's header
 //   tracker.team                the Linear team's key, for Linear
 //   tracker.writable            whether update can save
+//   tracker.prioritized         false when its issues have no priority to show or set
 //   tracker.statuses            the STATUSES (issue.js) its issues can be set to
 //   tracker.scopes              the issue lists the tracker can show, { id, label, group? }, its default
 //                                 first, a project's milestones under it as { milestones }; absent when
@@ -37,9 +38,11 @@
 //          delegateAvatar (an image URL, or null, for Linear issues) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order. A Linear issue's branch is its open pull request's in the repository,
-// else the one Linear suggests.
+// else the one Linear suggests. GitHub issues fill the same fields as Linear's labelColors, assignee,
+// assigneeAvatar and pullRequests; github.js says how their statuses and branches are derived.
 import { localTracker } from "./local.js";
 import { linearTracker } from "./linear.js";
+import { githubTracker } from "./github.js";
 import { trackerSetting } from "./setting.js";
 
 // The repository's .issues.json (setting.js) decides; without one, its own issues/ folder wins over Linear.
@@ -47,5 +50,6 @@ export async function trackerFor(project) {
   const setting = await trackerSetting(project);
   if (setting?.tracker === "local") return localTracker(project);
   if (setting?.tracker === "linear") return linearTracker(project, setting);
+  if (setting?.tracker === "github") return githubTracker(project, setting);
   return (await localTracker(project)) ?? linearTracker(project);
 }

@@ -212,6 +212,6 @@ export function issueDetail(view, t) {
       .child(facts(view, t)))
     .child(h_flex().flex_none().flex_wrap().px(14).py(8).gap(14).items_center().border_b(1).border_color(t.border).bg(fieldBar(t))
       .child(dropdown("status", "Status", view, t))
-      .child(dropdown("priority", "Priority", view, t)))
+      .when(view.prioritized, (e) => e.child(dropdown("priority", "Priority", view, t))))
     .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)));
 }

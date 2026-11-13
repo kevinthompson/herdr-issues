@@ -9,6 +9,7 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 1. **Find the tracker.** Use the main checkout (the first path `git worktree list` prints) and detect the tracker as `/issues:create` step 1 does.
    - **Markdown**: read `issues/README.md` and `issues/TEMPLATE.md` in the main checkout; they define the format. Every change is made and committed there on main, scoped `issues`, after checking the main checkout is on main and the issue file has no unrelated uncommitted edits.
    - **Linear**: load `list_issues`, `get_issue`, `save_issue`, `list_issue_statuses`, `list_issue_labels` and the comment tools (`list_comments`, `save_comment` or `create_comment`) with ToolSearch, prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`. Use the team that owns the repository. If the tools aren't available, stop and say so.
+   - **GitHub**: use the GitHub CLI against the repository the setting names: `gh issue list`, `gh issue view --comments`, `gh issue edit --body-file`, `gh issue comment` and `gh issue close`. GitHub has no priority or Backlog state, so skip those questions in step 7; blockers are a "Blocked by #<number>" line in the body.
    - Read `../create/SKILL.md` beside this skill: its step 4 is what an issue must contain, and this skill doesn't restate it.
 
 2. **Pick the issues.** With issue IDs or a scope in the arguments, triage those. Otherwise confirm the scope before reading any issue. Triaging is this skill's job, not a list: never assume the person means Linear's Triage state.
