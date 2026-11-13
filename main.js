@@ -717,7 +717,7 @@ export default class Issues extends View {
     this.openRequestedIssue();
     this.applyFieldEdits(cx);
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
-    publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue);
+    publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];
     const content = issue
       ? (this.loadBody(issue, cx), issueDetail({

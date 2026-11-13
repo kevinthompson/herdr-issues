@@ -2,7 +2,7 @@
 # UserPromptSubmit hook: in a Herdr terminal, tells Claude which issues the Herdr
 # issues panel lists for the session's repository, as the panel publishes them in
 # ~/.config/herdr-app/data/issues/scope, and which issue the panel has open in the
-# session's checkout, as it publishes it in shared.json. It speaks only when one of
+# session's checkout, as it publishes it in data/issues/open.json. It speaks only when one of
 # them differs from what it last told this session.
 
 [[ -n $HC_TERMINAL_ID ]] || exit 0
@@ -33,9 +33,9 @@ compgen -G "$scope_folder/*.json" >/dev/null && scope=$(jq -rs --arg repo "$repo
 ' "$scope_folder"/*.json 2>/dev/null)
 
 open_issue=$(jq -r --arg checkout "$checkout" '
-  ."issues.open" // empty | select(.root == $checkout)
+  select(.root? == $checkout)
   | "The Herdr issues panel has \(.id) open: \"\(.title)\"\(if .link then " (\(.link))" else "" end). When I say \"this issue\" without naming one, I mean \(.id)."
-' "$app_home/shared.json" 2>/dev/null)
+' "$app_home/data/issues/open.json" 2>/dev/null)
 
 state_folder="${TMPDIR:-/tmp}/claude-herdr-issues-scope"
 mkdir -p "$state_folder"
