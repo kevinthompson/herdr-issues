@@ -1,6 +1,6 @@
 // The issues of the project in the focused pane: its git repository's root, or its folder outside one.
-// Clicking an issue shows it in the panel in place of the list (detail.js). Status and priority
-// dropdowns are popups of this same mod
+// Clicking an issue shows it in the panel in place of the list (detail.js). The list draws a limited
+// number of rows, and Show more draws more. Status and priority dropdowns are popups of this same mod
 // with props { menu } (menu.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
@@ -26,6 +26,9 @@ import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses } from "./status-commits.js";
 
 const POLL_MS = 5 * 60 * 1000;
+// Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
+// team at once is too slow.
+const ROW_LIMIT = 100;
 const PULL_REQUEST_CHECK_MS = 2 * 60 * 1000;
 const CHECKLIST_COMMIT_DELAY_MS = 5000;
 const STATUS_COMMIT_DELAY_MS = 5000;
@@ -88,6 +91,7 @@ export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
     this.issues = []; this.generation = 0; this.expanded = {};
+    this.rowLimit = ROW_LIMIT;
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
@@ -107,7 +111,7 @@ export default class Issues extends View {
     if (context !== this.context) {
       this.context = context; this.project = null; this.tracker = null; this.issues = []; this.error = null; this.loaded = false; this.repository = null;
       this.scopeKey = null; this.listedScope = undefined; this.listKey = null;
-      this.closeIssue(); this.focusHandled = null;
+      this.closeIssue(); this.focusHandled = null; this.rowLimit = ROW_LIMIT;
     }
     const generation = ++this.generation;
     this.seenChangeAt = issuesChangedAt();
@@ -545,8 +549,9 @@ export default class Issues extends View {
       .child(div().min_w(0).truncate().child(issue.assignee ?? ""));
   }
 
-  group(group, t) {
-    const expanded = this.isExpanded(group);
+  // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
+  group(group, shown, t) {
+    const expanded = this.isExpanded(group), hidden = group.issues.length - shown;
     const color = GROUP_COLORS[group.id];
     const fill = color ? tinted(color) : t.raised;
     return v_flex().flex_none().gap(1)
@@ -556,7 +561,22 @@ export default class Issues extends View {
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
         .child(div().font_semibold().child(group.label))
         .child(div().opacity(0.7).child(String(group.issues.length))))
-      .when(expanded, (e) => e.children(group.issues.map((issue) => this.row(issue, t))));
+      .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, t))))
+      .when(expanded && hidden > 0, (e) => e.child(div().id(`show-more-${group.id}`).flex_none().px(10).py(6).rounded(7)
+        .cursor_pointer().text_size(12).text_color(t.accent).hover((s) => s.bg(t.hover))
+        .on_click((_e, cx) => { this.rowLimit += ROW_LIMIT; cx.notify(); })
+        .child(`Show ${hidden} more`)));
+  }
+
+  // Each expanded group's share of the rows the list draws, in order, until the limit runs out.
+  shownCounts(groups) {
+    let remaining = this.rowLimit;
+    return groups.map((group) => {
+      if (!this.isExpanded(group)) return 0;
+      const shown = Math.min(group.issues.length, remaining);
+      remaining -= shown;
+      return shown;
+    });
   }
 
   emptyText() {
@@ -602,6 +622,7 @@ export default class Issues extends View {
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     const groups = groupIssues(this.issues), error = this.error ?? this.detailError, milestoneBar = this.milestoneBar(t);
+    const shown = this.shownCounts(groups);
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Issues"))
@@ -612,7 +633,7 @@ export default class Issues extends View {
       .when(Boolean(milestoneBar), (e) => e.child(milestoneBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
-        .children(groups.map((group) => this.group(group, t)))
+        .children(groups.map((group, index) => this.group(group, shown[index], t)))
         .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
   }
 
@@ -620,7 +641,7 @@ export default class Issues extends View {
     if (this.menu) return this.menu.render();
     if (contextKey() !== this.context) this.refresh(cx);
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
-    else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.refresh(cx); }
+    else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     this.scheduleStatusCommits(cx);
     this.openRequestedIssue();
     const t = theme(), issue = this.issues.find((each) => each.id === this.openId);

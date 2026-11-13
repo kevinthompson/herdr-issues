@@ -13,7 +13,7 @@ const GROUPS = [
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
   { id: "todo", label: "Todo", has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
   { id: "blocked", label: "Blocked", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
-  { id: "backlog", label: "Backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
+  { id: "backlog", label: "Backlog", collapsed: true, has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
   { id: "done", label: "Done", collapsed: true, sort: byRecentlyCompleted, has: (issue) => issue.status === "done" },
   { id: "canceled", label: "Canceled", collapsed: true, has: (issue) => issue.status === "canceled" },
