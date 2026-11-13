@@ -1,7 +1,7 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
 // this same mod with props { menu: field, root, on, id, current, statuses }; picking an option hands the
 // edit to the panel, which shows it at once and saves it.
-// The panel's scope and milestone dropdowns are popups too, with props { menu: "scope", scopes, current, key }:
+// The panel's scope, milestone and label dropdowns are popups too, with props { menu: "scope", scopes, current, key, store }:
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick.
@@ -52,11 +52,13 @@ function optionList(options, current, onPick) {
       .child(div().flex_none().text_color(t.muted).child(option.value === current ? "✓" : ""))));
 }
 
-// The scope each repository lists, by its main checkout: { "<path>": "<scope id>" }. Shared, so every
-// copy of the panel lists the same issues and the choice outlives a reload.
-const SCOPES = "issues.scopes";
-const selections = () => /** @type {Record<string, string>} */ (shared(SCOPES) ?? {});
-export const selectedScope = (key) => selections()[key];
+// The scope each repository lists, and the label it narrows the list to, by its main checkout:
+// { "<path>": "<scope id or label>" }. Shared, so every copy of the panel lists the same issues and the
+// choice outlives a reload.
+const SCOPES = "issues.scopes", LABELS = "issues.labels";
+const selections = (store) => /** @type {Record<string, string>} */ (shared(store) ?? {});
+export const selectedScope = (key) => selections(SCOPES)[key];
+export const selectedLabel = (key) => selections(LABELS)[key] || null;
 
 const SCOPE_MENU_WIDTH = 280;
 const SCOPE_MENU_MAX_HEIGHT = 440;
@@ -78,20 +80,27 @@ function scopeOptions(scopes) {
 const menuHeight = (options) => options.reduce((height, option, index) =>
   height + ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0), PADDING * 2);
 
-export function openScopeMenu(scopes, current, key) {
+export function openScopeMenu(scopes, current, key, store = SCOPES) {
   const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
   openOverlay({
     mod: "issues", kind: "popup", at: "pointer", width: SCOPE_MENU_WIDTH,
     height: Math.min(menuHeight(scopeOptions(listed)), SCOPE_MENU_MAX_HEIGHT),
-    props: { menu: "scope", scopes: listed, current, key },
+    props: { menu: "scope", scopes: listed, current, key, store },
   });
+}
+
+const ALL_LABELS = "";
+// "All labels", then each label by name.
+export function openLabelMenu(labels, current, key) {
+  const options = [{ id: ALL_LABELS, label: "All labels" }, ...labels.map((label) => ({ id: label, label }))];
+  openScopeMenu(options, current ?? ALL_LABELS, key, LABELS);
 }
 
 export class ScopeMenu {
   render() {
-    const { scopes, current, key, overlay } = props();
+    const { scopes, current, key, store, overlay } = props();
     return optionList(scopeOptions(scopes), current, (option) => {
-      setShared(SCOPES, { ...selections(), [key]: option.value });
+      setShared(store, { ...selections(store), [key]: option.value });
       closeOverlay(overlay);
     });
   }
