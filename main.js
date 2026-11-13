@@ -643,7 +643,7 @@ export default class Issues extends View {
         .child(div().font_semibold().child("Issues"))
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
-        .child(this.refreshButton(t))
+        .when(Boolean(this.tracker) && this.tracker.kind !== "local", (e) => e.child(this.refreshButton(t)))
         .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
       .when(Boolean(milestoneBar), (e) => e.child(milestoneBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
