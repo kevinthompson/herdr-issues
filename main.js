@@ -582,10 +582,10 @@ export default class Issues extends View {
   }
 
   // The assignee's name after their avatar once it is cached, then the agent it's delegated to, if any.
-  assignee(issue, t) {
+  assignee(issue, t, textColor = t.dim) {
     const avatar = avatarImage(issue.assigneeAvatar, (loading) => this.avatarLoads.push(loading));
     const delegateAvatar = avatarImage(issue.delegateAvatar, (loading) => this.avatarLoads.push(loading));
-    return h_flex().min_w(0).gap(5).items_center().text_size(11).text_color(t.dim)
+    return h_flex().min_w(0).gap(5).items_center().text_size(11).text_color(textColor)
       .when(Boolean(avatar), (e) => e.child(image(avatar ?? "").flex_none().size(AVATAR_PX).rounded(AVATAR_PX / 2)))
       .child(div().min_w(0).truncate().child(issue.assignee ?? ""))
       .when(Boolean(issue.delegate), (e) => e
@@ -700,7 +700,7 @@ export default class Issues extends View {
         issue, writable: this.tracker?.writable,
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         syncIndicator: this.syncIndicator(t),
-        assignee: issue.assignee ? this.assignee(issue, t) : null,
+        assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
         onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),

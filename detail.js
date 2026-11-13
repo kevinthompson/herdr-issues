@@ -32,19 +32,28 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
   }));
 }
 
-const FACT_ROW_PX = 18;
+const FACT_ROW_PX = 18, FACT_ICON_PX = 12;
 
 // The bar of fields you can change, a shade lighter than the panel so it reads apart from the issue's details.
 const fieldBar = (t) => mixColors(t.background, t.raised, 0.35) ?? t.surface;
 
 // One of the issue's facts on a line of its own: its name dimmed, then its value.
-function fact(label, value) {
+function fact(label, value, t) {
   return h_flex().min_h(FACT_ROW_PX).gap(4).items_center()
-    .child(div().flex_none().child(label))
+    .child(div().flex_none().text_color(t.dim).child(label))
     .child(value);
 }
 
-const linkedFact = (key, label, ids, view, t) => fact(label, issueLinks(key, ids, view, t, t.accent));
+// A fact named by an icon, which names it in words on hover. The icon sits on the first line of a
+// value that wraps or lists several things.
+function iconFact(icon, name, value, t) {
+  return h_flex().gap(10).items_start()
+    .child(div().id(`fact-${icon}`).flex_none().h(FACT_ROW_PX).flex().items_center().tooltip(name)
+      .child(svg(`mods/issues/${icon}.svg`).size(FACT_ICON_PX).text_color(t.dim)))
+    .child(div().flex_1().min_w(0).min_h(FACT_ROW_PX).flex().items_center().child(value));
+}
+
+const linkedFact = (key, label, ids, view, t) => fact(label, issueLinks(key, ids, view, t, t.accent), t);
 
 // A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
 function labelChip(label, color, t) {
@@ -57,12 +66,13 @@ export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => 
 
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
-  const { issue: { blockedBy, branch }, blocking, assignee } = view;
-  return v_flex().gap(2).text_size(11).text_color(t.dim)
-    .when(Boolean(assignee), (e) => e.child(fact("Assignee:", assignee)))
+  const { issue: { blockedBy, branch, pullRequests: attached }, blocking, assignee } = view;
+  return v_flex().gap(2).text_size(11).text_color(t.muted)
+    .when(Boolean(assignee), (e) => e.child(iconFact("user", "Assignee", assignee, t)))
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
-    .when(Boolean(branch), (e) => e.child(fact("Branch:", div().flex_1().min_w(0).truncate().text_color(t.muted).child(branch))));
+    .when(Boolean(branch), (e) => e.child(iconFact("git-branch", "Branch", div().min_w(0).truncate().child(branch), t)))
+    .when(attached?.length > 0, (e) => e.child(iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t)));
 }
 
 const PULL_REQUEST_STATUSES = {
@@ -70,22 +80,24 @@ const PULL_REQUEST_STATUSES = {
   merged: ["Merged", "ansi5"], closed: ["Closed", "ansi1"],
 };
 
-// The pull requests attached to the issue as a bulleted list, each opened in the browser by clicking
-// its number or title.
+// A pull request's status, then its number and title, which open it in the browser when clicked.
+function pullRequestLine(issueId, pullRequest, onLink, t) {
+  const [status, color] = PULL_REQUEST_STATUSES[pullRequest.status] ?? [pullRequest.status, "dim"];
+  const reference = pullRequest.number ? `${pullRequest.repo ?? ""}#${pullRequest.number}` : "";
+  return h_flex().flex_1().min_w(0).gap(6).items_start()
+    .child(div().flex_none().text_color(t[color]).child(status))
+    .child(h_flex().id(`pull-request-${issueId}-${pullRequest.url}`).flex_1().min_w(0).gap(6).items_start().cursor_pointer()
+      .on_click((_e, cx) => onLink(pullRequest.url, cx))
+      .child(div().flex_none().text_color(t.accent).child(reference))
+      .child(div().flex_1().min_w(0).whitespace_normal().child(pullRequest.title)));
+}
+
+// The issue's one pull request, or a bulleted list of several.
 function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
-  return v_flex().gap(3).text_size(11)
-    .child(div().text_color(t.dim).child("Pull requests:"))
-    .children(pullRequests.map((pullRequest) => {
-      const [status, color] = PULL_REQUEST_STATUSES[pullRequest.status] ?? [pullRequest.status, "dim"];
-      const reference = pullRequest.number ? `${pullRequest.repo ?? ""}#${pullRequest.number}` : "";
-      return h_flex().gap(6).items_start()
-        .child(div().flex_none().text_color(t.dim).child("•"))
-        .child(div().flex_none().text_color(t[color]).child(status))
-        .child(h_flex().id(`pull-request-${id}-${pullRequest.url}`).flex_1().min_w(0).gap(6).items_start().cursor_pointer()
-          .on_click((_e, cx) => onLink(pullRequest.url, cx))
-          .child(div().flex_none().text_color(t.accent).child(reference))
-          .child(div().flex_1().min_w(0).whitespace_normal().child(pullRequest.title)));
-    }));
+  if (pullRequests.length === 1) return pullRequestLine(id, pullRequests[0], onLink, t);
+  return v_flex().flex_1().min_w(0).gap(2).children(pullRequests.map((pullRequest) => h_flex().min_h(FACT_ROW_PX).gap(6).items_start()
+    .child(div().flex_none().text_color(t.dim).child("•"))
+    .child(pullRequestLine(id, pullRequest, onLink, t))));
 }
 
 // An icon has its own color, so a button whose label is an icon redraws it in the hover color.
@@ -192,8 +204,7 @@ export function issueDetail(view, t) {
           .when(issue.labels.length > 0, (e) => e.child(h_flex().flex_wrap().justify_end().gap(4).items_center().text_size(11)
             .children(labelChips(issue, t)))))
         .child(div().whitespace_normal().font_semibold().child(issue.title)))
-      .child(facts(view, t))
-      .when(issue.pullRequests?.length > 0, (e) => e.child(pullRequests(view, t))))
+      .child(facts(view, t)))
     .child(h_flex().flex_none().flex_wrap().px(14).py(8).gap(14).items_center().border_b(1).border_color(t.border).bg(fieldBar(t))
       .child(dropdown("status", "Status", view, t))
       .child(dropdown("priority", "Priority", view, t)))
