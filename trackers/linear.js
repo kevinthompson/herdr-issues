@@ -1,11 +1,13 @@
-// Issues in Linear, for repositories named in ~/.config/herdr-app/linear.json:
+// Issues in Linear, for Planning Center repositories (their team found by linear-team.js) and those named in
+// ~/.config/herdr-app/linear.json, whose entries win:
 // { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time: its first view, else every open issue assigned to
 // you, across teams. The team's open projects are scopes too, each narrowed further to one of its
 // milestones. Scopes other than a view add the issues completed or merged most recently.
-import { home, appHome, readTextFile, exec } from "herdr";
+import { home, appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
+import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS } from "../issue.js";
 
 const API_URL = "https://api.linear.app/graphql";
@@ -52,7 +54,6 @@ const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) 
 // works the issues delegated to it.
 const CLOUD_AGENT = `query { users(filter: { app: { eq: true }, name: { eq: "Cloud Agent" } }) { nodes { id } }
   issueLabels(filter: { name: { eq: "one-shot" }, parent: { name: { eq: "cloud-agent" } } }) { nodes { id } } }`;
-const PLANNING_CENTER_REMOTE = /github\.com[:/]planningcenter\//;
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
@@ -109,7 +110,7 @@ const statusRank = (project) => {
 // The issue lists a repository can show: { id, label, group?, subgroup?, milestones? }, its default first.
 // Projects are grouped under their status. A project scope lists its milestones as scopes of their own:
 // { id, label }.
-function scopesFor({ views }, projects) {
+function scopesFor({ views, detected }, projects) {
   const viewScopes = views.map((view) => ({ id: `view:${view.id}`, label: view.name, group: "Views" }));
   const byStatus = [...projects].sort((a, b) => statusRank(a) - statusRank(b));
   const projectScopes = byStatus.map((project) => ({
@@ -117,7 +118,9 @@ function scopesFor({ views }, projects) {
     milestones: [...project.projectMilestones.nodes].sort((a, b) => a.sortOrder - b.sortOrder)
       .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
   }));
-  const listScopes = [{ id: "mine", label: "My issues", group: "Views" }, { id: "team", label: "Team issues", group: "Views" }];
+  const mine = { id: "mine", label: "My issues", group: "Views" }, team = { id: "team", label: "Team issues", group: "Views" };
+  // A repository whose team was detected rather than configured shows that team's issues first.
+  const listScopes = detected ? [team, mine] : [mine, team];
   return [...viewScopes, ...listScopes, ...projectScopes];
 }
 
@@ -174,11 +177,6 @@ function toIssue(node) {
   };
 }
 
-async function isPlanningCenterRepo(root) {
-  const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: root }).catch(() => null);
-  return origin?.code === 0 && PLANNING_CENTER_REMOTE.test(origin.stdout);
-}
-
 // { agentId, labelId } once read, shared by every tracker since neither changes.
 let cloudAgent = null;
 async function cloudAgentIds(linear) {
@@ -211,12 +209,16 @@ async function projectsOf(teamKey, linear) {
 export async function linearTracker({ root: projectRoot, on }) {
   if (on != null) return null;
   const config = await loadConfig(), root = await mainCheckout(projectRoot, on);
-  const repo = config?.repos.find((each) => each.path === root);
-  if (!repo) return null;
-  if (!config.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
+  const configured = config?.repos.find((each) => each.path === root);
+  const repoName = await planningCenterRepoName(root);
+  if (!configured && !repoName) return null;
+  if (!config?.apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
   const linear = (query, variables = {}) => request(config.apiKey, query, variables);
+  const teamKey = configured?.teamKey ?? (await detectedTeam(root, repoName, linear));
+  if (!teamKey) return null;
+  const repo = configured ?? { teamKey, path: root, views: [], detected: true };
   const scopes = scopesFor(repo, await projectsOf(repo.teamKey, linear));
-  const agent = (await isPlanningCenterRepo(root)) ? await cloudAgentIds(linear) : null;
+  const agent = repoName ? await cloudAgentIds(linear) : null;
 
   // Every page of the connection `connectionOf` picks out of each answer.
   async function allPages(query, variables, connectionOf) {
