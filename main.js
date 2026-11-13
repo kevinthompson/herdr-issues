@@ -700,6 +700,7 @@ export default class Issues extends View {
         issue, writable: this.tracker?.writable,
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         syncIndicator: this.syncIndicator(t),
+        assignee: issue.assignee ? this.assignee(issue, t) : null,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
         onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),

@@ -57,8 +57,9 @@ export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => 
 
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
-  const { issue, issue: { labels, blockedBy, branch }, blocking } = view;
+  const { issue, issue: { labels, blockedBy, branch }, blocking, assignee } = view;
   return v_flex().gap(2).text_size(11).text_color(t.dim)
+    .when(Boolean(assignee), (e) => e.child(fact("Assignee:", assignee)))
     .when(labels.length > 0, (e) => e.child(fact("Labels:", h_flex().flex_wrap().gap(4).items_center().children(labelChips(issue, t)))))
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
