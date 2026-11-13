@@ -69,6 +69,7 @@ function scopeDropdown(id, label, onClick, t) {
 const SCOPE_DROPDOWN_MAX_PX = 260;
 const REFRESH_ICON_PX = 15;
 const SYNC_ICON_PX = 15;
+const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
@@ -451,8 +452,9 @@ export default class Issues extends View {
         .on_click((_e, cx) => { forgetEdits(failed.map(([id]) => id)); cx.notify(); })
         .child(icon("circle-alert", t.ansi1));
     }
-    if (edits.length) return slot.tooltip("Saving to the tracker…").child(icon("loader-circle", t.dim));
-    if (this.syncFade) return slot.opacity(this.syncFade.opacity).child(icon("loader-circle", t.dim));
+    const spinner = () => icon("loader-circle", t.dim).spin(SYNC_SPIN_MS);
+    if (edits.length) return slot.tooltip("Saving to the tracker…").child(spinner());
+    if (this.syncFade) return slot.opacity(this.syncFade.opacity).child(spinner());
     return null;
   }
 
