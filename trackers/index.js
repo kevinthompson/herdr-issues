@@ -32,10 +32,11 @@
 //          labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
-//          pullRequests ([{ url, title, repo, number, status }] attached to Linear issues),
+//          pullRequests ([{ url, title, repo, number, status, branch }] attached to Linear issues),
 //          delegateId (the agent working it, or null, for Linear issues) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
-// its manual sort order onto order.
+// its manual sort order onto order. A Linear issue's branch is its open pull request's in the repository,
+// else the one Linear suggests.
 import { localTracker } from "./local.js";
 import { linearTracker } from "./linear.js";
 

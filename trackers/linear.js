@@ -68,8 +68,8 @@ function statusOf(state) {
 }
 const isFinished = (state) => ["done", "canceled"].includes(statusOf(state));
 
-// GitHub's pull requests attached to an issue: { url, title, repo, number, status }, where status is
-// Linear's, such as "open", "draft", "inReview", "approved", "merged" or "closed".
+// GitHub's pull requests attached to an issue: { url, title, repo, number, status, branch }, where status
+// is Linear's, such as "open", "draft", "inReview", "approved", "merged" or "closed".
 function pullRequestsOf(attachments) {
   return attachments.nodes
     .filter((attachment) => attachment.sourceType === "github" && /\/pull\/\d+/.test(attachment.url))
@@ -79,6 +79,7 @@ function pullRequestsOf(attachments) {
       repo: metadata.repoName ?? null,
       number: metadata.number ?? null,
       status: metadata.draft && !["merged", "closed"].includes(metadata.status) ? "draft" : (metadata.status ?? "open"),
+      branch: metadata.branch ?? null,
     }));
 }
 
@@ -148,7 +149,16 @@ async function request(apiKey, query, variables) {
   return json.data;
 }
 
-function toIssue(node) {
+// The branch work on the issue continues on: its open pull request's in this repository, where the work
+// may sit on a branch other than the one Linear suggests, else Linear's.
+function workBranch(node, pullRequests, repoName) {
+  const open = pullRequests.find((pullRequest) => pullRequest.repo === repoName && pullRequest.branch
+    && !["merged", "closed"].includes(pullRequest.status));
+  return open?.branch ?? (node.branchName || null);
+}
+
+function toIssue(node, repoName) {
+  const pullRequests = pullRequestsOf(node.attachments);
   return {
     id: node.identifier,
     linearId: node.id,
@@ -163,14 +173,14 @@ function toIssue(node) {
     blockedBy: node.inverseRelations.nodes
       .filter((relation) => relation.type === "blocks" && !isFinished(relation.issue.state))
       .map((relation) => relation.issue.identifier),
-    branch: node.branchName || null,
+    branch: workBranch(node, pullRequests, repoName),
     assignee: node.assignee?.name ?? "Unassigned",
     assigneeAvatar: node.assignee?.avatarUrl ?? null,
     sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
     created: node.createdAt,
     completed: node.completedAt ?? null,
     body: node.description === undefined ? null : (node.description ?? "").trim(),
-    pullRequests: pullRequestsOf(node.attachments),
+    pullRequests,
     updated: node.updatedAt,
     url: node.url,
     delegateId: node.delegate?.id ?? null,
@@ -290,7 +300,7 @@ export async function linearTracker({ root: projectRoot, on }) {
 
   async function get(id) {
     const { issue } = await linear(ISSUE, { id }).catch(() => ({ issue: null }));
-    return issue ? toIssue(issue) : null;
+    return issue ? toIssue(issue, repoName) : null;
   }
 
   const tracker = {
@@ -303,7 +313,7 @@ export async function linearTracker({ root: projectRoot, on }) {
     // An unknown scope, such as a view since removed from the config, lists the default.
     async list(scopeId) {
       const scope = findScope(scopes, scopeId)?.scope ?? scopes[0];
-      return (await issuesIn(scope.id)).map(toIssue);
+      return (await issuesIn(scope.id)).map((node) => toIssue(node, repoName));
     },
     get,
     // A new body only saves over the description `issue` was read with, so edits made in Linear
