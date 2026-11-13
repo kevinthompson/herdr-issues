@@ -59,27 +59,39 @@ async function git(cwd, args, on) {
   return { ok: r.code === 0, out: (r.stdout ?? "").trim(), err: (r.stderr ?? r.stdout ?? "").trim() };
 }
 
-// What removing a checkout would leave unsaved on its branch, against origin's default branch
-// fetched just now: { branch, base, merged, unpushed }, or null on a detached HEAD. Merged means
-// merging the branch would change nothing, which also catches squash merges and an untouched
-// branch. Unpushed counts commits on no origin branch, null without origin.
-async function branchState(repo, on) {
-  const branch = (await git(repo.top, ["branch", "--show-current"], on)).out;
-  if (!branch) return null;
-  const hasOrigin = (await git(repo.top, ["remote", "get-url", "origin"], on)).ok;
-  let base = "main";
-  if (hasOrigin) {
-    const head = await git(repo.top, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], on);
-    base = head.ok ? head.out : "origin/main";
-    await git(repo.top, ["fetch", "-q", "origin", base.slice("origin/".length)], on);
-  }
+// Whether merging HEAD into `base` would change nothing, which also catches squash merges and an
+// untouched branch.
+async function isMergedInto(repo, base, on) {
   const [mergedTree, baseTree] = await Promise.all([
     git(repo.top, ["merge-tree", "--write-tree", base, "HEAD"], on),
     git(repo.top, ["rev-parse", `${base}^{tree}`], on),
   ]);
-  const merged = mergedTree.ok && baseTree.ok && mergedTree.out.split("\n")[0] === baseTree.out;
+  return mergedTree.ok && baseTree.ok && mergedTree.out.split("\n")[0] === baseTree.out;
+}
+
+// What removing a checkout would leave unsaved on its branch: { branch, bases, mergedInto, unpushed },
+// or null on a detached HEAD. The work is kept once it's merged into either the local default branch
+// (repos merged locally) or origin's, fetched just now (repos merged through pull requests):
+// `bases` lists those that exist, and `mergedInto` is the first one holding the branch, else null.
+// Unpushed counts commits on no origin branch, null without origin.
+async function branchState(repo, on) {
+  const branch = (await git(repo.top, ["branch", "--show-current"], on)).out;
+  if (!branch) return null;
+  const hasOrigin = (await git(repo.top, ["remote", "get-url", "origin"], on)).ok;
+  let remoteBase = null;
+  if (hasOrigin) {
+    const head = await git(repo.top, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], on);
+    remoteBase = head.ok ? head.out : "origin/main";
+    await git(repo.top, ["fetch", "-q", "origin", remoteBase.slice("origin/".length)], on);
+  }
+  const localCandidates = remoteBase ? [remoteBase.slice("origin/".length)] : ["main", "master"];
+  const exists = async (ref) => (await git(repo.top, ["rev-parse", "--verify", "--quiet", ref], on)).ok;
+  const bases = [];
+  for (const base of [...localCandidates, remoteBase].filter(Boolean)) if (await exists(base)) bases.push(base);
+  const merged = await Promise.all(bases.map((base) => isMergedInto(repo, base, on)));
+  const mergedInto = bases.find((_base, index) => merged[index]) ?? null;
   const unpushed = hasOrigin ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0 : null;
-  return { branch, base, merged, unpushed };
+  return { branch, bases, mergedInto, unpushed };
 }
 
 // The submodule repos git keeps for a checkout (nested ones too, checked out
@@ -377,8 +389,8 @@ export class WorktreeDialog {
     const b = this.branch;
     if (b === undefined) return div().text_color(t.dim).child("Checking the branch against main…");
     if (b === null) return div().text_color(t.dim).child("No branch is checked out.");
-    const base = b.base.replace(/^origin\//, "");
-    const safe = b.merged && !this.dirty && this.unpushed.length === 0;
+    const merged = Boolean(b.mergedInto);
+    const safe = merged && !this.dirty && this.unpushed.length === 0;
     const pushed = b.unpushed === null ? `${b.branch} has no origin to push to.`
       : b.unpushed === 0 ? `${b.branch} is pushed to origin.`
         : `${b.branch} has ${b.unpushed} ${b.unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.`;
@@ -388,8 +400,9 @@ export class WorktreeDialog {
       .child(div().flex_1().min_w(0).text_color(t.foreground).child(text));
     const failed = (text) => div().text_color(t.working).child(text);
     return v_flex().gap(4)
-      .child(b.merged ? passed(`${b.branch} has nothing that isn't on ${base}.`) : failed(`${b.branch} has changes that aren't on ${base}.`))
-      .when(!b.merged, (el) => el.child(b.unpushed === 0 ? passed(pushed) : failed(pushed)))
+      .child(merged ? passed(`${b.branch} has nothing that isn't on ${b.mergedInto}.`)
+        : failed(b.bases.length ? `${b.branch} has changes that aren't on ${b.bases.join(" or ")}.` : `${b.branch} has no main branch to compare with.`))
+      .when(!merged, (el) => el.child(b.unpushed === 0 ? passed(pushed) : failed(pushed)))
       .when(safe, (el) => el.child(div().font_semibold().text_color(t.foreground).child("Safe to remove.")));
   }
 
