@@ -68,6 +68,7 @@ function scopeDropdown(id, label, onClick, t) {
 }
 
 const SCOPE_DROPDOWN_MAX_PX = 260;
+const REFRESH_ICON_PX = 15;
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 
 // Issues whose Done waits for their branch's pull request to merge: { id, branch, root, on }. Shared, so every
@@ -631,11 +632,10 @@ export default class Issues extends View {
 
   refreshButton(t) {
     return div().id("issues-refresh").flex_none().size(24).flex().items_center().justify_center().rounded(6)
-      .border_1().border_color(t.border).bg(t.raised).text_size(13)
-      .when(this.refreshing, (e) => e.text_color(t.dim))
-      .when(!this.refreshing, (e) => e.text_color(t.foreground).cursor_pointer().hover((s) => s.bg(t.hover))
+      .border_1().border_color(t.border).bg(t.raised)
+      .when(!this.refreshing, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover))
         .on_click((_e, cx) => { this.refresh(cx); this.checkPullRequests(cx); cx.notify(); }))
-      .child("↻");
+      .child(svg("mods/issues/rotate-cw.svg").size(REFRESH_ICON_PX).text_color(this.refreshing ? t.dim : t.foreground));
   }
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
@@ -646,8 +646,8 @@ export default class Issues extends View {
         .child(div().font_semibold().child("Issues"))
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
-        .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t)))
-        .child(this.refreshButton(t)))
+        .child(this.refreshButton(t))
+        .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
       .when(Boolean(milestoneBar), (e) => e.child(milestoneBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
