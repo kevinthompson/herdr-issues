@@ -2,11 +2,13 @@
 // checkboxes and toggle them in place. Lines indented deeper than an item's marker continue its text.
 const TASK = /^(\s*)[-*+] \[([ xX])\] (.*)$/;
 const FENCE = /^\s*(```|~~~)/;
+const HEADING = /^ {0,3}#{1,6}(\s|$)/;
 
 const indentOf = (line) => /^\s*/.exec(line)[0].length;
 
-// Splits a body into Markdown runs ({ markdown }) and task items ({ line, indent, checked, text }),
-// where `line` is the item's index in the body's lines. Items inside fenced code stay Markdown.
+// Splits a body into Markdown runs ({ markdown }), ATX headings ({ markdown, heading: true }) and task
+// items ({ line, indent, checked, text }), where `line` is the item's index in the body's lines.
+// Headings and items inside fenced code stay in their run.
 export function bodySegments(body) {
   const lines = body.split("\n"), segments = [];
   let markdown = [], inFence = false;
@@ -17,6 +19,11 @@ export function bodySegments(body) {
   for (let index = 0; index < lines.length; index++) {
     const line = lines[index];
     if (FENCE.test(line)) inFence = !inFence;
+    if (!inFence && HEADING.test(line)) {
+      flushMarkdown();
+      segments.push({ markdown: line, heading: true });
+      continue;
+    }
     const task = !inFence && TASK.exec(line);
     if (!task) { markdown.push(line); continue; }
     flushMarkdown();

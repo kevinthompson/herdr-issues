@@ -5,6 +5,7 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
+import { mixColors } from "./colors.js";
 
 function dropdown(field, label, { issue, writable, onMenu }, t) {
   return h_flex().gap(6).items_center().text_size(11)
@@ -145,6 +146,11 @@ function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel
 
 const TASK_INDENT_PX = 9;
 const AFTER_TASKS_PX = 14;
+// A heading on its own loses the margins it has inside a block of Markdown.
+const BEFORE_HEADING_PX = 16, AFTER_HEADING_PX = 2;
+// Description text sits this far from the foreground toward muted, so headings stand out above it.
+const BODY_TEXT_MUTING = 1 / 3;
+const bodyText = (t) => mixColors(t.foreground, t.muted, BODY_TEXT_MUTING) ?? t.foreground;
 
 function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t) {
   const box = div().id(`task-${issue.id}-${task.line}`).flex_none().mt(3).size(14).rounded(4).border_1().flex().items_center().justify_center()
@@ -153,7 +159,7 @@ function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t)
   return h_flex().flex_none().gap(8).items_start().pl(task.indent * TASK_INDENT_PX)
     .child(box)
     .child(TextView.markdown(`task-text-${issue.id}-${task.line}`, linkFiles(task.text)).selectable().flex_1().min_w(0)
-      .on_link_click(onLink).text_color(task.checked ? t.dim : t.muted));
+      .on_link_click(onLink).text_color(task.checked ? t.muted : bodyText(t)));
 }
 
 function body(view, t) {
@@ -162,8 +168,10 @@ function body(view, t) {
   if (issue.body === null) return div().text_color(t.dim).child("Loading…");
   return v_flex().id(`issue-body-${issue.id}`).size_full().overflow_y_scrollbar().gap(4)
     .children(bodySegments(issue.body).map((segment, index, segments) => segment.markdown !== undefined
-      ? TextView.markdown(`issue-body-${issue.id}-${index}`, linkFiles(segment.markdown)).selectable().flex_none().on_link_click(onLink).text_color(t.muted)
-        .when(index > 0 && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
+      ? TextView.markdown(`issue-body-${issue.id}-${index}`, linkFiles(segment.markdown)).selectable().flex_none().on_link_click(onLink)
+        .text_color(segment.heading ? t.foreground : bodyText(t))
+        .when(segment.heading, (e) => e.mb(AFTER_HEADING_PX).when(index > 0, (e) => e.mt(BEFORE_HEADING_PX)))
+        .when(index > 0 && !segment.heading && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
       : taskItem(segment, view, t)));
 }
 
