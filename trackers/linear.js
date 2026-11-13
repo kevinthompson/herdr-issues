@@ -3,8 +3,9 @@
 // { "apiKey": "lin_api_…", "repos": { "<team key>": "~/Code/repo" } }, or, with saved Linear views,
 // { "<team key>": { "path": "~/Code/repo", "views": { "<name>": "https://linear.app/…/view/…" } } }.
 // A repository lists one scope of issues at a time: its first view, else every open issue assigned to
-// you, across teams. The team's open projects are scopes too, each narrowed further to one of its
-// milestones. Scopes other than a view add the issues completed or merged most recently.
+// you, across teams. The team's issues waiting in triage are a scope, and its open projects are scopes
+// too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
+// completed or merged most recently.
 import { home, appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
@@ -31,6 +32,7 @@ const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdA
 const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
 // Started states named Merged count as done, so they are listed with the finished issues instead.
 const MERGED_STATE = { type: { eq: "started" }, name: { containsIgnoreCase: "merged" } };
+const TRIAGE_STATE = { type: { eq: "triage" } };
 const OPEN_STATE = { type: { nin: ["completed", "canceled"] }, name: { notContainsIgnoreCase: "merged" } };
 const FINISHED_STATES = [{ type: { eq: "completed" } }, MERGED_STATE];
 
@@ -120,8 +122,9 @@ function scopesFor({ views, detected }, projects) {
       .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
   }));
   const mine = { id: "mine", label: "My issues", group: "Views" }, team = { id: "team", label: "Team issues", group: "Views" };
+  const triage = { id: "triage", label: "Triage", group: "Views" };
   // A repository whose team was detected rather than configured shows that team's issues first.
-  const listScopes = detected ? [team, mine] : [mine, team];
+  const listScopes = [...(detected ? [team, mine] : [mine, team]), triage];
   return [...viewScopes, ...listScopes, ...projectScopes];
 }
 
@@ -276,6 +279,7 @@ export async function linearTracker({ root: projectRoot, on }) {
       const filter = milestoneId ? { projectMilestone: { id: { eq: milestoneId } } } : { project: { id: { eq: projectId } } };
       return openAndRecentlyFinished(FILTERED_ISSUES_IN_STATE, { filter }, (data) => data.issues);
     }
+    if (scopeId === "triage") return allPages(TEAM_ISSUES, { team: repo.teamKey, state: TRIAGE_STATE }, (data) => data.issues);
     if (scopeId === "team") return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues);
     if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5));
     return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues);
