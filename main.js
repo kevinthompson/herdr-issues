@@ -65,6 +65,10 @@ const AWAITING = "issues.awaitingPullRequest";
 const awaitingPullRequests = () => shared(AWAITING) ?? [];
 const sameRequest = (a, b) => a.id === b.id && a.branch === b.branch;
 const workIssueSession = (issue) => ({ argv: ["claude"], task: `/issues:work ${issue.id}` });
+// wt sets up new checkouts, which can take minutes in a box app.
+const WT_TIMEOUT_MS = 10 * 60 * 1000;
+// wt works on this computer's checkouts and needs the issue's branch.
+const opensWithWt = (issue, project) => Boolean(issue.branch && project && !project.on);
 const pullRequestAsk = (issue) => `Issue ${issue.id} is done. Open a pull request for this branch with the open-pull-request skill.`;
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
@@ -365,8 +369,10 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try { await tracker.start(issue); }
       catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; cx.notify(); return; }
-      this.openWorktree(issue);
+      if (opensWithWt(issue, this.project)) this.detailError = await this.openWithWt(issue);
+      else this.openWorktreeDialog(issue);
       this.refresh(cx);
+      cx.notify();
     });
   }
 
@@ -390,16 +396,31 @@ export default class Issues extends View {
     this.detailError = null;
     cx.spawn(async (cx) => {
       try {
-        const worktree = project && await worktreeFor(issue.branch, project);
-        if (worktree?.space) run("space.select", { id: worktree.space.id });
-        else if (worktree) run("space.new", { name: issue.id, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
-        else this.openWorktree(issue);
+        if (opensWithWt(issue, project)) this.detailError = await this.openWithWt(issue);
+        else {
+          const worktree = project && await worktreeFor(issue.branch, project);
+          if (worktree?.space) run("space.select", { id: worktree.space.id });
+          else if (worktree) run("space.new", { name: issue.id, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
+          else this.openWorktreeDialog(issue);
+        }
       } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
       cx.notify();
     });
   }
 
-  openWorktree(issue) {
+  // Opens the issue's worktree as `/issues:work` does: wt switches to the space already showing it, or opens
+  // one nested under the repository's space with Claude working the issue. Returns an error message, or null.
+  // Without wt installed, the worktree dialog opens instead.
+  async openWithWt(issue) {
+    const args = [issue.branch, "--name", issue.id, "--claude", workIssueSession(issue).task];
+    const result = await exec("wt", args, { cwd: this.project.root, timeout: WT_TIMEOUT_MS }).catch(() => null);
+    if (!result) { this.openWorktreeDialog(issue); return null; }
+    if (result.code === 0) return null;
+    const lastLine = (result.stderr || result.stdout).trim().split("\n").pop();
+    return `Could not open the worktree: ${lastLine || `wt exited with ${result.code}`}`;
+  }
+
+  openWorktreeDialog(issue) {
     const project = this.project;
     openOverlay({
       mod: "fast-worktree", kind: "dialog", width: 440, height: 260,
