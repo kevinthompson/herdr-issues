@@ -20,6 +20,7 @@ import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, selectedScope } from "./
 import { worktreeFor, hasUncommittedChanges, isMerged, isCollaborative, mergeIntoMain, pullRequestFor, askClaude, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
+import { openInNeovim } from "./neovim.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
@@ -281,14 +282,17 @@ export default class Issues extends View {
     return bodyFiles.files;
   }
 
-  // Hands the link to macOS `open`, so each file opens in the app made for it and URLs in their own.
+  // Opens a file in Neovim within the current space, and hands a URL to macOS `open`.
   openLink(issue, url, cx) {
     const { file, url: address } = linkTarget(url, issue.path ?? `${this.project.root}/`);
     if (file && this.project?.on) { this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
-      const opened = await exec("open", [file ?? address]).catch((e) => ({ code: 1, stderr: String(e.message ?? e) }));
-      if (opened.code !== 0) this.detailError = `Could not open ${file ?? address}: ${opened.stderr.trim()}`;
+      if (file) await openInNeovim(file, this.project.root).catch((e) => { this.detailError = `Could not open ${file}: ${e.message ?? e}`; });
+      else {
+        const opened = await exec("open", [address]).catch((e) => ({ code: 1, stderr: String(e.message ?? e) }));
+        if (opened.code !== 0) this.detailError = `Could not open ${address}: ${opened.stderr.trim()}`;
+      }
       cx.notify();
     });
     cx.notify();
