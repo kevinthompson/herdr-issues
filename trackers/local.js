@@ -121,8 +121,8 @@ export async function localTracker({ root: projectRoot, on }) {
     kind: "local",
     name: "issues/",
     writable: on == null,
-    // issues/ files have no review state: review happens on the branch.
-    statuses: STATUSES.filter((status) => status !== "in-review"),
+    // issues/ files have no triage or review state: review happens on the branch.
+    statuses: STATUSES.filter((status) => !["triage", "in-review"].includes(status)),
     list,
     async get(id) {
       return (await list()).find((issue) => issue.id === id) ?? null;

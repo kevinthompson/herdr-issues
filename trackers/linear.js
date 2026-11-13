@@ -58,7 +58,7 @@ const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
 // review is In review, one named Merged is Done, and the rest are In progress.
-const STATUS_TYPES = { backlog: ["triage", "backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled"] };
+const STATUS_TYPES = { triage: ["triage"], backlog: ["backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled"] };
 const isReviewState = (state) => /review/i.test(state.name);
 const isMergedState = (state) => /merged/i.test(state.name);
 function statusOf(state) {

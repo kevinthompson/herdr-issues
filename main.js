@@ -44,6 +44,7 @@ const ACTION_COLUMN_PX = 32;
 const GROUP_TINT_ALPHA = "30";
 const tinted = (color) => `${color}${GROUP_TINT_ALPHA}`;
 const GROUP_COLORS = {
+  triage: "#fc7840",
   "in-progress": "#f2c94c",
   "in-review": "#4cb782",
   todo: "#e2e2e2",

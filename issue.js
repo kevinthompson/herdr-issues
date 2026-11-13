@@ -1,5 +1,5 @@
-export const STATUSES = ["backlog", "todo", "in-progress", "in-review", "done", "canceled"];
-export const STATUS_LABELS = { backlog: "Backlog", todo: "Todo", "in-progress": "In progress", "in-review": "In review", done: "Done", canceled: "Canceled" };
+export const STATUSES = ["triage", "backlog", "todo", "in-progress", "in-review", "done", "canceled"];
+export const STATUS_LABELS = { triage: "Triage", backlog: "Backlog", todo: "Todo", "in-progress": "In progress", "in-review": "In review", done: "Done", canceled: "Canceled" };
 export const PRIORITIES = ["None", "Urgent", "High", "Medium", "Low"];
 
 // Work starts only on issues nobody has picked up yet, and waits while any of their blockers is unfinished.
@@ -9,6 +9,7 @@ const isStartable = (issue) => STARTABLE_STATUSES.includes(issue.status);
 const isUnblocked = (issue, done) => issue.blockedBy.every((id) => done.has(id));
 
 const GROUPS = [
+  { id: "triage", label: "Triage", has: (issue) => issue.status === "triage" },
   { id: "in-review", label: "In review", has: (issue) => issue.status === "in-review" },
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
   { id: "todo", label: "Todo", has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
