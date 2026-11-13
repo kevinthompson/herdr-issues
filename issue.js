@@ -22,14 +22,17 @@ const GROUPS = [
   { id: "canceled", label: "Canceled", collapsed: true, loads: "canceled", has: (issue) => issue.status === "canceled" },
 ];
 
-// By priority (urgent first, "None" last), then issues with an order by that number, then by ID in
-// number order.
+// By priority (urgent first, "None" last), then by SLA (the soonest breach first, issues without one
+// after), then issues with an order by that number, then by ID in number order.
 const priorityRank = (issue) => issue.priority || PRIORITIES.length;
+const slaBreachTime = (issue) => (issue.sla ? Date.parse(issue.sla.breachesAt) : Infinity);
 const byId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
 
 function byPosition(a, b) {
   const byPriority = priorityRank(a) - priorityRank(b);
   if (byPriority) return byPriority;
+  const [aBreach, bBreach] = [slaBreachTime(a), slaBreachTime(b)];
+  if (aBreach !== bBreach) return aBreach < bBreach ? -1 : 1;
   if (a.order !== null || b.order !== null) {
     if (a.order === null) return 1;
     if (b.order === null) return -1;
