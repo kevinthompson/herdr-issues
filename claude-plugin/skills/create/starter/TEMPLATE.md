@@ -11,8 +11,7 @@ created: YYYY-MM-DD
 
 ## Context
 
-Why this work matters. Name the relevant files, functions and earlier
-decisions so the work can start without searching.
+Why this work matters. Name the relevant files, functions and earlier decisions so the work can start without searching.
 
 ## Goal
 
@@ -20,8 +19,7 @@ What is true when this issue is finished.
 
 ## Acceptance criteria
 
-- [ ] A verifiable check: a passing test, a command's output, or behavior
-      observed in the running program.
+- [ ] A verifiable check: a passing test, a command's output, or behavior observed in the running program.
 
 ## Out of scope
 

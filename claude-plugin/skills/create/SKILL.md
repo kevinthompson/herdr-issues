@@ -19,7 +19,8 @@ Write one issue per distinct piece of work described in `$ARGUMENTS` or the conv
    - every acceptance criterion is a check an agent can run or observe: a test, a command's output, or named behavior in the running program;
    - for a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after;
    - Out of scope names the nearby work a reader might wander into;
-   - Context holds what the code doesn't say: the reason for the work and any constraint behind it.
+   - Context holds what the code doesn't say: the reason for the work and any constraint behind it;
+   - each paragraph and list item is one line, never hard-wrapped, since GitHub keeps every line break.
 
    Scope each issue to exactly one branch and one pull request: the issue is finished when that branch merges into main, whether directly or through its pull request, and nothing of it is left over. Split work that needs more than one branch or pull request, or that has separable outcomes, into several issues joined by blockers. Never write criteria that wait on a later pull request; make that work its own issue and list it as a blocker.
    - **Markdown**: write `issues/<ID>-<slug>.md` from the template, numbering on from the highest ID. Use `status: todo` unless the person says otherwise, today's date for `created`, the branch name the README's rule gives, and `blocked_by` for blockers.
