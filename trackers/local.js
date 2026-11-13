@@ -142,6 +142,7 @@ export async function localTracker({ root: projectRoot, on }) {
     },
     // Committed, so the worktree branched next starts with the status too and merging it back
     // never meets an uncommitted change to the issue file.
+    startPrecedesWorktree: true,
     async start(issue) {
       await commitStatus(issue, "in-progress", "start");
     },

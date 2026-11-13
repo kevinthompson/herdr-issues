@@ -377,19 +377,26 @@ export default class Issues extends View {
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
-  // Without a branch, the worktree dialog asks for one.
+  // Without a branch, the worktree dialog asks for one. The worktree opens while the tracker saves the start,
+  // unless the tracker needs the start saved before the branch is made.
   startWork(issue, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
     this.detailError = null;
-    this.showOpening(issue, `Marking ${issue.id} in progress…`, cx);
+    const opening = `Opening ${issue.id}'s worktree…`;
+    this.showOpening(issue, tracker.startPrecedesWorktree ? `Marking ${issue.id} in progress…` : opening, cx);
     cx.spawn(async (cx) => {
       try {
-        try { await tracker.start(issue); }
-        catch (e) { this.detailError = `Could not start: ${e.message ?? e}`; return; }
-        this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
-        if (opensWithWt(issue, this.project)) this.detailError = await this.openWithWt(issue);
+        const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
+        if (tracker.startPrecedesWorktree) {
+          this.detailError = await starting;
+          if (this.detailError) return;
+          this.showOpening(issue, opening, cx);
+        }
+        let openError = null;
+        if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue);
         else this.openWorktreeDialog(issue);
+        this.detailError = (await starting) ?? openError;
         this.refresh(cx);
       } finally { this.opening = null; cx.notify(); }
     });

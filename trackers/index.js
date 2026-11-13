@@ -13,8 +13,9 @@
 //   tracker.get(id)             → Issue, or null
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
-//   tracker.start(issue)        → marks the issue in progress where new work branches from, before its
-//                                 worktree is made
+//   tracker.start(issue)        → marks the issue in progress
+//   tracker.startPrecedesWorktree whether start must finish before the issue's worktree is made, because
+//                                 new work branches from where it records the status
 //   tracker.delegate(issue)     → hands the issue to Planning Center's Cloud Agent to work; null where
 //                                 the project can't
 //   tracker.isDelegated(issue)  → whether the Cloud Agent has the issue already; null with delegate
