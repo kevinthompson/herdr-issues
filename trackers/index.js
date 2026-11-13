@@ -32,7 +32,8 @@
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
 //          pullRequests ([{ url, title, repo, number, status, branch }] attached to Linear issues),
-//          delegateId (the agent working it, or null, for Linear issues) }
+//          delegateId (the agent working it, or null, for Linear issues), delegate (its name, or null),
+//          delegateAvatar (an image URL, or null, for Linear issues) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order. A Linear issue's branch is its open pull request's in the repository,
 // else the one Linear suggests.

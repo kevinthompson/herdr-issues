@@ -23,7 +23,7 @@ const TEAM_TTL_MS = 10 * 60 * 1000;
 
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt url
-  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl } delegate { id }
+  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl } delegate { id name avatarUrl }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type name } } } }
@@ -189,6 +189,8 @@ function toIssue(node, repoName) {
     updated: node.updatedAt,
     url: node.url,
     delegateId: node.delegate?.id ?? null,
+    delegate: node.delegate?.name ?? null,
+    delegateAvatar: node.delegate?.avatarUrl ?? null,
   };
 }
 

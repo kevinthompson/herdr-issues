@@ -581,12 +581,19 @@ export default class Issues extends View {
           }, t, { primary: false, compact: true }))))));
   }
 
-  // The assignee's name, after their avatar once it is cached.
+  // The assignee's name after their avatar once it is cached, then the agent it's delegated to, if any.
   assignee(issue, t) {
     const avatar = avatarImage(issue.assigneeAvatar, (loading) => this.avatarLoads.push(loading));
+    const delegateAvatar = avatarImage(issue.delegateAvatar, (loading) => this.avatarLoads.push(loading));
     return h_flex().min_w(0).gap(5).items_center().text_size(11).text_color(t.dim)
       .when(Boolean(avatar), (e) => e.child(image(avatar ?? "").flex_none().size(AVATAR_PX).rounded(AVATAR_PX / 2)))
-      .child(div().min_w(0).truncate().child(issue.assignee ?? ""));
+      .child(div().min_w(0).truncate().child(issue.assignee ?? ""))
+      .when(Boolean(issue.delegate), (e) => e
+        .child(div().flex_none().child(">"))
+        .child(delegateAvatar
+          ? image(delegateAvatar).flex_none().size(AVATAR_PX).rounded(AVATAR_PX / 2)
+          : svg("mods/issues/cloud.svg").flex_none().size(AVATAR_PX).text_color(t.ansi4))
+        .child(div().min_w(0).truncate().child(issue.delegate ?? "")));
   }
 
   // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
