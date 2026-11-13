@@ -25,6 +25,7 @@ import { avatarImage } from "./avatars.js";
 import { lastList, rememberList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueStatusCommit } from "./status-commits.js";
+import { mixColors } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 
 const POLL_MS = 60 * 1000;
@@ -93,13 +94,9 @@ const opensWithWt = (issue, project) => Boolean(issue.branch && project && !proj
 // A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
 // otherwise halfway back to the panel's background.
 function rowHover(t) {
-  const hover = /^#([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(t.hover), background = /^#([0-9a-f]{6})$/i.exec(t.background);
-  if (!hover) return t.hover;
-  if (hover[2]) return `#${hover[1]}${Math.round(parseInt(hover[2], 16) / 2).toString(16).padStart(2, "0")}`;
-  if (!background) return t.hover;
-  const channels = (hex) => [0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16));
-  const [from, to] = [channels(background[1]), channels(hover[1])];
-  return `#${from.map((each, index) => Math.round((each + to[index]) / 2).toString(16).padStart(2, "0")).join("")}`;
+  const translucent = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(t.hover);
+  if (translucent) return `#${translucent[1]}${Math.round(parseInt(translucent[2], 16) / 2).toString(16).padStart(2, "0")}`;
+  return mixColors(t.background, t.hover, 0.5) ?? t.hover;
 }
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
