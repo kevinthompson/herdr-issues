@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "issues",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Plan, write, work and delegate issues tracked in a repository's issues/ folder, in Linear or in GitHub Issues.",
   "author": {
     "name": "Kevin Thompson",
