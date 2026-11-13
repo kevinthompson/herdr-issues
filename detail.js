@@ -125,20 +125,22 @@ function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
     .child(svg("mods/issues/cloud.svg").size(14).text_color(enabled ? t.foreground : t.dim));
 }
 
-// Continue and Done for an issue in progress, otherwise Start.
+const icon = (name) => (color) => svg(`mods/issues/${name}.svg`).size(14).text_color(color);
+
+// Continue and Done for an issue in progress, otherwise Start, as icons with the primary action last.
 function workActions(view, t) {
-  if (!view.finishable) return workButton("issue", view, t);
+  if (!view.finishable) return workButton("issue", view, t, { compact: true });
   const { awaitingPullRequest, hasUnmergedPullRequests, onDone } = view;
   const blockedReason = awaitingPullRequest ? "Waiting for this branch's pull request to merge"
     : hasUnmergedPullRequests ? "This issue has pull requests that haven't merged" : null;
   return h_flex().flex_none().gap(6)
-    .child(workButton("issue", view, t, { primary: false }))
-    .child(button("issue-done", "Done", onDone, t, { primary: true, enabled: !blockedReason, tooltip: blockedReason }));
+    .child(workButton("issue", view, t, { primary: false, compact: true }))
+    .child(button("issue-done", icon("square-check"), onDone, t, { primary: true, enabled: !blockedReason, tooltip: blockedReason ?? "Mark done" }));
 }
 
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
   if (!writable || issue.body === null) return div();
-  if (!editor) return button("issue-edit", "Edit", onEdit, t);
+  if (!editor) return button("issue-edit", icon("pencil"), onEdit, t, { tooltip: "Edit" });
   return h_flex().flex_none().gap(6)
     .child(button("issue-cancel", "Cancel", onCancel, t, { enabled: !saving }))
     .child(button("issue-save", saving ? "Saving…" : "Save", onSave, t, { primary: true, enabled: !saving }));
@@ -177,9 +179,9 @@ export function issueDetail(view, t) {
       .child(div().flex_1())
       .when(Boolean(view.syncIndicator), (e) => e.child(view.syncIndicator))
       .child(div().flex_none().text_size(11).text_color(t.accent).child(issue.id))
+      .child(editActions(view, t))
       .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
-      .when(!view.editor, (e) => e.child(workActions(view, t)))
-      .child(editActions(view, t)))
+      .when(!view.editor, (e) => e.child(workActions(view, t))))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
       .child(div().whitespace_normal().font_semibold().child(issue.title))
