@@ -5,7 +5,8 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
-import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
+import { dueStatus } from "./issue.js";
+import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
 
 // The status dropdown takes the status's color, as the list's status headers do.
 function dropdown(field, label, { issue, writable, onMenu }, t) {
@@ -71,9 +72,10 @@ export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => 
 
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
-  const { issue: { blockedBy, branch, pullRequests: attached }, blocking, assignee } = view;
+  const { issue: { blockedBy, branch, pullRequests: attached }, blocking, assignee } = view, due = dueStatus(view.issue);
   return v_flex().gap(2).text_size(11).text_color(t.muted)
     .when(Boolean(assignee), (e) => e.child(iconFact("user", "Assignee", assignee, t)))
+    .when(Boolean(due), (e) => e.child(iconFact("calendar", "Due", div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text), t)))
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
     .when(Boolean(branch), (e) => e.child(iconFact("git-branch", "Branch", div().min_w(0).truncate().child(branch), t)))
