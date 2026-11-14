@@ -6,6 +6,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { run, props, closeOverlay, theme, spaces, panes, exec, home } from "herdr";
 import { branchState } from "./worktree.js";
+import { checksAnswered, removalFindings, removalVerdict, PASS, LOSS } from "./removal.js";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s, all = panes()) {
@@ -100,6 +101,13 @@ async function freshStart(repo, on) {
   return fetched.ok ? { start } : { error: fetched.err || `Couldn't fetch ${start}.` };
 }
 
+// Whether a checkout has uncommitted changes.
+async function uncommitted(top, on) {
+  const status = await git(top, ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain"], on);
+  if (!status.ok) throw new Error(status.err || "git status failed.");
+  return status.out !== "";
+}
+
 // The worktree's submodules, and the names of those with commits that exist
 // nowhere else: not on a remote, and not the commit the parent pins (git
 // fetches that by hash, so it is often on no remote branch here).
@@ -147,9 +155,7 @@ export class WorktreeDialog {
     this.busy = false;
     this.error = "";
     this.repo = undefined; // undefined: looking, null: not in git
-    this.dirty = false;
-    this.unpushed = [];
-    this.branch = undefined; // remove: the checkout's branchState, once read
+    this.checks = {}; // remove: the checks removal.js reads, each filled in as it answers
     this.handle = cx.focus_handle();
     if (props()?.action === "remove") this.handle.focus();
     cx.spawn(async (cx) => {
@@ -162,23 +168,31 @@ export class WorktreeDialog {
           this.userHome = result.stdout.trim().replace(/\\/g, "/");
         }
         this.folder = props()?.folder || place(this.space()) || this.userHome;
-        // The repo is set last: Enter does nothing until the warnings it consents to are known.
         const repo = await repoOf(this.folder, this.on);
-        if (repo && props().action === "remove") {
-          this.dirty = (await git(repo.top, ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain"], this.on)).out !== "";
-          this.unpushed = (await submodules(repo.top, this.on)).unpushed;
-        }
         if (repo && this.opening) this.list = await checkouts(repo, this.on);
         this.repo = repo;
         cx.notify();
-        // Fetching can be slow, so the branch's state follows without holding up Enter.
-        if (repo?.linked && props().action === "remove") {
-          this.branch = await branchState(repo, this.on).catch(() => null);
-          cx.notify();
-        }
+        if (repo?.linked && props().action === "remove") await this.check(repo, cx);
         if (props().branch) await this.work(cx);
       } catch (error) { this.repo = null; this.error = String(error); cx.notify(); }
     });
+  }
+
+  // Runs removal's checks side by side, showing each answer as it lands.
+  async check(repo, cx) {
+    const answer = (name, lookup) => lookup()
+      .catch((error) => ({ error: String(error?.message ?? error) }))
+      .then((result) => { this.checks[name] = result; cx.notify(); });
+    await Promise.all([
+      answer("dirty", () => uncommitted(repo.top, this.on)),
+      answer("submodules", async () => (await submodules(repo.top, this.on)).unpushed),
+      answer("branch", () => branchState(repo, this.on)),
+    ]);
+  }
+
+  // Enter removes only once every check has answered, so nobody confirms before seeing the verdict.
+  checking() {
+    return props()?.action === "remove" && Boolean(this.repo?.linked) && !checksAnswered(this.checks);
   }
 
   space() {
@@ -191,12 +205,12 @@ export class WorktreeDialog {
   }
 
   go(cx) {
-    if (this.busy || !this.repo) return;
+    if (this.busy || !this.repo || this.checking()) return;
     cx.spawn(async (cx) => this.work(cx));
   }
 
   async work(cx) {
-    if (this.busy || !this.repo) return;
+    if (this.busy || !this.repo || this.checking()) return;
     this.busy = true;
     this.error = "";
     cx.notify();
@@ -242,19 +256,19 @@ export class WorktreeDialog {
 
   async remove() {
     const s = this.space();
-    const status = await git(this.repo.top, ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain"], this.on);
-    if (!status.ok) return status.err || "git status failed.";
+    const dirty = await uncommitted(this.repo.top, this.on);
     // git refuses a worktree with submodules unless forced, because their
     // history goes with it. The popup already showed what's at risk; only
     // risk that appeared since it opened gets one more warning.
     const { mods, unpushed } = await submodules(this.repo.top, this.on);
-    const changed = (status.out && !this.dirty) || unpushed.some((name) => !this.unpushed.includes(name));
-    this.dirty ||= status.out !== "";
-    this.unpushed = [...new Set([...this.unpushed, ...unpushed])];
+    const shown = Array.isArray(this.checks.submodules) ? this.checks.submodules : [];
+    const changed = (dirty && this.checks.dirty !== true) || unpushed.some((name) => !shown.includes(name));
+    if (dirty) this.checks.dirty = true;
+    if (changed) this.checks.submodules = [...new Set([...shown, ...unpushed])];
     if (changed) return "It changed since this opened. Enter again removes it anyway.";
     // Terminals first: a shell sitting in the folder keeps it busy on Windows.
     run("space.close", { id: s.id, confirmed: true });
-    const force = this.dirty || mods.length > 0;
+    const force = dirty || mods.length > 0;
     // A set-up checkout (gems, node_modules) holds hundreds of thousands of
     // files and takes git tens of seconds to delete. Rename it to a hidden
     // sibling instead (instant, same volume), let git forget it, and delete
@@ -350,28 +364,17 @@ export class WorktreeDialog {
       .child(h_flex().justify_end().text_size(11).text_color(t.dim).child("\u2191\u2193 choose \u00b7 \u21b5 open \u00b7 esc close"));
   }
 
-  // Whether the branch holds work main doesn't, so a safe removal is plain at a glance.
-  renderBranch(t) {
-    const b = this.branch;
-    if (b === undefined) return div().text_color(t.dim).child("Checking the branch against main…");
-    if (b === null) return div().text_color(t.dim).child("No branch is checked out.");
-    const merged = Boolean(b.mergedInto);
-    const inReview = !merged && b.unpushed === 0 && Boolean(b.pullRequest);
-    const safe = (merged || inReview) && !this.dirty && this.unpushed.length === 0;
-    const pushed = b.unpushed === null ? `${b.branch} has no origin to push to.`
-      : b.unpushed === 0 ? `${b.branch} is pushed to origin.`
-        : `${b.branch} has ${b.unpushed} ${b.unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.`;
-    // A passing check keeps the text plain and colors only its mark.
-    const passed = (text) => h_flex().gap(6).items_start()
-      .child(div().flex_none().text_color(t.ansi2).child("✓"))
+  // Each check's finding as it lands, then, once all have answered, the verdict on removing the checkout.
+  renderChecks(t) {
+    const findings = removalFindings({ ...this.checks, warning: props()?.warning });
+    const row = ({ result, text }) => h_flex().gap(6).items_start()
+      .child(div().flex_none().text_color(result === PASS ? t.ansi2 : result === LOSS ? t.blocked : t.working).child(result === PASS ? "✓" : "✗"))
       .child(div().flex_1().min_w(0).text_color(t.foreground).child(text));
-    const failed = (text) => div().text_color(t.working).child(text);
+    const verdict = this.checking() ? null : removalVerdict(findings);
     return v_flex().gap(4)
-      .child(merged ? passed(`${b.branch} has nothing that isn't on ${b.mergedInto}.`)
-        : inReview ? passed(`${b.branch} has an open pull request: ${b.pullRequest}`)
-          : failed(b.bases.length ? `${b.branch} has changes that aren't on ${b.bases.join(" or ")}.` : `${b.branch} has no main branch to compare with.`))
-      .when(!merged, (el) => el.child(b.unpushed === 0 ? passed(pushed) : failed(pushed)))
-      .when(safe, (el) => el.child(div().font_semibold().text_color(t.foreground).child("Safe to remove.")));
+      .children(findings.map(row))
+      .when(this.checking(), (el) => el.child(div().text_color(t.dim).child("Checking the worktree's state…")))
+      .when(Boolean(verdict), (el) => el.child(div().pt(4).font_semibold().text_color(t.foreground).child(`${verdict.mark} ${verdict.text}`)));
   }
 
   render(cx) {
@@ -402,10 +405,7 @@ export class WorktreeDialog {
       .text_size(13)
       .child(div().font_semibold().text_color(t.foreground).child(title))
       .child(div().text_color(t.muted).child(detail))
-      .when(remove && Boolean(r?.linked), (el) => el.child(this.renderBranch(t)))
-      .when(remove && Boolean(props()?.warning), (el) => el.child(div().text_color(t.blocked).child(props()?.warning ?? "")))
-      .when(remove && this.dirty, (el) => el.child(div().text_color(t.blocked).child("It has uncommitted changes: they will be lost.")))
-      .when(remove && this.unpushed.length > 0, (el) => el.child(div().text_color(t.blocked).child(`Submodule ${this.unpushed.join(", ")} has commits that aren't pushed anywhere: they will be lost.`)))
+      .when(remove && Boolean(r?.linked), (el) => el.child(this.renderChecks(t)))
       .when(!remove && !blocked, (el) =>
         el.child(
           Input.new(this.input)
@@ -426,7 +426,7 @@ export class WorktreeDialog {
           .justify_end()
           .text_size(11)
           .text_color(t.dim)
-          .child(this.busy ? "working…" : blocked ? "esc close" : remove ? "↵ remove · esc cancel" : "↵ create · esc cancel"),
+          .child(this.busy ? "working…" : blocked ? "esc close" : this.checking() ? "checking… · esc cancel" : remove ? "↵ remove · esc cancel" : "↵ create · esc cancel"),
       );
   }
 }
