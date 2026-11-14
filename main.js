@@ -23,7 +23,7 @@ import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { isTextFile, openInEditor } from "./editor.js";
 import { avatarImage } from "./avatars.js";
-import { lastList, fetchList } from "./lists.js";
+import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
@@ -102,7 +102,7 @@ export default class Issues extends View {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
     if (props()?.action) { this.worktreeDialog = new WorktreeDialog(cx); return; }
     this.issues = []; this.unloaded = new Set(); this.generation = 0; this.expanded = {};
-    this.rowLimit = ROW_LIMIT;
+    this.rowLimit = ROW_LIMIT; this.shownByContext = new Map();
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx, { reuse: true });
@@ -122,6 +122,7 @@ export default class Issues extends View {
     if (context !== this.context) {
       this.context = context; this.error = null;
       this.closeIssue(); this.focusHandled = null;
+      this.restoreShown(context);
     }
     const generation = ++this.generation;
     this.refreshedAt = Date.now();
@@ -162,6 +163,7 @@ export default class Issues extends View {
         if (generation !== this.generation) return;
         const leaving = this.openId && !issues.some((each) => each.id === this.openId) ? this.findIssue(this.openId) : null;
         Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null, setup: null });
+        this.shownByContext.set(context, { project, tracker, scopeKey, listKey, unloaded, listedScope: scope, repository: null });
         if (leaving) this.holdOpenIssue(leaving, tracker, cx);
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.scanRepository(project, generation, cx);
@@ -187,6 +189,13 @@ export default class Issues extends View {
   showUntrackable(where, context) {
     this.forgetList(); this.closeIssue();
     Object.assign(this, { setup: null, error: null, resolvedContext: context, untrackable: where.on == null ? NOT_A_REPOSITORY : ON_ANOTHER_MACHINE });
+  }
+
+  // A space shown before shows its last list at once, while the lookups that confirm it run again.
+  restoreShown(context) {
+    const shown = this.shownByContext.get(context), issues = shown && rememberedList(shown.listKey);
+    if (!issues || selectedScope(shown.scopeKey) !== shown.listedScope) return;
+    Object.assign(this, { ...shown, issues, resolvedContext: context, untrackable: null, setup: null, loaded: true });
   }
 
   forgetList() {
@@ -219,6 +228,8 @@ export default class Issues extends View {
       const repository = await repositoryState(this.issues, project).catch(() => null);
       if (generation !== this.generation) return;
       this.repository = repository;
+      const shown = this.shownByContext.get(this.resolvedContext);
+      if (shown?.listKey === this.listKey) shown.repository = repository;
       cx.notify();
       if (!repository?.mergedFinished.length) return;
       const deleted = await deleteMergedBranches(repository.mergedFinished, repository).catch(() => []);

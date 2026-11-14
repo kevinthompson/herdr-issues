@@ -25,6 +25,9 @@ export async function lastList(key) {
   return lists.get(key).issues;
 }
 
+// The list last fetched or read for the key in this run of Herdr, or null, without waiting on anything.
+export const rememberedList = (key) => lists.get(key)?.issues ?? null;
+
 // Writes only a list that changed, so polling an unchanged scope touches nothing on disk.
 export async function rememberList(key, issues) {
   const text = JSON.stringify(issues), unchanged = lists.get(key)?.text === text;
