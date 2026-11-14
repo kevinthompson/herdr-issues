@@ -24,6 +24,8 @@ const panelUnmovedExitCode = 10;
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
 // The panel collapses to a 32px strip by resizing this column, so its min mustn't stop it there.
 const issuesColumn = { id: "issues-panel", type: "column", size: { px: 368 }, min: 32, max: 900, children: [issuesBlock] };
+// Bindings earlier versions of the mod's keys.json made, which setup replaces with the mod's current one.
+const supersededBindings = { global: { "cmd-shift-i": "layout.toggle:panel" } };
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const readStdinJson = () => JSON.parse(readFileSync(0, "utf8"));
@@ -53,7 +55,7 @@ function mergeKeys(mine, mod) {
   for (const [section, keys] of Object.entries(mod)) {
     for (const [key, action] of Object.entries(keys)) {
       const bound = mine[section]?.[key];
-      if (bound == null) {
+      if (bound == null || sameJson(bound, supersededBindings[section]?.[key])) {
         merged[section] = isObject(merged[section]) ? merged[section] : {};
         merged[section][key] = action;
       } else if (!sameJson(bound, action)) {

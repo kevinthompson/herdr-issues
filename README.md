@@ -31,7 +31,7 @@ d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github
 
 It clones the repository into `~/.local/share/herdr-issues-mod` and runs its setup. Run the same command again to update.
 
-Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to show or hide the Issues panel.
+Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to collapse the Issues panel to a thin strip or expand it again; the strip's button expands it too.
 
 ### Linear
 

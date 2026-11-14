@@ -38,6 +38,20 @@ test("merge-keys adds unbound keys and keeps a key bound to something else", (t)
   });
 });
 
+test("merge-keys rebinds the key an earlier setup bound to toggle the side panel", (t) => {
+  const folder = temporaryFolder(t);
+  const keys = join(folder, "keys.json");
+  const modKeys = join(folder, "mod-keys.json");
+  writeJson(keys, { global: { "cmd-shift-i": "layout.toggle:panel" } });
+  writeJson(modKeys, { global: { "cmd-shift-i": "issues.toggle" } });
+
+  const result = run(["merge-keys", keys, modKeys]);
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "");
+  assert.deepEqual(readJson(keys), { global: { "cmd-shift-i": "issues.toggle" } });
+});
+
 test("merge-keys leaves a file that already has the keys alone", (t) => {
   const folder = temporaryFolder(t);
   const keys = join(folder, "keys.json");
