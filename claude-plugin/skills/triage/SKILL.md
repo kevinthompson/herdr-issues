@@ -6,7 +6,7 @@ argument-hint: [issue IDs, a status, or what to triage]
 
 Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issues:create` sets: each one is a self-contained hand-off, scoped to one branch and one pull request, that an agent holding only the issue and the repository could finish and know it had finished. Triage never adds labels to sort issues; the bar is the same for every issue.
 
-1. **Find the tracker.** Use the main checkout (the first path `git worktree list` prints) and detect the tracker as `/issues:create` step 1 does.
+1. **Find the tracker** as `/issues:create` step 1 does, with `issues tracker --json`.
    - **Linear**: load `list_issues`, `get_issue`, `save_issue`, `list_issue_statuses`, `list_issue_labels` and the comment tools (`list_comments`, `save_comment` or `create_comment`) with ToolSearch, prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`. Use the team that owns the repository. If the tools aren't available, stop and say so.
    - **GitHub**: use the GitHub CLI against the repository the setting names: `gh issue list`, `gh issue view --comments`, `gh issue edit --body-file`, `gh issue comment` and `gh issue close`. GitHub has no priority or Backlog state, so skip those questions in step 7; blockers are a "Blocked by #<number>" line in the body.
    - Read `../create/SKILL.md` beside this skill: its step 4 is what an issue must contain, and this skill doesn't restate it.

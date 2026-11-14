@@ -9,7 +9,7 @@ import { openWorktree } from "./worktree.js";
 const USAGE = `Usage: issues <command> [options]
 
 Commands:
-  tracker [--json]         Print the tracker the repository's issues live in: its kind, name and Linear team
+  tracker [--json]         Print the tracker the repository's issues live in: its kind, name, Linear team or GitHub repository
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge or complete
@@ -44,9 +44,9 @@ async function currentTracker() {
 
 async function tracker(args) {
   const tracker = await currentTracker();
-  const { kind, name, team = null } = tracker;
-  if (args.includes("--json")) console.log(JSON.stringify({ kind, name, team }));
-  else console.log([kind, name, team].filter(Boolean).join("\t"));
+  const { kind, name, team = null, repo = null } = tracker;
+  if (args.includes("--json")) console.log(JSON.stringify({ kind, name, team, repo }));
+  else console.log([kind, name, team, repo].filter(Boolean).join("\t"));
 }
 
 // The trackers list only an issue's unfinished blockers, so any blocker left holds the work back.

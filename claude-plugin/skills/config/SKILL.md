@@ -37,12 +37,12 @@ The file holds no secrets. Linear's API key lives apart from it, in `~/.config/h
 
 `issues setting merge` and `issues setting complete`, run in the repository, print the settings with their defaults applied.
 
-1. **Read the current state.** Read the repository's entry in `issues.json`, if any; in the main checkout, read `git remote get-url origin`, `issues setting merge` and `issues setting complete`. Say what the repository uses today: its tracker (its setting, else Linear for a `planningcenter` repository, else nothing), and how work lands, saying which settings are set and which are defaults. For `show`, stop here.
+1. **Read the current state.** Read the repository's entry in `issues.json`, if any; in the main checkout, read `git remote get-url origin`, `issues tracker --json`, `issues setting merge` and `issues setting complete`. Say what the repository uses today: its tracker, from `issues tracker`'s `kind` with its `team` or `repo` (or what it printed when it fails, such as that the repository has no tracker), and how work lands, saying which settings are set and which are defaults. For `show`, stop here.
 2. **Choose what to change.**
    - `merge <value>`, `complete <value>` or `clear <key>` change only that setting: go to step 5.
    - When the person only asks about `worktreeSetup`, keep the current tracker and go to step 6.
    - Otherwise choose the tracker. Use the arguments when they name one. Otherwise ask with AskUserQuestion, offering the tracker the repository already uses first, marked Recommended:
-     - **Linear**: a Linear team. Load `list_teams` with ToolSearch (prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`) and offer the teams; for a `planningcenter` repository, offer the team that owns it first. Ask whether to add any saved views, and take their URLs from the person.
+     - **Linear**: a Linear team. Load `list_teams` with ToolSearch (prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`) and offer the teams, with the `team` from step 1 first. Ask whether to add any saved views, and take their URLs from the person.
      - **GitHub**: the repository's GitHub Issues. Offer origin's repository (`gh repo view --json nameWithOwner,hasIssuesEnabled`) and leave `repo` out when it's that one; if issues are disabled there, say so.
 3. **Check the credentials.** Never print a secret, and never ask for one in chat: tell the person where to put it.
    - **Linear**: the panel reads the API key from `apiKey` in `~/.config/herdr-app/linear.json`. Check the key is present without showing it (`jq -e '.apiKey | length > 0' ~/.config/herdr-app/linear.json`). If it's missing, tell the person to create a personal API key in Linear under Settings → Account → Security & access, and save it there as `{ "apiKey": "lin_api_…" }` with `chmod 600`. The skills reach Linear through its MCP server instead: if the Linear tools aren't available, tell the person to add the Linear MCP server to Claude Code.

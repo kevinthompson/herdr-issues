@@ -4,6 +4,7 @@
 //   tracker.kind                "linear" or "github"
 //   tracker.name                shown in the panel's header
 //   tracker.team                the Linear team's key, for Linear
+//   tracker.repo                the GitHub repository, owner/name, for GitHub
 //   tracker.writable            whether update can save
 //   tracker.prioritized         false when its issues have no priority to show or set
 //   tracker.statuses            the STATUSES (issue.js) its issues can be set to
