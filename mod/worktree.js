@@ -37,6 +37,14 @@ export async function worktreeFor(branch, { root, on }) {
   return { ...worktree, on, main, space: spaceShowing(worktree.path, on) };
 }
 
+// Whether `folder` is in a linked worktree rather than a repository's main checkout.
+export async function isLinkedWorktree(folder, on) {
+  if (!folder) return false;
+  const revParse = (option) => git(folder, ["rev-parse", "--path-format=absolute", option], on);
+  const [top, common] = await Promise.all([revParse("--show-toplevel"), revParse("--git-common-dir")]);
+  return top.ok && common.ok && common.out !== `${top.out}/.git`;
+}
+
 const lines = (text) => text.split("\n").filter(Boolean);
 const MAIN_BRANCHES = ["main", "master"];
 

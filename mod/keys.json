@@ -1,6 +1,7 @@
 {
   "global": {
-    "cmd-shift-i": "issues.toggle"
+    "cmd-shift-i": "issues.toggle",
+    "cmd-shift-w": "issues.close-space"
   },
   "mod:issues": {
     "cmd-s": "issues.save",

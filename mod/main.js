@@ -11,7 +11,7 @@
 // tracker, and the issues.refresh key command fetches it at once.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, spaces, focused, notify, exec, run, watchFolder, appHome } from "herdr";
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
@@ -21,7 +21,7 @@ import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
-import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
+import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { isTextFile, openInEditor } from "./editor.js";
@@ -58,6 +58,18 @@ const ID_CHARACTER_PX = 7;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
 const contextKey = () => JSON.stringify(location());
+
+// Closes the focused space, through the remove-worktree dialog when it shows a linked worktree, so
+// the checkout goes with it once the dialog has checked for unsaved work.
+async function closeFocusedSpace() {
+  const space = spaces().find((candidate) => candidate.id === focused()?.space);
+  if (!space) return;
+  if (await isLinkedWorktree(focused()?.cwd ?? space.folder, space.machine)) {
+    openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: space.id, action: "remove" } });
+  } else {
+    run("space.close", { id: space.id });
+  }
+}
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
 function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
@@ -115,6 +127,7 @@ export default class Issues extends View {
         if (command === "save") this.save(cx);
         else if (command === "toggle") this.toggleCollapsed();
         else if (command === "refresh" && !this.refreshing) this.refresh(cx);
+        else if (command === "close-space") closeFocusedSpace().catch((error) => notify({ title: "Could not close the space", body: String(error) }));
         cx.notify();
       }
     });
