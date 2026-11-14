@@ -28,6 +28,7 @@ import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
+import { issueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 
@@ -419,9 +420,10 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try {
         const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
+        const spaceName = await this.spaceName(issue);
         let openError = null;
-        if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue, { unstarted: !hasPullRequestOnBranch(issue) });
-        else this.openWorktreeDialog(issue);
+        if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue, spaceName, { unstarted: !hasPullRequestOnBranch(issue) });
+        else this.openWorktreeDialog(issue, spaceName);
         this.detailError = (await starting) ?? openError;
         this.refresh(cx);
       } finally { this.opening = null; cx.notify(); }
@@ -522,12 +524,13 @@ export default class Issues extends View {
     this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
-        if (opensWithWt(issue, project)) this.detailError = await this.openWithWt(issue);
+        const spaceName = await this.spaceName(issue);
+        if (opensWithWt(issue, project)) this.detailError = await this.openWithWt(issue, spaceName);
         else {
           const worktree = project && await worktreeFor(issue.branch, project);
           if (worktree?.space) run("space.select", { id: worktree.space.id });
-          else if (worktree) run("space.new", { name: issue.id, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
-          else this.openWorktreeDialog(issue);
+          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
+          else this.openWorktreeDialog(issue, spaceName);
         }
       } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
       this.opening = null;
@@ -539,22 +542,27 @@ export default class Issues extends View {
   // one nested under the repository's space with Claude working the issue. Returns an error message, or null.
   // Without wt installed, the worktree dialog opens instead. An unstarted issue's branch can't be on origin yet,
   // so wt skips fetching and branches from the local main.
-  async openWithWt(issue, { unstarted = false } = {}) {
-    const args = [issue.branch, ...(unstarted ? ["--new"] : []), "--name", issue.id, "--claude", workIssueSession(issue).task];
+  async openWithWt(issue, spaceName, { unstarted = false } = {}) {
+    const args = [issue.branch, ...(unstarted ? ["--new"] : []), "--name", spaceName, "--claude", workIssueSession(issue).task];
     const result = await exec("wt", args, { cwd: this.project.root, timeout: WT_TIMEOUT_MS }).catch(() => null);
-    if (!result) { this.openWorktreeDialog(issue); return null; }
+    if (!result) { this.openWorktreeDialog(issue, spaceName); return null; }
     if (result.code === 0) return null;
     const lastLine = (result.stderr || result.stdout).trim().split("\n").pop();
     return `Could not open the worktree: ${lastLine || `wt exited with ${result.code}`}`;
   }
 
-  openWorktreeDialog(issue) {
+  // The name the repository gives the issue's space; the issue's ID when the name can't be worked out.
+  spaceName(issue) {
+    return this.project ? issueSpaceName(this.project, issue.id).catch(() => issue.id) : Promise.resolve(issue.id);
+  }
+
+  openWorktreeDialog(issue, spaceName) {
     const project = this.project;
     openOverlay({
       mod: "issues", kind: "dialog", width: 440, height: 260,
       props: {
         folder: project?.root, machine: project?.on ?? null, action: "new",
-        branch: issue.branch ?? undefined, name: issue.id, ...workIssueSession(issue),
+        branch: issue.branch ?? undefined, name: spaceName, ...workIssueSession(issue),
       },
     });
   }

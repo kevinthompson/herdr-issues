@@ -82,6 +82,12 @@ Each tracker needs:
   The Claude skills reach Linear through its MCP server, so add the Linear MCP server to Claude Code as well.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
 
+An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2449`. To name a repository's issue spaces differently, add a `spaceName` template to its entry in `issues.json` by hand. It takes two placeholders: `<issueId>`, the issue's ID, and `<repo>`, the repository's name without its owner (the GitHub repository's name for GitHub Issues, else the main checkout's folder name). For example, this names issue #41's space `herdr-issues-mod#41`, which tells it apart from other GitHub repositories' `#41`:
+
+```json
+"~/Code/herdr-issues-mod": { "tracker": "github", "spaceName": "<repo><issueId>" }
+```
+
 ## Using the panel
 
 Press **Cmd-Shift-I** to show or hide the panel. It shows the issues of the repository in the focused pane, grouped by status, and refreshes when issues change.
