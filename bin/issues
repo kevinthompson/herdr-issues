@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+// The issues CLI: runs the Herdr issues panel's own modules outside the app, so scripts and skills share
+// the panel's rules. The panel's modules import from `herdr`, which exists only inside the app; the hook
+// below points that import at cli/herdr.js before any of them load.
+import { registerHooks } from "node:module";
+
+const herdrShim = new URL("../cli/herdr.js", import.meta.url).href;
+registerHooks({
+  resolve: (specifier, context, nextResolve) =>
+    specifier === "herdr" ? { url: herdrShim, shortCircuit: true } : nextResolve(specifier, context),
+});
+
+const { main } = await import("../cli/main.js");
+process.exitCode = await main(process.argv.slice(2));

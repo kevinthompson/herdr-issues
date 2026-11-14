@@ -27,6 +27,7 @@ The panel also tells Claude sessions in Herdr which issues it lists and which is
 - Claude Code (`claude`)
 - `jq`
 - `git`
+- Node.js (`node`) 22.15 or later, for the `issues` command
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 
 ## Installation
@@ -44,7 +45,8 @@ The script:
 - links the checkout to `~/.config/herdr-app/mods/issues`, where Herdr loads it;
 - adds the panel's keys to `~/.config/herdr-app/keys.json`, keeping any key you already bound to something else;
 - adds the checkout as the `herdr-issues` plugin marketplace and installs the `issues@herdr-issues` plugin;
-- offers to add the Issues panel to the side panel of one of your layouts, or of a new copy of Herdr's `main` layout. Herdr's shipped layouts can't be changed, so it never edits them.
+- offers to add the Issues panel to the side panel of one of your layouts, or of a new copy of Herdr's `main` layout. Herdr's shipped layouts can't be changed, so it never edits them;
+- links the `issues` command to `~/.local/bin/issues`, warning if that folder isn't on your `PATH`.
 
 If you skipped the layout step or ran setup without a terminal, run `./setup` again, or follow the steps it printed.
 
