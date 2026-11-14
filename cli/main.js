@@ -11,6 +11,8 @@ Commands:
   tracker [--json]         Print the tracker the repository's issues live in: its kind, name and Linear team
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
+  worktree <id> [--name <space name>] [--claude <first message>]
+                           Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
                            Open a branch in a worktree; --new: it can't be on origin yet, so fetch only main
 
@@ -19,6 +21,9 @@ Options:
 
 const EXIT_FAILED = 1;
 const EXIT_USAGE = 2;
+
+// An answer the command refuses to give, printed as it is.
+class Refusal extends Error {}
 
 async function currentProject() {
   const root = await repositoryRoot({ cwd: process.cwd(), on: null });
@@ -40,21 +45,20 @@ async function tracker(args) {
 }
 
 // The trackers list only an issue's unfinished blockers, so any blocker left holds the work back.
+async function issueToWork(id) {
+  const issue = await (await currentTracker()).get(id);
+  if (!issue) throw new Refusal(`${id}: not found`);
+  if (issue.blockedBy.length) throw new Refusal(`blocked by ${issue.blockedBy.join(", ")}`);
+  if (!issue.branch) throw new Refusal(`${issue.id}: has no branch`);
+  return issue;
+}
+
 async function branch(args) {
   const [id] = args.filter((arg) => !arg.startsWith("--"));
   if (!id) throw new Error("branch needs an issue ID");
-  const issue = await (await currentTracker()).get(id);
-  if (!issue) return refuse(`${id}: not found`);
-  if (issue.blockedBy.length) return refuse(`blocked by ${issue.blockedBy.join(", ")}`);
-  if (!issue.branch) return refuse(`${issue.id}: has no branch`);
+  const issue = await issueToWork(id);
   if (args.includes("--json")) console.log(JSON.stringify({ id: issue.id, branch: issue.branch, new: needsNewBranch(issue), blockedBy: issue.blockedBy }));
   else console.log(issue.branch);
-  return 0;
-}
-
-function refuse(message) {
-  console.error(message);
-  return EXIT_FAILED;
 }
 
 async function spaceName([id]) {
@@ -63,7 +67,7 @@ async function spaceName([id]) {
 }
 
 function worktreeOptions(args) {
-  const options = { branch: null, isNew: false, name: null, claudeMessage: null };
+  const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
   const valueAfter = (index) => {
     if (index + 1 >= args.length) throw new Error(`worktree: ${args[index]} needs a value`);
     return args[index + 1];
@@ -74,15 +78,22 @@ function worktreeOptions(args) {
     else if (arg === "--branch") options.branch = valueAfter(index++);
     else if (arg === "--name") options.name = valueAfter(index++);
     else if (arg === "--claude") options.claudeMessage = valueAfter(index++);
-    else throw new Error(`worktree: unexpected ${arg}`);
+    else if (arg.startsWith("--") || options.id) throw new Error(`worktree: unexpected ${arg}`);
+    else options.id = arg;
   }
-  if (!options.branch) throw new Error("worktree needs --branch <branch>");
+  if (Boolean(options.id) === Boolean(options.branch)) throw new Error("worktree needs an issue ID or --branch <branch>");
+  if (options.id && options.isNew) throw new Error("worktree: --new goes with --branch; an issue decides it itself");
   return options;
 }
 
 async function worktree(args) {
-  const { branch, isNew, name, claudeMessage } = worktreeOptions(args);
-  return openWorktree({ cwd: process.cwd(), branch, isNew, name: name ?? branch, claudeMessage });
+  const { id, branch, isNew, name, claudeMessage } = worktreeOptions(args);
+  const cwd = process.cwd();
+  if (!id) return openWorktree({ cwd, branch, isNew, name: name ?? branch, claudeMessage });
+  const issue = await issueToWork(id);
+  console.log(`${issue.id} is on ${issue.branch}`);
+  const spaceName = name ?? await issueSpaceName(await currentProject(), issue.id);
+  return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
 const COMMANDS = { tracker, branch, "space-name": spaceName, worktree };
@@ -101,7 +112,7 @@ export async function main([command, ...args]) {
   try {
     return (await run(args)) ?? 0;
   } catch (error) {
-    console.error(`issues: ${error.message}`);
+    console.error(error instanceof Refusal ? error.message : `issues: ${error.message}`);
     if (error.fix) console.error(error.fix);
     return EXIT_FAILED;
   }
