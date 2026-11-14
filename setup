@@ -166,8 +166,9 @@ print_manual_layout_steps() {
 To show the Issues panel, make a personal copy of a layout and add the mod beside its side panel:
   herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
 Then add this column right after the node whose id is panel in $layouts_dir/main-issues.json:
-  { "id": "issues-panel", "type": "column", "size": { "px": 368 }, "min": 32, "max": 900,
+  { "id": "issues-panel", "type": "column", "size": { "weight": 1 }, "min": 32, "max": 900,
     "children": [{ "id": "issues", "type": "block", "content": { "mod": "issues" } }] }
+and give the node whose id is main "size": { "weight": 2 }, so the panel keeps its share as the window resizes.
 EOF
 }
 
@@ -175,12 +176,13 @@ add_panel_beside_panel_body() {
   node "$setup_json" add-panel "$1"
 }
 
-# Earlier versions of setup put the Issues panel inside panel-body, where collapsing it would shrink Files and Changes.
+# Earlier versions of setup put the Issues panel inside panel-body, where collapsing it would shrink Files and Changes,
+# then in a column fixed at 368px, which kept its width as the window resized.
 move_panel_out_of_panel_body() {
   local status=0
   node "$setup_json" move-panel "$1" || status=$?
   case $status in
-    0) success "Moved the Issues panel in the $(basename "$1" .json) layout into a column of its own" ;;
+    0) success "Gave the Issues panel in the $(basename "$1" .json) layout a column that keeps its share of the window" ;;
     10) ;;
     *) exit "$status" ;;
   esac

@@ -39,6 +39,8 @@ If you skipped the layout step or ran setup without a terminal, run `./setup` ag
 
 Setup puts the Issues panel in a column of its own beside the side panel that holds Files and Changes, so collapsing it to a strip leaves them as they are. When a layout an earlier setup prepared has the panel inside that side panel, setup moves it into its own column, and rebinds **Cmd-Shift-I** from showing and hiding the side panel to collapsing and expanding the Issues panel, unless you bound that key to something else.
 
+The Issues panel's `issues-panel` column has a weight of 1 beside the terminals' `main` node at 2, so the panel keeps its share of the window as the window resizes, after you drag its divider, and after you collapse it to its 32px strip and expand it again; Files and Changes keep Herdr's own sizing. Setup gives a layout an earlier setup fixed at 368px those weights.
+
 Start a new Claude Code session afterwards to load the plugin.
 
 ## Updating
