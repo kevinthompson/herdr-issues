@@ -90,6 +90,12 @@ export function unfinishedBlockers(issue, issues) {
 const UNDERWAY_STATUSES = ["in-progress", "in-review"];
 export const canFinishWork = (issue) => UNDERWAY_STATUSES.includes(issue.status);
 
+export const hasPullRequestOnBranch = (issue) => (issue.pullRequests ?? []).some((pullRequest) => pullRequest.branch === issue.branch);
+
+// An issue nobody has started, whose branch doesn't exist yet unless a pull request already uses it.
+const UNSTARTED_STATUSES = ["triage", "backlog", "todo"];
+export const needsNewBranch = (issue) => UNSTARTED_STATUSES.includes(issue.status) && !hasPullRequestOnBranch(issue);
+
 export function canStartWork(issue, issues) {
   return isStartable(issue) && unfinishedBlockers(issue, issues).length === 0;
 }
