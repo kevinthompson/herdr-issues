@@ -199,6 +199,7 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
   return {
     kind: "github",
     name: "GitHub",
+    repo,
     writable: true,
     prioritized: false,
     statuses: SETTABLE_STATUSES,
