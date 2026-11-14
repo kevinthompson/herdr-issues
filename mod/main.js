@@ -257,7 +257,8 @@ export default class Issues extends View {
     });
   }
 
-  // A panel out of sight skips its polls, and refreshes once when it comes back instead.
+  // A panel out of sight skips its polls, and refreshes once when it comes back instead. A collapsed panel
+  // is still in sight, so its strip describes the focused repository.
   poll(cx) {
     this.noticeSpaceSwitch();
     if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
@@ -268,7 +269,7 @@ export default class Issues extends View {
   }
 
   refreshOnReturn(cx) {
-    const visible = panelVisible() && !this.collapsed, returned = visible && this.visible === false;
+    const visible = panelVisible(), returned = visible && this.visible === false;
     this.visible = visible;
     const stale = returned && this.tracker && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS;
     if (stale) this.refresh(cx, { reuse: true });
@@ -836,19 +837,20 @@ export default class Issues extends View {
         .child(svg("mods/issues/icons/issues.svg").size(16).text_color(t.foreground)));
   }
 
-  render(cx) {
-    if (this.menu) return this.menu.render();
-    if (this.worktreeDialog) return this.worktreeDialog.render(cx);
-    if (this.collapsed) {
-      this.refreshOnReturn(cx);
-      this.noticeSpaceSwitch();
-      return this.strip(theme());
-    }
+  // Moving to another repository, an issue change and a newly selected scope each refresh the list.
+  keepListCurrent(cx) {
     if (contextKey() !== this.context) this.refresh(cx, { reuse: true });
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     else this.refreshOnReturn(cx);
+  }
+
+  render(cx) {
+    if (this.menu) return this.menu.render();
+    if (this.worktreeDialog) return this.worktreeDialog.render(cx);
+    this.keepListCurrent(cx);
     this.noticeSpaceSwitch();
+    if (this.collapsed) return this.strip(theme());
     this.openSpaceIssue(cx);
     this.applyFieldEdits(cx);
     this.setup?.takePickedTeam(cx);
