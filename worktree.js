@@ -37,6 +37,7 @@ export async function worktreeFor(branch, { root, on }) {
 }
 
 const lines = (text) => text.split("\n").filter(Boolean);
+const MAIN_BRANCHES = ["main", "master"];
 
 // What the repository holds for the listed issues:
 // - worktrees: its linked worktrees;
