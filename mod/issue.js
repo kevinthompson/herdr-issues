@@ -92,6 +92,21 @@ export const canFinishWork = (issue) => UNDERWAY_STATUSES.includes(issue.status)
 
 export const hasPullRequestOnBranch = (issue) => (issue.pullRequests ?? []).some((pullRequest) => pullRequest.branch === issue.branch);
 
+const CLOSED_PULL_REQUEST_STATUSES = ["merged", "closed"];
+const hasOpenPullRequestOnBranch = (issue) => (issue.pullRequests ?? []).some((pullRequest) =>
+  pullRequest.branch === issue.branch && !CLOSED_PULL_REQUEST_STATUSES.includes(pullRequest.status));
+
+// Whether the work in the issue's worktree is complete, so the worktree can close, given worktreeWork's answer for
+// it (worktree.js) and the repository's complete setting: nothing is uncommitted, and the issue is canceled, or its
+// branch moved since it was made and is merged into main or, with "pull-request-open", pushed with an open pull request.
+export function readyToClose(issue, work, complete) {
+  if (!work || work.dirty) return false;
+  if (issue.status === "canceled") return true;
+  if (!work.moved) return false;
+  if (work.merged) return true;
+  return complete === "pull-request-open" && work.unpushed === 0 && hasOpenPullRequestOnBranch(issue);
+}
+
 // An issue nobody has started, whose branch doesn't exist yet unless a pull request already uses it.
 const UNSTARTED_STATUSES = ["triage", "backlog", "todo"];
 export const needsNewBranch = (issue) => UNSTARTED_STATUSES.includes(issue.status) && !hasPullRequestOnBranch(issue);

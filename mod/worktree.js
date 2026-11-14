@@ -41,20 +41,43 @@ const lines = (text) => text.split("\n").filter(Boolean);
 const MAIN_BRANCHES = ["main", "master"];
 
 // What the repository holds for the listed issues:
-// - worktrees: its linked worktrees;
+// - worktrees: its linked worktrees, each with worktreeWork's answer as `work`;
+// - complete: when its work counts as complete, mergeSettings' complete, "merged" when that can't be read;
 // - mergedFinished: done issues' local branches already in main that no checkout has out.
 // null outside a repository, or when the main checkout isn't on main, since "merged" means merged into main.
 export async function repositoryState(issues, { root, on }) {
   const [main, ...linked] = await checkouts(root, on);
   if (!main || !MAIN_BRANCHES.includes(main.branch)) return null;
-  const worktrees = linked.map((checkout) => ({ ...checkout, on }));
-  const mergedBranches = await git(main.path, ["branch", "--merged", "HEAD", "--format=%(refname:short)"], on);
+  const [mergedBranches, { complete }, worktrees] = await Promise.all([
+    git(main.path, ["branch", "--merged", "HEAD", "--format=%(refname:short)"], on),
+    mergeSettings({ root, on }).catch(() => ({ complete: "merged" })),
+    Promise.all(linked.map(async (checkout) => ({ ...checkout, on, work: await worktreeWork({ ...checkout, on }, main) }))),
+  ]);
   const merged = new Set(lines(mergedBranches.out));
   const checkedOut = new Set([main.branch, ...linked.map((checkout) => checkout.branch)]);
   const mergedFinished = issues
     .filter((issue) => issue.status === "done" && merged.has(issue.branch) && !checkedOut.has(issue.branch))
     .map((issue) => issue.branch);
-  return { main, on, worktrees, mergedFinished };
+  return { main, on, complete, worktrees, mergedFinished };
+}
+
+// What a linked worktree's checkout says about whether its work is complete, read without fetching:
+// { dirty, moved, merged, unpushed }, or null without a branch or when git can't say.
+// - dirty: whether it has uncommitted changes, untracked files included;
+// - moved: whether its branch moved since it was made, since a fresh branch holds no work although main has it;
+// - merged: whether merging it into main would change nothing (isMergedInto);
+// - unpushed: its commits on no origin branch, as origin was last fetched, or null without origin.
+export async function worktreeWork({ path, branch, on }, main) {
+  if (!branch) return null;
+  const [status, reflog, merged, hasOrigin] = await Promise.all([
+    git(path, ["status", "--porcelain"], on),
+    git(path, ["reflog", "show", "--format=%H", `refs/heads/${branch}`], on),
+    isMergedInto({ top: path }, main.branch, on),
+    git(path, ["remote", "get-url", "origin"], on),
+  ]);
+  if (!status.ok) return null;
+  const unpushed = hasOrigin.ok ? await git(path, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on) : null;
+  return { dirty: Boolean(status.out), moved: lines(reflog.out).length > 1, merged, unpushed: unpushed?.ok ? Number(unpushed.out) : null };
 }
 
 // Deletes local branches already merged into the main checkout's HEAD; git refuses any that aren't.
@@ -65,9 +88,12 @@ export async function deleteMergedBranches(branches, { main, on }) {
   return deleted;
 }
 
+// The repository's linked worktree on the branch, or null.
+export const branchWorktree = (repository, branch) => (branch && repository?.worktrees.find((each) => each.branch === branch)) || null;
+
 // The space showing the branch's worktree right now, or null.
 export function worktreeSpace(repository, branch) {
-  const worktree = branch && repository?.worktrees.find((each) => each.branch === branch);
+  const worktree = branchWorktree(repository, branch);
   return worktree ? spaceShowing(worktree.path, worktree.on) : null;
 }
 
