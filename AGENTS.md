@@ -60,7 +60,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 ## Installing for development
 
-Run `./setup` from the main checkout. It needs `herdr-app`, `claude`, `jq`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
+Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `jq`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
 
 - links the checkout to `~/.config/herdr-app/mods/issues`;
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;

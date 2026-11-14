@@ -33,6 +33,18 @@ if ((${#missing[@]})); then
 fi
 command -v gh >/dev/null || echo "setup: warning: gh is not installed; repositories tracked in GitHub Issues need it" >&2
 
+refuse_linked_worktree() {
+  local git_dir common_dir main_checkout
+  git_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir)
+  common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)
+  [[ $git_dir == "$common_dir" ]] && return
+  main_checkout=$(git -C "$repo_root" worktree list --porcelain | sed -n '1s/^worktree //p')
+  echo "setup: $repo_root is a linked worktree; installing from it would point the mod, the issues CLI and the plugin at a folder that goes away when the worktree closes" >&2
+  echo "setup: run ./setup from the main checkout instead: cd $main_checkout && ./setup" >&2
+  exit 1
+}
+refuse_linked_worktree
+
 link_mod() {
   if [[ -e $mod_link && ! -L $mod_link ]]; then
     echo "setup: $mod_link exists and is not a symlink; move it aside and run setup again" >&2
