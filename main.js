@@ -24,7 +24,6 @@ import { isTextFile, openInEditor } from "./editor.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, fetchList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
-import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueStatusCommit } from "./status-commits.js";
 import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
@@ -39,8 +38,6 @@ const createdStampPath = () => `${appHome()}/data/issues/created`;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
 // team at once is too slow.
 const ROW_LIMIT = 100;
-const CHECKLIST_COMMIT_DELAY_MS = 5000;
-const STATUS_COMMIT_DELAY_MS = 5000;
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
@@ -230,7 +227,7 @@ export default class Issues extends View {
     });
   }
 
-  // Keeps the issue as it was read, so saving can tell whether its file changed underneath the edit.
+  // Keeps the issue as it was read, so saving can tell whether it changed underneath the edit.
   edit(issue, cx) {
     const t = theme();
     this.detailError = null;
@@ -364,7 +361,7 @@ export default class Issues extends View {
   }
 
   // Shows the checkbox's new state at once. Saves run one after another, each over the body the
-  // previous one wrote, so quick clicks never look like an edit made on disk meanwhile.
+  // previous one wrote, so quick clicks never look like an edit made elsewhere meanwhile.
   toggleTask(issue, line, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable || this.editing) return;
@@ -380,56 +377,7 @@ export default class Issues extends View {
       catch (e) { this.detailError = `Could not save the checkbox: ${e.message ?? e}`; this.refresh(cx); }
       cx.notify();
     });
-    this.scheduleChecklistCommit(tracker, issue, cx);
     cx.notify();
-  }
-
-  // Each click restarts the wait, so a run of clicks becomes one commit. Clicks in another
-  // project's issues commit the earlier project's first.
-  scheduleChecklistCommit(tracker, issue, cx) {
-    if (this.pendingChecklists && this.pendingChecklists.tracker !== tracker) this.commitChecklistsLater(this.takePendingChecklists(), cx);
-    const pending = this.pendingChecklists ??= { tracker, issues: new Map() };
-    pending.issues.set(issue.id, { id: issue.id, file: issue.file });
-    pending.timer?.cancel();
-    pending.timer = cx.timer.after(CHECKLIST_COMMIT_DELAY_MS, (cx) => this.commitChecklistsLater(this.takePendingChecklists(), cx));
-  }
-
-  takePendingChecklists() {
-    const pending = this.pendingChecklists;
-    this.pendingChecklists = null;
-    pending?.timer?.cancel();
-    return pending;
-  }
-
-  commitChecklistsLater(pending, cx) {
-    cx.spawn(async (cx) => {
-      try { await this.commitChecklists(pending); }
-      catch (e) { this.detailError = `Could not commit the checkboxes: ${e.message ?? e}`; cx.notify(); }
-    });
-  }
-
-  async commitChecklists(pending) {
-    if (!pending) return;
-    await this.taskSaves?.catch(() => {});
-    await pending.tracker.commitChecklists?.([...pending.issues.values()]);
-  }
-
-  // Each status change restarts the wait, so a run of changes becomes one commit.
-  scheduleStatusCommits(cx) {
-    const changedAt = pendingStatusCommits()?.changedAt;
-    if (!changedAt || changedAt === this.statusChangeScheduled) return;
-    this.statusChangeScheduled = changedAt;
-    this.statusCommitTimer?.cancel();
-    this.statusCommitTimer = cx.timer.after(STATUS_COMMIT_DELAY_MS, (cx) => cx.spawn(async () => {
-      try { await commitStatuses(takePendingStatusCommits()); }
-      catch (e) { notify({ title: "Could not commit the status change", body: String(e.message ?? e), level: "error" }); }
-    }));
-  }
-
-  // Herdr's teardown hook: checkboxes and statuses still waiting for their commit get it now.
-  async close() {
-    await this.commitChecklists(this.takePendingChecklists()).catch(() => {});
-    if (!this.menu && !this.worktreeDialog) await commitStatuses(takePendingStatusCommits()).catch(() => {});
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
@@ -475,7 +423,6 @@ export default class Issues extends View {
         const issue = this.issues.find((each) => each.id === edit.issueId) ?? await tracker.get(edit.issueId);
         if (!issue) throw new Error(`${edit.issueId} was not found`);
         await tracker.update(issue, { [edit.field]: edit.value });
-        if (edit.field === "status" && tracker.commitStatuses) queueStatusCommit(edit.root, issue, edit.value);
         forgetEdits([id]);
         this.fadeSyncIcon(cx);
         announceIssueChange();
@@ -764,7 +711,6 @@ export default class Issues extends View {
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     else this.refreshOnReturn(cx);
-    this.scheduleStatusCommits(cx);
     this.openRequestedIssue(cx);
     this.applyFieldEdits(cx);
     const t = theme(), issue = this.findIssue(this.openId);

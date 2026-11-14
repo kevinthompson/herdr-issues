@@ -18,10 +18,6 @@
 //   tracker.delegate(issue)     → hands the issue to Planning Center's Cloud Agent to work; null where
 //                                 the project can't
 //   tracker.isDelegated(issue)  → whether the Cloud Agent has the issue already; null with delegate
-//   tracker.commitChecklists(issues) → records checkbox changes saved with update where the tracker
-//                                 keeps history; nothing to do when every save is already final
-//   tracker.commitStatuses(issues) → records status changes saved with update the same way; issues are
-//                                 { id, file, status }
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
 //          branch, created, body (null until loaded: tracker.get loads it), updated (when the tracker
