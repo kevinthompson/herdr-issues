@@ -34,6 +34,12 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 `trackerFor` in `trackers/index.js` chooses one. The repository's entry in `~/.config/herdr-app/issues.json`, which `/issues:config` and the panel's setup view write and `trackers/setting.js` reads, decides first; it is keyed by the main checkout's path, so worktrees share it. Without an entry, it uses Linear.
 
+### The issues CLI (`bin/issues`, `cli/`)
+
+`bin/issues` is a Node script that runs the panel's own modules outside the app, so scripts and skills share one copy of each rule. Those modules import from `herdr`, which exists only inside the app, so it registers a module resolve hook that points `herdr` at `cli/herdr.js`: a shim exporting every name the modules import, following the app's contract in `gpui-kit.d.ts`, for this computer only. The modules load unchanged; a module the CLI loads that imports a new name from `herdr` needs the shim to export it too.
+
+- `cli/main.js`: the commands, each answering for the git repository holding the current folder. `issues tracker [--json]` prints the repository's tracker, as `trackerFor` chooses it.
+
 ### The Claude plugin (`claude-plugin/`)
 
 `.claude-plugin/marketplace.json` makes the repository the `herdr-issues` plugin marketplace, and `claude-plugin/` is its one plugin, `issues`.
