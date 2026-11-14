@@ -12,7 +12,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `detail.js`: one issue drawn in place of the list, with its body and the editor.
 - `setup.js`: the setup view drawn in place of the list for a repository with no tracker, or one whose tracker can't load.
 - `menu.js`: the status, priority, scope, milestone and label dropdowns, opened as popups of this same mod.
-- `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
+- `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces, and whether a folder is in a linked worktree.
 - `space-name.js`: the name of an issue's worktree space, from the repository's `spaceName` setting, and the issue ID read back out of a space's name, so switching to an issue's space opens its issue.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
@@ -22,7 +22,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `links.js`, `editor.js`, `neovim.js`: links in issue bodies and opening files in the person's editor.
 - `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
 - `collapse.js`: collapsing the panel to a thin strip and expanding it again, by resizing the layout node that holds it.
-- `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`.
+- `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`. `cmd-shift-w` sends `close-space`, which closes the focused space, through the worktree dialog's removal when the space shows a linked worktree. Herdr delivers a mod's commands only to a shown copy, so the key does nothing in a layout without the panel.
 - `icons/`: the panel's icons, drawn by their path in Herdr's mods folder, such as `mods/issues/icons/issues.svg`.
 
 Herdr generates `gpui-kit.d.ts` and `jsconfig.json` in the mod folder; they are git-ignored.
