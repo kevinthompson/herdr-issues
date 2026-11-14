@@ -24,7 +24,7 @@ import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { openInNeovim, opensInNeovim } from "./neovim.js";
 import { avatarImage } from "./avatars.js";
-import { lastList, rememberList } from "./lists.js";
+import { lastList, fetchList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueStatusCommit } from "./status-commits.js";
 import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
@@ -107,7 +107,7 @@ export default class Issues extends View {
     this.rowLimit = ROW_LIMIT;
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
-    this.refresh(cx);
+    this.refresh(cx, { reuse: true });
     cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); else this.refreshOnReturn(cx); });
     cx.spawn(async (cx) => {
       for (; ;) {
@@ -117,7 +117,9 @@ export default class Issues extends View {
     });
   }
 
-  refresh(cx) {
+  // With `reuse`, a remote list fetched moments ago, by this copy or another, is shown without asking again,
+  // so switching between spaces of one repository or coming back to the panel doesn't repeat the request.
+  refresh(cx, { reuse = false } = {}) {
     const context = contextKey();
     if (context !== this.context) {
       this.context = context; this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.error = null; this.loaded = false; this.repository = null;
@@ -150,10 +152,10 @@ export default class Issues extends View {
             cx.notify();
           }
         }
-        const issues = tracker ? await tracker.list(scope, loads) : [];
+        const listIssues = () => tracker.list(scope, loads);
+        const issues = !tracker ? [] : polled ? await fetchList(listKey, listIssues, reuse && tracker.kind !== "local") : await listIssues();
         if (generation !== this.generation) return;
         Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null });
-        if (polled) rememberList(listKey, issues).catch(() => {});
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.watch(tracker, cx);
         this.scanRepository(project, generation, cx);
@@ -187,7 +189,7 @@ export default class Issues extends View {
   refreshOnReturn(cx) {
     const visible = panelVisible(), returned = visible && this.visible === false;
     this.visible = visible;
-    if (returned && this.tracker && this.tracker.kind !== "local" && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx);
+    if (returned && this.tracker && this.tracker.kind !== "local" && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx, { reuse: true });
   }
 
   // Keyed by the tracker's kind too, so a repository that switches trackers stops watching the old one.
@@ -754,7 +756,7 @@ export default class Issues extends View {
   render(cx) {
     if (this.menu) return this.menu.render();
     if (this.worktreeDialog) return this.worktreeDialog.render(cx);
-    if (contextKey() !== this.context) this.refresh(cx);
+    if (contextKey() !== this.context) this.refresh(cx, { reuse: true });
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     else this.refreshOnReturn(cx);
