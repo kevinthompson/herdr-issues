@@ -22,7 +22,7 @@ import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedS
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
-import { openInNeovim, opensInNeovim } from "./neovim.js";
+import { isTextFile, openInEditor } from "./editor.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, fetchList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
@@ -334,13 +334,13 @@ export default class Issues extends View {
     return bodyFiles.files;
   }
 
-  // Opens a text file in Neovim within the current space, and hands a URL or any other file to macOS `open`.
+  // Opens a text file in the user's editor, and hands a URL or any other file to macOS `open`.
   openLink(issue, url, cx) {
     const { file, url: address } = linkTarget(url, issue.path ?? `${this.project.root}/`);
     if (file && this.project?.on) { this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
-      if (file && await opensInNeovim(file)) await openInNeovim(file, this.project.root).catch((e) => { this.detailError = `Could not open ${file}: ${e.message ?? e}`; });
+      if (file && await isTextFile(file)) await openInEditor(file, this.project.root).catch((e) => { this.detailError = `Could not open ${file}: ${e.message ?? e}`; });
       else {
         const target = file ?? address;
         const opened = await exec("open", [target]).catch((e) => ({ code: 1, stderr: String(e.message ?? e) }));
