@@ -1,7 +1,7 @@
 // A tracker is where a project's issues live. Every backend returns the same shapes, so the
 // panel never knows which one it is showing.
 //
-//   tracker.kind                "linear" or "github"
+//   tracker.kind                "linear", "github" or "beads"
 //   tracker.name                shown in the panel's header
 //   tracker.team                the Linear team's key, for Linear
 //   tracker.repo                the GitHub repository, owner/name, for GitHub
@@ -32,14 +32,17 @@
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
 // its manual sort order onto order. A Linear issue's branch is its open pull request's in the repository,
 // else the one Linear suggests. GitHub issues fill the same fields as Linear's labelColors, assignee,
-// assigneeAvatar and pullRequests; github.js says how their statuses and branches are derived.
+// assigneeAvatar and pullRequests; github.js says how their statuses and branches are derived. beads.js says how
+// Beads issues' statuses and priorities map.
 import { linearTracker } from "./linear.js";
 import { githubTracker } from "./github.js";
+import { beadsTracker } from "./beads.js";
 import { trackerSetting } from "./setting.js";
 
 // The repository's entry in issues.json (setting.js) decides; without one, Linear.
 export async function trackerFor(project) {
   const setting = await trackerSetting(project);
   if (setting?.tracker === "github") return githubTracker(project, setting);
+  if (setting?.tracker === "beads") return beadsTracker(project, setting);
   return linearTracker(project, setting);
 }

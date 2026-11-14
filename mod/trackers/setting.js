@@ -7,7 +7,8 @@
 //     "~/Code/app":      { "tracker": "github", "repo": "owner/name",   its GitHub issues; repo defaults to origin's
 //                          "spaceName": "<repo><issueId>",            names issue spaces (space-name.js), here app#41
 //                          "merge": "pull-request", "complete": "merged",
-//                          "worktreeSetup": "box worktree-setup", "pollSeconds": 30 } } }
+//                          "worktreeSetup": "box worktree-setup", "pollSeconds": 30 },
+//     "~/Code/notes":    { "tracker": "beads" } } }                   the Beads database in its .beads folder
 // pollSeconds, at the top level and in any entry, is how often the panel asks the tracker for its list, a whole number
 // of seconds of at least 10; an entry's overrides the top level's, and pollSettings resolves it, 60 without either.
 // spaceName, merge, complete and worktreeSetup are optional in any entry. In spaceName, <issueId> is the issue's ID
@@ -25,7 +26,7 @@ import { githubRepository } from "./github.js";
 import { badMergeSetting, badSetting, settingsUnreadable } from "./problems.js";
 
 export const settingsPath = () => `${appHome()}/issues.json`;
-const TRACKERS = ["linear", "github"];
+const TRACKERS = ["linear", "github", "beads"];
 const MERGES = ["auto", "review", "pull-request"];
 const COMPLETES = ["merged", "pull-request-open"];
 export const DEFAULT_POLL_SECONDS = 60;
