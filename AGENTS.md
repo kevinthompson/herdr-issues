@@ -15,6 +15,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
 - `space-name.js`: the name of an issue's worktree space, from the repository's `spaceName` setting.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
+- `agent-order.js`: orders `agent.next` and `agent.prev` to follow the list, by the agents in each drawn issue's worktree space.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
 - `edits.js`, `tasks.js`, `changes.js`: field edits saved in the background, checkbox toggles in an issue's body, and the stamp that tells every panel to refresh.
 - `lists.js`, `avatars.js`, `file-key.js`: cached lists and avatars in the app's data folder.
