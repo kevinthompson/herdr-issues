@@ -75,7 +75,8 @@ Run `./setup` from the main checkout; run from a linked worktree, it refuses and
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;
 - merges `mod/keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else;
 - adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`;
-- offers to add the Issues panel to the side panel (`panel-body`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal.
+- offers to add the Issues panel in a column of its own beside the side panel (`panel`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal;
+- moves the Issues panel out of `panel-body` in a personal layout an earlier setup put it in, into that column of its own.
 
 Running it again is safe, and is how plugin changes are installed. A person who only uses the panel installs and updates with the README's one-line command instead, whose checkout lives in `~/.local/share/herdr-issues-mod`.
 
