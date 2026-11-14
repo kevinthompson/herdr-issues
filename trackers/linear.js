@@ -7,6 +7,7 @@
 // completed or merged most recently.
 import { appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
+import { cachedLookup } from "../lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
 import { linearKeyMissing, linearKeyUnreadable, linearKeyInvalid } from "./problems.js";
@@ -96,11 +97,14 @@ function repoConfig(root, { team, views = {} }) {
   return { teamKey: team, path: root, views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
 }
 
-async function readApiKey() {
-  const text = await readTextFile(`${appHome()}/linear.json`).catch(() => null);
+export const linearKeyPath = () => `${appHome()}/linear.json`;
+
+const cachedApiKey = cachedLookup();
+const readApiKey = () => cachedApiKey("linear.json", async () => {
+  const text = await readTextFile(linearKeyPath()).catch(() => null);
   if (text === null) return null;
   try { return JSON.parse(text).apiKey ?? null; } catch { throw linearKeyUnreadable(); }
-}
+});
 
 // A function that asks Linear's API a query with the person's API key: (query, variables) → its data.
 export async function linearClient() {

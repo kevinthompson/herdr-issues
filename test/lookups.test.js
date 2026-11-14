@@ -7,7 +7,7 @@ import { createRepository, git, temporaryFolder } from "./support/repository.js"
 import { mainCheckout, repositoryRoot } from "../location.js";
 import { forgetLookups } from "../lookups.js";
 import { trackerFor } from "../trackers/index.js";
-import { settingsPath } from "../trackers/setting.js";
+import { saveSetupChoices, settingsPath, trackerSetting } from "../trackers/setting.js";
 
 // The git commands the mod's modules run during the test, each as one string, while still running them.
 function recordGitCommands(t) {
@@ -74,4 +74,26 @@ test("finding a repository's tracker lists its worktrees once", async (t) => {
 
   assert.equal(tracker.repo, "owner/name");
   assert.equal(commands.filter((command) => command.startsWith("worktree list")).length, 1);
+});
+
+test("issues.json is read once, until the lookups are forgotten", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  const project = { root: repository, on: null };
+  writeSettings({ repos: { [repository]: { tracker: "github", repo: "owner/first" } } });
+  assert.equal((await trackerSetting(project)).repo, "owner/first");
+
+  writeSettings({ repos: { [repository]: { tracker: "github", repo: "owner/second" } } });
+  assert.equal((await trackerSetting(project)).repo, "owner/first");
+  forgetLookups();
+  assert.equal((await trackerSetting(project)).repo, "owner/second");
+});
+
+test("saving the setup view's choices forgets the issues.json it read", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  const project = { root: repository, on: null };
+  writeSettings({ repos: {} });
+  assert.equal(await trackerSetting(project), null);
+
+  await saveSetupChoices(repository, { tracker: "github", repo: "owner/name" });
+  assert.equal((await trackerSetting(project)).repo, "owner/name");
 });

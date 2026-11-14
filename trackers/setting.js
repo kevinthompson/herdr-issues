@@ -17,6 +17,7 @@
 // view (setup.js) writes an entry too, with saveSetupChoices.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
+import { cachedLookup, forgetLookups } from "../lookups.js";
 import { githubRepository } from "./github.js";
 import { badMergeSetting, badSetting, settingsUnreadable } from "./problems.js";
 
@@ -31,12 +32,17 @@ function parseSettings(text) {
   try { return JSON.parse(text); } catch (e) { throw settingsUnreadable(`issues.json isn't valid JSON: ${e.message ?? e}`); }
 }
 
+const cachedSettings = cachedLookup();
+const readSettings = () => cachedSettings("issues.json", async () => {
+  const text = await readTextFile(settingsPath()).catch(() => null);
+  return text === null ? null : parseSettings(text);
+});
+
 // The repository's entry, or null when it has none.
 export async function trackerSetting({ root, on }) {
   if (on != null) return null;
-  const text = await readTextFile(settingsPath()).catch(() => null);
-  if (text === null) return null;
-  const settings = parseSettings(text);
+  const settings = await readSettings();
+  if (settings === null) return null;
   const main = await mainCheckout(root, on);
   const [key, setting] = Object.entries(settings?.repos ?? {}).find(([path]) => expandHome(path) === main) ?? [];
   if (!setting) return null;
@@ -87,4 +93,5 @@ export async function saveSetupChoices(main, setting) {
   others.splice(existing === -1 ? others.length : existing, 0, [key, { ...setting, ...kept }]);
   const text = `${JSON.stringify({ ...settings, repos: Object.fromEntries(others) }, null, 2)}\n`;
   await writeTextFile(settingsPath(), text, previous);
+  forgetLookups();
 }
