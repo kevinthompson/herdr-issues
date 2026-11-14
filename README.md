@@ -11,6 +11,18 @@ An Issues panel for the Herdr desktop app, and a Claude Code plugin that works t
 - **Claude knows what you're looking at.** Claude sessions in Herdr know which issues the panel lists and which one is open, so "the issues" and "this issue" mean what you see.
 - **Skills for the whole loop.** The Claude Code plugin's `issues:*` skills create, plan, triage and work issues in whichever tracker the repository uses.
 
+## Quickstart
+
+Install with one command:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues-mod/main/bootstrap | bash
+```
+
+Run the same command again to update.
+
+Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to collapse the Issues panel to a thin strip or expand it again; the strip's button expands it too.
+
 ## Getting started
 
 You need:
@@ -22,16 +34,6 @@ You need:
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear
 - [Beads](https://github.com/steveyegge/beads) (`bd`, `brew install beads`), for repositories tracked locally with Beads
-
-Install with one command:
-
-```sh
-d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues-mod.git "$d" && "$d/install"
-```
-
-It clones the repository into `~/.local/share/herdr-issues-mod` and runs its setup. Run the same command again to update.
-
-Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to collapse the Issues panel to a thin strip or expand it again; the strip's button expands it too.
 
 ### Linear
 

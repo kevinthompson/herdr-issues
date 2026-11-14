@@ -1,0 +1,36 @@
+#!/bin/bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues-mod/main/bootstrap | bash
+#
+# Clones the repository into ~/.local/share/herdr-issues-mod when it isn't there, then runs that
+# checkout's install script, so the same command installs and updates. HERDR_ISSUES_REPOSITORY_URL
+# overrides the repository it clones.
+
+# The body is one function called on the last line, so a download cut short runs nothing.
+bootstrap() {
+  set -euo pipefail
+
+  local repository_url checkout
+  repository_url="${HERDR_ISSUES_REPOSITORY_URL:-https://github.com/kevinthompson/herdr-issues-mod.git}"
+  checkout="$HOME/.local/share/herdr-issues-mod"
+
+  fail() {
+    printf 'bootstrap: %s\n' "$@" >&2
+    exit 1
+  }
+
+  command -v git >/dev/null || fail "git is not installed; install it and run the command again"
+
+  if [[ ! -d $checkout ]]; then
+    git clone --quiet "$repository_url" "$checkout" ||
+      fail "couldn't clone $repository_url into $checkout; the repository must be reachable from this computer"
+  fi
+
+  # Piped into bash, standard input is the download, so install and setup would take their
+  # no-terminal paths; give them the terminal when there is one.
+  if [[ ! -t 0 ]] && { : </dev/tty; } 2>/dev/null; then
+    exec "$checkout/install" </dev/tty
+  fi
+  exec "$checkout/install"
+}
+
+bootstrap "$@"

@@ -14,10 +14,16 @@
 Run this command:
 
 ```sh
-d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues-mod.git "$d" && "$d/install"
+curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues-mod/main/bootstrap | bash
 ```
 
-It clones the repository into `~/.local/share/herdr-issues-mod` when it isn't there, then runs that checkout's `install` script, which brings it up to date with `origin/main` and runs its `setup` script. Keep the folder: Herdr loads the panel, the `issues` command and the Claude plugin from it.
+It downloads the repository's `bootstrap` script, which clones the repository into `~/.local/share/herdr-issues-mod` when it isn't there, then runs that checkout's `install` script, which brings it up to date with `origin/main` and runs its `setup` script. Keep the folder: Herdr loads the panel, the `issues` command and the Claude plugin from it.
+
+If `curl` can't reach the repository, for example because GitHub needs your credentials to read it, run this command instead, which clones it with `git` and does the same:
+
+```sh
+d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues-mod.git "$d" && "$d/install"
+```
 
 If the Issues panel is already linked to another clone, such as one you develop in, the command says so and asks before pointing everything at `~/.local/share/herdr-issues-mod`; without a terminal to ask in, it changes nothing.
 
