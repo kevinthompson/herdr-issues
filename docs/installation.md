@@ -30,6 +30,13 @@ The script:
 
 If you skipped the layout step or ran setup without a terminal, run `./setup` again, or follow the steps it printed.
 
+In a layout setup prepares, the Issues panel keeps its share of the window's width when you resize the window, including after you drag it to a new width. Setup does this by giving the terminals' `main` node and the `panel` column proportional sizes in place of the panel's fixed width, and leaves a panel whose size is already a weight alone. To give a layout that already shows the panel the same behavior, set these sizes in it, in `~/.config/herdr-app/layouts/<layout>.json`, and adjust the ratio to taste:
+
+```json
+{ "id": "main", "size": { "weight": 5 }, ... }
+{ "id": "panel", "size": { "weight": 2 }, "min": 280, "max": 900, ... }
+```
+
 Start a new Claude Code session afterwards to load the plugin.
 
 ## Updating
