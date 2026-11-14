@@ -1,6 +1,7 @@
 // The `herdr` module for the issues CLI (bin/issues), which runs the panel's modules in Node rather than in
 // the app. It exports every name those modules import, following the app's contract in gpui-kit.d.ts, for
-// this computer only: a call with a machine (`on`) rejects, and there are no spaces or panes.
+// this computer only: a call with a machine (`on`) rejects, and there are no spaces or panes until readLayout
+// reads them from the running app.
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
@@ -51,6 +52,25 @@ export async function writeTextFile(path, text, expected) {
   return null;
 }
 
-export const spaces = () => [];
-export const panes = () => [];
+let layout = { spaces: [], panes: [] };
+
+async function listJson(command, args) {
+  const result = await exec(command, args);
+  if (result.code !== 0) throw new Error(`${command} ${args.join(" ")}: ${(result.stderr || result.stdout).trim().split("\n").pop()}`);
+  return JSON.parse(result.stdout);
+}
+
+// The app's spaces and panes are live, so `spaces` and `panes` answer synchronously; the CLI reads them
+// from the running app here, before calling a module that needs them.
+export async function readLayout() {
+  const [listing, terminals] = await Promise.all([listJson("herdr-app", ["ls"]), listJson("hc", ["ls", "--json"])]);
+  const folderOf = new Map(terminals.terminals.map((terminal) => [terminal.address, terminal.cwd]));
+  const panes = listing.spaces.flatMap((space) => space.tabs.flatMap((tab) => tab.terminals.map((terminal) => ({
+    pane: terminal.pane, terminal: terminal.terminal, tab: tab.id, cwd: folderOf.get(terminal.terminal) ?? null,
+  }))));
+  layout = { spaces: listing.spaces, panes };
+}
+
+export const spaces = () => layout.spaces;
+export const panes = () => layout.panes;
 export const focused = () => null;

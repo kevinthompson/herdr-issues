@@ -17,7 +17,7 @@ async function checkouts(root, on) {
 
 const isInside = (folder, path) => folder === path || folder?.startsWith(`${path}/`);
 
-function spaceShowing(path, on) {
+export function spaceShowing(path, on) {
   const paneList = panes();
   return spaces().find((space) => {
     if ((space.machine ?? null) !== (on ?? null)) return false;
