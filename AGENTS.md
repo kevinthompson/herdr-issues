@@ -61,11 +61,12 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 ### Repository tooling
 
 - `setup`: installs the mod and the plugin (see below).
+- `scripts/setup-json.js`: the JSON reading and editing `setup` does, so installing needs `node` and not `jq`.
 - `.claude/settings.json` registers `.claude/hooks/reload-mod.sh`, which makes Herdr reload the mod after Claude edits one of its files in the checkout Herdr loads.
 
 ## Installing for development
 
-Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `jq`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
+Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
 
 - links the checkout's `mod/` folder to `~/.config/herdr-app/mods/issues`, repointing a link an older install made to the checkout itself;
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;

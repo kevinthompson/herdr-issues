@@ -11,7 +11,7 @@
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
-# Needs herdr-app, claude, jq, git and node; gh is needed only for repositories tracked in GitHub Issues.
+# Needs herdr-app, claude, git and node; gh is needed only for repositories tracked in GitHub Issues.
 
 set -euo pipefail
 
@@ -23,6 +23,7 @@ herdr_home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
 mod_link="$herdr_home/mods/issues"
 keys_file="$herdr_home/keys.json"
 cli_link="$HOME/.local/bin/issues"
+setup_json="$repo_root/scripts/setup-json.js"
 
 colors_stream() {
   [[ -t $1 && -z ${NO_COLOR:-} ]]
@@ -55,7 +56,7 @@ warning() { print_in_color 2 33 "$@"; }
 error() { print_in_color 2 31 "$@"; }
 
 missing=()
-for command in herdr-app claude jq git node; do
+for command in herdr-app claude git node; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
@@ -101,11 +102,11 @@ link_cli() {
 }
 
 marketplace_path() {
-  claude plugin marketplace list --json | jq -r --arg name "$marketplace" '.[] | select(.name == $name) | .path // .installLocation // empty'
+  claude plugin marketplace list --json | node "$setup_json" marketplace-path "$marketplace"
 }
 
 plugin_installed() {
-  claude plugin list --json | jq -e --arg id "$plugin" 'any(.[]; .id == $id)' >/dev/null
+  claude plugin list --json | node "$setup_json" plugin-installed "$plugin"
 }
 
 install_plugin() {
@@ -137,38 +138,26 @@ merge_keys() {
     return
   fi
 
-  local skipped merged
-  skipped=$(jq -r --slurpfile mod "$mod_root/keys.json" '
-    . as $mine | $mod[0] | to_entries[] | .key as $section | .value | to_entries[]
-    | select($mine[$section][.key] != null and $mine[$section][.key] != .value)
-    | "setup: kept your \(.key) in \($section) (\($mine[$section][.key] | tojson)); the mod expects \(.value | tojson)"
-  ' "$keys_file")
-  [[ -z $skipped ]] || warning "$skipped"
-
-  merged=$(jq --slurpfile mod "$mod_root/keys.json" '
-    reduce ($mod[0] | to_entries[]) as $section (.;
-      reduce ($section.value | to_entries[]) as $key (.;
-        if .[$section.key][$key.key] == null then .[$section.key][$key.key] = $key.value else . end))
-  ' "$keys_file")
-  if jq -e --argjson merged "$merged" '. == $merged' "$keys_file" >/dev/null; then
-    success "$keys_file already has the mod's keys"
-    return
-  fi
-  # Redirecting into the path writes through a symlinked keys.json instead of replacing the link.
-  printf '%s\n' "$merged" >"$keys_file"
-  success "Added the mod's keys to $keys_file"
+  local kept status=0
+  kept=$(node "$setup_json" merge-keys "$keys_file" "$mod_root/keys.json") || status=$?
+  [[ -z $kept ]] || warning "$kept"
+  case $status in
+    0) success "Added the mod's keys to $keys_file" ;;
+    10) success "$keys_file already has the mod's keys" ;;
+    *) exit "$status" ;;
+  esac
 }
 
 layout_shows_mod() {
-  jq -e 'any(.. | objects; .content.mod? == "issues")' "$1" >/dev/null 2>&1
+  node "$setup_json" shows-mod "$1"
 }
 
 layout_has_panel_body() {
-  jq -e 'any(.. | objects; .id? == "panel-body")' "$1" >/dev/null 2>&1
+  node "$setup_json" has-panel-body "$1"
 }
 
 shipped_layout_names() {
-  jq -r 'keys[] | select(startswith("layout:")) | ltrimstr("layout:")' "$herdr_home/installed.json" 2>/dev/null || true
+  node "$setup_json" shipped-layouts "$herdr_home/installed.json"
 }
 
 print_manual_layout_steps() {
@@ -182,28 +171,8 @@ and the node whose id is panel "size": { "weight": 2 }.
 EOF
 }
 
-# Herdr stores a divider drag between weighted siblings as weights, so the panel keeps its share after one.
-# 5:2 starts the panel near the shipped 368px in a typical window.
-weigh_panel_beside_main() {
-  local layout_file=$1 updated
-  updated=$(jq '
-    (.. | objects | select(any(.children[]?; .id == "main")
-      and any(.children[]?; .id == "panel" and .size.px? != null and any(.. | objects; .id? == "panel-body"))))
-    |= (.children |= map(
-      if .id == "main" then .size = { weight: 5 }
-      elif .id == "panel" then .size = { weight: 2 }
-      else . end))
-  ' "$layout_file")
-  jq -e --argjson updated "$updated" '. == $updated' "$layout_file" >/dev/null && return
-  printf '%s\n' "$updated" >"$layout_file"
-}
-
-# Redirecting into the path writes through a symlinked layout instead of replacing the link.
 add_block_to_panel_body() {
-  local layout_file=$1 updated
-  updated=$(jq --argjson block "$issues_block" '(.. | objects | select(.id? == "panel-body") | .children) += [$block]' "$layout_file")
-  printf '%s\n' "$updated" >"$layout_file"
-  weigh_panel_beside_main "$layout_file"
+  node "$setup_json" add-panel "$1"
 }
 
 # Writes the copy itself instead of running layout.clone, which needs an open window and switches it to the copy.
@@ -221,8 +190,7 @@ copy_main_layout() {
     fi
   done
   version=$(herdr-app --version | awk '{ print $NF }')
-  jq --arg version "$version" '. + { cloned_from: { name: "main", version: $version } }' "$layouts_dir/main.json" >"$layouts_dir/$name.json"
-  add_block_to_panel_body "$layouts_dir/$name.json"
+  node "$setup_json" copy-layout "$layouts_dir/main.json" "$layouts_dir/$name.json" "$version"
   success "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
   info "Switch to it with: herdr-app do layout.switch '{\"name\":\"$name\"}'"
 }
@@ -230,7 +198,6 @@ copy_main_layout() {
 # Adds the Issues panel to a personal layout the person picks; Herdr restores any edited shipped layout at its next start.
 add_panel_to_layout() {
   layouts_dir="$herdr_home/layouts"
-  issues_block='{ "id": "issues", "type": "block", "content": { "mod": "issues" } }'
   if [[ ! -d $layouts_dir ]]; then
     warning "setup: $layouts_dir not found; open Herdr once and run setup again to add the Issues panel"
     return
