@@ -1,19 +1,14 @@
 ---
 name: work
-description: Work an issue from start to finish, whether it lives in Linear or in GitHub Issues. Use when asked to start, work on, pick up, continue or finish an issue, ticket or task, or given an issue ID or Linear URL to work, for example "start <issue URL>", "work on <issue ID>", "pick up <issue ID>" or "continue <issue ID>". Also starts several issues at once, each in its own worktree space, for example "start <ID> and <ID>" or "start the next 3 issues".
-argument-hint: <issue IDs or Linear URLs, or "next <N>">
+description: Work an issue from start to finish, whether it lives in Linear or in GitHub Issues. Use when asked to work on, pick up, continue or finish an issue, ticket or task, or given an issue ID or Linear URL to work, for example "work on <issue ID>", "work on <issue URL>", "pick up <issue ID>" or "continue <issue ID>". To start issues in their own worktree spaces, use /issues:start.
+argument-hint: <issue ID or Linear URL>
 ---
 
 Work the issue named in `$ARGUMENTS` or the conversation until it is done, or until it needs a decision only the person can make.
 
 **The `issues` CLI.** This skill runs `issues`, which `./setup` in the herdr-issues-mod repository installs. When `command -v issues` fails, tell the person to run `./setup` from that repository, and stop.
 
-**Starting an issue from outside its worktree.** When the Herdr app is installed (`command -v herdr-app`) and the session isn't already in a linked worktree on the issue's branch, your first action is one shell command from the repository: `issues worktree <issue ID> --claude "/issues:work <issue ID>"`. Don't load the tracker's tools or read the issue first. It reads the issue from the repository's tracker, takes the branch its work continues on, refuses an issue an unfinished issue blocks, and opens the branch's worktree in a Herdr space named after the issue, where the next session works it. Then stop and say the issue continues in that space; if it refused or failed, such as when the main checkout has the branch checked out, say why and stop.
-
-**Starting several issues.** When asked to start more than one issue, named or as "the next N", fan them out instead of working them here. This needs the Herdr app (`command -v herdr-app`); without it, say so and work only the first.
-- For "the next N", pick the N highest-ranked actionable issues: ready to start, nothing blocking them, and not waiting on a decision or content only the person can provide. **GitHub**: open issues labeled `todo` with no assignee and no linked pull request, oldest first. **Linear**: the person's issues (`list_issues` with assignee `me`) in the team's unstarted state, by priority. When the context says which issues the Herdr issues panel lists, such as a project or one of its milestones, pick from that scope instead: its unstarted issues assigned to the person or to no one, by priority. If fewer than N qualify, start those and say so.
-- Run `issues worktree <issue ID> --claude "/issues:work <issue ID>"` for each, one at a time; it refuses any an unfinished issue blocks. Don't mark the issues in progress or do any of their work here; each space's session does that.
-- Then stop: list each issue with its branch, and any that were refused or failed, with the reason.
+**Outside the issue's worktree.** When the Herdr app is installed (`command -v herdr-app`) and the session isn't already in a linked worktree on the issue's branch, don't work the issue here: invoke `/issues:start <issue ID>` with the Skill tool as your first action, without loading the tracker's tools or reading the issue first, and stop once it reports. It opens the issue's worktree in its own Herdr space, where the next session works it.
 
 **Gather context in one batch.** When the session starts in a linked worktree (its folder isn't the first path `git worktree list` prints), the Herdr panel or `issues worktree` already put it on the issue's branch. Then make every read steps 1 to 4 need in your first response, as parallel tool calls, rather than one turn at a time:
 - the issue: `get_issue` and `list_comments` (Linear), or `gh issue view` (GitHub);
@@ -28,7 +23,7 @@ Then summarize as step 4 says. Read the full diff, review comments or the code o
    - **`github`**: the issue's ID is `#<number>`. Read it with `gh issue view <number> --repo <repo> --json number,title,body,state,stateReason,assignees,labels,url,closedByPullRequestsReferences,comments`.
    - If no issue matches, stop and say so.
 2. **Check it can start.** Read every blocker. If one is unfinished, or the issue waits on content or a decision only the person can provide, stop and ask.
-3. **Get on the issue's branch.** In a linked worktree the session started in, that is the current branch, and the batch above already read its pull request. Elsewhere, the section above opened the issue's worktree when the Herdr app is installed.
+3. **Get on the issue's branch.** In a linked worktree the session started in, that is the current branch, and the batch above already read its pull request. Elsewhere, `/issues:start` opened the issue's worktree when the Herdr app is installed.
    - Without the Herdr app, continue in the current folder on the `branch` that `issues branch <issue ID> --json` prints, which refuses an issue an unfinished issue blocks, and read its pull request as the batch above does once on it. First check whether the branch already exists, locally (`git rev-parse --verify --quiet <branch>`) or on origin (`git fetch origin <branch>`). An existing branch holds earlier work, so always continue on it; never create a second branch from main.
    - If it exists: check it out (`git switch <branch>`, which tracks origin's copy when there is no local one). In a worktree on a temporary `worktree-<name>` branch with nothing uncommitted or committed on it, switch to the existing branch and delete the temporary one (`git branch -D worktree-<name>`). If the temporary branch has its own changes or commits, or the existing branch is checked out in another worktree, stop and ask.
    - If it doesn't exist: run `git fetch origin main` and create the branch from `origin/main` (`git switch -c <branch> origin/main`); on a temporary `worktree-<name>` branch, rename it to that branch before committing.

@@ -139,7 +139,8 @@ Run these in a Claude Code session in the repository, for example `/issues:work 
 | `/issues:create` | Write issues for work that is already settled, as self-contained hand-offs. |
 | `/issues:plan` | Turn a prompt, a brief or a full spec into a series of issues by interviewing you. |
 | `/issues:triage` | Triage issues, the backlog or Linear's triage queue, making each one small and actionable enough to hand to an agent. |
-| `/issues:work` | Work an issue from start to finish, or start several at once, each in its own worktree space. |
+| `/issues:start` | Start one or more issues, or the next few, each in its own worktree space with a Claude session working it. |
+| `/issues:work` | Work an issue from start to finish in the current session. |
 | `/issues:delegate` | Hand a Linear issue to Cloud Agent. |
 
 ## Contributing

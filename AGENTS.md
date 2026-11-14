@@ -52,7 +52,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 `.claude-plugin/marketplace.json` makes the repository the `herdr-issues` plugin marketplace, and `claude-plugin/` is its one plugin, `issues`.
 
 - `claude-plugin/.claude-plugin/plugin.json`: the plugin's manifest and `version`.
-- `claude-plugin/skills/<name>/SKILL.md`: the `issues:config`, `issues:create`, `issues:plan`, `issues:triage`, `issues:work` and `issues:delegate` skills.
+- `claude-plugin/skills/<name>/SKILL.md`: the `issues:config`, `issues:create`, `issues:plan`, `issues:triage`, `issues:start`, `issues:work` and `issues:delegate` skills. `skills/start/start.sh` runs `issues worktree` for each issue `issues:start` names, as the skill loads.
 - `claude-plugin/hooks/hooks.json` registers the hooks:
   - `herdr-terminal-env.sh` (SessionStart) exports `HC_TERMINAL_ID` into the Bash tool's environment, so `issues:work` can rename the session's Herdr tab after the issue.
   - `herdr-issues-scope.sh` (UserPromptSubmit) tells a session in a Herdr terminal which issues the panel lists and which issue it has open.
