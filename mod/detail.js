@@ -107,7 +107,6 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
     .child(pullRequestLine(id, pullRequest, onLink, t))));
 }
 
-// Sized and styled as the list header's refresh button, so the header bars' icon buttons match.
 export function collapseButton(onCollapse, t) {
   return div().id("issues-collapse").flex_none().size(24).flex().items_center().justify_center().rounded(6)
     .border_1().border_color(t.border).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))

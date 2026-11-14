@@ -23,7 +23,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
 - `collapse.js`: collapsing the panel to a thin strip and expanding it again, by resizing the layout node that holds it.
 - `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`.
-- `icons/`: the panel's icons, drawn by their path in Herdr's mods folder, such as `mods/issues/icons/rotate-cw.svg`.
+- `icons/`: the panel's icons, drawn by their path in Herdr's mods folder, such as `mods/issues/icons/issues.svg`.
 
 Herdr generates `gpui-kit.d.ts` and `jsconfig.json` in the mod folder; they are git-ignored.
 
