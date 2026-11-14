@@ -345,7 +345,7 @@ export default class Issues extends View {
 
   // Opens a text file in the user's editor, and hands a URL or any other file to macOS `open`.
   openLink(issue, url, cx) {
-    const { file, url: address } = linkTarget(url, `${this.project.root}/`);
+    const { file, url: address } = linkTarget(url, this.project.root);
     if (file && this.project?.on) { this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
