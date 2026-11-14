@@ -15,7 +15,7 @@ import { trackerFor } from "./trackers/index.js";
 import { settingsPath } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
@@ -25,7 +25,7 @@ import { isTextFile, openInEditor } from "./editor.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, fetchList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
-import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
+import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { panelVisible } from "./visibility.js";
@@ -570,11 +570,13 @@ export default class Issues extends View {
     return this.expanded[group.id] ?? !group.collapsed;
   }
 
-  // Room for SLA and priority under the ID when the tracker shows them; otherwise just the longest listed ID.
+  // Room for SLA and priority under the ID when the tracker shows them, otherwise for the longest listed
+  // ID, and in either case for the longest due date.
   idColumnWidth(groups) {
-    if (this.prioritized()) return ID_COLUMN_PX;
-    const longestId = groups.reduce((longest, group) => group.issues.reduce((most, issue) => Math.max(most, issue.id.length), longest), 0);
-    return longestId * ID_CHARACTER_PX;
+    const listed = groups.flatMap((group) => group.issues);
+    const widest = (texts) => Math.max(0, ...texts.map((text) => text.length)) * ID_CHARACTER_PX;
+    const dueWidth = widest(listed.map((issue) => dueStatus(issue)?.text ?? ""));
+    return Math.max(this.prioritized() ? ID_COLUMN_PX : widest(listed.map((issue) => issue.id)), dueWidth);
   }
 
   prioritized() {
@@ -583,7 +585,7 @@ export default class Issues extends View {
 
   row(issue, idColumnWidth, t) {
     const blockers = holdingBlockers(issue, this.issues);
-    const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
+    const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), due = dueStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
     const inSpace = Boolean(worktreeSpace(this.repository, issue.branch));
     return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
@@ -593,6 +595,7 @@ export default class Issues extends View {
         .child(v_flex().flex_none().min_w(idColumnWidth).when(this.prioritized(), (e) => e.w(idColumnWidth)).pt(1).gap(3).text_size(11)
           .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
+          .when(Boolean(due), (e) => e.child(div().whitespace_nowrap().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
           .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
             .child(svg(`mods/issues/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))))
         .child(v_flex().flex_1().min_w(0).gap(3)

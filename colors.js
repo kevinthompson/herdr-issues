@@ -22,5 +22,8 @@ export const STATUS_COLORS = {
   done: "#5e6ad2",
   canceled: "#95a2b3",
 };
+// A due date's theme color by its urgency (dueStatus in issue.js), matching the SLA's colors in the list.
+export const DUE_COLORS = { overdue: "ansi1", soon: "working", later: "dim" };
+
 // `alpha` is two hex digits of opacity.
 export const tinted = (color, alpha = "30") => `${color}${alpha}`;

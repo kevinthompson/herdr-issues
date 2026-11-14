@@ -24,6 +24,7 @@
 //          can say), labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
+//          due (a YYYY-MM-DD date, or null: Linear's due date, or the due date of a GitHub issue's milestone),
 //          pullRequests ([{ url, title, repo, number, status, branch }] attached to Linear issues),
 //          delegateId (the agent working it, or null, for Linear issues), delegate (its name, or null),
 //          delegateAvatar (an image URL, or null, for Linear issues) }

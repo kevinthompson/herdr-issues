@@ -123,3 +123,18 @@ export function slaStatus(issue, now = Date.now()) {
   const risk = highRiskAt && now >= Date.parse(highRiskAt) ? "high" : mediumRiskAt && now >= Date.parse(mediumRiskAt) ? "medium" : "low";
   return { text: `SLA ${duration(left)}`, risk };
 }
+
+// When an unfinished issue is due: { text, urgency }, where urgency is "overdue" before today, "soon"
+// from today through DUE_SOON_DAYS later, and "later" after that. Days are local. null without a due
+// date or once the issue is finished.
+const DUE_SOON_DAYS = 3;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function dueStatus(issue, now = new Date()) {
+  if (!issue.due || FINISHED.includes(issue.status)) return null;
+  const [year, month, day] = issue.due.split("-").map(Number);
+  const daysLeft = Math.round((new Date(year, month - 1, day) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / DAY_MS);
+  const urgency = daysLeft < 0 ? "overdue" : daysLeft <= DUE_SOON_DAYS ? "soon" : "later";
+  const date = `${MONTHS[month - 1]} ${day}${year === now.getFullYear() ? "" : `, ${year}`}`;
+  return { text: `Due ${date}`, urgency };
+}

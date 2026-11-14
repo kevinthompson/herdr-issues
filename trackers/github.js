@@ -17,7 +17,7 @@ const RECENTLY_CLOSED = 20;
 const BLOCKERS = 20;
 const BRANCH_SLUG_LENGTH = 50;
 
-const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateReason
+const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateReason milestone { dueOn }
   labels(first: 20) { nodes { name color } }
   assignees(first: 10) { nodes { login name avatarUrl } }
   blockedBy(first: ${BLOCKERS}) { nodes { number state repository { nameWithOwner } } }
@@ -91,6 +91,7 @@ function toIssue(node, repo) {
     assignee: assignee ? assignee.name || assignee.login : "Unassigned",
     assigneeAvatar: assignee?.avatarUrl ?? null,
     assigneeLogins: node.assignees.nodes.map((each) => each.login),
+    due: node.milestone?.dueOn?.slice(0, 10) ?? null,
     created: node.createdAt,
     completed: node.state === "CLOSED" ? node.closedAt : null,
     body: node.body === undefined ? null : (node.body ?? "").trim(),
