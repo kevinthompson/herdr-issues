@@ -5,6 +5,7 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { run, props, closeOverlay, theme, spaces, panes, exec, home } from "herdr";
+import { mergeSettings } from "./trackers/setting.js";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s, all = panes()) {
@@ -69,14 +70,28 @@ async function isMergedInto(repo, base, on) {
   return mergedTree.ok && baseTree.ok && mergedTree.out.split("\n")[0] === baseTree.out;
 }
 
-// What removing a checkout would leave unsaved on its branch: { branch, bases, mergedInto, unpushed },
+// The URL of the branch's open or draft pull request when the repository counts a pushed branch with one as
+// complete, else null: also when the settings can't be read or gh can't answer, so the dialog asks for main.
+async function completingPullRequest(repo, branch, on) {
+  const { complete } = await mergeSettings({ root: repo.main, on }).catch(() => ({ complete: "merged" }));
+  if (complete !== "pull-request-open") return null;
+  const view = await exec("gh", ["pr", "view", branch, "--json", "state,url"], { cwd: repo.top, on }).catch(() => null);
+  if (view?.code !== 0) return null;
+  try {
+    const pullRequest = JSON.parse(view.stdout);
+    return pullRequest.state === "OPEN" ? pullRequest.url : null;
+  } catch { return null; }
+}
+
+// What removing a checkout would leave unsaved on its branch: { branch, bases, mergedInto, unpushed, pullRequest },
 // or null on a detached HEAD. The work is kept once it's merged into either the local default branch
 // (repos merged locally) or origin's, fetched just now (repos merged through pull requests):
 // `bases` lists those that exist, and `mergedInto` is the first one holding the branch, else null.
-// Unpushed counts commits on no origin branch, null without origin.
+// Unpushed counts commits on no origin branch, null without origin. pullRequest is completingPullRequest's.
 async function branchState(repo, on) {
   const branch = (await git(repo.top, ["branch", "--show-current"], on)).out;
   if (!branch) return null;
+  const pullRequestLookup = completingPullRequest(repo, branch, on);
   const hasOrigin = (await git(repo.top, ["remote", "get-url", "origin"], on)).ok;
   let remoteBase = null;
   if (hasOrigin) {
@@ -91,7 +106,7 @@ async function branchState(repo, on) {
   const merged = await Promise.all(bases.map((base) => isMergedInto(repo, base, on)));
   const mergedInto = bases.find((_base, index) => merged[index]) ?? null;
   const unpushed = hasOrigin ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0 : null;
-  return { branch, bases, mergedInto, unpushed };
+  return { branch, bases, mergedInto, unpushed, pullRequest: await pullRequestLookup };
 }
 
 // The submodule repos git keeps for a checkout (nested ones too, checked out
@@ -390,7 +405,8 @@ export class WorktreeDialog {
     if (b === undefined) return div().text_color(t.dim).child("Checking the branch against main…");
     if (b === null) return div().text_color(t.dim).child("No branch is checked out.");
     const merged = Boolean(b.mergedInto);
-    const safe = merged && !this.dirty && this.unpushed.length === 0;
+    const inReview = !merged && b.unpushed === 0 && Boolean(b.pullRequest);
+    const safe = (merged || inReview) && !this.dirty && this.unpushed.length === 0;
     const pushed = b.unpushed === null ? `${b.branch} has no origin to push to.`
       : b.unpushed === 0 ? `${b.branch} is pushed to origin.`
         : `${b.branch} has ${b.unpushed} ${b.unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.`;
@@ -401,7 +417,8 @@ export class WorktreeDialog {
     const failed = (text) => div().text_color(t.working).child(text);
     return v_flex().gap(4)
       .child(merged ? passed(`${b.branch} has nothing that isn't on ${b.mergedInto}.`)
-        : failed(b.bases.length ? `${b.branch} has changes that aren't on ${b.bases.join(" or ")}.` : `${b.branch} has no main branch to compare with.`))
+        : inReview ? passed(`${b.branch} has an open pull request: ${b.pullRequest}`)
+          : failed(b.bases.length ? `${b.branch} has changes that aren't on ${b.bases.join(" or ")}.` : `${b.branch} has no main branch to compare with.`))
       .when(!merged, (el) => el.child(b.unpushed === 0 ? passed(pushed) : failed(pushed)))
       .when(safe, (el) => el.child(div().font_semibold().text_color(t.foreground).child("Safe to remove.")));
   }
