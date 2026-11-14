@@ -43,7 +43,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 - `cli/main.js`: the commands, each answering for the git repository holding the current folder. `issues tracker [--json]` prints the repository's tracker, as `trackerFor` chooses it. `issues branch <id> [--json]` prints the branch an issue is worked on, from `tracker.get`, and refuses an issue an unfinished issue blocks. `issues space-name <issue ID>` prints the name of the issue's worktree space, as the panel names it. `issues setting <key>` prints one of the repository's settings with its default applied, as `mergeSettings` in `trackers/setting.js` resolves it: `merge` or `complete`. `issues credentials <linear|github>` checks that tracker's credentials are present, as the panel does: a Linear API key in `linear.json`, or `gh` installed and logged in; it prints the problem and its fix from `trackers/problems.js` and exits 1 when they aren't, and never prints the key. `issues tab [--json]` prints the ID, name and space name of the Herdr tab holding `$HC_TERMINAL_ID`, and `issues tab rename <issue ID> <name>` renames it after the issue, as `/issues:work` does. `issues worktree <issue ID>` and `issues worktree --branch <branch> [--new]` take `--name` and `--claude` and open the branch in a worktree and a Herdr space, as the `wt` script did.
 - `cli/tab.js`: `issues tab`'s lookup in `herdr-app ls` and its renaming rules: only a tab named `Claude` or a number is renamed, and the issue ID prefixes the name unless the tab's space is named after the issue. It imports `exec` from `herdr`, so tests stub it with `stubHerdr`.
-- `cli/worktree.js`: `issues worktree`'s checkout and space: it reuses or creates the branch's worktree under `~/.herdr/worktrees/`, fetching origin unless `--new` says the branch can't be there yet, runs the repository's `worktreeSetup` command in a checkout it created, then selects the space showing it or opens one, using `worktree.js`'s `worktreeFor` and `spaceShowing`. It takes the `wt-fetched` marker and `wt-spaces.lock` in the git common dir, which `wt` uses too.
+- `cli/worktree.js`: `issues worktree`'s checkout and space: it reuses or creates the branch's worktree under `~/.herdr/worktrees/`, fetching origin unless the repository has none or `--new` says the branch can't be there yet, runs the repository's `worktreeSetup` command in a checkout it created, then selects the space showing it or opens one, using `worktree.js`'s `worktreeFor` and `spaceShowing`. It takes the `wt-fetched` marker and `wt-spaces.lock` in the git common dir, which `wt` uses too.
 
 ### Tests (`test/`)
 
@@ -64,7 +64,8 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 - `install`: the script the README's one-line install command runs, after cloning the repository into `~/.local/share/herdr-issues-mod` when it isn't there. It fast-forwards its checkout to `origin/main` and runs `setup`, changing nothing when the checkout has local changes, isn't on `main` or can't fast-forward, and asking before it repoints a mod link to another checkout (refusing when standard input isn't a terminal). Its body is one function, so a fast-forward that rewrites it doesn't change the script while it runs.
 - `setup`: installs the mod and the plugin (see below).
-- `scripts/setup-json.js`: the JSON reading and editing `setup` does, so installing needs `node` and not `jq`.
+- `scripts/setup-json.js`: the JSON reading and editing `setup` and `scripts/demo-setup` do, so they need `node` and not `jq`.
+- `scripts/demo-setup`: builds the `blog` and `recipe-app` demo projects under `$DEMO_ROOT` (default `~/Demo`) for recording the panel. Each is a git repository with a committed `.claude/settings.json` whose status line prints nothing, its issues in a local Beads database, an entry of `{ "tracker": "beads", "merge": "auto" }` in `issues.json`, a Herdr space, and a nested worktree space for each issue in progress, opened with this checkout's `bin/issues worktree`; one of those branches is already merged into main, so its row shows as ready to close. Running it again tears the projects down and rebuilds them, and `--teardown` only tears them down: it closes their spaces, removes their worktrees, repositories and `issues.json` entries, and refuses to delete a project folder without the `.herdr-demo` marker it writes.
 - `.claude/settings.json` registers `.claude/hooks/reload-mod.sh`, which makes Herdr reload the mod after Claude edits one of its files in the checkout Herdr loads.
 
 ## Installing for development
@@ -88,8 +89,8 @@ Running it again is safe, and is how plugin changes are installed. A person who 
 
 - `npm test` runs the tests.
 - `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree's mod folder: `herdr-app check "$PWD/mod"`.
-- `bash -n install setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
-- `shellcheck install setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
+- `bash -n install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
+- `shellcheck install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
 
 ## Verifying a UI change
 

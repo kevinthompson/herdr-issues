@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// The JSON reading and editing `setup` does, so installing needs only node and not jq.
+// The JSON reading and editing `setup` and `scripts/demo-setup` do, so they need only node and not jq.
 //
 //   marketplace-path <name>           prints the path of the named marketplace in `claude plugin marketplace list --json` on stdin
 //   plugin-installed <id>             succeeds when `claude plugin list --json` on stdin lists the plugin
@@ -10,10 +10,18 @@
 //   shipped-layouts <installed.json>  prints the name of each layout Herdr ships
 //   add-panel <layout>                adds the issues block to panel-body and weighs the panel beside main
 //   copy-layout <from> <to> <version> copies a layout, records what it was cloned from, and adds the issues block
+//   set-repo <issues.json> <main checkout> <entry>
+//                                     replaces the repository's entry in issues.json with the entry's JSON, under
+//                                     its ~ path as trackers/setting.js writes it
+//   remove-repos <issues.json> <main checkout>...
+//                                     removes the repositories' entries from issues.json
+//   spaces-in <folder>...             prints the ID of each space in `herdr-app ls` on stdin showing a folder or
+//                                     one inside it
 //
 // Files are written through a symlink in place of replacing the link.
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 
 const keysAddedExitCode = 0;
 const keysUnchangedExitCode = 10;
@@ -95,6 +103,17 @@ function shippedLayoutNames(installedPath) {
     .map((key) => key.slice("layout:".length));
 }
 
+const expandHome = (path) => (path.startsWith("~/") ? `${homedir()}${path.slice(1)}` : path);
+const abbreviateHome = (path) => (path.startsWith(`${homedir()}/`) ? `~${path.slice(homedir().length)}` : path);
+
+// issues.json without the repositories' entries, under either spelling of their paths.
+function withoutRepos(settings, mainCheckouts) {
+  const repos = Object.entries(settings.repos ?? {}).filter(([path]) => !mainCheckouts.includes(expandHome(path)));
+  return { ...settings, repos: Object.fromEntries(repos) };
+}
+
+const isInside = (path, folder) => path === folder || path?.startsWith(`${folder}/`);
+
 const commands = {
   "marketplace-path": (name) => {
     const marketplace = readStdinJson().find((entry) => entry.name === name);
@@ -120,6 +139,18 @@ const commands = {
   "copy-layout": (fromPath, toPath, version) => {
     const copy = { ...readJson(fromPath), cloned_from: { name: "main", version } };
     writeJson(toPath, addPanel(copy));
+  },
+  "set-repo": (settingsPath, mainCheckout, entry) => {
+    const settings = withoutRepos(existsSync(settingsPath) ? readJson(settingsPath) : {}, [mainCheckout]);
+    settings.repos[abbreviateHome(mainCheckout)] = JSON.parse(entry);
+    writeJson(settingsPath, settings);
+  },
+  "remove-repos": (settingsPath, ...mainCheckouts) => {
+    if (existsSync(settingsPath)) writeJson(settingsPath, withoutRepos(readJson(settingsPath), mainCheckouts));
+  },
+  "spaces-in": (...folders) => {
+    const ids = readStdinJson().spaces.filter((space) => folders.some((folder) => isInside(space.folder, folder))).map((space) => space.id);
+    if (ids.length) console.log(ids.join("\n"));
   },
 };
 
