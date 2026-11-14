@@ -23,5 +23,7 @@ export const linearKeyUnreadable = () => new SetupProblem("~/.config/herdr-app/l
 export const linearKeyInvalid = () => new SetupProblem("Linear refused the API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);
 export const badSetting = (message) => new SetupProblem(message,
   "Fix the repository's entry in `~/.config/herdr-app/issues.json`, or choose a different tracker to replace it.");
+export const badMergeSetting = (message) => new SetupProblem(message,
+  "Fix the repository's `merge` and `complete` in `~/.config/herdr-app/issues.json`, then check again. Choosing a tracker keeps them.");
 export const settingsUnreadable = (message) => new SetupProblem(message,
   "Fix `~/.config/herdr-app/issues.json` so it's valid JSON, then check again.");

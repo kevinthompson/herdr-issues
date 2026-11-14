@@ -16,7 +16,7 @@
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { githubRepository } from "./github.js";
-import { badSetting, settingsUnreadable } from "./problems.js";
+import { badMergeSetting, badSetting, settingsUnreadable } from "./problems.js";
 
 export const settingsPath = () => `${appHome()}/issues.json`;
 const TRACKERS = ["linear", "github"];
@@ -41,10 +41,10 @@ export async function trackerSetting({ root, on }) {
   if (!TRACKERS.includes(setting.tracker)) throw badSetting(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
   if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
   if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
-  if (setting.merge != null && !MERGES.includes(setting.merge)) throw badSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
-  if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
+  if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
+  if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
   if (setting.complete === "pull-request-open" && setting.merge && setting.merge !== "pull-request") {
-    throw badSetting(`issues.json's ${key} merges with ${setting.merge}, so its complete can only be merged`);
+    throw badMergeSetting(`issues.json's ${key} merges with ${setting.merge}, so its complete can only be merged`);
   }
   return setting;
 }
