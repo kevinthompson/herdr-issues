@@ -24,15 +24,22 @@ mod_link="$herdr_home/mods/issues"
 keys_file="$herdr_home/keys.json"
 cli_link="$HOME/.local/bin/issues"
 
+success() { printf '%s\n' "$*"; }
+info() { printf '%s\n' "$*"; }
+note() { printf '%s\n' "$*"; }
+prompt() { printf '%s\n' "$*"; }
+warning() { printf '%s\n' "$*" >&2; }
+error() { printf '%s\n' "$*" >&2; }
+
 missing=()
 for command in herdr-app claude jq git node; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
-  echo "setup: missing required commands: ${missing[*]}" >&2
+  error "setup: missing required commands: ${missing[*]}"
   exit 1
 fi
-command -v gh >/dev/null || echo "setup: warning: gh is not installed; repositories tracked in GitHub Issues need it" >&2
+command -v gh >/dev/null || warning "setup: warning: gh is not installed; repositories tracked in GitHub Issues need it"
 
 refuse_linked_worktree() {
   local git_dir common_dir main_checkout
@@ -40,33 +47,33 @@ refuse_linked_worktree() {
   common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)
   [[ $git_dir == "$common_dir" ]] && return
   main_checkout=$(git -C "$repo_root" worktree list --porcelain | sed -n '1s/^worktree //p')
-  echo "setup: $repo_root is a linked worktree; installing from it would point the mod, the issues CLI and the plugin at a folder that goes away when the worktree closes" >&2
-  echo "setup: run ./setup from the main checkout instead: cd $main_checkout && ./setup" >&2
+  error "setup: $repo_root is a linked worktree; installing from it would point the mod, the issues CLI and the plugin at a folder that goes away when the worktree closes"
+  error "setup: run ./setup from the main checkout instead: cd $main_checkout && ./setup"
   exit 1
 }
 refuse_linked_worktree
 
 link_mod() {
   if [[ -e $mod_link && ! -L $mod_link ]]; then
-    echo "setup: $mod_link exists and is not a symlink; move it aside and run setup again" >&2
+    error "setup: $mod_link exists and is not a symlink; move it aside and run setup again"
     exit 1
   fi
   mkdir -p "$(dirname "$mod_link")"
   ln -sfn "$mod_root" "$mod_link"
-  echo "Linked $mod_link -> $mod_root"
+  success "Linked $mod_link -> $mod_root"
 }
 
 link_cli() {
   if [[ -e $cli_link && ! -L $cli_link ]]; then
-    echo "setup: $cli_link exists and is not a symlink; move it aside and run setup again" >&2
+    error "setup: $cli_link exists and is not a symlink; move it aside and run setup again"
     exit 1
   fi
   mkdir -p "$(dirname "$cli_link")"
   ln -sfn "$repo_root/bin/issues" "$cli_link"
-  echo "Linked $cli_link -> $repo_root/bin/issues"
+  success "Linked $cli_link -> $repo_root/bin/issues"
   case ":$PATH:" in
     *":$(dirname "$cli_link"):"*) ;;
-    *) echo "setup: warning: $(dirname "$cli_link") is not on PATH; add it to run the issues command" >&2 ;;
+    *) warning "setup: warning: $(dirname "$cli_link") is not on PATH; add it to run the issues command" ;;
   esac
 }
 
@@ -82,7 +89,7 @@ install_plugin() {
   local registered_path
   registered_path=$(marketplace_path)
   if [[ -n $registered_path && $registered_path != "$repo_root" ]]; then
-    echo "The $marketplace marketplace points to $registered_path; pointing it to $repo_root"
+    info "The $marketplace marketplace points to $registered_path; pointing it to $repo_root"
     claude plugin marketplace remove "$marketplace"
     registered_path=""
   fi
@@ -103,7 +110,7 @@ install_plugin() {
 # Adds each of the mod's keys the person hasn't bound; a key they bound to another action stays theirs.
 merge_keys() {
   if [[ ! -f $keys_file ]]; then
-    echo "setup: $keys_file not found; open Herdr once and run setup again to add the mod's keys" >&2
+    warning "setup: $keys_file not found; open Herdr once and run setup again to add the mod's keys"
     return
   fi
 
@@ -113,7 +120,7 @@ merge_keys() {
     | select($mine[$section][.key] != null and $mine[$section][.key] != .value)
     | "setup: kept your \(.key) in \($section) (\($mine[$section][.key] | tojson)); the mod expects \(.value | tojson)"
   ' "$keys_file")
-  [[ -z $skipped ]] || echo "$skipped" >&2
+  [[ -z $skipped ]] || warning "$skipped"
 
   merged=$(jq --slurpfile mod "$mod_root/keys.json" '
     reduce ($mod[0] | to_entries[]) as $section (.;
@@ -121,12 +128,12 @@ merge_keys() {
         if .[$section.key][$key.key] == null then .[$section.key][$key.key] = $key.value else . end))
   ' "$keys_file")
   if jq -e --argjson merged "$merged" '. == $merged' "$keys_file" >/dev/null; then
-    echo "$keys_file already has the mod's keys"
+    success "$keys_file already has the mod's keys"
     return
   fi
   # Redirecting into the path writes through a symlinked keys.json instead of replacing the link.
   printf '%s\n' "$merged" >"$keys_file"
-  echo "Added the mod's keys to $keys_file"
+  success "Added the mod's keys to $keys_file"
 }
 
 layout_shows_mod() {
@@ -142,7 +149,8 @@ shipped_layout_names() {
 }
 
 print_manual_layout_steps() {
-  cat <<EOF
+  note "$(
+    cat <<EOF
 To show the Issues panel, make a personal copy of a layout and add the mod to its side panel:
   herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
 Then add this block to the children of the node whose id is panel-body in $layouts_dir/main-issues.json:
@@ -150,6 +158,7 @@ Then add this block to the children of the node whose id is panel-body in $layou
 To keep the panel's share of the window as it resizes, give the node whose id is main "size": { "weight": 5 }
 and the node whose id is panel "size": { "weight": 2 }.
 EOF
+  )"
 }
 
 # Herdr stores a divider drag between weighted siblings as weights, so the panel keeps its share after one.
@@ -183,9 +192,9 @@ copy_main_layout() {
     read -r -p "Name for the new layout [main-issues]: " name || return 1
     name=${name:-main-issues}
     if [[ ! $name =~ ^[A-Za-z0-9._-]+$ ]]; then
-      echo "Use only letters, numbers, dots, dashes and underscores."
+      prompt "Use only letters, numbers, dots, dashes and underscores."
     elif [[ -e $layouts_dir/$name.json ]]; then
-      echo "$layouts_dir/$name.json already exists; choose another name."
+      prompt "$layouts_dir/$name.json already exists; choose another name."
     else
       break
     fi
@@ -193,8 +202,8 @@ copy_main_layout() {
   version=$(herdr-app --version | awk '{ print $NF }')
   jq --arg version "$version" '. + { cloned_from: { name: "main", version: $version } }' "$layouts_dir/main.json" >"$layouts_dir/$name.json"
   add_block_to_panel_body "$layouts_dir/$name.json"
-  echo "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
-  echo "Switch to it with: herdr-app do layout.switch '{\"name\":\"$name\"}'"
+  success "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
+  info "Switch to it with: herdr-app do layout.switch '{\"name\":\"$name\"}'"
 }
 
 # Adds the Issues panel to a personal layout the person picks; Herdr restores any edited shipped layout at its next start.
@@ -202,7 +211,7 @@ add_panel_to_layout() {
   layouts_dir="$herdr_home/layouts"
   issues_block='{ "id": "issues", "type": "block", "content": { "mod": "issues" } }'
   if [[ ! -d $layouts_dir ]]; then
-    echo "setup: $layouts_dir not found; open Herdr once and run setup again to add the Issues panel" >&2
+    warning "setup: $layouts_dir not found; open Herdr once and run setup again to add the Issues panel"
     return
   fi
 
@@ -219,7 +228,7 @@ add_panel_to_layout() {
   done
 
   if ((${#showing[@]})); then
-    echo "The Issues panel is already in the ${showing[*]} layout"
+    success "The Issues panel is already in the ${showing[*]} layout"
     return
   fi
 
@@ -234,7 +243,7 @@ add_panel_to_layout() {
   choices+=("$skip_choice")
 
   echo
-  echo "Which layout should show the Issues panel?"
+  prompt "Which layout should show the Issues panel?"
   PS3="Choose a number: "
   select choice in "${choices[@]}"; do
     [[ -n $choice ]] && break
@@ -248,7 +257,7 @@ add_panel_to_layout() {
       ;;
     *)
       add_block_to_panel_body "$layouts_dir/$choice.json"
-      echo "Added the Issues panel to the $choice layout"
+      success "Added the Issues panel to the $choice layout"
       ;;
   esac
 }
@@ -259,9 +268,11 @@ merge_keys
 install_plugin
 add_panel_to_layout
 
-cat <<EOF
-
+echo
+note "$(
+  cat <<EOF
 Done. Start a new Claude Code session to load the plugin.
 If you installed by hand before, remove the old links so skills and the scope hook don't load twice:
   ~/.claude/skills/issues, ~/.claude/hooks/herdr-issues-scope.sh and its UserPromptSubmit entry in ~/.claude/settings.json
 EOF
+)"
