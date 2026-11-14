@@ -4,9 +4,9 @@ This repository holds two things that ship together: the Herdr app's issues pane
 
 ## Layout
 
-### The Herdr mod (repository root)
+### The Herdr mod (`mod/`)
 
-Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `main.js` is its entry point: the panel listing the issues of the project in the focused pane. Each module opens with a comment saying what it does; read that before changing it.
+Herdr loads `mod/` as the `issues` mod, and every path in this section is inside it. `mod.json` declares it, and `main.js` is its entry point: the panel listing the issues of the project in the focused pane. Each module opens with a comment saying what it does; read that before changing it.
 
 - `main.js`: the panel, its list, polling and refreshes.
 - `detail.js`: one issue drawn in place of the list, with its body and the editor.
@@ -22,11 +22,11 @@ Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `ma
 - `links.js`, `editor.js`, `neovim.js`: links in issue bodies and opening files in the person's editor.
 - `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
 - `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`.
-- The `*.svg` files at the root are the panel's icons.
+- `icons/`: the panel's icons, drawn by their path in Herdr's mods folder, such as `mods/issues/icons/rotate-cw.svg`.
 
 Herdr generates `gpui-kit.d.ts` and `jsconfig.json` in the mod folder; they are git-ignored.
 
-### Trackers (`trackers/`)
+### Trackers (`mod/trackers/`)
 
 A tracker is where a repository's issues live. Every backend returns the same shapes, documented at the top of `trackers/index.js`, so the panel never knows which one it shows.
 
@@ -38,7 +38,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 ### The issues CLI (`bin/issues`, `cli/`)
 
-`bin/issues` is a Node script that runs the panel's own modules outside the app, so scripts and skills share one copy of each rule. Those modules import from `herdr`, which exists only inside the app, so it registers a module resolve hook that points `herdr` at `cli/herdr.js`: a shim exporting every name the modules import, following the app's contract in `gpui-kit.d.ts`, for this computer only. The modules load unchanged; a module the CLI loads that imports a new name from `herdr` needs the shim to export it too. The app's `spaces` and `panes` are live and synchronous, so the shim's are empty until the CLI calls its `readLayout`, which reads them from `herdr-app ls` and `hc ls --json`.
+`bin/issues` is a Node script that runs the panel's own modules in `mod/` outside the app, so scripts and skills share one copy of each rule. Those modules import from `herdr`, which exists only inside the app, so it registers a module resolve hook that points `herdr` at `cli/herdr.js`: a shim exporting every name the modules import, following the app's contract in `gpui-kit.d.ts`, for this computer only. The modules load unchanged; a module the CLI loads that imports a new name from `herdr` needs the shim to export it too. The app's `spaces` and `panes` are live and synchronous, so the shim's are empty until the CLI calls its `readLayout`, which reads them from `herdr-app ls` and `hc ls --json`.
 
 - `cli/main.js`: the commands, each answering for the git repository holding the current folder. `issues tracker [--json]` prints the repository's tracker, as `trackerFor` chooses it. `issues branch <id> [--json]` prints the branch an issue is worked on, from `tracker.get`, and refuses an issue an unfinished issue blocks. `issues space-name <issue ID>` prints the name of the issue's worktree space, as the panel names it. `issues setting <key>` prints one of the repository's settings with its default applied, as `mergeSettings` in `trackers/setting.js` resolves it: `merge` or `complete`. `issues worktree <issue ID>` and `issues worktree --branch <branch> [--new]` take `--name` and `--claude` and open the branch in a worktree and a Herdr space, as the `wt` script did.
 - `cli/worktree.js`: `issues worktree`'s checkout and space: it reuses or creates the branch's worktree under `~/.herdr/worktrees/`, fetching origin as `--new` allows, runs the repository's `worktreeSetup` command in a checkout it created, then selects the space showing it or opens one, using `worktree.js`'s `worktreeFor` and `spaceShowing`. It takes the `wt-fetched` marker and `wt-spaces.lock` in the git common dir, which `wt` uses too.
@@ -67,9 +67,9 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `jq`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
 
-- links the checkout to `~/.config/herdr-app/mods/issues`;
+- links the checkout's `mod/` folder to `~/.config/herdr-app/mods/issues`, repointing a link an older install made to the checkout itself;
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;
-- merges `keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else;
+- merges `mod/keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else;
 - adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`;
 - offers to add the Issues panel to the side panel (`panel-body`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal.
 
@@ -77,13 +77,13 @@ Running it again is safe, and is how plugin changes are installed.
 
 ## How changes reach the running app and Claude Code
 
-- **The mod** runs from the main checkout through the link, so edits there take effect in the running app. Herdr watches its mods folder, but macOS reports a save under the folder a link points to, so `.claude/hooks/reload-mod.sh` touches the link after each Claude edit. Edits in a worktree don't reach the running app until they're merged into main.
+- **The mod** runs from the main checkout's `mod/` folder through the link, so edits there take effect in the running app. Herdr watches its mods folder, but macOS reports a save under the folder a link points to, so `.claude/hooks/reload-mod.sh` touches the link after each Claude edit. Edits in a worktree don't reach the running app until they're merged into main.
 - **The plugin** is installed into Claude Code's plugin cache, so edits to `claude-plugin/` reach sessions only after it is updated. Bump `version` in `claude-plugin/.claude-plugin/plugin.json` with any change to the skills or hooks that installed sessions should get (minor for new behavior, patch for fixes), then, once it is on main, run `./setup` and start a new Claude Code session.
 
 ## Checks before committing
 
 - `npm test` runs the tests.
-- `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree itself: `herdr-app check "$PWD"`.
+- `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree's mod folder: `herdr-app check "$PWD/mod"`.
 - `bash -n setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
 - `shellcheck setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
 
