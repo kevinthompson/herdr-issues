@@ -9,7 +9,7 @@
 // can't load, shows the setup view (setup.js) in place of the list.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
@@ -29,7 +29,7 @@ import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
-import { issueSpaceName } from "./space-name.js";
+import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 
@@ -105,6 +105,7 @@ export default class Issues extends View {
     this.rowLimit = ROW_LIMIT; this.shownByContext = new Map();
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
+    this.noticeSpaceSwitch();
     this.refresh(cx, { reuse: true });
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
     cx.spawn(async (cx) => {
@@ -121,7 +122,7 @@ export default class Issues extends View {
     const context = contextKey();
     if (context !== this.context) {
       this.context = context; this.error = null;
-      this.closeIssue(); this.focusHandled = null;
+      this.closeIssue(); this.openingSpaceIssue = null;
       this.restoreShown(context);
     }
     const generation = ++this.generation;
@@ -202,7 +203,7 @@ export default class Issues extends View {
 
   forgetList() {
     this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
-    this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.focusHandled = null;
+    this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.openingSpaceIssue = null;
     this.setup = null;
   }
 
@@ -241,6 +242,7 @@ export default class Issues extends View {
 
   // A panel out of sight skips its polls, and refreshes once when it comes back instead.
   poll(cx) {
+    this.noticeSpaceSwitch();
     if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
   }
 
@@ -314,20 +316,31 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // Opens the issue the tabs bar asked for when its space was shown, once this space's repository is known
-  // and its issues have loaded. An issue the list leaves out, such as a done one, is read on its own.
-  openRequestedIssue(cx) {
-    const request = shared("issues.focus"), space = spaces().find((each) => each.active);
-    if (!request || !this.loaded || this.resolvedContext !== this.context || request.at === this.focusHandled || request.space !== space?.id) return;
-    this.focusHandled = request.at;
-    if (this.hasUnsavedEdits()) return;
-    if (this.hasIssue(request.id)) { this.stopEditing(); this.openId = request.id; return; }
-    const tracker = this.tracker;
-    if (!tracker) return;
+  // Remembers a switch to another space, which polls notice while the panel is hidden, so the panel opens
+  // the issue the space is named after once it's shown there.
+  noticeSpaceSwitch() {
+    const space = spaces().find((each) => each.active);
+    if (space?.id === this.activeSpaceId) return;
+    this.activeSpaceId = space?.id;
+    this.spaceRequest = space?.named ? { space: space.id, name: space.name } : null;
+  }
+
+  // Opens the issue the space just switched to is named after, once the space's issues have loaded. An issue
+  // the list leaves out, such as a done one, is read on its own.
+  openSpaceIssue(cx) {
+    const request = this.spaceRequest, project = this.project, tracker = this.tracker;
+    if (!request || !this.loaded || this.resolvedContext !== this.context || request.space !== this.activeSpaceId) return;
+    this.spaceRequest = null;
+    if (!project || !tracker || this.hasUnsavedEdits()) return;
+    this.openingSpaceIssue = request;
+    const stillWanted = () => this.openingSpaceIssue === request && this.activeSpaceId === request.space && this.tracker === tracker && !this.hasUnsavedEdits();
     cx.spawn(async (cx) => {
-      const issue = await tracker.get(request.id).catch(() => null);
-      if (!issue || this.focusHandled !== request.at || this.tracker !== tracker || this.hasUnsavedEdits()) return;
-      this.stopEditing(); this.openId = issue.id; this.heldIssue = issue;
+      const id = await issueIdOfSpace(project, request.name);
+      if (!id || !stillWanted()) return;
+      const issue = this.hasIssue(id) ? null : await tracker.get(id).catch(() => null);
+      if (!stillWanted() || (!issue && !this.hasIssue(id))) return;
+      this.stopEditing(); this.openId = issue?.id ?? id;
+      if (issue) this.heldIssue = issue;
       cx.notify();
     });
   }
@@ -788,7 +801,8 @@ export default class Issues extends View {
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     else this.refreshOnReturn(cx);
-    this.openRequestedIssue(cx);
+    this.noticeSpaceSwitch();
+    this.openSpaceIssue(cx);
     this.applyFieldEdits(cx);
     this.setup?.takePickedTeam(cx);
     const t = theme(), issue = this.findIssue(this.openId);
