@@ -35,7 +35,7 @@ let publishedOpenIssue;
 
 // Publishes the issue the panel shows, or null when it shows the list. Writes only an issue that changed.
 export async function publishOpenIssue(root, issue) {
-  const text = JSON.stringify(root && issue ? { root, id: issue.id, title: issue.title, link: issue.url ?? issue.path ?? null } : null);
+  const text = JSON.stringify(root && issue ? { root, id: issue.id, title: issue.title, link: issue.url ?? null } : null);
   if (text === publishedOpenIssue) return;
   publishedOpenIssue = text;
   const path = `${appHome()}/data/issues/open.json`;

@@ -6,9 +6,8 @@ An Issues panel for the Herdr desktop app, and a Claude Code plugin that works t
 
 ## What it is
 
-**The panel** lists the issues of the repository in the focused pane. Issues can live in any of three trackers, and the panel looks the same for each:
+**The panel** lists the issues of the repository in the focused pane. Issues can live in either of two trackers, and the panel looks the same for each:
 
-- Markdown files in the repository's `issues/` folder;
 - a Linear team, with its triage queue, projects, milestones and optional saved views;
 - GitHub Issues, through the `gh` CLI.
 
@@ -59,17 +58,16 @@ herdr-app check ~/.config/herdr-app/mods/issues
 
 ## Choosing a tracker
 
-Without any setting, a repository with an `issues/` folder uses it, and the panel otherwise looks for the repository's Linear team. To choose explicitly, run this in a Claude Code session in the repository:
+Without any setting, the panel looks for the repository's Linear team. To choose explicitly, run this in a Claude Code session in the repository:
 
 ```
 /issues:config
 ```
 
-It asks which tracker to use, checks the credentials it needs, and saves the choice in `~/.config/herdr-app/issues.json`, keyed by the repository's main checkout so its worktrees share it. You can also name the tracker directly: `/issues:config local`, `/issues:config linear <team key>` or `/issues:config github [owner/name]`.
+It asks which tracker to use, checks the credentials it needs, and saves the choice in `~/.config/herdr-app/issues.json`, keyed by the repository's main checkout so its worktrees share it. You can also name the tracker directly: `/issues:config linear <team key>` or `/issues:config github [owner/name]`.
 
 Each tracker needs:
 
-- **Local** (`issues/` folder): nothing. `/issues:create` sets up the folder with a `README.md` and `TEMPLATE.md` that define the issue format.
 - **Linear**: a personal API key, created in Linear under Settings → Account → Security & access. Save it in `~/.config/herdr-app/linear.json`, readable only by you:
 
   ```sh
@@ -108,7 +106,7 @@ Run these in a Claude Code session in the repository, for example `/issues:work 
 
 | Skill | Use it to |
 | --- | --- |
-| `/issues:config` | Choose where a repository's issues are tracked (its `issues/` folder, a Linear team or GitHub Issues), and check the credentials that tracker needs. |
+| `/issues:config` | Choose where a repository's issues are tracked (a Linear team or GitHub Issues), and check the credentials that tracker needs. |
 | `/issues:create` | Write issues for work that is already settled, as self-contained hand-offs. |
 | `/issues:plan` | Turn a prompt, a brief or a full spec into a series of issues by interviewing you. |
 | `/issues:triage` | Triage issues, the backlog or Linear's triage queue, making each one small and actionable enough to hand to an agent. |

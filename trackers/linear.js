@@ -365,9 +365,6 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
       await linear(UPDATE, { id: issue.linearId, input: { delegateId: agent.agentId, addedLabelIds: [agent.labelId] } });
       issue.delegateId = agent.agentId;
     }),
-    // Every Linear save is already final.
-    async commitChecklists() {},
-    changed: null,
   };
   return tracker;
 }

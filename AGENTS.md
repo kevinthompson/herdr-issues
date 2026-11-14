@@ -14,7 +14,7 @@ Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `ma
 - `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
-- `edits.js`, `status-commits.js`, `tasks.js`, `changes.js`: field edits saved in the background, status and checkbox changes committed together, and the stamp that tells every panel to refresh.
+- `edits.js`, `tasks.js`, `changes.js`: field edits saved in the background, checkbox toggles in an issue's body, and the stamp that tells every panel to refresh.
 - `lists.js`, `avatars.js`, `file-key.js`: cached lists and avatars in the app's data folder.
 - `links.js`, `editor.js`, `neovim.js`: links in issue bodies and opening files in the person's editor.
 - `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
@@ -27,18 +27,17 @@ Herdr generates `gpui-kit.d.ts` and `jsconfig.json` in the mod folder; they are 
 
 A tracker is where a repository's issues live. Every backend returns the same shapes, documented at the top of `trackers/index.js`, so the panel never knows which one it shows.
 
-- `trackers/local.js`: Markdown files in the repository's `issues/` folder.
 - `trackers/linear.js`: Linear, with `trackers/linear-team.js` finding the team for a Planning Center repository that has no setting.
 - `trackers/github.js`: GitHub Issues, through the `gh` CLI.
 
-`trackerFor` in `trackers/index.js` chooses one. The repository's entry in `~/.config/herdr-app/issues.json`, which `/issues:config` writes and `trackers/setting.js` reads, decides first; it is keyed by the main checkout's path, so worktrees share it. Without an entry, the repository's `issues/` folder wins, then Linear.
+`trackerFor` in `trackers/index.js` chooses one. The repository's entry in `~/.config/herdr-app/issues.json`, which `/issues:config` writes and `trackers/setting.js` reads, decides first; it is keyed by the main checkout's path, so worktrees share it. Without an entry, it uses Linear.
 
 ### The Claude plugin (`claude-plugin/`)
 
 `.claude-plugin/marketplace.json` makes the repository the `herdr-issues` plugin marketplace, and `claude-plugin/` is its one plugin, `issues`.
 
 - `claude-plugin/.claude-plugin/plugin.json`: the plugin's manifest and `version`.
-- `claude-plugin/skills/<name>/SKILL.md`: the `issues:config`, `issues:create`, `issues:plan`, `issues:triage`, `issues:work` and `issues:delegate` skills. `claude-plugin/skills/create/starter/` holds the `README.md` and `TEMPLATE.md` copied into a repository that starts an `issues/` folder.
+- `claude-plugin/skills/<name>/SKILL.md`: the `issues:config`, `issues:create`, `issues:plan`, `issues:triage`, `issues:work` and `issues:delegate` skills.
 - `claude-plugin/hooks/hooks.json` registers the hooks:
   - `herdr-issues-scope.sh` (UserPromptSubmit) tells a session in a Herdr terminal which issues the panel lists and which issue it has open.
   - `herdr-issues-created.sh` (PostToolUse) touches a stamp after Claude creates a GitHub or Linear issue, so the panel refreshes at once.
