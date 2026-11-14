@@ -107,6 +107,14 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
     .child(pullRequestLine(id, pullRequest, onLink, t))));
 }
 
+// Sized and styled as the list header's refresh button, so the header bars' icon buttons match.
+export function collapseButton(onCollapse, t) {
+  return div().id("issues-collapse").flex_none().size(24).flex().items_center().justify_center().rounded(6)
+    .border_1().border_color(t.border).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
+    .on_click(() => onCollapse())
+    .child(svg("mods/issues/icons/panel-right-close.svg").size(15).text_color(t.foreground));
+}
+
 // An icon has its own color, so a button whose label is an icon redraws it in the hover color.
 let hoveredButton = null;
 
@@ -203,7 +211,8 @@ export function issueDetail(view, t) {
       .when(Boolean(view.syncIndicator), (e) => e.child(view.syncIndicator))
       .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
       .child(editActions(view, t))
-      .when(!view.editor, (e) => e.child(workActions(view, t))))
+      .when(!view.editor, (e) => e.child(workActions(view, t)))
+      .child(collapseButton(view.onCollapse, t)))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
       .child(v_flex().gap(2)
