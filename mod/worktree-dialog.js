@@ -267,7 +267,7 @@ export class WorktreeDialog {
     if (changed) this.checks.submodules = [...new Set([...shown, ...unpushed])];
     if (changed) return "It changed since this opened. Enter again removes it anyway.";
     // Terminals first: a shell sitting in the folder keeps it busy on Windows.
-    if (s?.id) run("space.close", { id: s.id, confirmed: true });
+    run("space.close", { id: s.id, confirmed: true });
     const force = dirty || mods.length > 0;
     // A set-up checkout (gems, node_modules) holds hundreds of thousands of
     // files and takes git tens of seconds to delete. Rename it to a hidden
