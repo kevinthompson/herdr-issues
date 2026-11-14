@@ -168,7 +168,9 @@ export default class Issues extends View {
         const listIssues = () => tracker.list(scope, loads);
         const issues = !tracker ? [] : polled ? await fetchList(listKey, listIssues, reuse && tracker.kind !== "local") : await listIssues();
         if (generation !== this.generation) return;
+        const leaving = this.openId && !issues.some((each) => each.id === this.openId) ? this.findIssue(this.openId) : null;
         Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null });
+        if (leaving) this.holdOpenIssue(leaving, tracker, cx);
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.watch(tracker, cx);
         this.scanRepository(project, generation, cx);
@@ -180,6 +182,23 @@ export default class Issues extends View {
   forgetList() {
     this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
     this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.focusHandled = null;
+  }
+
+  // The open issue stays up after leaving the list, such as when it's done and the Done group isn't
+  // listed, so its work can still be reviewed; it's read again for the change that moved it.
+  holdOpenIssue(issue, tracker, cx) {
+    this.heldIssue = issue;
+    cx.spawn(async (cx) => {
+      const current = await tracker.get(issue.id).catch(() => null);
+      if (!current || this.heldIssue !== issue) return;
+      this.heldIssue = current;
+      cx.notify();
+    });
+  }
+
+  // A listed issue, or the open one held after it left the list.
+  findIssue(id) {
+    return this.issues.find((each) => each.id === id) ?? (this.heldIssue?.id === id ? this.heldIssue : undefined);
   }
 
   // Reads the repository's worktrees and branches for the issues just listed, after the list shows, marks the
@@ -279,7 +298,7 @@ export default class Issues extends View {
 
   closeIssue() {
     this.stopEditing();
-    this.openId = null;
+    this.openId = null; this.heldIssue = null;
   }
 
   // Shows another issue, such as a blocker, unless that would throw away unsaved edits.
@@ -290,12 +309,21 @@ export default class Issues extends View {
   }
 
   // Opens the issue the tabs bar asked for when its space was shown, once this space's repository is known
-  // and its issues have loaded.
-  openRequestedIssue() {
+  // and its issues have loaded. An issue the list leaves out, such as a done one, is read on its own.
+  openRequestedIssue(cx) {
     const request = shared("issues.focus"), space = spaces().find((each) => each.active);
     if (!request || !this.loaded || this.resolvedContext !== this.context || request.at === this.focusHandled || request.space !== space?.id) return;
     this.focusHandled = request.at;
-    if (this.hasIssue(request.id) && !this.hasUnsavedEdits()) { this.stopEditing(); this.openId = request.id; }
+    if (this.hasUnsavedEdits()) return;
+    if (this.hasIssue(request.id)) { this.stopEditing(); this.openId = request.id; return; }
+    const tracker = this.tracker;
+    if (!tracker) return;
+    cx.spawn(async (cx) => {
+      const issue = await tracker.get(request.id).catch(() => null);
+      if (!issue || this.focusHandled !== request.at || this.tracker !== tracker || this.hasUnsavedEdits()) return;
+      this.stopEditing(); this.openId = issue.id; this.heldIssue = issue;
+      cx.notify();
+    });
   }
 
   // Fetches the open issue's body when its list left it out.
@@ -481,7 +509,7 @@ export default class Issues extends View {
   // Shows each edit on its issue, puts a failed one's field back, and saves the edits no copy has claimed.
   applyFieldEdits(cx) {
     for (const [id, edit] of this.projectEdits()) {
-      const issue = this.issues.find((each) => each.id === edit.issueId);
+      const issue = this.findIssue(edit.issueId);
       if (edit.failed) { if (issue?.[edit.field] === edit.value) issue[edit.field] = edit.previous; continue; }
       if (issue) issue[edit.field] = edit.value;
       if (this.tracker && claimEdit(id)) this.saveFieldEdit(id, edit, cx);
@@ -786,9 +814,9 @@ export default class Issues extends View {
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
     else this.refreshOnReturn(cx);
     this.scheduleStatusCommits(cx);
-    this.openRequestedIssue();
+    this.openRequestedIssue(cx);
     this.applyFieldEdits(cx);
-    const t = theme(), issue = this.issues.find((each) => each.id === this.openId);
+    const t = theme(), issue = this.findIssue(this.openId);
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];
     const content = issue
