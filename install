@@ -1,0 +1,51 @@
+#!/bin/bash
+# Usage: ./install
+#
+# Updates this checkout to origin/main and runs its setup. The README's install command clones the
+# repository into ~/.local/share/herdr-issues-mod when it isn't there and runs this script, so the
+# same command installs and updates. It changes nothing when the checkout has local changes, isn't
+# on main or can't fast-forward, or when the issues mod is linked to another checkout and the person
+# doesn't agree to repoint it.
+
+# The body is one function, read whole before it runs, since the fast-forward can rewrite this file.
+install() {
+  set -euo pipefail
+
+  local repo_root mod_link current_link answer branch
+  repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+  mod_link="${HERDR_APP_HOME:-$HOME/.config/herdr-app}/mods/issues"
+
+  fail() {
+    printf 'install: %s\n' "$@" >&2
+    exit 1
+  }
+
+  if [[ -n $(git -C "$repo_root" status --porcelain) ]]; then
+    fail "$repo_root has local changes; commit, stash or discard them and run the install command again"
+  fi
+  branch=$(git -C "$repo_root" symbolic-ref --quiet --short HEAD || true)
+  [[ $branch == main ]] || fail "$repo_root is not on main; run git switch main in it and run the install command again"
+
+  # A link to the checkout itself is what older installs made.
+  if [[ -L $mod_link ]]; then
+    current_link=$(readlink "$mod_link")
+    if [[ $current_link != "$repo_root/mod" && $current_link != "$repo_root" ]]; then
+      printf 'The issues mod is linked to %s, another checkout.\n' "$current_link"
+      printf 'Installing points the mod, the issues command and the Claude plugin at %s instead.\n' "$repo_root"
+      [[ -t 0 ]] || fail "standard input is not a terminal, so nothing was changed; run the install command in a terminal to choose"
+      read -r -p "Repoint them? [y/N] " answer
+      [[ $answer == [yY]* ]] || fail "nothing was changed"
+    fi
+  fi
+
+  git -C "$repo_root" fetch --quiet origin main
+  if ! git -C "$repo_root" merge-base --is-ancestor HEAD origin/main; then
+    fail "$repo_root has commits that origin/main doesn't, so it can't fast-forward; reset it to origin/main or remove it, then run the install command again"
+  fi
+  git -C "$repo_root" merge --quiet --ff-only origin/main
+  printf 'Updated %s to %s\n' "$repo_root" "$(git -C "$repo_root" log -1 --format='%h %s')"
+
+  exec "$repo_root/setup"
+}
+
+install "$@"

@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/herdr-issues-scope.sh\"",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/herdr-issues-scope.mjs\"",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/herdr-issues-created.sh\"",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/herdr-issues-created.mjs\"",
             "timeout": 10
           }
         ]

@@ -4,23 +4,24 @@
 
 - Herdr (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
 - Claude Code (`claude`)
-- `jq`
-- `git`
+- `git`, with access to the GitHub repository
 - Node.js (`node`) 22.15 or later, for the `issues` command
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear; [Configuration](configuration.md#credentials) explains adding it
 
-## Running setup
+## Installing
 
-Clone the repository and run its setup script:
+Run this command:
 
 ```sh
-git clone https://github.com/kevinthompson/herdr-issues-mod.git
-cd herdr-issues-mod
-./setup
+d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues-mod.git "$d" && "$d/install"
 ```
 
-The script:
+It clones the repository into `~/.local/share/herdr-issues-mod` when it isn't there, then runs that checkout's `install` script, which brings it up to date with `origin/main` and runs its `setup` script. Keep the folder: Herdr loads the panel, the `issues` command and the Claude plugin from it.
+
+If the Issues panel is already linked to another clone, such as one you develop in, the command says so and asks before pointing everything at `~/.local/share/herdr-issues-mod`; without a terminal to ask in, it changes nothing.
+
+The setup script:
 
 - links the checkout's `mod/` folder, which holds the panel, to `~/.config/herdr-app/mods/issues`, where Herdr loads it;
 - adds the panel's keys to `~/.config/herdr-app/keys.json`, keeping any key you already bound to something else;
@@ -41,7 +42,9 @@ Start a new Claude Code session afterwards to load the plugin.
 
 ## Updating
 
-Running `./setup` again is safe; it is also how you update after pulling.
+Run the install command again. It fast-forwards `~/.local/share/herdr-issues-mod` to `origin/main` and runs setup again. When that checkout has local changes, isn't on `main` or has commits `origin/main` doesn't, it stops and says so, changing nothing.
+
+If you develop in your own clone, run `./setup` in it instead, after pulling; running it again is safe.
 
 ## Checking the mod loads
 

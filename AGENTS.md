@@ -55,17 +55,19 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 - `claude-plugin/skills/<name>/SKILL.md`: the `issues:config`, `issues:create`, `issues:plan`, `issues:triage`, `issues:start`, `issues:work` and `issues:delegate` skills. `skills/start/start.sh` runs `issues worktree` for each issue `issues:start` names, as the skill loads.
 - `claude-plugin/hooks/hooks.json` registers the hooks:
   - `herdr-terminal-env.sh` (SessionStart) exports `HC_TERMINAL_ID` into the Bash tool's environment, so `issues:work` can rename the session's Herdr tab after the issue.
-  - `herdr-issues-scope.sh` (UserPromptSubmit) tells a session in a Herdr terminal which issues the panel lists and which issue it has open.
-  - `herdr-issues-created.sh` (PostToolUse) touches a stamp after Claude creates a GitHub or Linear issue, so the panel refreshes at once.
+  - `herdr-issues-scope.mjs` (UserPromptSubmit) tells a session in a Herdr terminal which issues the panel lists and which issue it has open.
+  - `herdr-issues-created.mjs` (PostToolUse) touches a stamp after Claude creates a GitHub or Linear issue, so the panel refreshes at once.
 
 ### Repository tooling
 
+- `install`: the script the README's one-line install command runs, after cloning the repository into `~/.local/share/herdr-issues-mod` when it isn't there. It fast-forwards its checkout to `origin/main` and runs `setup`, changing nothing when the checkout has local changes, isn't on `main` or can't fast-forward, and asking before it repoints a mod link to another checkout (refusing when standard input isn't a terminal). Its body is one function, so a fast-forward that rewrites it doesn't change the script while it runs.
 - `setup`: installs the mod and the plugin (see below).
+- `scripts/setup-json.js`: the JSON reading and editing `setup` does, so installing needs `node` and not `jq`.
 - `.claude/settings.json` registers `.claude/hooks/reload-mod.sh`, which makes Herdr reload the mod after Claude edits one of its files in the checkout Herdr loads.
 
 ## Installing for development
 
-Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `jq`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
+Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
 
 - links the checkout's `mod/` folder to `~/.config/herdr-app/mods/issues`, repointing a link an older install made to the checkout itself;
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;
@@ -73,7 +75,7 @@ Run `./setup` from the main checkout; run from a linked worktree, it refuses and
 - adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`;
 - offers to add the Issues panel to the side panel (`panel-body`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal.
 
-Running it again is safe, and is how plugin changes are installed.
+Running it again is safe, and is how plugin changes are installed. A person who only uses the panel installs and updates with the README's one-line command instead, whose checkout lives in `~/.local/share/herdr-issues-mod`.
 
 ## How changes reach the running app and Claude Code
 
@@ -84,8 +86,8 @@ Running it again is safe, and is how plugin changes are installed.
 
 - `npm test` runs the tests.
 - `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree's mod folder: `herdr-app check "$PWD/mod"`.
-- `bash -n setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
-- `shellcheck setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
+- `bash -n install setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
+- `shellcheck install setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
 
 ## Verifying a UI change
 
