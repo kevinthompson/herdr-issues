@@ -7,6 +7,7 @@ import { rmdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { exec, home, readLayout } from "./herdr.js";
 import { spaceShowing, worktreeFor } from "../worktree.js";
+import { trackerSetting } from "../trackers/setting.js";
 
 const GIT_TIMEOUT_MS = 10 * 60 * 1000;
 const RECENT_FETCH_MS = 60 * 1000;
@@ -127,11 +128,30 @@ async function checkoutFolder({ branch, isNew, main, common }) {
   const existing = await worktreeFor(branch, { root: main, on: null });
   if (existing) {
     console.log(`reusing ${existing.path}`);
-    return existing.path;
+    return { path: existing.path, created: false };
   }
   const path = join(home(), ".herdr/worktrees", basename(main), branchFolderName(branch));
   await createWorktree({ branch, isNew, main, common, path });
-  return path;
+  return { path, created: true };
+}
+
+// The Herdr app starts commands without the person's shell profile, so the login shell supplies its PATH.
+function runInLoginShell(command, cwd) {
+  return new Promise((resolve) => {
+    const shell = spawn(process.env.SHELL || "/bin/sh", ["-lc", command], { cwd, stdio: "inherit" });
+    shell.on("error", () => resolve(false));
+    shell.on("exit", (code) => resolve(code === 0));
+  });
+}
+
+// A failed setup keeps the worktree, so the person can finish it by hand.
+async function runWorktreeSetup(path, main) {
+  const command = (await trackerSetting({ root: main, on: null }))?.worktreeSetup;
+  if (!command) return;
+  console.log(`running worktreeSetup: ${command}`);
+  if (!(await runInLoginShell(command, path))) {
+    throw new Error(`worktreeSetup \`${command}\` failed in ${path}; kept the worktree without opening a space`);
+  }
 }
 
 // A space's shell loads .envrc as soon as it opens. Content already allowed in the main checkout is trusted.
@@ -193,7 +213,8 @@ export async function openWorktree({ cwd, branch, isNew = false, name = branch, 
   const commonDir = await git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   if (!commonDir.ok) throw new Error("not in a git repository");
   const common = commonDir.out, main = dirname(common);
-  const path = await checkoutFolder({ branch, isNew, main, common });
+  const { path, created } = await checkoutFolder({ branch, isNew, main, common });
+  if (created) await runWorktreeSetup(path, main);
   await allowEnvrc(path, main);
   if (await isInstalled("herdr-app") && await isInstalled("hc")) await showInSpace({ branch, path, main, common, name, claudeMessage });
   console.log(`cd ${path}`);
