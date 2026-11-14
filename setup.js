@@ -1,7 +1,8 @@
 // The panel's view for a repository whose issues it can't list. With no tracker, it offers GitHub Issues or
 // Linear: choosing one checks what that tracker needs (gh installed and logged in with origin on GitHub, or a
-// Linear API key that works), then writes the repository's entry in issues.json (setting.js), and the panel
-// lists the issues. A configured tracker that fails to load with a SetupProblem (trackers/problems.js) shows the
+// Linear API key that works), and Linear asks for a team. It then asks how work gets into main, and for a pull
+// request when the work is complete, proposing the repository's current or default settings. Only then does it
+// write the repository's entry in issues.json (setting.js), and the panel lists the issues. A configured tracker that fails to load with a SetupProblem (trackers/problems.js) shows the
 // problem and its fix, with Check again and a way to choose a different tracker. Linear's team dropdown is a
 // scope menu popup (menu.js), whose pick comes back through shared state.
 import { div } from "gpui-kit";
@@ -9,7 +10,7 @@ import { v_flex, h_flex, TextView } from "gpui-base";
 import { exec, shared, setShared } from "herdr";
 import { button } from "./detail.js";
 import { openScopeMenu } from "./menu.js";
-import { saveTrackerSetting } from "./trackers/setting.js";
+import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
 import { linearClient } from "./trackers/linear.js";
 import { planningCenterRepoName, detectedTeam } from "./trackers/linear-team.js";
 import { ghMissing, ghLoggedOut, originNotOnGitHub } from "./trackers/problems.js";
@@ -18,7 +19,16 @@ const TEAM_PICKS = "issues.setupTeams";
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TRACKERS = [{ id: "github", label: "GitHub Issues" }, { id: "linear", label: "Linear" }];
 const TEAM_DROPDOWN_MAX_PX = 280;
-const CONFIG_HINT = "For saved Linear views and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
+const CONFIG_HINT = "For saved Linear views, changing how work lands later, and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
+const MERGE_CHOICES = [
+  { id: "auto", label: "Merge automatically", detail: "The branch merges into main on this computer as soon as its work is done." },
+  { id: "review", label: "Merge after I review", detail: "The branch merges into main on this computer once you approve it." },
+  { id: "pull-request", label: "Open a pull request", detail: "The branch lands in main through a pull request." },
+];
+const COMPLETE_CHOICES = [
+  { id: "pull-request-open", label: "Once the pull request is open", detail: "The session can finish and the worktree close while the pull request waits for review." },
+  { id: "merged", label: "Once it merges", detail: "The work stays open until the pull request merges into main." },
+];
 
 async function checkGitHub(main) {
   const installed = await exec("gh", ["--version"]).catch(() => null);
@@ -52,6 +62,9 @@ export class TrackerSetup {
     this.main = main; this.onSaved = onSaved;
     this.failure = null; this.choosingAnother = false;
     this.choice = null; this.checking = false; this.problem = null; this.teams = null;
+    // Once the tracker is ready: { tracker, proposed: { merge, complete }, merge }, where merge is set while
+    // asking when a pull request's work is complete.
+    this.landing = null;
   }
 
   // The configured tracker's SetupProblem, or null when the repository has no tracker.
@@ -67,12 +80,13 @@ export class TrackerSetup {
 
   check(cx) {
     const choice = this.choice;
-    Object.assign(this, { checking: true, problem: null, teams: null });
+    Object.assign(this, { checking: true, problem: null, teams: null, landing: null });
     cx.spawn(async (cx) => {
       try {
         if (choice === "github") {
           await checkGitHub(this.main);
-          await this.save({ tracker: "github" }, cx);
+          const landing = await this.proposeLanding({ tracker: "github" });
+          if (this.choice === choice) this.landing = landing;
         } else {
           const teams = await linearTeams(this.main);
           if (this.choice === choice) this.teams = teams;
@@ -83,10 +97,30 @@ export class TrackerSetup {
     cx.notify();
   }
 
-  async save(setting, cx) {
-    await saveTrackerSetting(this.main, setting);
-    Object.assign(this, { choice: null, choosingAnother: false, teams: null });
-    this.onSaved(cx);
+  // An entry that fails to load proposes the defaults instead of its own settings.
+  async proposeLanding(tracker) {
+    const proposed = await mergeSettings({ root: this.main, on: null }).catch(() => resolveMergeSettings(this.main, null));
+    if (proposed.merge !== "pull-request") proposed.complete = "pull-request-open";
+    return { tracker, proposed, merge: null };
+  }
+
+  chooseMerge(merge, cx) {
+    if (merge === "pull-request") { this.landing.merge = merge; cx.notify(); }
+    else this.save({ merge }, cx);
+  }
+
+  save(choices, cx) {
+    const setting = { ...this.landing.tracker, ...choices };
+    Object.assign(this, { checking: true, problem: null });
+    cx.spawn(async (cx) => {
+      try {
+        await saveSetupChoices(this.main, setting);
+        Object.assign(this, { choice: null, choosingAnother: false, teams: null, landing: null });
+        this.onSaved(cx);
+      } catch (e) { this.problem = e; }
+      finally { this.checking = false; cx.notify(); }
+    });
+    cx.notify();
   }
 
   openTeamMenu() {
@@ -94,7 +128,7 @@ export class TrackerSetup {
     openScopeMenu(scopes, null, this.main, TEAM_PICKS);
   }
 
-  // Saves the team picked in the dropdown, which hands it over through shared state.
+  // Takes the team picked in the dropdown, which hands it over through shared state, and asks how work lands.
   takePickedTeam(cx) {
     const picks = shared(TEAM_PICKS) ?? {}, team = picks[this.main];
     if (!team) return;
@@ -102,8 +136,10 @@ export class TrackerSetup {
     setShared(TEAM_PICKS, others);
     this.checking = true;
     cx.spawn(async (cx) => {
-      try { await this.save({ tracker: "linear", team }, cx); }
-      catch (e) { this.problem = e; }
+      try {
+        const landing = await this.proposeLanding({ tracker: "linear", team });
+        if (this.choice === "linear") this.landing = landing;
+      } catch (e) { this.problem = e; }
       finally { this.checking = false; cx.notify(); }
     });
   }
@@ -130,11 +166,31 @@ export class TrackerSetup {
       .child(div().whitespace_normal().text_size(12).text_color(t.muted).child(sentence))
       .child(h_flex().gap(6).children(TRACKERS.map(({ id, label }) =>
         button(`setup-${id}`, label, (cx) => this.choose(id, cx), t, { primary: this.choice === id, enabled: !this.checking }))))
-      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Checking…")))
+      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child(this.landing ? "Saving…" : "Checking…")))
       .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t)))
-      .when(!this.checking && !this.problem && Boolean(this.teams), (e) => e.child(this.teamPicker(t)))
-      .when(Boolean(this.failure), (e) => e.child(button("setup-back", "Back", (cx) => { this.choosingAnother = false; this.choice = null; this.problem = null; this.teams = null; cx.notify(); }, t)))
+      .when(!this.checking && !this.problem && Boolean(this.teams) && !this.landing, (e) => e.child(this.teamPicker(t)))
+      .when(!this.checking && !this.problem && Boolean(this.landing), (e) => e.child(this.landingQuestion(t)))
+      .when(Boolean(this.failure), (e) => e.child(button("setup-back", "Back", (cx) => { Object.assign(this, { choosingAnother: false, choice: null, problem: null, teams: null, landing: null }); cx.notify(); }, t)))
       .child(markdown("setup-hint", CONFIG_HINT, t.dim));
+  }
+
+  // How work gets into main, or, once a pull request is chosen, when its work is complete. The proposed choice
+  // stands out.
+  landingQuestion(t) {
+    const { tracker, proposed, merge } = this.landing;
+    const team = tracker.team && this.teams?.find(({ key }) => key === tracker.team);
+    const [question, kind, choices, proposedId, onChoose] = merge
+      ? ["When is the work complete?", "complete", COMPLETE_CHOICES, proposed.complete, (id, cx) => this.save({ merge, complete: id }, cx)]
+      : ["How does work get into main?", "merge", MERGE_CHOICES, proposed.merge, (id, cx) => this.chooseMerge(id, cx)];
+    return v_flex().flex_none().gap(12)
+      .when(Boolean(team), (e) => e.child(div().text_size(12).text_color(t.muted).child(`Team: ${team?.name} (${team?.key})`)))
+      .child(div().text_size(12).text_color(t.muted).child(question))
+      .children(choices.map(({ id, label, detail }) => v_flex().flex_none().gap(4)
+        .child(h_flex().gap(8).items_center()
+          .child(button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, { primary: id === proposedId }))
+          .when(id === proposedId, (e) => e.child(div().text_size(11).text_color(t.dim).child("Proposed"))))
+        .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))))
+      .when(Boolean(merge), (e) => e.child(button("setup-landing-back", "Back", (cx) => { this.landing.merge = null; cx.notify(); }, t)));
   }
 
   teamPicker(t) {

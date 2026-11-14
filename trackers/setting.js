@@ -12,7 +12,7 @@
 // means and resolves their defaults.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in linear.json.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
-// view (setup.js) writes an entry too, with saveTrackerSetting.
+// view (setup.js) writes an entry too, with saveSetupChoices.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { githubRepository } from "./github.js";
@@ -57,22 +57,29 @@ const hasGitHubOrigin = (main) => githubRepository(main, {}).then(() => true, ()
 // else review. complete is "merged" (once the branch is in main) or "pull-request-open" (once it's pushed with
 // an open pull request), which only a pull request allows and is its default.
 export async function mergeSettings(project) {
-  const setting = await trackerSetting(project);
-  const merge = setting?.merge
-    ?? (await hasGitHubOrigin(await mainCheckout(project.root, project.on)) ? "pull-request" : "review");
+  return resolveMergeSettings(await mainCheckout(project.root, project.on), await trackerSetting(project));
+}
+
+// mergeSettings for the repository whose main checkout is `main`, from `setting`, its entry or null.
+export async function resolveMergeSettings(main, setting) {
+  const merge = setting?.merge ?? (await hasGitHubOrigin(main) ? "pull-request" : "review");
   const complete = merge === "pull-request" ? setting?.complete ?? "pull-request-open" : "merged";
   return { merge, complete };
 }
 
-// Makes `setting`, a tracker and its team or repo, the tracker of the repository whose main checkout is `main`,
-// replacing the tracker of any entry it has under either spelling of its path but keeping that entry's other
-// keys, and keeps every other repository's entry.
-export async function saveTrackerSetting(main, setting) {
+const SETUP_KEYS = ["tracker", "team", "repo", "merge", "complete"];
+
+// Makes `setting`, a tracker with its team or repo and how work lands (merge, and complete for a pull request),
+// the choices of the repository whose main checkout is `main`. It replaces those keys in any entry the
+// repository has under either spelling of its path but keeps that entry's other keys, and keeps every other
+// repository's entry.
+export async function saveSetupChoices(main, setting) {
   const previous = await readTextFile(settingsPath()).catch(() => null);
   const settings = previous === null ? {} : parseSettings(previous);
   const entries = Object.entries(settings.repos ?? {}), key = abbreviateHome(main);
   const existing = entries.findIndex(([path]) => expandHome(path) === main);
-  const { tracker: _tracker, team: _team, repo: _repo, ...kept } = existing === -1 ? {} : entries[existing][1];
+  const kept = Object.fromEntries(Object.entries(existing === -1 ? {} : entries[existing][1])
+    .filter(([name]) => !SETUP_KEYS.includes(name)));
   const others = entries.filter(([path]) => expandHome(path) !== main);
   others.splice(existing === -1 ? others.length : existing, 0, [key, { ...setting, ...kept }]);
   const text = `${JSON.stringify({ ...settings, repos: Object.fromEntries(others) }, null, 2)}\n`;

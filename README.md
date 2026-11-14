@@ -60,7 +60,7 @@ herdr-app check ~/.config/herdr-app/mods/issues
 
 ## Choosing a tracker
 
-Without any setting, the panel looks for a Planning Center repository's Linear team. A repository it can't place shows a setup view in the panel instead: choose **GitHub Issues** or **Linear** (then a team), and the panel checks what that tracker needs and saves the choice. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
+Without any setting, the panel looks for a Planning Center repository's Linear team. A repository it can't place shows a setup view in the panel instead: choose **GitHub Issues** or **Linear** (then a team), and the panel checks what that tracker needs, asks how work gets into main (below), and saves the choices. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
 
 For saved Linear views, a GitHub repository other than origin's, and the other options the panel doesn't offer, run this in a Claude Code session in the repository:
 
@@ -97,7 +97,7 @@ Two more settings in the same entry say how an issue's branch gets into main and
 "~/Code/herdr-issues-mod": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
 ```
 
-`issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
+The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
 
 ## Using the panel
 
