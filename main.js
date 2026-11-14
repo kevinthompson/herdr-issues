@@ -15,7 +15,7 @@ import { trackerFor } from "./trackers/index.js";
 import { settingsPath } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, hasPullRequestOnBranch, PRIORITIES } from "./issue.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
@@ -84,10 +84,10 @@ const NOT_A_REPOSITORY = "The issues panel tracks issues for git repositories, a
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
 
 const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/issues:work ${issue.id}` });
-// wt sets up new checkouts, which can take minutes in a box app.
-const WT_TIMEOUT_MS = 10 * 60 * 1000;
-// wt works on this computer's checkouts and needs the issue's branch.
-const opensWithWt = (issue, project) => Boolean(issue.branch && project && !project.on);
+// issues worktree sets up new checkouts, which can take minutes in a box app.
+const ISSUES_WORKTREE_TIMEOUT_MS = 10 * 60 * 1000;
+// issues worktree works on this computer's checkouts and needs the issue's branch.
+const opensWithIssuesWorktree = (issue, project) => Boolean(issue.branch && project && !project.on);
 // A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
 // otherwise halfway back to the panel's background.
 function rowHover(t) {
@@ -411,7 +411,8 @@ export default class Issues extends View {
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
-  // Without a branch, the worktree dialog asks for one. The worktree opens while the tracker saves the start.
+  // Without a branch, the worktree dialog asks for one. The tracker saves the start once issues worktree has
+  // read the issue, since it branches an unstarted issue from the local main.
   startWork(issue, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
@@ -419,12 +420,11 @@ export default class Issues extends View {
     this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
-        const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
-        const spaceName = await this.spaceName(issue);
         let openError = null;
-        if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue, spaceName, { unstarted: !hasPullRequestOnBranch(issue) });
-        else this.openWorktreeDialog(issue, spaceName);
-        this.detailError = (await starting) ?? openError;
+        if (opensWithIssuesWorktree(issue, this.project)) openError = await this.openWithIssuesWorktree(issue);
+        else this.openWorktreeDialog(issue, await this.spaceName(issue));
+        const startError = await tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
+        this.detailError = startError ?? openError;
         this.refresh(cx);
       } finally { this.opening = null; cx.notify(); }
     });
@@ -492,7 +492,7 @@ export default class Issues extends View {
     return null;
   }
 
-  // Starting and continuing work wait on the tracker and wt, so the footer says what they're doing meanwhile.
+  // Starting and continuing work wait on the tracker and issues worktree, so the footer says what they're doing meanwhile.
   showOpening(issue, status, cx) {
     this.opening = { id: issue.id, status };
     cx.notify();
@@ -524,9 +524,9 @@ export default class Issues extends View {
     this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
-        const spaceName = await this.spaceName(issue);
-        if (opensWithWt(issue, project)) this.detailError = await this.openWithWt(issue, spaceName);
+        if (opensWithIssuesWorktree(issue, project)) this.detailError = await this.openWithIssuesWorktree(issue);
         else {
+          const spaceName = await this.spaceName(issue);
           const worktree = project && await worktreeFor(issue.branch, project);
           if (worktree?.space) run("space.select", { id: worktree.space.id });
           else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
@@ -538,17 +538,16 @@ export default class Issues extends View {
     });
   }
 
-  // Opens the issue's worktree as `/issues:work` does: wt switches to the space already showing it, or opens
-  // one nested under the repository's space with Claude working the issue. Returns an error message, or null.
-  // Without wt installed, the worktree dialog opens instead. An unstarted issue's branch can't be on origin yet,
-  // so wt skips fetching and branches from the local main.
-  async openWithWt(issue, spaceName, { unstarted = false } = {}) {
-    const args = [issue.branch, ...(unstarted ? ["--new"] : []), "--name", spaceName, "--claude", workIssueSession(issue).task];
-    const result = await exec("wt", args, { cwd: this.project.root, timeout: WT_TIMEOUT_MS }).catch(() => null);
-    if (!result) { this.openWorktreeDialog(issue, spaceName); return null; }
+  // Opens the issue's worktree as `/issues:work` does: issues worktree reads the issue's branch from the tracker,
+  // switches to the space already showing it, or opens one nested under the repository's space with Claude
+  // working the issue. Returns an error message, or null. Without issues installed, the worktree dialog opens instead.
+  async openWithIssuesWorktree(issue) {
+    const args = ["worktree", issue.id, "--claude", workIssueSession(issue).task];
+    const result = await exec("issues", args, { cwd: this.project.root, timeout: ISSUES_WORKTREE_TIMEOUT_MS }).catch(() => null);
+    if (!result) { this.openWorktreeDialog(issue, await this.spaceName(issue)); return null; }
     if (result.code === 0) return null;
     const lastLine = (result.stderr || result.stdout).trim().split("\n").pop();
-    return `Could not open the worktree: ${lastLine || `wt exited with ${result.code}`}`;
+    return `Could not open the worktree: ${lastLine || `issues worktree exited with ${result.code}`}`;
   }
 
   // The name the repository gives the issue's space; the issue's ID when the name can't be worked out.
