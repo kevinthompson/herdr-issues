@@ -54,3 +54,30 @@ To confirm the mod loads, run:
 ```sh
 herdr-app check ~/.config/herdr-app/mods/issues
 ```
+
+## Removing
+
+Run this command:
+
+```sh
+~/.local/share/herdr-issues-mod/uninstall
+```
+
+If you installed from your own clone with `./setup`, run `./uninstall` in it instead; it leaves the clone in place.
+
+The uninstall script removes:
+
+- the `~/.config/herdr-app/mods/issues` and `~/.local/bin/issues` links, when they point into the checkout it runs from; anything else at those paths stays, and it says so;
+- each of the panel's keys in `~/.config/herdr-app/keys.json` that is still bound to the panel's action, keeping any you rebound;
+- the `issues@herdr-issues` plugin and the `herdr-issues` plugin marketplace from Claude Code;
+- `~/.local/share/herdr-issues-mod` itself, last, when it runs from there.
+
+It asks before each of these, and keeps them unless you answer yes:
+
+- removing the Issues panel from your layouts that show it; Herdr's shipped layouts are never changed;
+- deleting `~/.config/herdr-app/issues.json`, each repository's tracker and merge settings, and `~/.config/herdr-app/linear.json`, your Linear API key;
+- deleting the cached lists and avatars in `~/.config/herdr-app/data/issues/`.
+
+Without a terminal to ask in, it keeps all three and prints how to remove each. Running it again is safe, and says when there is nothing left to remove.
+
+It leaves issue worktrees in `~/.herdr/worktrees/` and their Herdr spaces, and the Linear MCP server in Claude Code; remove that with `claude mcp remove linear`.
