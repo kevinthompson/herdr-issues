@@ -77,7 +77,7 @@ Running it again is safe, and is how plugin changes are installed.
 
 ## How changes reach the running app and Claude Code
 
-- **The mod** runs from the main checkout's `mod/` folder through the link, so edits there take effect in the running app. Herdr watches its mods folder, but macOS reports a save under the folder a link points to, so `.claude/hooks/reload-mod.sh` touches the link after each Claude edit. Edits in a worktree don't reach the running app until they're merged into main.
+- **The mod** runs from the main checkout's `mod/` folder through the link, so edits there take effect in the running app. Herdr watches its mods folder, but macOS reports a save under the folder a link points to, so `.claude/hooks/reload-mod.sh` touches the link after each Claude edit. Edits in a worktree don't reach the running app until they're merged into main. Changes git makes in the main checkout, such as a merge, pull or checkout, don't reload the mod, since the hook runs only after Claude's own edits: after one that changes `mod/`, run `touch -h ~/.config/herdr-app/mods/issues`.
 - **The plugin** is installed into Claude Code's plugin cache, so edits to `claude-plugin/` reach sessions only after it is updated. Bump `version` in `claude-plugin/.claude-plugin/plugin.json` with any change to the skills or hooks that installed sessions should get (minor for new behavior, patch for fixes), then, once it is on main, run `./setup` and start a new Claude Code session.
 
 ## Checks before committing
