@@ -89,7 +89,7 @@ Running it again is safe, and is how plugin changes are installed.
 
 ## Verifying a UI change
 
-`herdr-app check` proves the mod loads, not that it looks right. With the change loaded in the running window, save a frame with `herdr-app shot <file>.png` (the path must end in `.png`) and look at it, before and after the change. `herdr-app status` reports the layout and any mod errors, and `herdr-app --skill` explains driving the window: inspecting spaces and running its commands.
+`herdr-app check` proves the mod loads, not that it looks right. Don't verify a change with screenshots unless the person asks for them, even when an issue lists `herdr-app shot`: the running window is the one they work in. When they do, save a frame with `herdr-app shot <file>.png` (the path must end in `.png`) with the change loaded in the running window. `herdr-app status` reports the layout and any mod errors, and `herdr-app --skill` explains driving the window: inspecting spaces and running its commands.
 
 ## Issues
 
