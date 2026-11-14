@@ -11,7 +11,7 @@ Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `ma
 - `main.js`: the panel, its list, polling and refreshes.
 - `detail.js`: one issue drawn in place of the list, with its body and the editor.
 - `menu.js`: the status, priority, scope, milestone and label dropdowns, opened as popups of this same mod.
-- `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding, opening and marking issue worktrees and their spaces.
+- `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
 - `edits.js`, `status-commits.js`, `tasks.js`, `changes.js`: field edits saved in the background, status and checkbox changes committed together, and the stamp that tells every panel to refresh.

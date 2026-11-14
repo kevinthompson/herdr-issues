@@ -92,7 +92,7 @@ Press **Cmd-Shift-I** to show or hide the panel. It shows the issues of the repo
 
 ![An issue open in the panel, with its label, the issues it blocks, its branch, its status and priority dropdowns, and its description with checked-off criteria](docs/screenshots/issue-detail.png)
 
-**Starting work.** **Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue. **Continue** reopens an issue already in progress, and **Go to space** switches to the space that already shows it. When the work is finished, the panel marks that space's name with ✅.
+**Starting work.** **Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue. **Continue** reopens an issue already in progress, and **Go to space** switches to the space that already shows it. When the work is finished, the Claude session ends with a message saying the worktree can be closed.
 
 **Removing a worktree.** The mod includes a dialog that removes a worktree and closes its space. It shows whether the branch is merged or pushed, and warns about uncommitted changes before anything is lost; the branch itself is kept. Open it from a key or another mod with:
 
