@@ -66,6 +66,57 @@ test("merge-keys leaves a file that already has the keys alone", (t) => {
   assert.equal(readFileSync(keys, "utf8"), '{"global":{"cmd-shift-i":"issues.toggle"}}');
 });
 
+test("unmerge-keys removes the mod's keys and keeps a key the person rebound", (t) => {
+  const folder = temporaryFolder(t);
+  const keys = join(folder, "keys.json");
+  const modKeys = join(folder, "mod-keys.json");
+  writeJson(keys, { global: { "cmd-shift-i": "other.action", "cmd-k": "palette" }, "mod:issues": { "cmd-s": "issues.save" } });
+  writeJson(modKeys, { global: { "cmd-shift-i": "issues.toggle" }, "mod:issues": { "cmd-s": "issues.save" } });
+
+  assert.equal(run(["unmerge-keys", keys, modKeys]).status, 0);
+
+  assert.deepEqual(readJson(keys), { global: { "cmd-shift-i": "other.action", "cmd-k": "palette" } });
+});
+
+test("unmerge-keys leaves a file without the mod's keys alone", (t) => {
+  const folder = temporaryFolder(t);
+  const keys = join(folder, "keys.json");
+  const modKeys = join(folder, "mod-keys.json");
+  writeFileSync(keys, '{"global":{"cmd-k":"palette"}}');
+  writeJson(modKeys, { global: { "cmd-shift-i": "issues.toggle" }, "mod:issues": { "cmd-s": "issues.save" } });
+
+  assert.equal(run(["unmerge-keys", keys, modKeys]).status, 10);
+  assert.equal(readFileSync(keys, "utf8"), '{"global":{"cmd-k":"palette"}}');
+});
+
+test("remove-panel removes the issues column and leaves the layout's other nodes alone", (t) => {
+  const folder = temporaryFolder(t);
+  const layout = join(folder, "mine.json");
+  writeJson(layout, mainLayout());
+  run(["add-panel", layout]);
+
+  assert.equal(run(["remove-panel", layout]).status, 0);
+
+  assert.deepEqual(readJson(layout), mainLayout());
+  assert.equal(run(["remove-panel", layout]).status, 10);
+});
+
+test("remove-panel takes an issues block out of panel-body and shows its next child", (t) => {
+  const folder = temporaryFolder(t);
+  const layout = join(folder, "mine.json");
+  writeJson(layout, workBody([
+    { id: "main" },
+    { id: "panel", children: [{ id: "panel-body", active: "issues", children: [{ id: "files" }, issuesBlock] }] },
+  ]));
+
+  assert.equal(run(["remove-panel", layout]).status, 0);
+
+  assert.deepEqual(readJson(layout), workBody([
+    { id: "main" },
+    { id: "panel", children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] },
+  ]));
+});
+
 test("add-panel adds the issues block in a column of its own beside the panel", (t) => {
   const folder = temporaryFolder(t);
   const layout = join(folder, "mine.json");

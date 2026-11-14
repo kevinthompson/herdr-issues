@@ -61,9 +61,19 @@ Each tracker needs credentials:
 
 [Configuration](docs/configuration.md) covers creating the Linear key and every setting in `issues.json`.
 
+## Removing
+
+Run this command:
+
+```sh
+~/.local/share/herdr-issues-mod/uninstall
+```
+
+It removes the panel, the `issues` command and the Claude plugin, and asks before removing the panel from your layouts and deleting your settings, Linear API key and cached lists. [Installation](docs/installation.md#removing) lists everything it removes.
+
 ## Further reading
 
-- [Installation](docs/installation.md): requirements, what the install command changes, updating and checking the mod loads.
+- [Installation](docs/installation.md): requirements, what the install command changes, updating, checking the mod loads and removing it.
 - [Configuration](docs/configuration.md): choosing a tracker, credentials and the `issues.json` settings.
 - [Using the panel](docs/using-the-panel.md): scopes and labels, an issue's detail view, starting work and removing a worktree.
 - [Claude skills](docs/skills.md): the `issues:*` skills.
