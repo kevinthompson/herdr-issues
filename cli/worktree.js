@@ -12,7 +12,6 @@ import { trackerSetting } from "../mod/trackers/setting.js";
 const GIT_TIMEOUT_MS = 10 * 60 * 1000;
 const RECENT_FETCH_MS = 60 * 1000;
 const FETCH_RETRY_DELAY_MS = 2000;
-const BRIEF_FETCH_MS = 5000;
 const LOCK_POLL_MS = 200;
 // Shared with the wt script this command replaces, so the two take turns while both are in use.
 const FETCHED_MARKER = "wt-fetched";
@@ -75,19 +74,6 @@ async function fetchOrigin(main, marker) {
   await writeFile(marker, "");
 }
 
-// Gives up after a few seconds, so an unreachable network can't hold up the worktree. Git starts a new ssh
-// when its ssh dies, so the whole process group is stopped at once.
-function fetchBriefly(cwd, ref) {
-  return new Promise((resolve) => {
-    const fetch = spawn("git", ["fetch", "-q", "origin", ref], { cwd, detached: true, stdio: "ignore" });
-    const timer = setTimeout(() => {
-      try { process.kill(-fetch.pid, "SIGTERM"); } catch { /* it already exited */ }
-    }, BRIEF_FETCH_MS);
-    fetch.on("error", () => { clearTimeout(timer); resolve(false); });
-    fetch.on("exit", (code) => { clearTimeout(timer); resolve(code === 0); });
-  });
-}
-
 // The newer of the local default branch and origin's copy, by ancestry: where others push, origin's is
 // ahead; where branches merge locally first, the local one is.
 async function newerDefault(main, localDefault, originDefault) {
@@ -100,8 +86,8 @@ async function newerDefault(main, localDefault, originDefault) {
 }
 
 // A new branch starts from origin's default branch, fetched unless that happened in the last minute. A
-// branch that can't be on origin yet (isNew) fetches only the default branch, and starts from whichever of
-// the local and origin's copies is newer.
+// branch that can't be on origin yet (isNew) skips the fetch, and starts from whichever of the local default
+// branch and origin's copy from the last fetch is newer.
 async function createWorktree({ branch, isNew, main, common, path }) {
   await trashLeftover(path);
   if (!isNew) await fetchOrigin(main, join(common, FETCHED_MARKER));
@@ -114,10 +100,7 @@ async function createWorktree({ branch, isNew, main, common, path }) {
     return gitOrFail(main, ["worktree", "add", "--track", "-b", branch, path, `origin/${branch}`]);
   }
   let start = originDefault;
-  if (isNew && await hasRef(main, `refs/heads/${localDefault}`)) {
-    if (!(await fetchBriefly(main, localDefault))) warn(`couldn't fetch ${originDefault}; comparing with the copy from the last fetch`);
-    start = await newerDefault(main, localDefault, originDefault);
-  }
+  if (isNew && await hasRef(main, `refs/heads/${localDefault}`)) start = await newerDefault(main, localDefault, originDefault);
   return gitOrFail(main, ["worktree", "add", "--no-track", "-b", branch, path, start]);
 }
 

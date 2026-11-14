@@ -16,7 +16,7 @@ Commands:
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
-                           Open a branch in a worktree; --new: it can't be on origin yet, so fetch only main
+                           Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
 
 Options:
   -h, --help               Print this help`;
