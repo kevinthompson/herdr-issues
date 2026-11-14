@@ -13,14 +13,13 @@ const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value, nul
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
+const issuesColumn = { id: "issues-panel", type: "column", size: { px: 368 }, min: 32, max: 900, children: [issuesBlock] };
 
-const mainLayout = () => ({
-  id: "root",
-  children: [
-    { id: "main", size: { px: 900 } },
-    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "agents" }] }] },
-  ],
-});
+const workBody = (children) => ({ id: "root", children: [{ id: "work", children: [{ id: "work-body", children }, { id: "status" }] }] });
+const mainLayout = () => workBody([
+  { id: "main" },
+  { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+]);
 
 test("merge-keys adds unbound keys and keeps a key bound to something else", (t) => {
   const folder = temporaryFolder(t);
@@ -39,6 +38,20 @@ test("merge-keys adds unbound keys and keeps a key bound to something else", (t)
   });
 });
 
+test("merge-keys rebinds the key an earlier setup bound to toggle the side panel", (t) => {
+  const folder = temporaryFolder(t);
+  const keys = join(folder, "keys.json");
+  const modKeys = join(folder, "mod-keys.json");
+  writeJson(keys, { global: { "cmd-shift-i": "layout.toggle:panel" } });
+  writeJson(modKeys, { global: { "cmd-shift-i": "issues.toggle" } });
+
+  const result = run(["merge-keys", keys, modKeys]);
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, "");
+  assert.deepEqual(readJson(keys), { global: { "cmd-shift-i": "issues.toggle" } });
+});
+
 test("merge-keys leaves a file that already has the keys alone", (t) => {
   const folder = temporaryFolder(t);
   const keys = join(folder, "keys.json");
@@ -53,7 +66,7 @@ test("merge-keys leaves a file that already has the keys alone", (t) => {
   assert.equal(readFileSync(keys, "utf8"), '{"global":{"cmd-shift-i":"issues.toggle"}}');
 });
 
-test("add-panel adds the issues block to panel-body and weighs the panel beside main", (t) => {
+test("add-panel adds the issues block in a column of its own beside the panel", (t) => {
   const folder = temporaryFolder(t);
   const layout = join(folder, "mine.json");
   writeJson(layout, mainLayout());
@@ -62,14 +75,40 @@ test("add-panel adds the issues block to panel-body and weighs the panel beside 
   assert.equal(run(["shows-mod", layout]).status, 1);
   assert.equal(run(["add-panel", layout]).status, 0);
 
-  assert.deepEqual(readJson(layout), {
-    id: "root",
-    children: [
-      { id: "main", size: { weight: 5 } },
-      { id: "panel", size: { weight: 2 }, children: [{ id: "panel-body", children: [{ id: "agents" }, issuesBlock] }] },
-    ],
-  });
+  assert.deepEqual(readJson(layout), workBody([
+    { id: "main" },
+    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+    issuesColumn,
+  ]));
   assert.equal(run(["shows-mod", layout]).status, 0);
+});
+
+test("move-panel moves an issues block out of panel-body into a column of its own", (t) => {
+  const folder = temporaryFolder(t);
+  const layout = join(folder, "mine.json");
+  writeJson(layout, workBody([
+    { id: "main", size: { weight: 5 } },
+    { id: "panel", size: { weight: 2 }, children: [{ id: "panel-body", active: "issues", children: [{ id: "files" }, issuesBlock] }] },
+  ]));
+
+  assert.equal(run(["move-panel", layout]).status, 0);
+
+  assert.deepEqual(readJson(layout), workBody([
+    { id: "main", size: { weight: 5 } },
+    { id: "panel", size: { weight: 2 }, children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] },
+    issuesColumn,
+  ]));
+});
+
+test("move-panel leaves a layout without an issues block in panel-body alone", (t) => {
+  const folder = temporaryFolder(t);
+  const layout = join(folder, "mine.json");
+  writeJson(layout, mainLayout());
+  run(["add-panel", layout]);
+  const added = readFileSync(layout, "utf8");
+
+  assert.equal(run(["move-panel", layout]).status, 10);
+  assert.equal(readFileSync(layout, "utf8"), added);
 });
 
 test("add-panel writes through a symlinked layout", (t) => {

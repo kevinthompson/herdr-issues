@@ -1,6 +1,6 @@
 {
   "global": {
-    "cmd-shift-i": "layout.toggle:panel"
+    "cmd-shift-i": "issues.toggle"
   },
   "mod:issues": {
     "cmd-s": "issues.save"

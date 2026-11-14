@@ -13,7 +13,7 @@ From the panel you can:
 
 The panel also tells Claude sessions in Herdr which issues it lists and which issue is open, so "the issues" and "this issue" mean what you see.
 
-Press **Cmd-Shift-I** to show or hide the panel. It shows the issues of the repository in the focused pane, grouped by status, and refreshes when issues change.
+Press **Cmd-Shift-I** to collapse the panel to a thin strip or expand it again, or click the strip's button to expand it. Dragging the panel's edge nearly closed collapses it too. It stays collapsed or expanded in every space, and doesn't check its tracker for changes while collapsed. It shows the issues of the repository in the focused pane, grouped by status, and refreshes when issues change.
 
 ## Scopes and labels
 

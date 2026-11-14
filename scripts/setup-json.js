@@ -8,7 +8,9 @@
 //   shows-mod <layout>                succeeds when the layout shows the issues mod
 //   has-panel-body <layout>           succeeds when the layout has a panel-body node
 //   shipped-layouts <installed.json>  prints the name of each layout Herdr ships
-//   add-panel <layout>                adds the issues block to panel-body and weighs the panel beside main
+//   add-panel <layout>                adds the issues block in a column of its own beside the panel holding panel-body
+//   move-panel <layout>               moves an issues block an earlier setup put in panel-body into a column of its own;
+//                                     exits 0 after moving it and 10 when there was none to move
 //   copy-layout <from> <to> <version> copies a layout, records what it was cloned from, and adds the issues block
 //   set-repo <issues.json> <main checkout> <entry>
 //                                     replaces the repository's entry in issues.json with the entry's JSON, under
@@ -25,7 +27,13 @@ import { homedir } from "node:os";
 
 const keysAddedExitCode = 0;
 const keysUnchangedExitCode = 10;
+const panelMovedExitCode = 0;
+const panelUnmovedExitCode = 10;
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
+// The panel collapses to a 32px strip by resizing this column, so its min mustn't stop it there.
+const issuesColumn = { id: "issues-panel", type: "column", size: { px: 368 }, min: 32, max: 900, children: [issuesBlock] };
+// Bindings earlier versions of the mod's keys.json made, which setup replaces with the mod's current one.
+const supersededBindings = { global: { "cmd-shift-i": "layout.toggle:panel" } };
 
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const readStdinJson = () => JSON.parse(readFileSync(0, "utf8"));
@@ -55,7 +63,7 @@ function mergeKeys(mine, mod) {
   for (const [section, keys] of Object.entries(mod)) {
     for (const [key, action] of Object.entries(keys)) {
       const bound = mine[section]?.[key];
-      if (bound == null) {
+      if (bound == null || sameJson(bound, supersededBindings[section]?.[key])) {
         merged[section] = isObject(merged[section]) ? merged[section] : {};
         merged[section][key] = action;
       } else if (!sameJson(bound, action)) {
@@ -66,29 +74,34 @@ function mergeKeys(mine, mod) {
   return { merged, kept };
 }
 
-// Herdr stores a divider drag between weighted siblings as weights, so the panel keeps its share after one.
-// 5:2 starts the panel near the shipped 368px in a typical window.
-function weighPanelBesideMain(layout) {
+const isIssuesBlock = (node) => node?.content?.mod === "issues";
+
+const holdsPanelBodyDirectly = (node) => Array.isArray(node?.children) && node.children.some((child) => child?.id === "panel-body");
+
+// Places a column holding the issues block right after the node whose child is panel-body.
+function addPanel(layout) {
   for (const object of objectsIn(layout)) {
     const children = Array.isArray(object.children) ? object.children : [];
-    const hasMain = children.some((child) => child?.id === "main");
-    const fixedPanel = children.some(
-      (child) => child?.id === "panel" && child.size?.px != null && hasPanelBody(child),
-    );
-    if (!hasMain || !fixedPanel) continue;
-    for (const child of children) {
-      if (child?.id === "main") child.size = { weight: 5 };
-      else if (child?.id === "panel") child.size = { weight: 2 };
-    }
+    const panelIndex = children.findIndex(holdsPanelBodyDirectly);
+    if (panelIndex === -1) continue;
+    children.splice(panelIndex + 1, 0, structuredClone(issuesColumn));
+    break;
   }
+  return layout;
 }
 
-function addPanel(layout) {
-  for (const object of [...objectsIn(layout)]) {
-    if (object.id === "panel-body") object.children = [...(object.children ?? []), structuredClone(issuesBlock)];
+// Takes the issues block out of panel-body, answering whether there was one. A stack showing the block
+// shows its first remaining child instead.
+function removeFromPanelBody(layout) {
+  let removed = false;
+  for (const object of objectsIn(layout)) {
+    if (object.id !== "panel-body" || !Array.isArray(object.children) || !object.children.some(isIssuesBlock)) continue;
+    const shown = object.children.find((child) => child?.id === object.active);
+    object.children = object.children.filter((child) => !isIssuesBlock(child));
+    if (isIssuesBlock(shown)) object.active = object.children[0]?.id;
+    removed = true;
   }
-  weighPanelBesideMain(layout);
-  return layout;
+  return removed;
 }
 
 function shippedLayoutNames(installedPath) {
@@ -136,6 +149,12 @@ const commands = {
     if (names.length) console.log(names.join("\n"));
   },
   "add-panel": (layoutPath) => writeJson(layoutPath, addPanel(readJson(layoutPath))),
+  "move-panel": (layoutPath) => {
+    const layout = readJson(layoutPath);
+    if (!removeFromPanelBody(layout)) return panelUnmovedExitCode;
+    writeJson(layoutPath, addPanel(layout));
+    return panelMovedExitCode;
+  },
   "copy-layout": (fromPath, toPath, version) => {
     const copy = { ...readJson(fromPath), cloned_from: { name: "main", version } };
     writeJson(toPath, addPanel(copy));

@@ -6,10 +6,11 @@
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
-// can't load, shows the setup view (setup.js) in place of the list.
+// can't load, shows the setup view (setup.js) in place of the list. The issues.toggle key command and the
+// strip's button collapse the panel to a thin strip and expand it again (collapse.js).
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome, layout, shared, setShared } from "herdr";
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
@@ -31,6 +32,7 @@ import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
+import { COLLAPSED_PX, DEFAULT_EXPANDED_PX, collapsibleNodeId, isCollapsed, remembersWidth } from "./collapse.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
@@ -55,6 +57,7 @@ const ID_CHARACTER_PX = 7;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
 const contextKey = () => JSON.stringify(location());
+const expandedWidthKey = () => `issues.expandedWidth:${shared("layout") ?? "main"}`;
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
 function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
@@ -110,7 +113,9 @@ export default class Issues extends View {
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
     cx.spawn(async (cx) => {
       for (; ;) {
-        if (await nextCommand() === "save") this.save(cx);
+        const command = await nextCommand();
+        if (command === "save") this.save(cx);
+        else if (command === "toggle") this.toggleCollapsed();
         cx.notify();
       }
     });
@@ -251,11 +256,35 @@ export default class Issues extends View {
   }
 
   refreshOnReturn(cx) {
-    const visible = panelVisible(), returned = visible && this.visible === false;
+    const visible = panelVisible() && !this.collapsed, returned = visible && this.visible === false;
     this.visible = visible;
     const stale = returned && this.tracker && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS;
     if (stale) this.refresh(cx, { reuse: true });
     return stale;
+  }
+
+  // Crossing the collapse threshold, by a toggle or a drag, redraws the panel as the strip or the list.
+  noticeWidth(width, cx) {
+    const wasCollapsed = this.collapsed;
+    this.width = width;
+    this.collapsed = isCollapsed(width);
+    if (remembersWidth(width)) this.expandedWidth = width;
+    if (this.collapsed !== wasCollapsed) cx.notify();
+  }
+
+  // Herdr remembers the node's size in the layout, so the panel stays collapsed or expanded in every space. The
+  // width to return to is shared too, so it outlasts this copy of the mod.
+  toggleCollapsed() {
+    const id = collapsibleNodeId(layout());
+    if (!id || this.width == null) return;
+    if (this.collapsed) {
+      const remembered = shared(expandedWidthKey());
+      run("layout.resize", { id, px: this.expandedWidth ?? (typeof remembered === "number" ? remembered : DEFAULT_EXPANDED_PX) });
+    } else {
+      this.expandedWidth = this.width;
+      setShared(expandedWidthKey(), this.width);
+      run("layout.resize", { id, px: COLLAPSED_PX });
+    }
   }
 
   // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the created stamp says
@@ -794,9 +823,28 @@ export default class Issues extends View {
         .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
   }
 
+  frame(t) {
+    return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
+      .text_color(t.foreground).text_size(13)
+      .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
+  }
+
+  // Centered on the expanded panel's header, which is 42px tall.
+  strip(t) {
+    return this.frame(t).items_center().pt(8)
+      .child(div().id("issues-expand").flex_none().size(24).flex().items_center().justify_center().rounded(6)
+        .cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => this.toggleCollapsed())
+        .child(svg("mods/issues/icons/issues.svg").size(16).text_color(t.foreground)));
+  }
+
   render(cx) {
     if (this.menu) return this.menu.render();
     if (this.worktreeDialog) return this.worktreeDialog.render(cx);
+    if (this.collapsed) {
+      this.refreshOnReturn(cx);
+      this.noticeSpaceSwitch();
+      return this.strip(theme());
+    }
     if (contextKey() !== this.context) this.refresh(cx, { reuse: true });
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
@@ -836,8 +884,7 @@ export default class Issues extends View {
       : this.list(t);
     const avatarLoads = this.avatarLoads;
     if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });
-    return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
-      .text_color(t.foreground).text_size(13)
+    return this.frame(t)
       .child(v_flex().flex_1().min_h(0).child(content))
       .when(Boolean(this.opening), (e) => e.child(this.openingFooter(t)));
   }

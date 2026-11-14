@@ -21,6 +21,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `lookups.js`: the repository, main checkout and settings lookups kept between refreshes, forgotten when `issues.json` or `linear.json` changes.
 - `links.js`, `editor.js`, `neovim.js`: links in issue bodies and opening files in the person's editor.
 - `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
+- `collapse.js`: collapsing the panel to a thin strip and expanding it again, by resizing the layout node that holds it.
 - `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`.
 - `icons/`: the panel's icons, drawn by their path in Herdr's mods folder, such as `mods/issues/icons/rotate-cw.svg`.
 
@@ -74,9 +75,10 @@ Run `./setup` from the main checkout; run from a linked worktree, it refuses and
 
 - links the checkout's `mod/` folder to `~/.config/herdr-app/mods/issues`, repointing a link an older install made to the checkout itself;
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;
-- merges `mod/keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else;
+- merges `mod/keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else, except a binding an earlier version of the mod made, such as `cmd-shift-i` to `layout.toggle:panel`;
 - adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`;
-- offers to add the Issues panel to the side panel (`panel-body`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal.
+- offers to add the Issues panel in a column of its own beside the side panel (`panel`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal;
+- moves the Issues panel out of `panel-body` in a personal layout an earlier setup put it in, into that column of its own.
 
 Running it again is safe, and is how plugin changes are installed. A person who only uses the panel installs and updates with the README's one-line command instead, whose checkout lives in `~/.local/share/herdr-issues-mod`.
 

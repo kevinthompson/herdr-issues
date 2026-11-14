@@ -7,7 +7,8 @@
 #     which brings the issues:* skills and the Claude hooks
 #   - adds the mod's keys (mod/keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
 #     to something else
-#   - offers to add the Issues panel to a personal layout's side panel, unless a layout already shows it
+#   - offers to add the Issues panel beside a personal layout's side panel, unless a layout already shows it,
+#     and moves the panel out of the side panel of a layout an earlier setup put it in
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
@@ -162,17 +163,27 @@ shipped_layout_names() {
 
 print_manual_layout_steps() {
   note <<EOF
-To show the Issues panel, make a personal copy of a layout and add the mod to its side panel:
+To show the Issues panel, make a personal copy of a layout and add the mod beside its side panel:
   herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
-Then add this block to the children of the node whose id is panel-body in $layouts_dir/main-issues.json:
-  { "id": "issues", "type": "block", "content": { "mod": "issues" } }
-To keep the panel's share of the window as it resizes, give the node whose id is main "size": { "weight": 5 }
-and the node whose id is panel "size": { "weight": 2 }.
+Then add this column right after the node whose id is panel in $layouts_dir/main-issues.json:
+  { "id": "issues-panel", "type": "column", "size": { "px": 368 }, "min": 32, "max": 900,
+    "children": [{ "id": "issues", "type": "block", "content": { "mod": "issues" } }] }
 EOF
 }
 
-add_block_to_panel_body() {
+add_panel_beside_panel_body() {
   node "$setup_json" add-panel "$1"
+}
+
+# Earlier versions of setup put the Issues panel inside panel-body, where collapsing it would shrink Files and Changes.
+move_panel_out_of_panel_body() {
+  local status=0
+  node "$setup_json" move-panel "$1" || status=$?
+  case $status in
+    0) success "Moved the Issues panel in the $(basename "$1" .json) layout into a column of its own" ;;
+    10) ;;
+    *) exit "$status" ;;
+  esac
 }
 
 # Writes the copy itself instead of running layout.clone, which needs an open window and switches it to the copy.
@@ -210,6 +221,7 @@ add_panel_to_layout() {
     name=$(basename "$layout_file" .json)
     if layout_shows_mod "$layout_file"; then
       showing+=("$name")
+      grep -qxF "$name" <<<"$shipped" || move_panel_out_of_panel_body "$layout_file"
     elif ! grep -qxF "$name" <<<"$shipped" && layout_has_panel_body "$layout_file"; then
       candidates+=("$name")
     fi
@@ -244,7 +256,7 @@ add_panel_to_layout() {
       copy_main_layout || print_manual_layout_steps
       ;;
     *)
-      add_block_to_panel_body "$layouts_dir/$choice.json"
+      add_panel_beside_panel_body "$layouts_dir/$choice.json"
       success "Added the Issues panel to the $choice layout"
       ;;
   esac
