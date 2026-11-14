@@ -8,6 +8,7 @@
 - `git`
 - Node.js (`node`) 22.15 or later, for the `issues` command
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
+- the Linear MCP server in Claude Code, for repositories tracked in Linear; [Configuration](configuration.md#credentials) explains adding it
 
 ## Running setup
 
