@@ -30,10 +30,13 @@ import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueSt
 import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
+import { panelVisible } from "./visibility.js";
 
 const POLL_MS = 60 * 1000;
 // A local issues/ folder on a remote host can't be watched, but reading it is cheap.
 const LOCAL_POLL_MS = 10 * 1000;
+// A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
+const STALE_ON_RETURN_MS = 10 * 1000;
 // A Claude hook (claude-plugin/hooks/herdr-issues-created.sh) touches this file after Claude creates a remote issue.
 const createdStampPath = () => `${appHome()}/data/issues/created`;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
@@ -102,7 +105,7 @@ export default class Issues extends View {
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
-    cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); });
+    cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); else this.refreshOnReturn(cx); });
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
@@ -175,6 +178,13 @@ export default class Issues extends View {
     if (this.tracker?.changed && this.watching) return false;
     const interval = this.tracker?.kind === "local" ? LOCAL_POLL_MS : POLL_MS;
     return Date.now() - this.refreshedAt >= interval;
+  }
+
+  // Polls can leave a remote list a minute old, so coming back to a panel that was out of sight refreshes it.
+  refreshOnReturn(cx) {
+    const visible = panelVisible(), returned = visible && this.visible === false;
+    this.visible = visible;
+    if (returned && this.tracker && this.tracker.kind !== "local" && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx);
   }
 
   // Keyed by the tracker's kind too, so a repository that switches trackers stops watching the old one.
@@ -732,6 +742,7 @@ export default class Issues extends View {
     if (contextKey() !== this.context) this.refresh(cx);
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
+    else this.refreshOnReturn(cx);
     this.scheduleStatusCommits(cx);
     this.openRequestedIssue();
     this.applyFieldEdits(cx);
