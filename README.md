@@ -99,6 +99,14 @@ Two more settings in the same entry say how an issue's branch gets into main and
 
 The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
 
+`worktreeSetup` is a command to run in each new worktree, such as one that installs the branch's dependencies. `issues worktree` runs it once, in a worktree it has just created, before opening the worktree's space; it doesn't run again when it reuses a worktree. The command runs through your login shell (`$SHELL -lc`), so it finds the tools on your profile's `PATH` even when the Herdr app starts it, and its output is printed. When it fails, `issues worktree` says which command failed, keeps the worktree so you can finish setting it up by hand, and exits with an error without opening the space. For example, a Planning Center box app:
+
+```json
+"~/Code/people": { "tracker": "linear", "worktreeSetup": "box worktree-setup" }
+```
+
+A repository whose own git hook already sets up new worktrees, such as calendar, leaves `worktreeSetup` unset.
+
 ## Using the panel
 
 Press **Cmd-Shift-I** to show or hide the panel. It shows the issues of the repository in the focused pane, grouped by status, and refreshes when issues change.
