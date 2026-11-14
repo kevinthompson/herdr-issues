@@ -10,6 +10,7 @@ Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `ma
 
 - `main.js`: the panel, its list, polling and refreshes.
 - `detail.js`: one issue drawn in place of the list, with its body and the editor.
+- `setup.js`: the setup view drawn in place of the list for a repository with no tracker, or one whose tracker can't load.
 - `menu.js`: the status, priority, scope, milestone and label dropdowns, opened as popups of this same mod.
 - `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
@@ -29,8 +30,9 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 - `trackers/linear.js`: Linear, with `trackers/linear-team.js` finding the team for a Planning Center repository that has no setting.
 - `trackers/github.js`: GitHub Issues, through the `gh` CLI.
+- `trackers/problems.js`: the errors a person can fix, each with what to do, which the setup view shows.
 
-`trackerFor` in `trackers/index.js` chooses one. The repository's entry in `~/.config/herdr-app/issues.json`, which `/issues:config` writes and `trackers/setting.js` reads, decides first; it is keyed by the main checkout's path, so worktrees share it. Without an entry, it uses Linear.
+`trackerFor` in `trackers/index.js` chooses one. The repository's entry in `~/.config/herdr-app/issues.json`, which `/issues:config` and the panel's setup view write and `trackers/setting.js` reads, decides first; it is keyed by the main checkout's path, so worktrees share it. Without an entry, it uses Linear.
 
 ### The Claude plugin (`claude-plugin/`)
 

@@ -5,11 +5,12 @@
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
-// checkbox in the body saves that one change at once.
+// checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
+// can't load, shows the setup view (setup.js) in place of the list.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
-import { location, projectRoot, mainCheckout } from "./location.js";
+import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
@@ -28,6 +29,7 @@ import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { panelVisible } from "./visibility.js";
+import { TrackerSetup, untrackableView } from "./setup.js";
 
 const POLL_MS = 60 * 1000;
 const REFRESH_CHECK_MS = 10 * 1000;
@@ -77,6 +79,8 @@ const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
 const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
+const NOT_A_REPOSITORY = "The issues panel tracks issues for git repositories, and this folder isn't in one.";
+const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
 
 const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/issues:work ${issue.id}` });
 // wt sets up new checkouts, which can take minutes in a box app.
@@ -124,23 +128,29 @@ export default class Issues extends View {
     this.seenChangeAt = issuesChangedAt();
     this.refreshing = true;
     cx.spawn(async (cx) => {
+      let scopeKey = null;
       try {
         const where = location();
         if (!where.cwd) throw new Error("No folder in focus");
-        const root = await projectRoot(where);
-        const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
+        const root = where.on == null ? await repositoryRoot(where) : null;
+        if (generation !== this.generation) return;
+        if (!root) { this.showUntrackable(where, context); return; }
+        scopeKey = await mainCheckout(root, where.on);
+        const scope = selectedScope(scopeKey);
         if (generation !== this.generation) return;
         // Every checkout of a repository lists the same issues, so its list stays up across its spaces.
         if (scopeKey !== this.scopeKey) { this.forgetList(); cx.notify(); }
-        this.project = { root, on: where.on }; this.resolvedContext = context;
+        this.project = { root, on: where.on }; this.resolvedContext = context; this.scopeKey = scopeKey; this.untrackable = null;
         this.watchAppFiles(cx);
         const tracker = await trackerFor({ root, on: where.on });
+        if (generation !== this.generation) return;
+        this.listedScope = scope;
+        if (!tracker) { this.showSetup(scopeKey, null, cx); return; }
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
         const loads = loadsFor((group) => this.isExpanded(group));
         const unloaded = new Set((tracker?.deferred?.(scope) ?? []).filter((each) => !loads.has(each)));
         const project = { root, on: where.on }, listKey = `${scopeKey}\n${scope ?? ""}\n${[...loads].sort()}`;
         // A tracker is slow to list, so a scope not shown yet starts from its last list.
-        this.listedScope = scope;
         if (tracker && this.listKey !== listKey) {
           const last = await lastList(listKey);
           if (last && generation === this.generation) {
@@ -151,18 +161,38 @@ export default class Issues extends View {
         const issues = tracker ? await fetchList(listKey, () => tracker.list(scope, loads), reuse) : [];
         if (generation !== this.generation) return;
         const leaving = this.openId && !issues.some((each) => each.id === this.openId) ? this.findIssue(this.openId) : null;
-        Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null });
+        Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null, setup: null });
         if (leaving) this.holdOpenIssue(leaving, tracker, cx);
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.scanRepository(project, generation, cx);
-      } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
+      } catch (e) {
+        if (generation !== this.generation) return;
+        if (e.fix && scopeKey) this.showSetup(scopeKey, e, cx);
+        else this.error = String(e.message ?? e);
+      }
       finally { if (generation === this.generation) { this.loaded = true; this.refreshing = false; cx.notify(); } }
     });
+  }
+
+  // The setup view in place of the list: choosing a tracker, or `failure`, the problem that stops the
+  // configured one loading. It survives polls, so a choice in progress isn't lost.
+  showSetup(main, failure, cx) {
+    if (this.setup?.main !== main) this.setup = new TrackerSetup(main, (cx) => this.refresh(cx));
+    this.setup.showFailure(failure);
+    Object.assign(this, { tracker: null, issues: [], unloaded: new Set(), listKey: null, repository: null, error: null });
+    this.closeIssue();
+    cx.notify();
+  }
+
+  showUntrackable(where, context) {
+    this.forgetList(); this.closeIssue();
+    Object.assign(this, { setup: null, error: null, resolvedContext: context, untrackable: where.on == null ? NOT_A_REPOSITORY : ON_ANOTHER_MACHINE });
   }
 
   forgetList() {
     this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
     this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.focusHandled = null;
+    this.setup = null;
   }
 
   // The open issue stays up after leaving the list, such as when it's done and the Done group isn't
@@ -631,9 +661,7 @@ export default class Issues extends View {
   }
 
   emptyText() {
-    if (!this.loaded) return "Loading…";
-    if (!this.tracker) return `No Linear team or GitHub repository for ${this.project?.root ?? "this folder"}`;
-    return "No issues yet";
+    return this.loaded ? "No issues yet" : "Loading…";
   }
 
   // The scope listed now: { scope, project, milestone }, a milestone's under its project.
@@ -685,18 +713,30 @@ export default class Issues extends View {
       .child(svg("mods/issues/rotate-cw.svg").size(REFRESH_ICON_PX).text_color(this.refreshing ? t.dim : t.foreground));
   }
 
+  header(t) {
+    const syncIndicator = this.syncIndicator(t);
+    return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
+      .child(div().font_semibold().child("Issues"))
+      .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
+      .child(div().flex_1())
+      .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
+      .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)).child(this.trackerLabel(t)));
+  }
+
+  // The panel's header over `content`, which stands in for the list.
+  listFrame(content, t) {
+    return v_flex().size_full().min_h(0).child(this.header(t)).child(content);
+  }
+
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
+    if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
+    if (this.setup) return this.listFrame(this.setup.render(t, { onRetry: (cx) => { this.refresh(cx); cx.notify(); } }), t);
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
-    const shown = this.shownCounts(groups), syncIndicator = this.syncIndicator(t), idColumnWidth = this.idColumnWidth(groups);
+    const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
     return v_flex().size_full().min_h(0)
-      .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-        .child(div().font_semibold().child("Issues"))
-        .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
-        .child(div().flex_1())
-        .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
-        .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)).child(this.trackerLabel(t))))
+      .child(this.header(t))
       .when(Boolean(filterBar), (e) => e.child(filterBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
@@ -713,6 +753,7 @@ export default class Issues extends View {
     else this.refreshOnReturn(cx);
     this.openRequestedIssue(cx);
     this.applyFieldEdits(cx);
+    this.setup?.takePickedTeam(cx);
     const t = theme(), issue = this.findIssue(this.openId);
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];

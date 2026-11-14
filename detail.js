@@ -110,7 +110,7 @@ let hoveredButton = null;
 
 // Buttons stop the pointer events a list row would otherwise take as an open. A label may be a
 // function of the button's text color, for an icon.
-function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {}) {
+export function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {}) {
   const solidOnHover = primaryOnHover && !primary;
   const hoverStyle = solidOnHover ? (s) => s.bg(t.solid).text_color(t.solid_foreground) : (s) => s.opacity(0.85);
   const textColor = !enabled ? t.dim
