@@ -12,7 +12,7 @@ import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { settingsPath } from "./trackers/setting.js";
+import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
@@ -33,7 +33,6 @@ import { issueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 
-const POLL_MS = 60 * 1000;
 const REFRESH_CHECK_MS = 10 * 1000;
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
 const STALE_ON_RETURN_MS = 10 * 1000;
@@ -145,7 +144,9 @@ export default class Issues extends View {
         this.project = { root, on: where.on }; this.resolvedContext = context; this.scopeKey = scopeKey; this.untrackable = null;
         this.watchAppFiles(cx);
         const tracker = await trackerFor({ root, on: where.on });
+        const { pollSeconds } = await pollSettings({ root, on: where.on });
         if (generation !== this.generation) return;
+        this.pollMs = pollSeconds * 1000;
         this.listedScope = scope;
         if (!tracker) { this.showSetup(scopeKey, null, cx); return; }
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
@@ -244,7 +245,7 @@ export default class Issues extends View {
   }
 
   pollDue() {
-    return Date.now() - this.refreshedAt >= POLL_MS;
+    return Date.now() - this.refreshedAt >= (this.pollMs ?? DEFAULT_POLL_SECONDS * 1000);
   }
 
   refreshOnReturn(cx) {
