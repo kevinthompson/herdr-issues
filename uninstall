@@ -1,0 +1,190 @@
+#!/bin/bash
+# Usage: ./uninstall
+#
+# Removes what setup installed from this checkout:
+#   - the $HERDR_APP_HOME/mods/issues and ~/.local/bin/issues links, when they point into this checkout
+#   - the mod's keys in $HERDR_APP_HOME/keys.json still bound to the mod's actions
+#   - the issues@herdr-issues plugin and the herdr-issues marketplace
+# It asks before removing the Issues panel from personal layouts, the issues.json and linear.json settings,
+# and the cached lists and avatars; the default answer is no, and without a terminal it keeps all three.
+# Run from ~/.local/share/herdr-issues-mod, where the install command keeps its checkout, it deletes that
+# checkout last; it leaves any other checkout in place.
+#
+# Needs git and node.
+
+# The body is one function, read whole before it runs, since it can delete this file.
+uninstall() {
+  set -euo pipefail
+
+  local repo_root herdr_home mod_link cli_link keys_file layouts_dir setup_json installed_checkout
+  repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+  herdr_home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
+  mod_link="$herdr_home/mods/issues"
+  cli_link="$HOME/.local/bin/issues"
+  keys_file="$herdr_home/keys.json"
+  layouts_dir="$herdr_home/layouts"
+  setup_json="$repo_root/scripts/setup-json.js"
+  installed_checkout="$HOME/.local/share/herdr-issues-mod"
+  local marketplace=herdr-issues plugin=issues@herdr-issues
+  local removed=0 kept=()
+
+  fail() {
+    printf 'uninstall: %s\n' "$@" >&2
+    exit 1
+  }
+
+  local command
+  for command in git node; do
+    command -v "$command" >/dev/null || fail "missing required command: $command"
+  done
+
+  local git_dir common_dir main_checkout
+  git_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-dir)
+  common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)
+  if [[ $git_dir != "$common_dir" ]]; then
+    main_checkout=$(git -C "$repo_root" worktree list --porcelain | sed -n '1s/^worktree //p')
+    fail "$repo_root is a linked worktree, which setup never installs from, so nothing was changed" \
+      "run ./uninstall from the main checkout instead: cd $main_checkout && ./uninstall"
+  fi
+
+  points_into_checkout() {
+    local target
+    target=$(readlink "$1")
+    [[ $target == "$repo_root" || $target == "$repo_root/"* ]]
+  }
+
+  remove_link() {
+    local link=$1
+    if [[ -L $link ]]; then
+      if points_into_checkout "$link"; then
+        rm "$link"
+        printf 'Removed %s\n' "$link"
+        removed=1
+      else
+        printf 'Left %s, which points to %s, not this checkout\n' "$link" "$(readlink "$link")"
+      fi
+    elif [[ -e $link ]]; then
+      printf 'Left %s, which is not a link\n' "$link"
+    fi
+  }
+
+  remove_keys() {
+    [[ -f $keys_file ]] || return 0
+    local status=0
+    node "$setup_json" unmerge-keys "$keys_file" "$repo_root/mod/keys.json" || status=$?
+    case $status in
+      0)
+        printf "Removed the mod's keys from %s\n" "$keys_file"
+        removed=1
+        ;;
+      10) ;;
+      *) exit "$status" ;;
+    esac
+  }
+
+  remove_plugin() {
+    if ! command -v claude >/dev/null; then
+      printf 'Skipped the Claude plugin: claude is not installed\n'
+      return
+    fi
+    if claude plugin list --json | node "$setup_json" plugin-installed "$plugin"; then
+      claude plugin uninstall "$plugin"
+      removed=1
+    else
+      printf 'Skipped the %s plugin: it is not installed\n' "$plugin"
+    fi
+    if [[ -n $(claude plugin marketplace list --json | node "$setup_json" marketplace-path "$marketplace") ]]; then
+      claude plugin marketplace remove "$marketplace"
+      removed=1
+    else
+      printf 'Skipped the %s marketplace: it is not added\n' "$marketplace"
+    fi
+  }
+
+  # Answers no without asking when standard input isn't a terminal.
+  confirm() {
+    local answer
+    [[ -t 0 ]] || return 1
+    read -r -p "$1 [y/N] " answer || return 1
+    [[ $answer == [yY]* ]]
+  }
+
+  remove_panel_from_layouts() {
+    [[ -d $layouts_dir ]] || return 0
+    local layout_file name shipped showing=()
+    shipped=$(node "$setup_json" shipped-layouts "$herdr_home/installed.json")
+    for layout_file in "$layouts_dir"/*.json; do
+      [[ -f $layout_file ]] || continue
+      name=$(basename "$layout_file" .json)
+      grep -qxF "$name" <<<"$shipped" && continue
+      node "$setup_json" shows-mod "$layout_file" && showing+=("$layout_file")
+    done
+    ((${#showing[@]})) || return 0
+
+    if confirm "Remove the Issues panel from the $(basename -a -s .json "${showing[@]}" | paste -sd ' ' -) layouts?"; then
+      for layout_file in "${showing[@]}"; do
+        node "$setup_json" remove-panel "$layout_file" || [[ $? == 10 ]]
+        printf 'Removed the Issues panel from %s\n' "$layout_file"
+      done
+      removed=1
+    else
+      for layout_file in "${showing[@]}"; do
+        kept+=("the Issues panel in $layout_file; delete its node whose content is {\"mod\":\"issues\"}, and the issues-panel column holding it")
+      done
+    fi
+  }
+
+  remove_settings() {
+    local files=() file
+    for file in "$herdr_home/issues.json" "$herdr_home/linear.json"; do
+      [[ -e $file ]] && files+=("$file")
+    done
+    ((${#files[@]})) || return 0
+    if confirm "Delete the issues settings and Linear API key (${files[*]})?"; then
+      rm -f "${files[@]}"
+      printf 'Deleted %s\n' "${files[@]}"
+      removed=1
+    else
+      kept+=("the settings in ${files[*]}; delete them with: rm ${files[*]}")
+    fi
+  }
+
+  remove_cached_data() {
+    local data_dir="$herdr_home/data/issues"
+    [[ -e $data_dir ]] || return 0
+    if confirm "Delete the cached lists and avatars in $data_dir?"; then
+      rm -rf "$data_dir"
+      printf 'Deleted %s\n' "$data_dir"
+      removed=1
+    else
+      kept+=("the cached lists and avatars in $data_dir; delete them with: rm -r $data_dir")
+    fi
+  }
+
+  remove_link "$mod_link"
+  remove_link "$cli_link"
+  remove_keys
+  remove_plugin
+  remove_panel_from_layouts
+  remove_settings
+  remove_cached_data
+
+  if [[ $repo_root == "$(cd "$installed_checkout" 2>/dev/null && pwd -P)" ]]; then
+    rm -rf "$repo_root"
+    printf 'Deleted %s\n' "$repo_root"
+    removed=1
+  fi
+
+  if ((${#kept[@]})); then
+    printf '\nKept:\n'
+    printf -- '- %s\n' "${kept[@]}"
+  fi
+  if ((removed)); then
+    printf '\nDone. Start a new Claude Code session to unload the plugin.\n'
+  else
+    printf '\nNothing left to remove.\n'
+  fi
+  exit 0
+}
+
+uninstall "$@"

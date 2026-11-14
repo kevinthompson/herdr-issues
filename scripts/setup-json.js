@@ -1,16 +1,21 @@
 #!/usr/bin/env node
-// The JSON reading and editing `setup` and `scripts/demo-setup` do, so they need only node and not jq.
+// The JSON reading and editing `setup`, `uninstall` and `scripts/demo-setup` do, so they need only node and not jq.
 //
 //   marketplace-path <name>           prints the path of the named marketplace in `claude plugin marketplace list --json` on stdin
 //   plugin-installed <id>             succeeds when `claude plugin list --json` on stdin lists the plugin
 //   merge-keys <keys.json> <mod keys> adds each mod key the person hasn't bound, printing one line per key kept;
 //                                     exits 0 after adding keys and 10 when the file already had them
+//   unmerge-keys <keys.json> <mod keys>
+//                                     removes each mod key still bound to the mod's action, keeping any the person
+//                                     rebound; exits 0 after removing keys and 10 when there were none to remove
 //   shows-mod <layout>                succeeds when the layout shows the issues mod
 //   has-panel-body <layout>           succeeds when the layout has a panel-body node
 //   shipped-layouts <installed.json>  prints the name of each layout Herdr ships
 //   add-panel <layout>                adds the issues block in a column of its own beside the panel holding panel-body
 //   move-panel <layout>               moves an issues block an earlier setup put in panel-body into a column of its own;
 //                                     exits 0 after moving it and 10 when there was none to move
+//   remove-panel <layout>             removes the issues block and a column holding only it;
+//                                     exits 0 after removing it and 10 when the layout didn't show it
 //   copy-layout <from> <to> <version> copies a layout, records what it was cloned from, and adds the issues block
 //   set-repo <issues.json> <main checkout> <entry>
 //                                     replaces the repository's entry in issues.json with the entry's JSON, under
@@ -27,8 +32,11 @@ import { homedir } from "node:os";
 
 const keysAddedExitCode = 0;
 const keysUnchangedExitCode = 10;
+const keysRemovedExitCode = 0;
 const panelMovedExitCode = 0;
 const panelUnmovedExitCode = 10;
+const panelRemovedExitCode = 0;
+const panelAbsentExitCode = 10;
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
 // The panel collapses to a 32px strip by resizing this column, so its min mustn't stop it there.
 const issuesColumn = { id: "issues-panel", type: "column", size: { px: 368 }, min: 32, max: 900, children: [issuesBlock] };
@@ -74,7 +82,38 @@ function mergeKeys(mine, mod) {
   return { merged, kept };
 }
 
+// The person's keys without each mod key still bound to the mod's action. A section left empty goes too.
+function unmergeKeys(mine, mod) {
+  const unmerged = structuredClone(mine);
+  for (const [section, keys] of Object.entries(mod)) {
+    if (!isObject(unmerged[section])) continue;
+    for (const [key, action] of Object.entries(keys)) {
+      if (sameJson(unmerged[section][key], action)) delete unmerged[section][key];
+    }
+    if (isObject(mine[section]) && Object.keys(mine[section]).length && !Object.keys(unmerged[section]).length) delete unmerged[section];
+  }
+  return unmerged;
+}
+
 const isIssuesBlock = (node) => node?.content?.mod === "issues";
+
+const holdsOnlyIssuesBlocks = (node) => Array.isArray(node?.children) && node.children.length > 0 && node.children.every(isIssuesBlock);
+
+// Takes out every issues block and each node holding nothing else, answering whether there was one. A stack
+// showing a removed node shows its first remaining child instead.
+function removePanel(layout) {
+  let removed = false;
+  for (const object of [...objectsIn(layout)]) {
+    if (!Array.isArray(object.children)) continue;
+    const removable = (child) => isIssuesBlock(child) || holdsOnlyIssuesBlocks(child);
+    if (!object.children.some(removable)) continue;
+    const shown = object.children.find((child) => child?.id === object.active);
+    object.children = object.children.filter((child) => !removable(child));
+    if (shown && removable(shown)) object.active = object.children[0]?.id;
+    removed = true;
+  }
+  return removed;
+}
 
 const holdsPanelBodyDirectly = (node) => Array.isArray(node?.children) && node.children.some((child) => child?.id === "panel-body");
 
@@ -142,6 +181,13 @@ const commands = {
     writeJson(keysPath, merged);
     return keysAddedExitCode;
   },
+  "unmerge-keys": (keysPath, modKeysPath) => {
+    const mine = readJson(keysPath);
+    const unmerged = unmergeKeys(mine, readJson(modKeysPath));
+    if (sameJson(mine, unmerged)) return keysUnchangedExitCode;
+    writeJson(keysPath, unmerged);
+    return keysRemovedExitCode;
+  },
   "shows-mod": (layoutPath) => (showsMod(readJson(layoutPath)) ? 0 : 1),
   "has-panel-body": (layoutPath) => (hasPanelBody(readJson(layoutPath)) ? 0 : 1),
   "shipped-layouts": (installedPath) => {
@@ -154,6 +200,12 @@ const commands = {
     if (!removeFromPanelBody(layout)) return panelUnmovedExitCode;
     writeJson(layoutPath, addPanel(layout));
     return panelMovedExitCode;
+  },
+  "remove-panel": (layoutPath) => {
+    const layout = readJson(layoutPath);
+    if (!removePanel(layout)) return panelAbsentExitCode;
+    writeJson(layoutPath, layout);
+    return panelRemovedExitCode;
   },
   "copy-layout": (fromPath, toPath, version) => {
     const copy = { ...readJson(fromPath), cloned_from: { name: "main", version } };
