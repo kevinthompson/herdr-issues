@@ -148,7 +148,7 @@ export default class Issues extends View {
         if (generation !== this.generation) return;
         // Every checkout of a repository lists the same issues, so its list stays up across its spaces.
         if (scopeKey !== this.scopeKey) { this.forgetList(); cx.notify(); }
-        this.project = { root, on: where.on };
+        this.project = { root, on: where.on }; this.resolvedContext = context;
         this.watchAppFiles(cx);
         const tracker = await trackerFor({ root, on: where.on });
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
@@ -179,7 +179,7 @@ export default class Issues extends View {
 
   forgetList() {
     this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
-    this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT;
+    this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.focusHandled = null;
   }
 
   // Reads the repository's worktrees and branches for the issues just listed, after the list shows, marks the
@@ -289,10 +289,11 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // Opens the issue the tabs bar asked for when its space was shown, once this space's issues have loaded.
+  // Opens the issue the tabs bar asked for when its space was shown, once this space's repository is known
+  // and its issues have loaded.
   openRequestedIssue() {
     const request = shared("issues.focus"), space = spaces().find((each) => each.active);
-    if (!request || !this.loaded || request.at === this.focusHandled || request.space !== space?.id) return;
+    if (!request || !this.loaded || this.resolvedContext !== this.context || request.at === this.focusHandled || request.space !== space?.id) return;
     this.focusHandled = request.at;
     if (this.hasIssue(request.id) && !this.hasUnsavedEdits()) { this.stopEditing(); this.openId = request.id; }
   }
