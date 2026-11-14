@@ -190,7 +190,7 @@ export class TrackerSetup {
           .child(button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, { primary: id === proposedId }))
           .when(id === proposedId, (e) => e.child(div().text_size(11).text_color(t.dim).child("Proposed"))))
         .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))))
-      .when(Boolean(merge), (e) => e.child(button("setup-landing-back", "Back", (cx) => { this.landing.merge = null; cx.notify(); }, t)));
+      .when(Boolean(merge), (e) => e.child(h_flex().child(button("setup-landing-back", "Back", (cx) => { this.landing.merge = null; cx.notify(); }, t))));
   }
 
   teamPicker(t) {
