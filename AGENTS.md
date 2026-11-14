@@ -32,6 +32,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 - `trackers/linear.js`: Linear, with `trackers/linear-team.js` finding the team for a Planning Center repository that has no setting.
 - `trackers/github.js`: GitHub Issues, through the `gh` CLI.
+- `trackers/beads.js`: a local Beads database in the main checkout's `.beads/` folder, through the `bd` CLI, for an entry of `{ "tracker": "beads" }` written by hand. Beads keeps its database out of git, so its changes never make a commit.
 - `trackers/problems.js`: the errors a person can fix, each with what to do, which the setup view shows.
 
 `trackerFor` in `trackers/index.js` chooses one. The repository's entry in `~/.config/herdr-app/issues.json`, which `/issues:config` and the panel's setup view write and `trackers/setting.js` reads, decides first; it is keyed by the main checkout's path, so worktrees share it. Without an entry, it uses Linear.

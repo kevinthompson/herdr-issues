@@ -18,6 +18,12 @@ export const ghFailed = (message) => new SetupProblem(message,
   "Check that `gh auth status` shows you logged in and that your GitHub account can see the repository, then check again.");
 export const originNotOnGitHub = () => new SetupProblem("This repository's origin isn't on GitHub",
   "Add the repository's GitHub copy as the `origin` remote, then check again. To track issues in another GitHub repository, run `/issues:config` in Claude.");
+export const bdMissing = () => new SetupProblem("The Beads CLI (bd) isn't installed",
+  "Install it with `brew install beads`, or as [Beads' README](https://github.com/steveyegge/beads) says, then check again.");
+export const beadsNotInitialized = () => new SetupProblem("This repository has no Beads database",
+  "Run `bd init` in the repository's main checkout, then check again.");
+export const bdFailed = (message) => new SetupProblem(message,
+  "Check that `bd list` works in the repository's main checkout, then check again.");
 export const linearKeyMissing = () => new SetupProblem("No Linear API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);
 export const linearKeyUnreadable = () => new SetupProblem("~/.config/herdr-app/linear.json isn't valid JSON", LINEAR_KEY_FIX);
 export const linearKeyInvalid = () => new SetupProblem("Linear refused the API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);

@@ -6,7 +6,7 @@
 
 An Issues panel for the Herdr desktop app, and a Claude Code plugin that works the same issues from Claude sessions.
 
-- **Your issues beside your terminals.** The Herdr mod's Issues panel lists the issues of the repository in the focused pane, from Linear or GitHub Issues, and lets you read and edit them in place.
+- **Your issues beside your terminals.** The Herdr mod's Issues panel lists the issues of the repository in the focused pane, from Linear, GitHub Issues or a local Beads database, and lets you read and edit them in place.
 - **One click to start.** **Start** opens an issue's branch in its own worktree and Herdr space, with Claude already working the issue.
 - **Claude knows what you're looking at.** Claude sessions in Herdr know which issues the panel lists and which one is open, so "the issues" and "this issue" mean what you see.
 - **Skills for the whole loop.** The Claude Code plugin's `issues:*` skills create, plan, triage and work issues in whichever tracker the repository uses.
@@ -21,6 +21,7 @@ You need:
 - Node.js 22.15 or later
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear
+- [Beads](https://github.com/steveyegge/beads) (`bd`, `brew install beads`), for repositories tracked locally with Beads
 
 Install with one command:
 
@@ -54,6 +55,7 @@ Each tracker needs credentials:
 
 - **Linear**: a personal API key in `~/.config/herdr-app/linear.json`, and the Linear MCP server in Claude Code.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
+- **Beads**: none; it needs `bd` installed and a database made with `bd init` in the repository. The setup view doesn't offer Beads yet, so add `{ "tracker": "beads" }` as the repository's entry in `issues.json` by hand. The panel lists its issues and edits their status, priority and body, and none of it makes a git commit. The `issues:*` skills don't work Beads issues yet.
 
 [Configuration](docs/configuration.md) covers creating the Linear key and every setting in `issues.json`.
 
