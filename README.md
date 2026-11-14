@@ -17,16 +17,18 @@ You need:
 
 - Herdr, opened at least once
 - Claude Code
-- `jq` and `git`
+- `git`, with access to the GitHub repository
 - Node.js 22.15 or later
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear
 
+Install with one command:
+
 ```sh
-git clone https://github.com/kevinthompson/herdr-issues-mod.git
-cd herdr-issues-mod
-./setup
+d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues-mod.git "$d" && "$d/install"
 ```
+
+It clones the repository into `~/.local/share/herdr-issues-mod` and runs its setup. Run the same command again to update.
 
 Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to show or hide the Issues panel.
 
@@ -42,7 +44,7 @@ Then start a Claude Code session, run `/mcp`, choose `linear` and sign in to Lin
 
 The panel also needs a personal Linear API key; [Configuration](docs/configuration.md#credentials) explains creating it.
 
-[Installation](docs/installation.md) explains what `./setup` changes and how to update.
+[Installation](docs/installation.md) explains what the install command changes and how to update.
 
 ## Configuration
 
@@ -57,7 +59,7 @@ Each tracker needs credentials:
 
 ## Further reading
 
-- [Installation](docs/installation.md): requirements, what `./setup` changes, updating and checking the mod loads.
+- [Installation](docs/installation.md): requirements, what the install command changes, updating and checking the mod loads.
 - [Configuration](docs/configuration.md): choosing a tracker, credentials and the `issues.json` settings.
 - [Using the panel](docs/using-the-panel.md): scopes and labels, an issue's detail view, starting work and removing a worktree.
 - [Claude skills](docs/skills.md): the `issues:*` skills.
