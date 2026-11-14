@@ -8,12 +8,12 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 1. **Find the tracker** as `/issues:create` step 1 does, with `issues tracker --json`.
    - **Linear**: load `list_issues`, `get_issue`, `save_issue`, `list_issue_statuses`, `list_issue_labels` and the comment tools (`list_comments`, `save_comment` or `create_comment`) with ToolSearch, prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`. Use the team that owns the repository. If the tools aren't available, stop and say so.
-   - **GitHub**: use the GitHub CLI against the repository the setting names: `gh issue list`, `gh issue view --comments`, `gh issue edit --body-file`, `gh issue comment` and `gh issue close`. GitHub has no priority or Backlog state, so skip those questions in step 7; blockers are a "Blocked by #<number>" line in the body.
+   - **GitHub**: use the GitHub CLI against the repository the setting names: `gh issue list`, `gh issue view --comments`, `gh issue edit --body-file`, `gh issue comment` and `gh issue close`. GitHub has no priority or Backlog state, so skip the priority and status questions in step 7, and leave the issue open and unassigned; blockers are a "Blocked by #<number>" line in the body.
    - Read `../create/SKILL.md` beside this skill: its step 4 is what an issue must contain, and this skill doesn't restate it.
 
 2. **Pick the issues.** With issue IDs or a scope in the arguments, triage those. Otherwise confirm the scope before reading any issue. Triaging is this skill's job, not a list: never assume the person means Linear's Triage state.
    - **A list is in context**, such as the one the Herdr issues panel shows, which the session's context names: count that list's issues exactly as it defines them. For My issues that is every open issue assigned to the person across all teams (`list_issues` with `assignee: "me"` and no team), where open means not completed, canceled, a duplicate or in a state named Merged; In Review counts as open. Ask "There are <n> issues in <list>. What would you like to triage?" with the options **All issues** and **A different list**, and let the person type which issues they mean in the free-text answer.
-   - **No list is in context**, or the person picks **A different list**: ask "Which issues would you like to triage?" with the lists as options, each with its count: for Linear, My issues, the team's Triage state and the team's other open issues by status; for GitHub, the open issues by status (Backlog, Todo, In progress, In review).
+   - **No list is in context**, or the person picks **A different list**: ask "Which issues would you like to triage?" with the lists as options, each with its count: for Linear, My issues, the team's Triage state and the team's other open issues by status; for GitHub, the open issues by status (Todo, In progress, In review).
    - Triage the chosen issues oldest first.
 
    Work through the issues one at a time: finish each (steps 3 to 8) before starting the next.
@@ -33,7 +33,7 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 7. **Rewrite it.** Bring the issue to the bar: testable acceptance criteria, Out of scope, Verification commands that exist, Context naming real code and the reason for the work, and correct blockers (add or remove Linear blocking relations or "Blocked by" lines the work reveals). For a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after.
    - Also suggest a priority with a one-line reason, and ask the person to confirm or change it.
-   - Ask which status to leave it in, Todo or Backlog, offering Todo first when nothing blocks it. An issue in Linear's Triage state always leaves Triage.
+   - For Linear, ask which status to leave it in, Todo or Backlog, offering Todo first when nothing blocks it. An issue in Linear's Triage state always leaves Triage.
    - **Not yet worked** (step 3): rewrite the description itself.
    - **Already worked**, or others have commented: ask whether to revise the description or add a comment, since rewriting could erase what others rely on.
    - Show the person a summary of what changes and why, and save only once they approve, adjusting it first if they ask.
@@ -41,7 +41,7 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 8. **Save.**
    - **Linear**: save with `save_issue`, which replaces the whole description, so send the full rewritten text; set the state and priority the person chose, and the blocking relations. Post comments with the comment tool.
-   - **GitHub**: save the body with `gh issue edit <number> --body-file <file>`, and set the status the person chose: the `todo` label for Todo, none for Backlog. Post comments with `gh issue comment`.
+   - **GitHub**: save the body with `gh issue edit <number> --body-file <file>`, leaving the issue open and unassigned. Post comments with `gh issue comment`.
    - **Canceling** (already implemented, duplicate, or the person decides against it): set Linear's Canceled state or close the GitHub issue as not planned (`gh issue close <number> --reason "not planned"`), and record why in a comment, with a link to where it lives or the issue it duplicates.
 
 9. **Report** when the queue is done: each issue triaged, with its ID, what changed, its status and priority, and any new or canceled issues.
