@@ -58,9 +58,10 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 ## Installing for development
 
-Run `./setup` from the main checkout. It needs `herdr-app`, `claude`, `jq` and `git`, and `gh` for repositories tracked in GitHub Issues. It:
+Run `./setup` from the main checkout. It needs `herdr-app`, `claude`, `jq`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
 
 - links the checkout to `~/.config/herdr-app/mods/issues`;
+- links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;
 - merges `keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else;
 - adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`;
 - offers to add the Issues panel to the side panel (`panel-body`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal.

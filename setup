@@ -8,9 +8,10 @@
 #   - adds the mod's keys (keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
 #     to something else
 #   - offers to add the Issues panel to a personal layout's side panel, unless a layout already shows it
-# Running it again re-links the mod and updates the plugin to this checkout's version.
+#   - links the issues CLI (bin/issues) to ~/.local/bin/issues
+# Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
-# Needs herdr-app, claude, jq and git; gh is needed only for repositories tracked in GitHub Issues.
+# Needs herdr-app, claude, jq, git and node; gh is needed only for repositories tracked in GitHub Issues.
 
 set -euo pipefail
 
@@ -20,9 +21,10 @@ plugin="issues@$marketplace"
 herdr_home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
 mod_link="$herdr_home/mods/issues"
 keys_file="$herdr_home/keys.json"
+cli_link="$HOME/.local/bin/issues"
 
 missing=()
-for command in herdr-app claude jq git; do
+for command in herdr-app claude jq git node; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
@@ -39,6 +41,20 @@ link_mod() {
   mkdir -p "$(dirname "$mod_link")"
   ln -sfn "$repo_root" "$mod_link"
   echo "Linked $mod_link -> $repo_root"
+}
+
+link_cli() {
+  if [[ -e $cli_link && ! -L $cli_link ]]; then
+    echo "setup: $cli_link exists and is not a symlink; move it aside and run setup again" >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "$cli_link")"
+  ln -sfn "$repo_root/bin/issues" "$cli_link"
+  echo "Linked $cli_link -> $repo_root/bin/issues"
+  case ":$PATH:" in
+    *":$(dirname "$cli_link"):"*) ;;
+    *) echo "setup: warning: $(dirname "$cli_link") is not on PATH; add it to run the issues command" >&2 ;;
+  esac
 }
 
 marketplace_path() {
@@ -206,6 +222,7 @@ add_panel_to_layout() {
 }
 
 link_mod
+link_cli
 merge_keys
 install_plugin
 add_panel_to_layout
