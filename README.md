@@ -65,4 +65,5 @@ Each tracker needs credentials:
 - [Configuration](docs/configuration.md): choosing a tracker, credentials and the `issues.json` settings.
 - [Using the panel](docs/using-the-panel.md): scopes and labels, an issue's detail view, starting work and removing a worktree.
 - [Claude skills](docs/skills.md): the `issues:*` skills.
+- [Contributing](CONTRIBUTING.md): setting up for development, checking and committing a change, and recording the demo.
 - [AGENTS.md](AGENTS.md): how the repository is laid out, how to install it for development, how changes reach the running app and Claude Code, and the checks to run before committing.
