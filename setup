@@ -5,6 +5,8 @@
 #   - links the repository to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues)
 #   - adds the repository as the herdr-issues plugin marketplace and installs issues@herdr-issues,
 #     which brings the issues:* skills and the Claude hooks
+#   - adds the mod's keys (keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
+#     to something else
 # Running it again re-links the mod and updates the plugin to this checkout's version.
 #
 # Needs herdr-app, claude, jq and git; gh is needed only for repositories tracked in GitHub Issues.
@@ -14,7 +16,9 @@ set -euo pipefail
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 marketplace=herdr-issues
 plugin="issues@$marketplace"
-mod_link="${HERDR_APP_HOME:-$HOME/.config/herdr-app}/mods/issues"
+herdr_home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
+mod_link="$herdr_home/mods/issues"
+keys_file="$herdr_home/keys.json"
 
 missing=()
 for command in herdr-app claude jq git; do
@@ -66,7 +70,37 @@ install_plugin() {
   fi
 }
 
+# Adds each of the mod's keys the person hasn't bound; a key they bound to another action stays theirs.
+merge_keys() {
+  if [[ ! -f $keys_file ]]; then
+    echo "setup: $keys_file not found; open Herdr once and run setup again to add the mod's keys" >&2
+    return
+  fi
+
+  local skipped merged
+  skipped=$(jq -r --slurpfile mod "$repo_root/keys.json" '
+    . as $mine | $mod[0] | to_entries[] | .key as $section | .value | to_entries[]
+    | select($mine[$section][.key] != null and $mine[$section][.key] != .value)
+    | "setup: kept your \(.key) in \($section) (\($mine[$section][.key] | tojson)); the mod expects \(.value | tojson)"
+  ' "$keys_file")
+  [[ -z $skipped ]] || echo "$skipped" >&2
+
+  merged=$(jq --slurpfile mod "$repo_root/keys.json" '
+    reduce ($mod[0] | to_entries[]) as $section (.;
+      reduce ($section.value | to_entries[]) as $key (.;
+        if .[$section.key][$key.key] == null then .[$section.key][$key.key] = $key.value else . end))
+  ' "$keys_file")
+  if jq -e --argjson merged "$merged" '. == $merged' "$keys_file" >/dev/null; then
+    echo "$keys_file already has the mod's keys"
+    return
+  fi
+  # Redirecting into the path writes through a symlinked keys.json instead of replacing the link.
+  printf '%s\n' "$merged" >"$keys_file"
+  echo "Added the mod's keys to $keys_file"
+}
+
 link_mod
+merge_keys
 install_plugin
 
 cat <<EOF
