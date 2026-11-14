@@ -17,6 +17,7 @@ import { ghMissing, ghLoggedOut, originNotOnGitHub } from "./trackers/problems.j
 const TEAM_PICKS = "issues.setupTeams";
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TRACKERS = [{ id: "github", label: "GitHub Issues" }, { id: "linear", label: "Linear" }];
+const TEAM_DROPDOWN_MAX_PX = 280;
 const CONFIG_HINT = "For saved Linear views and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
 
 async function checkGitHub(main) {
@@ -34,7 +35,7 @@ async function linearTeams(main) {
   const { teams } = await linear(TEAMS);
   const repoName = await planningCenterRepoName(main);
   const detected = repoName ? await detectedTeam(main, repoName, linear) : null;
-  const byName = [...teams.nodes].sort((a, b) => a.name.localeCompare(b.name));
+  const byName = [...teams.nodes].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
   return [...byName.filter((team) => team.key === detected), ...byName.filter((team) => team.key !== detected)];
 }
 
@@ -140,7 +141,7 @@ export class TrackerSetup {
     if (!this.teams.length) return div().text_size(12).text_color(t.dim).child("The Linear API key can't see any teams.");
     return v_flex().flex_none().gap(6)
       .child(div().text_size(12).text_color(t.muted).child("Team"))
-      .child(h_flex().id("setup-team").flex_none().h(26).px(10).gap(6).items_center().rounded(7).border_1().border_color(t.border)
+      .child(h_flex().id("setup-team").flex_none().max_w(TEAM_DROPDOWN_MAX_PX).h(26).px(10).gap(6).items_center().rounded(7).border_1().border_color(t.border)
         .bg(t.raised).text_size(12).cursor_pointer().hover((s) => s.bg(t.hover))
         .on_click(() => this.openTeamMenu())
         .child(div().flex_1().truncate().child("Choose a team"))
