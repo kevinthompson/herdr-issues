@@ -8,7 +8,7 @@
 // or backlog; blockers come from its issue dependencies.
 import { exec } from "herdr";
 import { mainCheckout } from "../location.js";
-import { ghMissing, ghFailed } from "./problems.js";
+import { ghMissing, ghLoggedOut, ghFailed } from "./problems.js";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
@@ -118,6 +118,14 @@ const ghIn = (root) => async (args) => {
   if (result.code !== 0) throw ghFailed(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
   return result.stdout;
 };
+
+// Throws the problem that stops the GitHub CLI from answering as the person: not installed, or not logged in.
+export async function checkGitHubLogin() {
+  const installed = await exec("gh", ["--version"]).catch(() => null);
+  if (installed?.code !== 0) throw ghMissing();
+  const auth = await exec("gh", ["auth", "status", "--hostname", "github.com"]).catch(() => null);
+  if (auth?.code !== 0) throw ghLoggedOut();
+}
 
 // The repository a GitHub-tracked main checkout's issues live in, as "owner/name".
 export const githubRepository = (root, setting) => setting.repo ?? originRepository(root, ghIn(root));

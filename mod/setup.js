@@ -14,9 +14,10 @@ import { button } from "./detail.js";
 import { openScopeMenu } from "./menu.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
 import { linearClient } from "./trackers/linear.js";
+import { checkGitHubLogin } from "./trackers/github.js";
 import { forgetLookups } from "./lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./trackers/linear-team.js";
-import { ghMissing, ghLoggedOut, originNotOnGitHub } from "./trackers/problems.js";
+import { originNotOnGitHub } from "./trackers/problems.js";
 
 const TEAM_PICKS = "issues.setupTeams";
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
@@ -35,10 +36,7 @@ const COMPLETE_CHOICES = [
 ];
 
 async function checkGitHub(main) {
-  const installed = await exec("gh", ["--version"]).catch(() => null);
-  if (installed?.code !== 0) throw ghMissing();
-  const auth = await exec("gh", ["auth", "status", "--hostname", "github.com"]).catch(() => null);
-  if (auth?.code !== 0) throw ghLoggedOut();
+  await checkGitHubLogin();
   const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: main }).catch(() => null);
   if (origin?.code !== 0 || !/github\.com[:/]/.test(origin.stdout)) throw originNotOnGitHub();
 }
