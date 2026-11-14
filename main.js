@@ -89,6 +89,7 @@ const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/
 const WT_TIMEOUT_MS = 10 * 60 * 1000;
 // wt works on this computer's checkouts and needs the issue's branch.
 const opensWithWt = (issue, project) => Boolean(issue.branch && project && !project.on);
+const hasPullRequestOnBranch = (issue) => (issue.pullRequests ?? []).some((pullRequest) => pullRequest.branch === issue.branch);
 // A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
 // otherwise halfway back to the panel's background.
 function rowHover(t) {
@@ -435,7 +436,7 @@ export default class Issues extends View {
           this.showOpening(issue, opening, cx);
         }
         let openError = null;
-        if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue);
+        if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue, { unstarted: !hasPullRequestOnBranch(issue) });
         else this.openWorktreeDialog(issue);
         this.detailError = (await starting) ?? openError;
         this.refresh(cx);
@@ -553,9 +554,10 @@ export default class Issues extends View {
 
   // Opens the issue's worktree as `/issues:work` does: wt switches to the space already showing it, or opens
   // one nested under the repository's space with Claude working the issue. Returns an error message, or null.
-  // Without wt installed, the worktree dialog opens instead.
-  async openWithWt(issue) {
-    const args = [issue.branch, "--name", issue.id, "--claude", workIssueSession(issue).task];
+  // Without wt installed, the worktree dialog opens instead. An unstarted issue's branch can't be on origin yet,
+  // so wt skips fetching and branches from the local main.
+  async openWithWt(issue, { unstarted = false } = {}) {
+    const args = [issue.branch, ...(unstarted ? ["--new"] : []), "--name", issue.id, "--claude", workIssueSession(issue).task];
     const result = await exec("wt", args, { cwd: this.project.root, timeout: WT_TIMEOUT_MS }).catch(() => null);
     if (!result) { this.openWorktreeDialog(issue); return null; }
     if (result.code === 0) return null;
