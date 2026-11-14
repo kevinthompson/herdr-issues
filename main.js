@@ -594,7 +594,7 @@ export default class Issues extends View {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), due = dueStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
-    const inSpace = Boolean(worktreeSpace(this.repository, issue.branch));
+    const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
     return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
       .hover((s) => s.bg(rowHover(t)))
       .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
@@ -621,8 +621,14 @@ export default class Issues extends View {
           .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))))
         .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
           .when(finishable || startable || inSpace, (e) => e.child(workButton(`row-${issue.id}`, {
-            finishable, startable, inSpace, opening: this.opening?.id === issue.id, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
+            finishable, startable, inSpace, inActiveSpace, opening: this.opening?.id === issue.id, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
           }, t, { primary: false, compact: true }))))));
+  }
+
+  // Whether a space shows the issue's worktree, and whether it is the active space.
+  spaceShowingWorktree(issue) {
+    const space = worktreeSpace(this.repository, issue.branch);
+    return { inSpace: Boolean(space), inActiveSpace: Boolean(space?.active) };
   }
 
   // The assignee's name after their avatar once it is cached, then the agent it's delegated to, if any.
@@ -784,7 +790,7 @@ export default class Issues extends View {
         opening: this.opening?.id === issue.id,
         onStart: (cx) => this.startWork(issue, cx),
         finishable: canFinishWork(issue),
-        inSpace: Boolean(worktreeSpace(this.repository, issue.branch)),
+        ...this.spaceShowingWorktree(issue),
         onContinue: (cx) => this.continueWork(issue, cx),
         onDelegate: this.tracker?.delegate && ((cx) => this.delegateToCloudAgent(issue, cx)),
         delegated: Boolean(this.tracker?.isDelegated?.(issue)),
