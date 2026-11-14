@@ -39,7 +39,8 @@ describe("repositoryState", () => {
     git(repository, "worktree", "add", "-q", "-b", "feature", join(folder, "feature"));
     const state = await repositoryState([], { root: repository, ...local });
     assert.deepEqual(state.main, { path: repository, branch: "main" });
-    assert.deepEqual(state.worktrees, [{ path: join(folder, "feature"), branch: "feature", on: null }]);
+    const work = { dirty: false, moved: false, merged: true, unpushed: null };
+    assert.deepEqual(state.worktrees, [{ path: join(folder, "feature"), branch: "feature", on: null, work }]);
   });
 
   test("is null when the main checkout isn't on main or master", async (t) => {
