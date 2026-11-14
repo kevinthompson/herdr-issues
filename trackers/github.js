@@ -9,6 +9,7 @@
 // come from its issue dependencies.
 import { exec } from "herdr";
 import { mainCheckout } from "../location.js";
+import { ghMissing, ghFailed } from "./problems.js";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
@@ -121,8 +122,8 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
 
   async function gh(args) {
     const result = await exec("gh", args, { cwd: root }).catch(() => null);
-    if (!result) throw new Error("The GitHub CLI (gh) isn't installed");
-    if (result.code !== 0) throw new Error(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
+    if (!result) throw ghMissing();
+    if (result.code !== 0) throw ghFailed(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
     return result.stdout;
   }
 

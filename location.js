@@ -9,10 +9,10 @@ export function location() {
   return { cwd: pane?.cwd || f?.cwd || space?.folder || null, on };
 }
 
-// The git repository's top folder, or the folder itself outside a repository.
-export async function projectRoot({ cwd, on }) {
+// The git repository's top folder, or null outside a repository.
+export async function repositoryRoot({ cwd, on }) {
   const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(() => null);
-  return top?.code === 0 ? top.stdout.trim() : cwd;
+  return top?.code === 0 ? top.stdout.trim() : null;
 }
 
 // The repository's main checkout: the first `git worktree list` entry, which a linked worktree is not.

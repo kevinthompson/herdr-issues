@@ -9,6 +9,7 @@ import { appHome, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
+import { linearKeyMissing, linearKeyUnreadable, linearKeyInvalid } from "./problems.js";
 
 const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
@@ -97,7 +98,15 @@ function repoConfig(root, { team, views = {} }) {
 
 async function readApiKey() {
   const text = await readTextFile(`${appHome()}/linear.json`).catch(() => null);
-  return text === null ? null : JSON.parse(text).apiKey ?? null;
+  if (text === null) return null;
+  try { return JSON.parse(text).apiKey ?? null; } catch { throw linearKeyUnreadable(); }
+}
+
+// A function that asks Linear's API a query with the person's API key: (query, variables) → its data.
+export async function linearClient() {
+  const apiKey = await readApiKey();
+  if (!apiKey) throw linearKeyMissing();
+  return (query, variables = {}) => request(apiKey, query, variables);
 }
 
 // Projects in the scope menu, by status: in progress, then planned, paused and backlog. Within a status, by
@@ -140,9 +149,10 @@ async function request(apiKey, query, variables) {
     headers: { "Content-Type": "application/json", Authorization: apiKey },
     body: JSON.stringify({ query, variables }),
   });
-  if (response.status === 401) throw new Error("Invalid Linear API key");
+  if (response.status === 401) throw linearKeyInvalid();
   const json = /** @type {any} */ (JSON.parse(await response.text()));
   const error = json?.errors?.[0];
+  if (error?.extensions?.code === "AUTHENTICATION_ERROR") throw linearKeyInvalid();
   if (error) throw new Error(error.extensions?.userPresentableMessage ?? error.message);
   if (!response.ok) throw new Error(`Linear answered ${response.status}`);
   return json.data;
@@ -225,9 +235,7 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
   const configured = setting && repoConfig(root, setting);
   const repoName = await planningCenterRepoName(root);
   if (!configured && !repoName) return null;
-  const apiKey = await readApiKey();
-  if (!apiKey) throw new Error("No apiKey in ~/.config/herdr-app/linear.json");
-  const linear = (query, variables = {}) => request(apiKey, query, variables);
+  const linear = await linearClient();
   const teamKey = configured?.teamKey ?? (await detectedTeam(root, repoName, linear));
   if (!teamKey) return null;
   const repo = configured ?? { teamKey, path: root, views: [] };
