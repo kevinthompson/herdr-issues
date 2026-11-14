@@ -1,8 +1,10 @@
-// The panel's view for a repository whose issues it can't list. With no tracker, it offers GitHub Issues or
-// Linear: choosing one checks what that tracker needs (gh installed and logged in with origin on GitHub, or a
-// Linear API key that works), and Linear asks for a team. It then asks how work gets into main, and for a pull
-// request when the work is complete, proposing the repository's current or default settings. Only then does it
-// write the repository's entry in issues.json (setting.js), and the panel lists the issues. A configured tracker that fails to load with a SetupProblem (trackers/problems.js) shows the
+// The panel's view for a repository whose issues it can't list. With no tracker, it walks through one question
+// per page, with Back at the top left and the step at the top right, as an open issue's view has its way back:
+// the tracker, GitHub Issues or Linear, which it checks (gh installed and logged in with origin on GitHub, or a
+// Linear API key that works); Linear's team; how work gets into main; for a pull request, when the work is
+// complete; and a review of the choices. Only Save on the review writes the repository's entry in issues.json
+// (setting.js), and the panel lists the issues. How work lands proposes the repository's current or default
+// settings. A configured tracker that fails to load with a SetupProblem (trackers/problems.js) shows the
 // problem and its fix, with Check again and a way to choose a different tracker. Linear's team dropdown is a
 // scope menu popup (menu.js), whose pick comes back through shared state.
 import { div } from "gpui-kit";
@@ -57,15 +59,16 @@ export function untrackableView(sentence, t) {
   return v_flex().p(14).child(div().whitespace_normal().text_color(t.dim).child(sentence));
 }
 
+const answerLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label ?? "";
+
 export class TrackerSetup {
   // main: the repository's main checkout. onSaved(cx) runs once its entry is written.
   constructor(main, onSaved) {
     this.main = main; this.onSaved = onSaved;
     this.failure = null; this.choosingAnother = false;
-    this.choice = null; this.checking = false; this.problem = null; this.teams = null;
-    // Once the tracker is ready: { tracker, proposed: { merge, complete }, merge }, where merge is set while
-    // asking when a pull request's work is complete.
-    this.landing = null;
+    this.step = "tracker"; this.checking = false; this.problem = null;
+    // The answers so far, and the proposed merge and complete once the tracker is ready.
+    this.choice = null; this.teams = null; this.team = null; this.merge = null; this.complete = null; this.proposed = null;
   }
 
   // The configured tracker's SetupProblem, or null when the repository has no tracker.
@@ -74,24 +77,41 @@ export class TrackerSetup {
     if (!failure) this.choosingAnother = false;
   }
 
+  // The steps for the answers so far; before how work lands is chosen, the proposed choice decides whether
+  // completion is asked.
+  steps() {
+    const merge = this.merge ?? this.proposed?.merge ?? "pull-request";
+    return ["tracker", ...(this.choice === "linear" ? ["team"] : []), "merge", ...(merge === "pull-request" ? ["complete"] : []), "review"];
+  }
+
+  goTo(step, cx) {
+    Object.assign(this, { step, problem: null });
+    cx.notify();
+  }
+
+  // The previous step, or, choosing another tracker for one that fails to load, the failure.
+  back(cx) {
+    const steps = this.steps(), index = steps.indexOf(this.step);
+    if (index > 0) this.goTo(steps[index - 1], cx);
+    else { this.choosingAnother = false; cx.notify(); }
+  }
+
   choose(choice, cx) {
+    if (choice !== this.choice) this.team = null;
     this.choice = choice;
     this.check(cx);
   }
 
+  // Checks the chosen tracker, then moves on to Linear's team or how work lands.
   check(cx) {
     const choice = this.choice;
-    Object.assign(this, { checking: true, problem: null, teams: null, landing: null });
+    Object.assign(this, { checking: true, problem: null });
     cx.spawn(async (cx) => {
       try {
-        if (choice === "github") {
-          await checkGitHub(this.main);
-          const landing = await this.proposeLanding({ tracker: "github" });
-          if (this.choice === choice) this.landing = landing;
-        } else {
-          const teams = await linearTeams(this.main);
-          if (this.choice === choice) this.teams = teams;
-        }
+        const ready = choice === "github" ? checkGitHub(this.main) : linearTeams(this.main);
+        const [teams, proposed] = await Promise.all([ready, this.proposeLanding()]);
+        if (this.choice !== choice) return;
+        Object.assign(this, { teams: teams ?? null, proposed, step: choice === "linear" ? "team" : "merge" });
       } catch (e) { if (this.choice === choice) this.problem = e; }
       finally { if (this.choice === choice) this.checking = false; cx.notify(); }
     });
@@ -99,24 +119,32 @@ export class TrackerSetup {
   }
 
   // An entry that fails to load proposes the defaults instead of its own settings.
-  async proposeLanding(tracker) {
+  async proposeLanding() {
     const proposed = await mergeSettings({ root: this.main, on: null }).catch(() => resolveMergeSettings(this.main, null));
-    if (proposed.merge !== "pull-request") proposed.complete = "pull-request-open";
-    return { tracker, proposed, merge: null };
+    return proposed.merge === "pull-request" ? proposed : { ...proposed, complete: "pull-request-open" };
   }
 
   chooseMerge(merge, cx) {
-    if (merge === "pull-request") { this.landing.merge = merge; cx.notify(); }
-    else this.save({ merge }, cx);
+    this.merge = merge;
+    if (merge !== "pull-request") this.complete = null;
+    this.goTo(merge === "pull-request" ? "complete" : "review", cx);
   }
 
-  save(choices, cx) {
-    const setting = { ...this.landing.tracker, ...choices };
+  chooseComplete(complete, cx) {
+    this.complete = complete;
+    this.goTo("review", cx);
+  }
+
+  save(cx) {
+    const setting = {
+      tracker: this.choice, ...(this.choice === "linear" && { team: this.team }),
+      merge: this.merge, ...(this.merge === "pull-request" && { complete: this.complete }),
+    };
     Object.assign(this, { checking: true, problem: null });
     cx.spawn(async (cx) => {
       try {
         await saveSetupChoices(this.main, setting);
-        Object.assign(this, { choice: null, choosingAnother: false, teams: null, landing: null });
+        Object.assign(this, { step: "tracker", choosingAnother: false, choice: null, teams: null, team: null, merge: null, complete: null, proposed: null });
         this.onSaved(cx);
       } catch (e) { this.problem = e; }
       finally { this.checking = false; cx.notify(); }
@@ -126,23 +154,22 @@ export class TrackerSetup {
 
   openTeamMenu() {
     const scopes = this.teams.map(({ key, name }) => ({ id: key, label: `${name} (${key})` }));
-    openScopeMenu(scopes, null, this.main, TEAM_PICKS);
+    openScopeMenu(scopes, this.team, this.main, TEAM_PICKS);
   }
 
-  // Takes the team picked in the dropdown, which hands it over through shared state, and asks how work lands.
+  // Takes the team picked in the dropdown, which hands it over through shared state, and moves on.
   takePickedTeam(cx) {
     const picks = shared(TEAM_PICKS) ?? {}, team = picks[this.main];
     if (!team) return;
     const { [this.main]: _taken, ...others } = picks;
     setShared(TEAM_PICKS, others);
-    this.checking = true;
-    cx.spawn(async (cx) => {
-      try {
-        const landing = await this.proposeLanding({ tracker: "linear", team });
-        if (this.choice === "linear") this.landing = landing;
-      } catch (e) { this.problem = e; }
-      finally { this.checking = false; cx.notify(); }
-    });
+    this.team = team;
+    if (this.step === "team") this.goTo("merge", cx);
+  }
+
+  teamLabel() {
+    const team = this.teams?.find(({ key }) => key === this.team);
+    return team ? `${team.name} (${team.key})` : this.team ?? "";
   }
 
   problemView(id, problem, onCheckAgain, t, extra = null) {
@@ -152,80 +179,93 @@ export class TrackerSetup {
       .child(h_flex().gap(6).child(button(`${id}-check`, "Check again", onCheckAgain, t, { primary: true })).when(Boolean(extra), (e) => e.child(extra)));
   }
 
-  render(t, { onRetry }) {
+  // header: the panel's header, which a failure shows under; the steps draw their own bar in its place.
+  render(t, { onRetry, header }) {
     const content = v_flex().id("issues-setup").flex_1().min_h(0).overflow_y_scrollbar().p(14).gap(12);
     if (this.failure && !this.choosingAnother) {
-      return content
+      return v_flex().size_full().min_h(0).child(header).child(content
         .child(div().font_semibold().child("Issues can't load"))
         .child(this.problemView("setup-failure", this.failure, onRetry, t,
           button("setup-choose-another", "Choose a different tracker", (cx) => { this.choosingAnother = true; cx.notify(); }, t)))
-        .child(markdown("setup-hint", CONFIG_HINT, t.dim));
+        .child(markdown("setup-hint", CONFIG_HINT, t.dim)));
     }
-    if (this.landing) {
-      return content
-        .child(div().font_semibold().child("Set up issues"))
-        .child(this.landingView(t))
-        .child(markdown("setup-hint", CONFIG_HINT, t.dim));
-    }
+    const page = { tracker: this.trackerPage, team: this.teamPage, merge: this.mergePage, complete: this.completePage, review: this.reviewPage }[this.step];
+    return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(page.call(this, content, t));
+  }
+
+  // Back at the top left, as an open issue has its way back, and where the step falls at the top right.
+  stepBar(t) {
+    const steps = this.steps(), index = steps.indexOf(this.step);
+    const canGoBack = index > 0 || Boolean(this.failure);
+    return h_flex().h(42).flex_none().px(10).gap(8).items_center().border_b(1).border_color(t.border)
+      .when(canGoBack, (e) => e.child(div().id("setup-back").flex_none().h(26).px(8).flex().items_center().rounded(7)
+        .text_color(this.checking ? t.dim : t.muted)
+        .when(!this.checking, (b) => b.cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground)).on_click((_e, cx) => this.back(cx)))
+        .child("‹ Back")))
+      .when(!canGoBack, (e) => e.child(div().px(8).font_semibold().child("Set up issues")))
+      .child(div().flex_1())
+      .child(div().px(4).text_size(12).text_color(t.dim).child(`Step ${index + 1} of ${steps.length}`));
+  }
+
+  // A page's question, a sentence under it, and its options, each with what it means. The current answer is
+  // solid, and the proposed one says so.
+  question(content, title, sentence, t) {
+    return content.child(div().font_semibold().child(title))
+      .when(Boolean(sentence), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.muted).child(sentence)));
+  }
+
+  options(kind, choices, { chosen, proposed, onChoose, enabled = true }, t) {
+    return v_flex().flex_none().gap(12).children(choices.map(({ id, label, detail }) => v_flex().flex_none().gap(4)
+      .child(h_flex().gap(8).items_center()
+        .child(button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, { primary: id === chosen, enabled }))
+        .when(id === proposed, (e) => e.child(div().text_size(11).text_color(t.dim).child("Proposed"))))
+      .when(Boolean(detail), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail ?? "")))));
+  }
+
+  trackerPage(content, t) {
     const sentence = this.failure ? "Choose a different issue tracker for this repository." : "This repository has no issue tracker yet. Choose where its issues live.";
-    return content
-      .child(div().font_semibold().child("Set up issues"))
-      .child(div().whitespace_normal().text_size(12).text_color(t.muted).child(sentence))
-      .child(h_flex().gap(6).children(TRACKERS.map(({ id, label }) =>
-        button(`setup-${id}`, label, (cx) => this.choose(id, cx), t, { primary: this.choice === id, enabled: !this.checking }))))
+    return this.question(content, "Where do this repository's issues live?", sentence, t)
+      .child(this.options("tracker", TRACKERS, { chosen: this.checking ? null : this.choice, onChoose: (id, cx) => this.choose(id, cx), enabled: !this.checking }, t))
       .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Checking…")))
       .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t)))
-      .when(!this.checking && !this.problem && Boolean(this.teams), (e) => e.child(this.teamPicker(t)))
-      .when(Boolean(this.failure), (e) => e.child(button("setup-back", "Back", (cx) => { Object.assign(this, { choosingAnother: false, choice: null, problem: null, teams: null, landing: null }); cx.notify(); }, t)))
       .child(markdown("setup-hint", CONFIG_HINT, t.dim));
   }
 
-  // Once the tracker is ready: the answers so far, then how work gets into main or, once a pull request is
-  // chosen, when its work is complete. Back returns to the previous question.
-  landingView(t) {
-    const { tracker, merge } = this.landing;
-    const team = tracker.team && this.teams?.find(({ key }) => key === tracker.team);
-    const answers = [
-      ["Tracker", TRACKERS.find(({ id }) => id === tracker.tracker)?.label],
-      ...(tracker.team ? [["Team", team ? `${team.name} (${team.key})` : tracker.team]] : []),
-      ...(merge ? [["Work lands", MERGE_CHOICES.find(({ id }) => id === merge)?.label]] : []),
-    ];
-    const back = merge
-      ? (cx) => { this.landing.merge = null; cx.notify(); }
-      : (cx) => { Object.assign(this, { landing: null, choice: null, teams: null }); cx.notify(); };
-    return v_flex().flex_none().gap(14)
-      .child(v_flex().flex_none().gap(4).children(answers.map(([name, value]) => h_flex().gap(8).text_size(12)
-        .child(div().w(ANSWER_LABEL_PX).flex_none().text_color(t.dim).child(name))
-        .child(div().text_color(t.foreground).child(value ?? "")))))
-      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Saving…")))
-      .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t)))
-      .when(!this.checking && !this.problem, (e) => e.child(this.landingQuestion(t)))
-      .child(h_flex().child(button("setup-landing-back", "Back", back, t, { enabled: !this.checking })));
-  }
-
-  // The proposed choice stands out.
-  landingQuestion(t) {
-    const { proposed, merge } = this.landing;
-    const [question, kind, choices, proposedId, onChoose] = merge
-      ? ["When is the work complete?", "complete", COMPLETE_CHOICES, proposed.complete, (id, cx) => this.save({ merge, complete: id }, cx)]
-      : ["How does work get into main?", "merge", MERGE_CHOICES, proposed.merge, (id, cx) => this.chooseMerge(id, cx)];
-    return v_flex().flex_none().gap(12)
-      .child(div().font_semibold().child(question))
-      .children(choices.map(({ id, label, detail }) => v_flex().flex_none().gap(4)
-        .child(h_flex().gap(8).items_center()
-          .child(button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, { primary: id === proposedId }))
-          .when(id === proposedId, (e) => e.child(div().text_size(11).text_color(t.dim).child("Proposed"))))
-        .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))));
-  }
-
-  teamPicker(t) {
-    if (!this.teams.length) return div().text_size(12).text_color(t.dim).child("The Linear API key can't see any teams.");
-    return v_flex().flex_none().gap(6)
-      .child(div().text_size(12).text_color(t.muted).child("Team"))
+  teamPage(content, t) {
+    const page = this.question(content, "Which Linear team?", "The panel lists this team's issues.", t);
+    if (!this.teams?.length) return page.child(div().text_size(12).text_color(t.dim).child("The Linear API key can't see any teams."));
+    return page
       .child(h_flex().id("setup-team").flex_none().max_w(TEAM_DROPDOWN_MAX_PX).h(26).px(10).gap(6).items_center().rounded(7).border_1().border_color(t.border)
         .bg(t.raised).text_size(12).cursor_pointer().hover((s) => s.bg(t.hover))
         .on_click(() => this.openTeamMenu())
-        .child(div().flex_1().truncate().child("Choose a team"))
-        .child(div().flex_none().text_color(t.dim).child("▾")));
+        .child(div().flex_1().truncate().child(this.team ? this.teamLabel() : "Choose a team"))
+        .child(div().flex_none().text_color(t.dim).child("▾")))
+      .when(Boolean(this.team), (e) => e.child(h_flex().child(button("setup-team-next", "Next", (cx) => this.goTo("merge", cx), t, { primary: true }))));
+  }
+
+  mergePage(content, t) {
+    return this.question(content, "How does work get into main?", null, t)
+      .child(this.options("merge", MERGE_CHOICES, { chosen: this.merge, proposed: this.proposed?.merge, onChoose: (id, cx) => this.chooseMerge(id, cx) }, t));
+  }
+
+  completePage(content, t) {
+    return this.question(content, "When is the work complete?", "When a session can finish and the issue's worktree is safe to close.", t)
+      .child(this.options("complete", COMPLETE_CHOICES, { chosen: this.complete, proposed: this.proposed?.complete, onChoose: (id, cx) => this.chooseComplete(id, cx) }, t));
+  }
+
+  reviewPage(content, t) {
+    const answers = [
+      ["Tracker", answerLabel(TRACKERS, this.choice)],
+      ...(this.choice === "linear" ? [["Team", this.teamLabel()]] : []),
+      ["Work lands", answerLabel(MERGE_CHOICES, this.merge)],
+      ...(this.merge === "pull-request" ? [["Complete", answerLabel(COMPLETE_CHOICES, this.complete)]] : []),
+    ];
+    return this.question(content, "Review your setup", "Save writes these choices for this repository. Go back to change one.", t)
+      .child(v_flex().flex_none().gap(6).children(answers.map(([name, value]) => h_flex().gap(8).text_size(12)
+        .child(div().w(ANSWER_LABEL_PX).flex_none().text_color(t.dim).child(name))
+        .child(div().flex_1().whitespace_normal().text_color(t.foreground).child(value)))))
+      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Saving…")))
+      .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.save(cx), t)))
+      .when(!this.checking && !this.problem, (e) => e.child(h_flex().child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true }))));
   }
 }

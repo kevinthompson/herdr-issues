@@ -746,7 +746,7 @@ export default class Issues extends View {
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
-    if (this.setup) return this.listFrame(this.setup.render(t, { onRetry: (cx) => { this.refresh(cx); cx.notify(); } }), t);
+    if (this.setup) return this.setup.render(t, { onRetry: (cx) => { this.refresh(cx); cx.notify(); }, header: this.header(t) });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
