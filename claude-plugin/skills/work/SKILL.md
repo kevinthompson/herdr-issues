@@ -58,7 +58,13 @@ Then summarize as step 4 says. Read the full diff, review comments or the code o
    - nothing in the worktree is uncommitted (`git status --porcelain` is empty), and the branch is merged into main (`git merge-base --is-ancestor HEAD main`) or is pushed with no unpushed commits and has an open pull request (`gh pr view --json state,url`) whose checks pass or whose failures are recorded under Notes as not caused by the branch; or
    - the person explicitly canceled the work.
 
-   If so, end your final message with this block, set apart from everything above it, filling in the issue ID, the reason, and the merge or PR result, and write nothing after it:
+   If so, and the Herdr app is installed, first mark the worktree's space as ready to close by starting its name with `✅ `, which the issues panel also does for spaces it finds finished. Run this one command from the worktree; it renames each space whose folder is the worktree and whose name doesn't start with the mark yet:
+
+   ```sh
+   herdr-app ls | jq -c --arg top "$(git rev-parse --show-toplevel)" '.spaces[] | select(.folder == $top and (.name | startswith("✅ ") | not)) | {id, name: ("✅ " + .name)}' | while read -r space; do herdr-app do space.rename "$space"; done
+   ```
+
+   Then end your final message with this block, set apart from everything above it, filling in the issue ID, the reason, and the merge or PR result, and write nothing after it:
 
    ```
    ---
