@@ -4,8 +4,9 @@
 //
 // GitHub issues are only open or closed, so their status is derived: closed as completed is done, closed
 // any other way is canceled; an open issue with a linked pull request (one that closes it) is in review,
-// an assigned one is in progress, and the rest are todo. GitHub has no priority; blockers come from its
-// issue dependencies.
+// an assigned one is in progress, one with the `todo` label is todo, and the rest are backlog. The label
+// only carries that status, so it isn't listed among the issue's labels. GitHub has no priority; blockers
+// come from its issue dependencies.
 import { exec } from "herdr";
 import { mainCheckout } from "../location.js";
 
@@ -29,7 +30,10 @@ const ISSUE = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { issue(number: $number) { ${ISSUE_FIELDS} body } } }`;
 
 // The statuses a person can pick. In review follows from a linked pull request, so it can't be set.
-const SETTABLE_STATUSES = ["todo", "in-progress", "done", "canceled"];
+const SETTABLE_STATUSES = ["backlog", "todo", "in-progress", "done", "canceled"];
+
+const TODO_LABEL = "todo";
+const isTodoLabel = (label) => label.name.toLowerCase() === TODO_LABEL;
 
 const issueNumber = (id) => Number(String(id).replace(/^#/, ""));
 
@@ -42,7 +46,8 @@ function pullRequestStatus({ state, isDraft }) {
 function statusOf(node, pullRequests) {
   if (node.state === "CLOSED") return node.stateReason === "COMPLETED" ? "done" : "canceled";
   if (pullRequests.some((pullRequest) => pullRequest.status !== "closed")) return "in-review";
-  return node.assignees.nodes.length ? "in-progress" : "todo";
+  if (node.assignees.nodes.length) return "in-progress";
+  return node.labels.nodes.some(isTodoLabel) ? "todo" : "backlog";
 }
 
 // The branch GitHub's "Create a branch" names for an issue: its number, then its title as a slug.
@@ -69,6 +74,7 @@ function toIssue(node, repo) {
   }));
   const open = pullRequests.find((pullRequest) => pullRequest.fullRepo === repo && ["open", "draft"].includes(pullRequest.status));
   const [assignee] = node.assignees.nodes;
+  const labels = node.labels.nodes.filter((label) => !isTodoLabel(label));
   return {
     id: `#${node.number}`,
     number: node.number,
@@ -76,8 +82,9 @@ function toIssue(node, repo) {
     status: statusOf(node, pullRequests),
     priority: 0,
     order: null,
-    labels: node.labels.nodes.map((label) => label.name),
-    labelColors: Object.fromEntries(node.labels.nodes.map((label) => [label.name, `#${label.color}`])),
+    labels: labels.map((label) => label.name),
+    labelColors: Object.fromEntries(labels.map((label) => [label.name, `#${label.color}`])),
+    todoLabel: node.labels.nodes.find(isTodoLabel)?.name ?? null,
     blockedBy: openBlockers(node, repo),
     branch: open?.branch ?? suggestedBranch(node),
     assignee: assignee ? assignee.name || assignee.login : "Unassigned",
@@ -154,6 +161,12 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
   const editIssue = (issue, fields) => rest("PATCH", `issues/${issue.number}`, fields);
   const assignees = (issue, method, login) => rest(method, `issues/${issue.number}/assignees`, { "assignees[]": login });
 
+  async function addTodoLabel(issue) {
+    await rest("GET", `labels/${TODO_LABEL}`, {}).catch(() => rest("POST", "labels", { name: TODO_LABEL }));
+    await rest("POST", `issues/${issue.number}/labels`, { "labels[]": TODO_LABEL });
+  }
+  const removeTodoLabel = (issue, label) => rest("DELETE", `issues/${issue.number}/labels/${encodeURIComponent(label)}`, {});
+
   async function get(id) {
     const number = issueNumber(id);
     if (!Number.isInteger(number)) return null;
@@ -171,7 +184,10 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     if (!current) throw new Error(`${issue.id} no longer exists`);
     const assigned = current.assigneeLogins.includes(login);
     if (status === "in-progress" && !current.assigneeLogins.length) await assignees(issue, "POST", login);
-    if (status === "todo" && assigned) await assignees(issue, "DELETE", login);
+    if (status === "in-progress") return;
+    if (assigned) await assignees(issue, "DELETE", login);
+    if (status === "todo" && !current.todoLabel) await addTodoLabel(issue);
+    if (status === "backlog" && current.todoLabel) await removeTodoLabel(issue, current.todoLabel);
   }
 
   return {
