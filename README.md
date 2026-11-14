@@ -1,7 +1,6 @@
 # Herdr Issues
 
-<!-- The demo GIF replaces this screenshot at docs/screenshots/demo.gif. -->
-![The Issues panel listing a demo project's issues, grouped into In review, In progress and Blocked, with their labels and blockers](docs/screenshots/issues-list.png)
+![A demo of the Issues panel in the Herdr app](docs/screenshots/demo.gif)
 
 ## What it is
 
