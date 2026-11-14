@@ -19,7 +19,7 @@ import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
-import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
+import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, markFinishedSpaces, workFinished, withoutFinishedMark } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { isTextFile, openInEditor } from "./editor.js";
@@ -99,6 +99,16 @@ function rowHover(t) {
 }
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
+// The worktree's issue is the listed one on its branch, or else the one its space is named after, which
+// may have left the list when it was canceled.
+async function worktreeIssueCanceled(worktree, space, issues, tracker) {
+  const id = withoutFinishedMark(space.name);
+  const listed = issues.find((issue) => issue.branch === worktree.branch) ?? issues.find((issue) => issue.id === id);
+  if (listed) return listed.status === "canceled";
+  if (!tracker || !id || /\s/.test(id)) return false;
+  return (await tracker.get(id).catch(() => null))?.status === "canceled";
+}
+
 export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
@@ -164,14 +174,20 @@ export default class Issues extends View {
     });
   }
 
-  // Reads the repository's worktrees and branches for the issues just listed, after the list shows, and
-  // deletes the branches of done issues that have landed in main, so finished work leaves nothing behind.
+  // Reads the repository's worktrees and branches for the issues just listed, after the list shows, marks the
+  // spaces whose work is ready to close, and deletes the branches of done issues that have landed in main,
+  // so finished work leaves nothing behind.
   scanRepository(project, generation, cx) {
     cx.spawn(async (cx) => {
       const repository = await repositoryState(this.issues, project).catch(() => null);
       if (generation !== this.generation) return;
       this.repository = repository;
       cx.notify();
+      if (repository) {
+        const tracker = this.tracker, issues = this.issues;
+        await markFinishedSpaces(repository, async (worktree, space) =>
+          await workFinished(worktree, repository.main) || await worktreeIssueCanceled(worktree, space, issues, tracker));
+      }
       if (!repository?.mergedFinished.length) return;
       const deleted = await deleteMergedBranches(repository.mergedFinished, repository).catch(() => []);
       if (deleted.length) notify({ title: `Deleted ${plural(deleted.length, "merged branch", "merged branches")}`, body: deleted.join(", ") });

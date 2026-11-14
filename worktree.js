@@ -1,4 +1,4 @@
-import { exec, spaces, panes } from "herdr";
+import { exec, spaces, panes, run } from "herdr";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -37,6 +37,7 @@ export async function worktreeFor(branch, { root, on }) {
 }
 
 const lines = (text) => text.split("\n").filter(Boolean);
+const MAIN_BRANCHES = ["main", "master"];
 
 // What the repository holds for the listed issues:
 // - worktrees: its linked worktrees;
@@ -67,4 +68,67 @@ export async function deleteMergedBranches(branches, { main, on }) {
 export function worktreeSpace(repository, branch) {
   const worktree = branch && repository?.worktrees.find((each) => each.branch === branch);
   return worktree ? spaceShowing(worktree.path, worktree.on) : null;
+}
+
+export const FINISHED_MARK = "✅ ";
+const PULL_REQUEST_REUSE_MS = 60 * 1000;
+const PASSING_CONCLUSIONS = ["SUCCESS", "NEUTRAL", "SKIPPED"];
+
+const checkPasses = (check) => check.__typename === "StatusContext"
+  ? check.state === "SUCCESS"
+  : check.status === "COMPLETED" && PASSING_CONCLUSIONS.includes(check.conclusion);
+
+// Asked at most once a minute per branch and commit, since checks can finish without the branch moving.
+const pullRequestAnswers = new Map();
+
+// Whether the branch has an open pull request, draft or not, whose checks have all passed.
+async function openPullRequestPasses(worktree, head) {
+  const key = `${worktree.path}\n${worktree.branch}\n${head}`, last = pullRequestAnswers.get(key);
+  if (last && Date.now() - last.at < PULL_REQUEST_REUSE_MS) return last.passes;
+  const result = await exec("gh", ["pr", "view", worktree.branch, "--json", "state,statusCheckRollup"], { cwd: worktree.path }).catch(() => null);
+  const pullRequest = result?.code === 0 ? JSON.parse(result.stdout) : null;
+  const passes = pullRequest?.state === "OPEN" && (pullRequest.statusCheckRollup ?? []).every(checkPasses);
+  pullRequestAnswers.set(key, { at: Date.now(), passes });
+  return passes;
+}
+
+// A branch that never moved since it was made holds no work, even though main contains it.
+async function branchMoved(worktree) {
+  const reflog = await git(worktree.path, ["reflog", "show", "--format=%H", `refs/heads/${worktree.branch}`], worktree.on);
+  return lines(reflog.out).length > 1;
+}
+
+// The worktree's work is ready to close: nothing uncommitted, and its branch merged into main, or pushed
+// with an open pull request whose checks pass. Pull requests are only asked about on this computer.
+export async function workFinished(worktree, main) {
+  if (!worktree.branch) return false;
+  const { path, on, branch } = worktree;
+  const [status, head] = await Promise.all([git(path, ["status", "--porcelain"], on), git(path, ["rev-parse", "HEAD"], on)]);
+  if (!status.ok || status.out || !head.ok) return false;
+  if ((await git(path, ["merge-base", "--is-ancestor", "HEAD", main.branch], on)).ok) return branchMoved(worktree);
+  if (on != null) return false;
+  const unpushed = await git(path, ["rev-list", "--count", `refs/remotes/origin/${branch}..HEAD`], on);
+  return unpushed.ok && unpushed.out === "0" && openPullRequestPasses(worktree, head.out);
+}
+
+export const withoutFinishedMark = (name) => name.startsWith(FINISHED_MARK) ? name.slice(FINISHED_MARK.length) : name;
+
+// The spaces made on the worktree, by `wt` or Continue: their own folder is in it, so the main checkout's space
+// never counts, even while one of its panes is in a worktree.
+const spacesOn = (worktree) => spaces().filter((space) =>
+  (space.machine ?? null) === (worktree.on ?? null) && isInside(space.folder, worktree.path));
+
+// Starts the name of each space on one of the repository's linked worktrees with the finished mark exactly
+// while `finished(worktree, space)` says its work is ready to close, keeping the rest of the name.
+export async function markFinishedSpaces(repository, finished) {
+  for (const worktree of repository.worktrees) {
+    const shown = spacesOn(worktree);
+    if (!shown.length) continue;
+    const isFinished = await finished(worktree, shown[0]).catch(() => false);
+    for (const space of shown) {
+      const unmarked = withoutFinishedMark(space.name);
+      const name = isFinished ? `${FINISHED_MARK}${unmarked}` : unmarked;
+      if (name !== space.name) run("space.rename", { id: space.id, name });
+    }
+  }
 }
