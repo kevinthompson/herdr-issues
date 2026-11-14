@@ -12,8 +12,9 @@
 //   has-panel-body <layout>           succeeds when the layout has a panel-body node
 //   shipped-layouts <installed.json>  prints the name of each layout Herdr ships
 //   add-panel <layout>                adds the issues block in a column of its own beside the panel holding panel-body
-//   move-panel <layout>               moves an issues block an earlier setup put in panel-body into a column of its own;
-//                                     exits 0 after moving it and 10 when there was none to move
+//   move-panel <layout>               moves an issues block an earlier setup put in panel-body into a column of its own,
+//                                     and weighs the fixed issues column an earlier setup wrote; exits 0 after
+//                                     changing the layout and 10 when there was nothing to change
 //   remove-panel <layout>             removes the issues block and a column holding only it;
 //                                     exits 0 after removing it and 10 when the layout didn't show it
 //   copy-layout <from> <to> <version> copies a layout, records what it was cloned from, and adds the issues block
@@ -33,13 +34,19 @@ import { homedir } from "node:os";
 const keysAddedExitCode = 0;
 const keysUnchangedExitCode = 10;
 const keysRemovedExitCode = 0;
-const panelMovedExitCode = 0;
-const panelUnmovedExitCode = 10;
+const panelChangedExitCode = 0;
+const panelUnchangedExitCode = 10;
 const panelRemovedExitCode = 0;
 const panelAbsentExitCode = 10;
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
+// Herdr shares what fixed siblings leave by weight, and stores a divider drag between weighted siblings as
+// weights, so a weighted column keeps its share as the window resizes. Beside main at twice its weight, the
+// column starts near 368px in a typical window.
+const mainWeight = 2;
+const issuesWeightOfMain = 0.5;
 // The panel collapses to a 32px strip by resizing this column, so its min mustn't stop it there.
-const issuesColumn = { id: "issues-panel", type: "column", size: { px: 368 }, min: 32, max: 900, children: [issuesBlock] };
+const issuesColumn = { id: "issues-panel", type: "column", size: { weight: 1 }, min: 32, max: 900, children: [issuesBlock] };
+const earlierFixedIssuesSize = { px: 368 };
 // Bindings earlier versions of the mod's keys.json made, which setup replaces with the mod's current one.
 const supersededBindings = { global: { "cmd-shift-i": "layout.toggle:panel" } };
 
@@ -117,6 +124,15 @@ function removePanel(layout) {
 
 const holdsPanelBodyDirectly = (node) => Array.isArray(node?.children) && node.children.some((child) => child?.id === "panel-body");
 
+// Weighs the issues column among its siblings by main's weight, giving main one first when it has none.
+function weighIssuesColumn(siblings) {
+  const column = siblings.find((child) => child?.id === issuesColumn.id);
+  const main = siblings.find((child) => child?.id === "main");
+  if (!column) return;
+  if (main && main.size?.weight == null) main.size = { weight: mainWeight };
+  column.size = { weight: main ? main.size.weight * issuesWeightOfMain : issuesColumn.size.weight };
+}
+
 // Places a column holding the issues block right after the node whose child is panel-body.
 function addPanel(layout) {
   for (const object of objectsIn(layout)) {
@@ -124,9 +140,23 @@ function addPanel(layout) {
     const panelIndex = children.findIndex(holdsPanelBodyDirectly);
     if (panelIndex === -1) continue;
     children.splice(panelIndex + 1, 0, structuredClone(issuesColumn));
+    weighIssuesColumn(children);
     break;
   }
   return layout;
+}
+
+// Weighs the issues column an earlier setup fixed at its starting width, answering whether there was one. A
+// column the person sized themselves keeps its size.
+function weighFixedIssuesColumn(layout) {
+  for (const object of objectsIn(layout)) {
+    const children = Array.isArray(object.children) ? object.children : [];
+    const column = children.find((child) => child?.id === issuesColumn.id);
+    if (!column || !sameJson(column.size, earlierFixedIssuesSize)) continue;
+    weighIssuesColumn(children);
+    return true;
+  }
+  return false;
 }
 
 // Takes the issues block out of panel-body, answering whether there was one. A stack showing the block
@@ -197,9 +227,12 @@ const commands = {
   "add-panel": (layoutPath) => writeJson(layoutPath, addPanel(readJson(layoutPath))),
   "move-panel": (layoutPath) => {
     const layout = readJson(layoutPath);
-    if (!removeFromPanelBody(layout)) return panelUnmovedExitCode;
-    writeJson(layoutPath, addPanel(layout));
-    return panelMovedExitCode;
+    const moved = removeFromPanelBody(layout);
+    if (moved) addPanel(layout);
+    const weighed = weighFixedIssuesColumn(layout);
+    if (!moved && !weighed) return panelUnchangedExitCode;
+    writeJson(layoutPath, layout);
+    return panelChangedExitCode;
   },
   "remove-panel": (layoutPath) => {
     const layout = readJson(layoutPath);

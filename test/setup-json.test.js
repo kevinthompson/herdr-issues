@@ -13,7 +13,8 @@ const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value, nul
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
-const issuesColumn = { id: "issues-panel", type: "column", size: { px: 368 }, min: 32, max: 900, children: [issuesBlock] };
+const issuesColumn = { id: "issues-panel", type: "column", size: { weight: 1 }, min: 32, max: 900, children: [issuesBlock] };
+const fixedIssuesColumn = { ...issuesColumn, size: { px: 368 } };
 
 const workBody = (children) => ({ id: "root", children: [{ id: "work", children: [{ id: "work-body", children }, { id: "status" }] }] });
 const mainLayout = () => workBody([
@@ -97,7 +98,9 @@ test("remove-panel removes the issues column and leaves the layout's other nodes
 
   assert.equal(run(["remove-panel", layout]).status, 0);
 
-  assert.deepEqual(readJson(layout), mainLayout());
+  const [main, ...others] = readJson(layout).children[0].children[0].children;
+  assert.deepEqual(main, { id: "main", size: { weight: 2 } });
+  assert.deepEqual(others, mainLayout().children[0].children[0].children.slice(1));
   assert.equal(run(["remove-panel", layout]).status, 10);
 });
 
@@ -127,7 +130,7 @@ test("add-panel adds the issues block in a column of its own beside the panel", 
   assert.equal(run(["add-panel", layout]).status, 0);
 
   assert.deepEqual(readJson(layout), workBody([
-    { id: "main" },
+    { id: "main", size: { weight: 2 } },
     { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
     issuesColumn,
   ]));
@@ -147,8 +150,40 @@ test("move-panel moves an issues block out of panel-body into a column of its ow
   assert.deepEqual(readJson(layout), workBody([
     { id: "main", size: { weight: 5 } },
     { id: "panel", size: { weight: 2 }, children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] },
+    { ...issuesColumn, size: { weight: 2.5 } },
+  ]));
+});
+
+test("move-panel weighs the fixed issues column an earlier setup wrote, and leaves every other node alone", (t) => {
+  const folder = temporaryFolder(t);
+  const layout = join(folder, "mine.json");
+  const fixed = workBody([
+    { id: "main" },
+    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+    fixedIssuesColumn,
+  ]);
+  writeJson(layout, fixed);
+
+  assert.equal(run(["move-panel", layout]).status, 0);
+
+  assert.deepEqual(readJson(layout), workBody([
+    { id: "main", size: { weight: 2 } },
+    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
     issuesColumn,
   ]));
+  const weighed = readFileSync(layout, "utf8");
+  assert.equal(run(["move-panel", layout]).status, 10);
+  assert.equal(readFileSync(layout, "utf8"), weighed);
+});
+
+test("move-panel leaves an issues column the person weighted alone", (t) => {
+  const folder = temporaryFolder(t);
+  const layout = join(folder, "mine.json");
+  writeJson(layout, workBody([{ id: "main" }, { ...issuesColumn, size: { weight: 3 } }]));
+  const weighted = readFileSync(layout, "utf8");
+
+  assert.equal(run(["move-panel", layout]).status, 10);
+  assert.equal(readFileSync(layout, "utf8"), weighted);
 });
 
 test("move-panel leaves a layout without an issues block in panel-body alone", (t) => {
@@ -182,6 +217,9 @@ test("copy-layout records what it was cloned from and adds the panel", (t) => {
 
   const copy = readJson(join(folder, "copy.json"));
   assert.deepEqual(copy.cloned_from, { name: "main", version: "1.2.3" });
+  const [main, , column] = copy.children[0].children[0].children;
+  assert.deepEqual(main.size, { weight: 2 });
+  assert.deepEqual(column.size, { weight: 1 });
   assert.equal(run(["shows-mod", join(folder, "copy.json")]).status, 0);
   assert.equal(run(["shows-mod", join(folder, "main.json")]).status, 1);
 });
