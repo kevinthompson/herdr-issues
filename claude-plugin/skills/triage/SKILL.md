@@ -8,7 +8,7 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 1. **Find the tracker** as `/issues:create` step 1 does, with `issues tracker --json`.
    - **Linear**: load `list_issues`, `get_issue`, `save_issue`, `list_issue_statuses`, `list_issue_labels` and the comment tools (`list_comments`, `save_comment` or `create_comment`) with ToolSearch, prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`. Use the team that owns the repository. If the tools aren't available, stop and say so.
-   - **GitHub**: use the GitHub CLI against the repository the setting names: `gh issue list`, `gh issue view --comments`, `gh issue edit --body-file`, `gh issue comment` and `gh issue close`. GitHub has no priority or Backlog state, so skip the priority and status questions in step 7, and leave the issue open and unassigned; blockers are a "Blocked by #<number>" line in the body.
+   - **GitHub**: use the GitHub CLI against the repository the setting names: `gh issue list`, `gh issue view --comments`, `gh issue edit --body-file`, `gh issue comment` and `gh issue close`. GitHub has no priority or Backlog state, so skip the priority and status questions in step 7, and leave the issue open and unassigned; blockers are GitHub issue dependencies, listed with `gh api repos/<owner>/<name>/issues/<number>/dependencies/blocked_by`, added as `/issues:create` adds them, and removed with `gh api -X DELETE repos/<owner>/<name>/issues/<number>/dependencies/blocked_by/<id>`. Replace any "Blocked by #<number>" line in the body with the dependency.
    - Read `../create/SKILL.md` beside this skill: its step 4 is what an issue must contain, and this skill doesn't restate it.
 
 2. **Pick the issues.** With issue IDs or a scope in the arguments, triage those. Otherwise confirm the scope before reading any issue. Triaging is this skill's job, not a list: never assume the person means Linear's Triage state.
@@ -31,7 +31,7 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 6. **Size it.** When the issue needs more than one branch or pull request, or has separable outcomes, propose a split: list each slice's title, goal and blockers, and ask the person to approve or adjust it before writing anything. Once approved, rewrite the original as the first slice and create the others with `/issues:create`'s format, blocked by it where they depend on it.
 
-7. **Rewrite it.** Bring the issue to the bar: testable acceptance criteria, Out of scope, Verification commands that exist, Context naming real code and the reason for the work, and correct blockers (add or remove Linear blocking relations or "Blocked by" lines the work reveals). For a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after.
+7. **Rewrite it.** Bring the issue to the bar: testable acceptance criteria, Out of scope, Verification commands that exist, Context naming real code and the reason for the work, and correct blockers (add or remove the Linear blocking relations or GitHub issue dependencies the work reveals). For a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after.
    - Also suggest a priority with a one-line reason, and ask the person to confirm or change it.
    - For Linear, ask which status to leave it in, Todo or Backlog, offering Todo first when nothing blocks it. An issue in Linear's Triage state always leaves Triage.
    - **Not yet worked** (step 3): rewrite the description itself.
