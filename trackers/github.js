@@ -4,18 +4,21 @@
 //
 // GitHub issues are only open or closed, so their status is derived: closed as completed is done, closed
 // any other way is canceled; an open issue with a linked pull request (one that closes it) is in review,
-// an assigned one is in progress, and the rest are todo. GitHub has no priority or blocking relations here.
+// an assigned one is in progress, and the rest are todo. GitHub has no priority; blockers come from its
+// issue dependencies.
 import { exec } from "herdr";
 import { mainCheckout } from "../location.js";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const RECENTLY_CLOSED = 20;
+const BLOCKERS = 20;
 const BRANCH_SLUG_LENGTH = 50;
 
 const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateReason
   labels(first: 20) { nodes { name color } }
   assignees(first: 10) { nodes { login name avatarUrl } }
+  blockedBy(first: ${BLOCKERS}) { nodes { number state repository { nameWithOwner } } }
   closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
     nodes { number title url state isDraft headRefName repository { nameWithOwner } } }`;
 const ISSUES = (state, orderBy) => `query($owner: String!, $name: String!, $first: Int!, $after: String) {
@@ -48,6 +51,12 @@ function suggestedBranch(node) {
   return slug ? `${node.number}-${slug}` : String(node.number);
 }
 
+// Closed blockers are only listed once Done or Canceled is expanded, so only the open ones may block.
+function openBlockers(node, repo) {
+  return node.blockedBy.nodes.filter((blocker) => blocker.state === "OPEN").map((blocker) =>
+    blocker.repository.nameWithOwner === repo ? `#${blocker.number}` : `${blocker.repository.nameWithOwner}#${blocker.number}`);
+}
+
 function toIssue(node, repo) {
   const pullRequests = node.closedByPullRequestsReferences.nodes.map((pullRequest) => ({
     url: pullRequest.url,
@@ -69,7 +78,7 @@ function toIssue(node, repo) {
     order: null,
     labels: node.labels.nodes.map((label) => label.name),
     labelColors: Object.fromEntries(node.labels.nodes.map((label) => [label.name, `#${label.color}`])),
-    blockedBy: [],
+    blockedBy: openBlockers(node, repo),
     branch: open?.branch ?? suggestedBranch(node),
     assignee: assignee ? assignee.name || assignee.login : "Unassigned",
     assigneeAvatar: assignee?.avatarUrl ?? null,
