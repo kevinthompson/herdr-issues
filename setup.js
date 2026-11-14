@@ -19,6 +19,7 @@ const TEAM_PICKS = "issues.setupTeams";
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TRACKERS = [{ id: "github", label: "GitHub Issues" }, { id: "linear", label: "Linear" }];
 const TEAM_DROPDOWN_MAX_PX = 280;
+const ANSWER_LABEL_PX = 80;
 const CONFIG_HINT = "For saved Linear views, changing how work lands later, and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
 const MERGE_CHOICES = [
   { id: "auto", label: "Merge automatically", detail: "The branch merges into main on this computer as soon as its work is done." },
@@ -160,37 +161,61 @@ export class TrackerSetup {
           button("setup-choose-another", "Choose a different tracker", (cx) => { this.choosingAnother = true; cx.notify(); }, t)))
         .child(markdown("setup-hint", CONFIG_HINT, t.dim));
     }
+    if (this.landing) {
+      return content
+        .child(div().font_semibold().child("Set up issues"))
+        .child(this.landingView(t))
+        .child(markdown("setup-hint", CONFIG_HINT, t.dim));
+    }
     const sentence = this.failure ? "Choose a different issue tracker for this repository." : "This repository has no issue tracker yet. Choose where its issues live.";
     return content
       .child(div().font_semibold().child("Set up issues"))
       .child(div().whitespace_normal().text_size(12).text_color(t.muted).child(sentence))
       .child(h_flex().gap(6).children(TRACKERS.map(({ id, label }) =>
         button(`setup-${id}`, label, (cx) => this.choose(id, cx), t, { primary: this.choice === id, enabled: !this.checking }))))
-      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child(this.landing ? "Saving…" : "Checking…")))
+      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Checking…")))
       .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t)))
-      .when(!this.checking && !this.problem && Boolean(this.teams) && !this.landing, (e) => e.child(this.teamPicker(t)))
-      .when(!this.checking && !this.problem && Boolean(this.landing), (e) => e.child(this.landingQuestion(t)))
+      .when(!this.checking && !this.problem && Boolean(this.teams), (e) => e.child(this.teamPicker(t)))
       .when(Boolean(this.failure), (e) => e.child(button("setup-back", "Back", (cx) => { Object.assign(this, { choosingAnother: false, choice: null, problem: null, teams: null, landing: null }); cx.notify(); }, t)))
       .child(markdown("setup-hint", CONFIG_HINT, t.dim));
   }
 
-  // How work gets into main, or, once a pull request is chosen, when its work is complete. The proposed choice
-  // stands out.
-  landingQuestion(t) {
-    const { tracker, proposed, merge } = this.landing;
+  // Once the tracker is ready: the answers so far, then how work gets into main or, once a pull request is
+  // chosen, when its work is complete. Back returns to the previous question.
+  landingView(t) {
+    const { tracker, merge } = this.landing;
     const team = tracker.team && this.teams?.find(({ key }) => key === tracker.team);
+    const answers = [
+      ["Tracker", TRACKERS.find(({ id }) => id === tracker.tracker)?.label],
+      ...(tracker.team ? [["Team", team ? `${team.name} (${team.key})` : tracker.team]] : []),
+      ...(merge ? [["Work lands", MERGE_CHOICES.find(({ id }) => id === merge)?.label]] : []),
+    ];
+    const back = merge
+      ? (cx) => { this.landing.merge = null; cx.notify(); }
+      : (cx) => { Object.assign(this, { landing: null, choice: null, teams: null }); cx.notify(); };
+    return v_flex().flex_none().gap(14)
+      .child(v_flex().flex_none().gap(4).children(answers.map(([name, value]) => h_flex().gap(8).text_size(12)
+        .child(div().w(ANSWER_LABEL_PX).flex_none().text_color(t.dim).child(name))
+        .child(div().text_color(t.foreground).child(value ?? "")))))
+      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Saving…")))
+      .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t)))
+      .when(!this.checking && !this.problem, (e) => e.child(this.landingQuestion(t)))
+      .child(h_flex().child(button("setup-landing-back", "Back", back, t, { enabled: !this.checking })));
+  }
+
+  // The proposed choice stands out.
+  landingQuestion(t) {
+    const { proposed, merge } = this.landing;
     const [question, kind, choices, proposedId, onChoose] = merge
       ? ["When is the work complete?", "complete", COMPLETE_CHOICES, proposed.complete, (id, cx) => this.save({ merge, complete: id }, cx)]
       : ["How does work get into main?", "merge", MERGE_CHOICES, proposed.merge, (id, cx) => this.chooseMerge(id, cx)];
     return v_flex().flex_none().gap(12)
-      .when(Boolean(team), (e) => e.child(div().text_size(12).text_color(t.muted).child(`Team: ${team?.name} (${team?.key})`)))
-      .child(div().text_size(12).text_color(t.muted).child(question))
+      .child(div().font_semibold().child(question))
       .children(choices.map(({ id, label, detail }) => v_flex().flex_none().gap(4)
         .child(h_flex().gap(8).items_center()
           .child(button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, { primary: id === proposedId }))
           .when(id === proposedId, (e) => e.child(div().text_size(11).text_color(t.dim).child("Proposed"))))
-        .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))))
-      .when(Boolean(merge), (e) => e.child(h_flex().child(button("setup-landing-back", "Back", (cx) => { this.landing.merge = null; cx.notify(); }, t))));
+        .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))));
   }
 
   teamPicker(t) {
