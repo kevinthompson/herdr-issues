@@ -4,8 +4,7 @@
 // with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
-// Claude session working the issue in its worktree. A row whose worktree's work is complete (readyToClose
-// in issue.js) shows Ready to close and a button that opens the worktree dialog to remove it. Clicking a task-list
+// Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list.
 import { View, div, image, svg } from "gpui-kit";
@@ -17,10 +16,10 @@ import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/set
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, readyToClose, PRIORITIES } from "./issue.js";
-import { issueDetail, issueLinks, workButton, labelChips, button } from "./detail.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
-import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, branchWorktree, spaceShowing } from "./worktree.js";
+import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { isTextFile, openInEditor } from "./editor.js";
@@ -46,14 +45,6 @@ const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
 const PRIORITY_ICON_PX = 18;
-// The mark beside an issue's ID for the most urgent agent status in the space showing its worktree.
-const AGENT_MARKS = {
-  blocked: { color: "blocked", tooltip: "Agent needs you" },
-  done: { color: "done", tooltip: "Agent finished" },
-  working: { color: "dim", tooltip: "Agent working" },
-};
-const AGENT_MARK_PX = 7;
-const READY_MARK_PX = 11;
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
@@ -624,19 +615,13 @@ export default class Issues extends View {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), due = dueStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
-    const { inSpace, inActiveSpace, agentStatus } = this.spaceShowingWorktree(issue);
-    const agentMark = AGENT_MARKS[agentStatus], closable = this.closableWorktree(issue);
+    const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
     return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
       .hover((s) => s.bg(rowHover(t)))
       .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().min_w(idColumnWidth).when(this.prioritized(), (e) => e.w(idColumnWidth)).pt(1).gap(3).text_size(11)
-          .child(h_flex().gap(5).items_center()
-            .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
-            .when(Boolean(agentMark), (e) => e.child(div().id(`agent-${issue.id}`).flex_none().size(AGENT_MARK_PX).rounded(AGENT_MARK_PX / 2)
-              .bg(t[agentMark?.color] ?? t.dim).tooltip(agentMark?.tooltip ?? "")))
-            .when(Boolean(closable), (e) => e.child(div().id(`ready-${issue.id}`).flex_none().tooltip("Ready to close")
-              .child(svg("mods/issues/icons/circle-check.svg").size(READY_MARK_PX).text_color(t.ansi2)))))
+          .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
           .when(Boolean(due), (e) => e.child(div().whitespace_nowrap().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
           .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
@@ -655,32 +640,16 @@ export default class Issues extends View {
               .child(div().flex_none().child("Blocking"))
               .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent))))))
           .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))))
-        .when(Boolean(this.tracker?.writable || closable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
-          .when(Boolean(closable), (e) => e.child(button(`row-${issue.id}-remove`, (color) => svg("mods/issues/icons/trash-2.svg").size(14).text_color(color),
-            () => this.openRemoveDialog(closable), t, { primaryOnHover: true, tooltip: "Remove worktree" })))
-          .when(!closable && (finishable || startable || inSpace), (e) => e.child(workButton(`row-${issue.id}`, {
+        .when(Boolean(this.tracker?.writable), (e) => e.child(h_flex().flex_none().w(ACTION_COLUMN_PX).justify_end()
+          .when(finishable || startable || inSpace, (e) => e.child(workButton(`row-${issue.id}`, {
             finishable, startable, inSpace, inActiveSpace, opening: this.opening?.id === issue.id, onStart: (cx) => this.startWork(issue, cx), onContinue: (cx) => this.continueWork(issue, cx),
           }, t, { primary: false, compact: true }))))));
   }
 
-  // Whether a space shows the issue's worktree, whether it is the active space, and its most urgent agent status.
+  // Whether a space shows the issue's worktree, and whether it is the active space.
   spaceShowingWorktree(issue) {
     const space = worktreeSpace(this.repository, issue.branch);
-    return { inSpace: Boolean(space), inActiveSpace: Boolean(space?.active), agentStatus: space?.status ?? null };
-  }
-
-  // The issue's linked worktree when its work is complete (readyToClose), else null.
-  closableWorktree(issue) {
-    const worktree = branchWorktree(this.repository, issue.branch);
-    return worktree && readyToClose(issue, worktree.work, this.repository.complete) ? worktree : null;
-  }
-
-  // The worktree dialog's checks for removing the worktree, which also closes the space showing it.
-  openRemoveDialog(worktree) {
-    openOverlay({
-      mod: "issues", kind: "dialog", width: 440, height: 320,
-      props: { space: spaceShowing(worktree.path, worktree.on)?.id, folder: worktree.path, machine: worktree.on ?? null, action: "remove" },
-    });
+    return { inSpace: Boolean(space), inActiveSpace: Boolean(space?.active) };
   }
 
   // The assignee's name after their avatar once it is cached, then the agent it's delegated to, if any.
