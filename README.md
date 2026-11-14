@@ -21,7 +21,7 @@ curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues-mod/main
 
 Run the same command again to update.
 
-Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to collapse the Issues panel to a thin strip or expand it again; the strip's button expands it too.
+Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to collapse the Issues panel to a thin strip or expand it again; the strip's button expands it too. With the panel focused, **Cmd-R** refreshes its list.
 
 ## Getting started
 

@@ -3,6 +3,7 @@
     "cmd-shift-i": "issues.toggle"
   },
   "mod:issues": {
-    "cmd-s": "issues.save"
+    "cmd-s": "issues.save",
+    "cmd-r": "issues.refresh"
   }
 }

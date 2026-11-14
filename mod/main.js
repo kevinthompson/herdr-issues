@@ -7,7 +7,8 @@
 // Claude session working the issue in its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list. The issues.toggle key command and the
-// strip's button collapse the panel to a thin strip and expand it again (collapse.js).
+// strip's button collapse the panel to a thin strip and expand it again (collapse.js). The list polls its
+// tracker, and the issues.refresh key command fetches it at once.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome, layout, shared, setShared } from "herdr";
@@ -77,12 +78,10 @@ function scopeDropdown(id, label, onClick, t) {
 }
 
 const SCOPE_DROPDOWN_MAX_PX = 260;
-const REFRESH_ICON_PX = 15;
 const SYNC_ICON_PX = 15;
 const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
-const folderName = (path) => path.split("/").filter(Boolean).pop() ?? path;
 const NOT_A_REPOSITORY = "The issues panel tracks issues for git repositories, and this folder isn't in one.";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
 
@@ -116,6 +115,7 @@ export default class Issues extends View {
         const command = await nextCommand();
         if (command === "save") this.save(cx);
         else if (command === "toggle") this.toggleCollapsed();
+        else if (command === "refresh" && !this.refreshing) this.refresh(cx);
         cx.notify();
       }
     });
@@ -784,22 +784,13 @@ export default class Issues extends View {
         .child(scopeDropdown("issues-label", label ?? "All labels", () => openLabelMenu(labels, label, this.scopeKey), t).flex_shrink(1)));
   }
 
-  refreshButton(t) {
-    return div().id("issues-refresh").flex_none().size(24).flex().items_center().justify_center().rounded(6)
-      .border_1().border_color(t.border).bg(t.raised)
-      .when(!this.refreshing, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover))
-        .on_click((_e, cx) => { this.refresh(cx); cx.notify(); }))
-      .child(svg("mods/issues/icons/rotate-cw.svg").size(REFRESH_ICON_PX).text_color(this.refreshing ? t.dim : t.foreground));
-  }
-
   header(t) {
     const syncIndicator = this.syncIndicator(t);
     return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-      .child(div().font_semibold().child("Issues"))
-      .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
+      .child(div().flex_none().font_semibold().child("Issues"))
+      .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t)))
       .child(div().flex_1())
       .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
-      .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)).child(this.trackerLabel(t)))
       .child(collapseButton(() => this.toggleCollapsed(), t));
   }
 
