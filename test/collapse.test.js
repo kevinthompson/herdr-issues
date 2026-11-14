@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
 import {
-  COLLAPSED_PX, DEFAULT_EXPANDED_PX, collapsibleNodeId, isCollapsed, noticeWidth, remembersWidth, toggleCollapsed,
+  COLLAPSED_PX, collapsibleNodeId, isCollapsed, noticeWidth, remembersWidth, toggleCollapsed,
 } from "../mod/collapse.js";
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
@@ -39,64 +39,101 @@ test("a panel narrower than the threshold is collapsed, and only wide ones are r
   assert.equal(remembersWidth(368), true);
 });
 
-// Herdr as the panel sees it: layout.resize sets the node's size in px at zoom 1, and the panel measures its
-// frame zoomed and inside the node's padding, as on_size_change reports it to noticeWidth.
-function fakeHerdr(t, { px = 368, zoom = 1.2, inset = 8 } = {}) {
-  const node = { id: "issues-panel", type: "column", size: { px }, children: [issuesBlock] };
-  const root = workBody([{ id: "main", type: "block" }, node]);
-  const values = {}, resizes = [];
-  const measuredWidth = () => node.size.px * zoom - inset;
+// Herdr as the panel sees it: the terminals' main node at weight 2 shares a row of `rowPx` with the panel's
+// node, sized at zoom 1 in px or by weight, and the panel measures its frame zoomed and inside the node's
+// padding, as on_size_change reports it to noticeWidth.
+function fakeHerdr(t, { size = { weight: 1 }, rowPx = 1100, zoom = 1.2, inset = 8, values = {} } = {}) {
+  const mainWeight = 2;
+  const node = { id: "issues-panel", type: "column", size, children: [issuesBlock] };
+  const root = workBody([{ id: "main", type: "block", size: { weight: mainWeight } }, node]);
+  const resizes = [];
+  let row = rowPx;
+  const nodePx = () => node.size.px ?? (row * node.size.weight) / (node.size.weight + mainWeight);
+  const measuredWidth = () => nodePx() * zoom - inset;
   const app = {
     resizes,
     measuredWidth,
-    drag(px) { node.size = { px }; noticeWidth(measuredWidth()); },
+    drag(weight) { node.size = { weight }; noticeWidth(measuredWidth()); },
+    resizeWindow(px) { row = px; noticeWidth(measuredWidth()); },
     toggle() { toggleCollapsed(measuredWidth()); },
   };
   stubHerdr(t, {
     layout: () => root,
     shared: (key) => values[key],
     setShared: (key, value) => { values[key] = value; },
-    run: (command, { id, ...size }) => {
+    run: (command, { id, ...resized }) => {
       assert.equal(command, "layout.resize");
       assert.equal(id, "issues-panel");
-      resizes.push(size);
-      node.size = size;
+      resizes.push(resized);
+      node.size = resized;
       noticeWidth(measuredWidth());
     },
   });
   return app;
 }
 
-test("collapsing and expanding returns the panel to the width it had, however often it's toggled", (t) => {
-  const app = fakeHerdr(t), width = app.measuredWidth();
+test("collapsing and expanding returns the panel to the weight it had, however often it's toggled", (t) => {
+  const app = fakeHerdr(t, { size: { weight: 0.8 } }), width = app.measuredWidth();
   for (let cycle = 0; cycle < 5; cycle++) {
     app.toggle();
     assert.deepEqual(app.resizes.at(-1), { px: COLLAPSED_PX });
     app.toggle();
+    assert.deepEqual(app.resizes.at(-1), { weight: 0.8 });
     assert.equal(app.measuredWidth(), width);
   }
 });
 
-test("a divider drag sets the width the panel returns to", (t) => {
+test("the expanded panel keeps its share when the window resizes while it's collapsed", (t) => {
   const app = fakeHerdr(t);
-  app.drag(500);
-  const width = app.measuredWidth();
   app.toggle();
+  app.resizeWindow(1600);
+  assert.equal(app.measuredWidth(), COLLAPSED_PX * 1.2 - 8);
   app.toggle();
-  assert.equal(app.measuredWidth(), width);
+  assert.equal(app.measuredWidth(), (1600 / 3) * 1.2 - 8);
 });
 
-test("a drag down to the strip expands to the last wide width it passed", (t) => {
+test("a divider drag sets the weight the panel returns to", (t) => {
   const app = fakeHerdr(t);
-  app.drag(420);
-  const width = app.measuredWidth();
-  for (const px of [200, 100, COLLAPSED_PX]) app.drag(px);
+  app.drag(1.5);
   app.toggle();
-  assert.equal(app.measuredWidth(), width);
+  app.toggle();
+  assert.deepEqual(app.resizes.at(-1), { weight: 1.5 });
 });
 
-test("expanding with no remembered width uses the default", (t) => {
-  const app = fakeHerdr(t, { px: COLLAPSED_PX });
+test("a drag down to the strip expands to the last wide weight it passed", (t) => {
+  const app = fakeHerdr(t);
+  app.drag(1.2);
+  for (const weight of [0.5, 0.2, 0.05]) app.drag(weight);
   app.toggle();
-  assert.deepEqual(app.resizes, [{ px: DEFAULT_EXPANDED_PX }]);
+  assert.deepEqual(app.resizes.at(-1), { weight: 1.2 });
+});
+
+test("expanding with no remembered weight takes a third of the row beside the terminals", (t) => {
+  const app = fakeHerdr(t, { size: { px: COLLAPSED_PX } });
+  app.toggle();
+  assert.deepEqual(app.resizes, [{ weight: 1 }]);
+});
+
+test("expanding a panel remembered in pixels gives it a weight instead", (t) => {
+  const app = fakeHerdr(t, { size: { px: COLLAPSED_PX }, values: { "issues.expandedSize:main": { px: 368 } } });
+  app.toggle();
+  assert.deepEqual(app.resizes, [{ weight: 1 }]);
+});
+
+test("collapsing a panel fixed in pixels expands it to a weight", (t) => {
+  const app = fakeHerdr(t, { size: { px: 368 } });
+  app.toggle();
+  app.toggle();
+  assert.deepEqual(app.resizes, [{ px: COLLAPSED_PX }, { weight: 1 }]);
+});
+
+test("expanding beside unsized siblings takes half their default weight", (t) => {
+  const node = { id: "issues-panel", type: "column", size: { px: COLLAPSED_PX }, children: [issuesBlock] };
+  const resizes = [];
+  stubHerdr(t, {
+    layout: () => workBody([{ id: "main", type: "block" }, { id: "side", type: "column", size: { px: 368 } }, node]),
+    run: (command, args) => { resizes.push(args); },
+  });
+  toggleCollapsed(COLLAPSED_PX);
+  assert.deepEqual(resizes, [{ id: "issues-panel", weight: 0.5 }]);
 });
