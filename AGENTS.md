@@ -13,6 +13,7 @@ Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `ma
 - `setup.js`: the setup view drawn in place of the list for a repository with no tracker, or one whose tracker can't load.
 - `menu.js`: the status, priority, scope, milestone and label dropdowns, opened as popups of this same mod.
 - `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
+- `space-name.js`: the name of an issue's worktree space, from the repository's `spaceName` setting.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
 - `edits.js`, `tasks.js`, `changes.js`: field edits saved in the background, checkbox toggles in an issue's body, and the stamp that tells every panel to refresh.
@@ -38,7 +39,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 `bin/issues` is a Node script that runs the panel's own modules outside the app, so scripts and skills share one copy of each rule. Those modules import from `herdr`, which exists only inside the app, so it registers a module resolve hook that points `herdr` at `cli/herdr.js`: a shim exporting every name the modules import, following the app's contract in `gpui-kit.d.ts`, for this computer only. The modules load unchanged; a module the CLI loads that imports a new name from `herdr` needs the shim to export it too.
 
-- `cli/main.js`: the commands, each answering for the git repository holding the current folder. `issues tracker [--json]` prints the repository's tracker, as `trackerFor` chooses it. `issues branch <id> [--json]` prints the branch an issue is worked on, from `tracker.get`, and refuses an issue an unfinished issue blocks.
+- `cli/main.js`: the commands, each answering for the git repository holding the current folder. `issues tracker [--json]` prints the repository's tracker, as `trackerFor` chooses it. `issues branch <id> [--json]` prints the branch an issue is worked on, from `tracker.get`, and refuses an issue an unfinished issue blocks. `issues space-name <issue ID>` prints the name of the issue's worktree space, as the panel names it.
 
 ### The Claude plugin (`claude-plugin/`)
 

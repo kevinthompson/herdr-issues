@@ -2,15 +2,17 @@
 import { repositoryRoot } from "../location.js";
 import { trackerFor } from "../trackers/index.js";
 import { needsNewBranch } from "../issue.js";
+import { issueSpaceName } from "../space-name.js";
 
 const USAGE = `Usage: issues <command> [options]
 
 Commands:
-  tracker [--json]       Print the tracker the repository's issues live in: its kind, name and Linear team
-  branch <id> [--json]   Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
+  tracker [--json]         Print the tracker the repository's issues live in: its kind, name and Linear team
+  branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
+  space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
 
 Options:
-  -h, --help             Print this help`;
+  -h, --help               Print this help`;
 
 const EXIT_FAILED = 1;
 const EXIT_USAGE = 2;
@@ -52,7 +54,12 @@ function refuse(message) {
   return EXIT_FAILED;
 }
 
-const COMMANDS = { tracker, branch };
+async function spaceName([id]) {
+  if (!id) throw new Error("space-name needs an issue ID");
+  console.log(await issueSpaceName(await currentProject(), id));
+}
+
+const COMMANDS = { tracker, branch, "space-name": spaceName };
 
 export async function main([command, ...args]) {
   if (command === "-h" || command === "--help") {
