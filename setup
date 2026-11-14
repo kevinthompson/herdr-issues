@@ -24,12 +24,35 @@ mod_link="$herdr_home/mods/issues"
 keys_file="$herdr_home/keys.json"
 cli_link="$HOME/.local/bin/issues"
 
-success() { printf '%s\n' "$*"; }
+colors_stream() {
+  [[ -t $1 && -z ${NO_COLOR:-} ]]
+}
+
+print_in_color() {
+  local stream=$1 sgr=$2
+  shift 2
+  if colors_stream "$stream"; then
+    printf '\e[%sm%s\e[0m\n' "$sgr" "$*" >&"$stream"
+  else
+    printf '%s\n' "$*" >&"$stream"
+  fi
+}
+
+# Prompts from read -p and select go to stderr.
+prompt_text() {
+  if colors_stream 2; then
+    printf '\e[36m%s\e[0m' "$1"
+  else
+    printf '%s' "$1"
+  fi
+}
+
+success() { print_in_color 1 32 "$@"; }
 info() { printf '%s\n' "$*"; }
-note() { printf '%s\n' "$*"; }
-prompt() { printf '%s\n' "$*"; }
-warning() { printf '%s\n' "$*" >&2; }
-error() { printf '%s\n' "$*" >&2; }
+note() { print_in_color 1 1 "$@"; }
+prompt() { print_in_color 1 36 "$@"; }
+warning() { print_in_color 2 33 "$@"; }
+error() { print_in_color 2 31 "$@"; }
 
 missing=()
 for command in herdr-app claude jq git node; do
@@ -189,7 +212,7 @@ add_block_to_panel_body() {
 copy_main_layout() {
   local name version
   while true; do
-    read -r -p "Name for the new layout [main-issues]: " name || return 1
+    read -r -p "$(prompt_text "Name for the new layout [main-issues]: ")" name || return 1
     name=${name:-main-issues}
     if [[ ! $name =~ ^[A-Za-z0-9._-]+$ ]]; then
       prompt "Use only letters, numbers, dots, dashes and underscores."
@@ -244,7 +267,7 @@ add_panel_to_layout() {
 
   echo
   prompt "Which layout should show the Issues panel?"
-  PS3="Choose a number: "
+  PS3=$(prompt_text "Choose a number: ")
   select choice in "${choices[@]}"; do
     [[ -n $choice ]] && break
   done
