@@ -13,7 +13,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `setup.js`: the setup view drawn in place of the list for a repository with no tracker, or one whose tracker can't load.
 - `menu.js`: the status, priority, scope, milestone and label dropdowns, opened as popups of this same mod.
 - `worktree-dialog.js` and `worktree.js`: the worktree dialog, and finding and opening issue worktrees and their spaces.
-- `space-name.js`: the name of an issue's worktree space, from the repository's `spaceName` setting.
+- `space-name.js`: the name of an issue's worktree space, from the repository's `spaceName` setting, and the issue ID read back out of a space's name, so switching to an issue's space opens its issue.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
 - `edits.js`, `tasks.js`, `changes.js`: field edits saved in the background, checkbox toggles in an issue's body, and the stamp that tells every panel to refresh.
