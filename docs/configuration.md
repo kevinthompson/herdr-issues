@@ -31,6 +31,7 @@ Each tracker needs:
 
   Then run `/mcp` in a Claude Code session, choose `linear` and sign in. A Linear connection on your Claude account at claude.ai works too.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
+- **Beads**: no credentials, but the `bd` CLI (`brew install beads`) and a database made with `bd init` in the repository's main checkout.
 
 ## The `issues.json` entry
 
@@ -49,7 +50,15 @@ The examples below show one entry each.
 
 ### `tracker`
 
-`linear` or `github`. A `linear` entry also needs `team`, the Linear team's key, and can list saved views as extra lists in `views`, each a name and the view's URL. A `github` entry can name a repository other than origin's in `repo`, as `owner/name`.
+`linear`, `github` or `beads`. A `linear` entry also needs `team`, the Linear team's key, and can list saved views as extra lists in `views`, each a name and the view's URL. A `github` entry can name a repository other than origin's in `repo`, as `owner/name`.
+
+`beads` lists the issues in the repository's own [Beads](https://github.com/steveyegge/beads) database, which `bd init` makes in the main checkout's `.beads/` folder; every worktree shares it. Neither the setup view nor `/issues:config` offers it yet, so write the entry by hand:
+
+```json
+"~/Code/notes": { "tracker": "beads" }
+```
+
+Beads keeps its database out of git, so changing an issue's status, priority or body, or starting it, never makes a commit. Its statuses show as todo (`open` and `blocked`), in progress, backlog (`deferred`) and done (`closed`), and its priorities P0 to P4 as Urgent, High, Medium, Low and None.
 
 ### `spaceName`
 
