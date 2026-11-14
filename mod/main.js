@@ -45,6 +45,13 @@ const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
 const PRIORITY_ICON_PX = 18;
+// The mark beside an issue's ID for the most urgent agent status in the space showing its worktree.
+const AGENT_MARKS = {
+  blocked: { color: "blocked", tooltip: "Agent needs you" },
+  done: { color: "done", tooltip: "Agent finished" },
+  working: { color: "dim", tooltip: "Agent working" },
+};
+const AGENT_MARK_PX = 7;
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
@@ -615,13 +622,17 @@ export default class Issues extends View {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), due = dueStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
-    const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
+    const { inSpace, inActiveSpace, agentStatus } = this.spaceShowingWorktree(issue);
+    const agentMark = AGENT_MARKS[agentStatus];
     return v_flex().id(`issue-${issue.id}`).flex_none().px(10).py(6).gap(3).rounded(7).cursor_pointer()
       .hover((s) => s.bg(rowHover(t)))
       .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
       .child(h_flex().gap(8).items_start()
         .child(v_flex().flex_none().min_w(idColumnWidth).when(this.prioritized(), (e) => e.w(idColumnWidth)).pt(1).gap(3).text_size(11)
-          .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
+          .child(h_flex().gap(5).items_center()
+            .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
+            .when(Boolean(agentMark), (e) => e.child(div().id(`agent-${issue.id}`).flex_none().size(AGENT_MARK_PX).rounded(AGENT_MARK_PX / 2)
+              .bg(t[agentMark?.color] ?? t.dim).tooltip(agentMark?.tooltip ?? ""))))
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
           .when(Boolean(due), (e) => e.child(div().whitespace_nowrap().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
           .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
@@ -646,10 +657,10 @@ export default class Issues extends View {
           }, t, { primary: false, compact: true }))))));
   }
 
-  // Whether a space shows the issue's worktree, and whether it is the active space.
+  // Whether a space shows the issue's worktree, whether it is the active space, and its most urgent agent status.
   spaceShowingWorktree(issue) {
     const space = worktreeSpace(this.repository, issue.branch);
-    return { inSpace: Boolean(space), inActiveSpace: Boolean(space?.active) };
+    return { inSpace: Boolean(space), inActiveSpace: Boolean(space?.active), agentStatus: space?.status ?? null };
   }
 
   // The assignee's name after their avatar once it is cached, then the agent it's delegated to, if any.
