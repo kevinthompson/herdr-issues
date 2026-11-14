@@ -11,7 +11,7 @@
 // tracker, and the issues.refresh key command fetches it at once.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome, layout, shared, setShared } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
@@ -33,7 +33,7 @@ import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
-import { COLLAPSED_PX, DEFAULT_EXPANDED_PX, collapsibleNodeId, isCollapsed, remembersWidth } from "./collapse.js";
+import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
@@ -58,7 +58,6 @@ const ID_CHARACTER_PX = 7;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
 const contextKey = () => JSON.stringify(location());
-const expandedWidthKey = () => `issues.expandedWidth:${shared("layout") ?? "main"}`;
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
 function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
@@ -268,23 +267,12 @@ export default class Issues extends View {
     const wasCollapsed = this.collapsed;
     this.width = width;
     this.collapsed = isCollapsed(width);
-    if (remembersWidth(width)) this.expandedWidth = width;
+    rememberWidth(width);
     if (this.collapsed !== wasCollapsed) cx.notify();
   }
 
-  // Herdr remembers the node's size in the layout, so the panel stays collapsed or expanded in every space. The
-  // width to return to is shared too, so it outlasts this copy of the mod.
   toggleCollapsed() {
-    const id = collapsibleNodeId(layout());
-    if (!id || this.width == null) return;
-    if (this.collapsed) {
-      const remembered = shared(expandedWidthKey());
-      run("layout.resize", { id, px: this.expandedWidth ?? (typeof remembered === "number" ? remembered : DEFAULT_EXPANDED_PX) });
-    } else {
-      this.expandedWidth = this.width;
-      setShared(expandedWidthKey(), this.width);
-      run("layout.resize", { id, px: COLLAPSED_PX });
-    }
+    toggleCollapsed(this.width);
   }
 
   // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the created stamp says
