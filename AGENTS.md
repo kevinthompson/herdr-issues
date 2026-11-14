@@ -64,7 +64,8 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 - `install`: the script the README's one-line install command runs, after cloning the repository into `~/.local/share/herdr-issues-mod` when it isn't there. It fast-forwards its checkout to `origin/main` and runs `setup`, changing nothing when the checkout has local changes, isn't on `main` or can't fast-forward, and asking before it repoints a mod link to another checkout (refusing when standard input isn't a terminal). Its body is one function, so a fast-forward that rewrites it doesn't change the script while it runs.
 - `setup`: installs the mod and the plugin (see below).
-- `scripts/setup-json.js`: the JSON reading and editing `setup` does, so installing needs `node` and not `jq`.
+- `scripts/setup-json.js`: the JSON reading and editing `setup` and `scripts/demo-setup` do, so they need `node` and not `jq`.
+- `scripts/demo-setup`: builds the `blog` and `recipe-app` demo projects under `$DEMO_ROOT` (default `~/Demo`) for recording the panel. Each is a git repository with a committed `.claude/settings.json` whose status line prints nothing, its issues in a local Beads database, an entry of `{ "tracker": "beads", "merge": "auto" }` in `issues.json`, a Herdr space, and a nested worktree space for each issue in progress, opened with this checkout's `bin/issues worktree`; one of those branches is already merged into main, so its row shows as ready to close. Running it again tears the projects down and rebuilds them, and `--teardown` only tears them down: it closes their spaces, removes their worktrees, repositories and `issues.json` entries, and refuses to delete a project folder without the `.herdr-demo` marker it writes.
 - `.claude/settings.json` registers `.claude/hooks/reload-mod.sh`, which makes Herdr reload the mod after Claude edits one of its files in the checkout Herdr loads.
 
 ## Installing for development
@@ -88,8 +89,8 @@ Running it again is safe, and is how plugin changes are installed. A person who 
 
 - `npm test` runs the tests.
 - `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree's mod folder: `herdr-app check "$PWD/mod"`.
-- `bash -n install setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
-- `shellcheck install setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
+- `bash -n install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
+- `shellcheck install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.
 
 ## Verifying a UI change
 
