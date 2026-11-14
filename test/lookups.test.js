@@ -4,10 +4,10 @@ import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { createRepository, git, temporaryFolder } from "./support/repository.js";
-import { mainCheckout, repositoryRoot } from "../location.js";
-import { forgetLookups } from "../lookups.js";
-import { trackerFor } from "../trackers/index.js";
-import { saveSetupChoices, settingsPath, trackerSetting } from "../trackers/setting.js";
+import { mainCheckout, repositoryRoot } from "../mod/location.js";
+import { forgetLookups } from "../mod/lookups.js";
+import { trackerFor } from "../mod/trackers/index.js";
+import { saveSetupChoices, settingsPath, trackerSetting } from "../mod/trackers/setting.js";
 
 // The git commands the mod's modules run during the test, each as one string, while still running them.
 function recordGitCommands(t) {

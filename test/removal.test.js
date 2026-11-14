@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict } from "../removal.js";
+import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict } from "../mod/removal.js";
 
 const mergedBranch = { branch: "feature", bases: ["main", "origin/main"], mergedInto: "main", unpushed: 0, pullRequest: null };
 const cleanChecks = { dirty: false, submodules: [], branch: mergedBranch };

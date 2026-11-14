@@ -21,7 +21,7 @@ cd herdr-issues-mod
 
 The script:
 
-- links the checkout to `~/.config/herdr-app/mods/issues`, where Herdr loads it;
+- links the checkout's `mod/` folder, which holds the panel, to `~/.config/herdr-app/mods/issues`, where Herdr loads it;
 - adds the panel's keys to `~/.config/herdr-app/keys.json`, keeping any key you already bound to something else;
 - adds the checkout as the `herdr-issues` plugin marketplace and installs the `issues@herdr-issues` plugin;
 - offers to add the Issues panel to the side panel of one of your layouts, or of a new copy of Herdr's `main` layout. Herdr's shipped layouts can't be changed, so it never edits them;

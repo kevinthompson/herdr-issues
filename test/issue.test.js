@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupIssues, holdingBlockers, waitingIssues } from "../issue.js";
+import { canStartWork, groupIssues, holdingBlockers, waitingIssues } from "../mod/issue.js";
 
 const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
   ({ id, status, priority, blockedBy, labels: [], order: null, sla: null });

@@ -55,7 +55,7 @@ function fact(label, value, t) {
 function iconFact(icon, name, value, t) {
   return h_flex().gap(10).items_start()
     .child(div().id(`fact-${icon}`).flex_none().h(FACT_ROW_PX).flex().items_center().tooltip(name)
-      .child(svg(`mods/issues/${icon}.svg`).size(FACT_ICON_PX).text_color(t.dim)))
+      .child(svg(`mods/issues/icons/${icon}.svg`).size(FACT_ICON_PX).text_color(t.dim)))
     .child(div().flex_1().min_w(0).min_h(FACT_ROW_PX).flex().items_center().child(value));
 }
 
@@ -141,7 +141,7 @@ export function workButton(key, { finishable, startable, inSpace, inActiveSpace,
     return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, { primary: true, enabled: !opening && !inActiveSpace, tooltip });
   }
   const style = { primary, primaryOnHover: compact, enabled: !opening };
-  const branchIcon = (color) => svg("mods/issues/git-branch-plus.svg").size(14).text_color(color);
+  const branchIcon = (color) => svg("mods/issues/icons/git-branch-plus.svg").size(14).text_color(color);
   if (finishable) return button(`${key}-continue`, compact ? branchIcon : "Continue", onContinue, t, { ...style, tooltip: compact ? "Continue work" : null });
   return button(`${key}-start`, compact ? branchIcon : "Start", onStart, t, { ...style, enabled: startable && !opening, tooltip: compact ? "Start work" : null });
 }
@@ -153,10 +153,10 @@ function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
   return div().id("issue-delegate").flex_none().size(26).flex().items_center().justify_center().rounded(7).bg(t.raised)
     .tooltip(tooltip)
     .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onDelegate(cx)))
-    .child(svg("mods/issues/cloud-upload.svg").size(14).text_color(enabled ? t.foreground : t.dim));
+    .child(svg("mods/issues/icons/cloud-upload.svg").size(14).text_color(enabled ? t.foreground : t.dim));
 }
 
-const icon = (name) => (color) => svg(`mods/issues/${name}.svg`).size(14).text_color(color);
+const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
 
 // Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
 const workActions = (view, t) => workButton("issue", view, t, { compact: true });

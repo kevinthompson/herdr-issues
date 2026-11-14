@@ -1,9 +1,9 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
-import { repositoryRoot } from "../location.js";
-import { trackerFor } from "../trackers/index.js";
-import { mergeSettings, pollSettings } from "../trackers/setting.js";
-import { needsNewBranch } from "../issue.js";
-import { issueSpaceName } from "../space-name.js";
+import { repositoryRoot } from "../mod/location.js";
+import { trackerFor } from "../mod/trackers/index.js";
+import { mergeSettings, pollSettings } from "../mod/trackers/setting.js";
+import { needsNewBranch } from "../mod/issue.js";
+import { issueSpaceName } from "../mod/space-name.js";
 import { openWorktree } from "./worktree.js";
 
 const USAGE = `Usage: issues <command> [options]

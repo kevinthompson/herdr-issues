@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { commitFile, createRepository, git, temporaryFolder } from "./support/repository.js";
-import { deleteMergedBranches, repositoryState } from "../worktree.js";
+import { deleteMergedBranches, repositoryState } from "../mod/worktree.js";
 
 const local = { on: null };
 const branches = (repository) => git(repository, "branch", "--format=%(refname:short)").split("\n").sort();

@@ -6,8 +6,8 @@ import { access, mkdir, readFile, rename, rmdir, stat, writeFile } from "node:fs
 import { rmdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { exec, home, readLayout } from "./herdr.js";
-import { spaceShowing, worktreeFor } from "../worktree.js";
-import { trackerSetting } from "../trackers/setting.js";
+import { spaceShowing, worktreeFor } from "../mod/worktree.js";
+import { trackerSetting } from "../mod/trackers/setting.js";
 
 const GIT_TIMEOUT_MS = 10 * 60 * 1000;
 const RECENT_FETCH_MS = 60 * 1000;
