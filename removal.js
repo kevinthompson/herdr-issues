@@ -32,16 +32,16 @@ export function removalFindings({ dirty, submodules, branch, warning }) {
   return findings;
 }
 
-function branchFindings({ branch, bases, mergedInto, unpushed, pullRequest }) {
+function branchFindings({ bases, mergedInto, unpushed, pullRequest }) {
   return [
-    mergedInto ? { result: PASS, text: `${branch} has nothing that isn't on ${mergedInto}.` }
-      : pullRequest ? { result: PASS, text: `${branch} has an open pull request: ${pullRequest}` }
-        : { result: CAUTION, text: bases.length ? `${branch} has changes that aren't on ${bases.join(" or ")}.` : `${branch} has no main branch to compare with.` },
-    unpushed === 0 ? { result: PASS, text: `${branch} is pushed to origin.` }
+    mergedInto ? { result: PASS, text: `Worktree branch has nothing that isn't on ${mergedInto}.` }
+      : pullRequest ? { result: PASS, text: `Worktree branch has an open pull request: ${pullRequest}` }
+        : { result: CAUTION, text: bases.length ? `Worktree branch has changes that aren't on ${bases.join(" or ")}.` : `Worktree branch has no main branch to compare with.` },
+    unpushed === 0 ? { result: PASS, text: "Worktree branch is pushed to origin." }
       // Commits on no origin branch are lost with the checkout, unless main already has their changes.
-      : mergedInto ? { result: PASS, text: `${branch} needs no push: its changes are on ${mergedInto}.` }
-        : unpushed === null ? { result: LOSS, text: `${branch} has no origin to push to.` }
-          : { result: LOSS, text: `${branch} has ${unpushed} ${unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.` },
+      : mergedInto ? { result: PASS, text: `Worktree branch needs no push: its changes are on ${mergedInto}.` }
+        : unpushed === null ? { result: LOSS, text: "Worktree branch has no origin to push to." }
+          : { result: LOSS, text: `Worktree branch has ${unpushed} ${unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.` },
   ];
 }
 
