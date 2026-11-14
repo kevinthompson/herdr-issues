@@ -2,6 +2,8 @@
 import { repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
 import { mergeSettings, pollSettings } from "../mod/trackers/setting.js";
+import { linearClient } from "../mod/trackers/linear.js";
+import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { needsNewBranch } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
 import { openWorktree } from "./worktree.js";
@@ -13,6 +15,7 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
+  credentials <tracker>    Check the credentials a tracker needs are present: linear (an API key) or github (gh logged in)
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -79,6 +82,15 @@ async function setting([key]) {
   console.log((await settings(await currentProject()))[key]);
 }
 
+// Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
+const CREDENTIAL_CHECKS = { linear: linearClient, github: checkGitHubLogin };
+
+async function credentials([kind, ...rest]) {
+  const check = CREDENTIAL_CHECKS[kind];
+  if (!check || rest.length) throw new UsageError(`credentials needs one tracker: ${Object.keys(CREDENTIAL_CHECKS).join(" or ")}`);
+  await check();
+}
+
 function worktreeOptions(args) {
   const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
   const valueAfter = (index) => {
@@ -109,7 +121,7 @@ async function worktree(args) {
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, setting, worktree };
+const COMMANDS = { tracker, branch, "space-name": spaceName, setting, credentials, worktree };
 
 export async function main([command, ...args]) {
   if (command === "-h" || command === "--help") {
