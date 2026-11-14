@@ -61,9 +61,10 @@ async function fetchedRecently(marker) {
 }
 
 // Concurrent fetches in one repository can fail to lock refs, so a failure waits for the other fetch and
-// retries once.
+// retries once. A repository without origin, such as one tracked in Beads, has nothing to fetch.
 async function fetchOrigin(main, marker) {
   if (await fetchedRecently(marker)) return;
+  if (!(await git(main, ["remote", "get-url", "origin"])).ok) return;
   let fetch = await git(main, ["fetch", "-q", "origin"]);
   if (!fetch.ok) {
     await sleep(FETCH_RETRY_DELAY_MS);
@@ -86,8 +87,8 @@ async function newerDefault(main, localDefault, originDefault) {
 }
 
 // A new branch starts from origin's default branch, fetched unless that happened in the last minute. A
-// branch that can't be on origin yet (isNew) skips the fetch, and starts from whichever of the local default
-// branch and origin's copy from the last fetch is newer.
+// branch that can't be on origin yet (isNew) skips the fetch, and it and a branch in a repository without
+// origin start from whichever of the local default branch and origin's copy from the last fetch is newer.
 async function createWorktree({ branch, isNew, main, common, path }) {
   await trashLeftover(path);
   if (!isNew) await fetchOrigin(main, join(common, FETCHED_MARKER));
@@ -100,7 +101,10 @@ async function createWorktree({ branch, isNew, main, common, path }) {
     return gitOrFail(main, ["worktree", "add", "--track", "-b", branch, path, `origin/${branch}`]);
   }
   let start = originDefault;
-  if (isNew && await hasRef(main, `refs/heads/${localDefault}`)) start = await newerDefault(main, localDefault, originDefault);
+  const originHasDefault = await hasRef(main, `refs/remotes/${originDefault}`);
+  if ((isNew || !originHasDefault) && await hasRef(main, `refs/heads/${localDefault}`)) {
+    start = await newerDefault(main, localDefault, originDefault);
+  }
   return gitOrFail(main, ["worktree", "add", "--no-track", "-b", branch, path, start]);
 }
 
