@@ -1,38 +1,26 @@
 # Herdr Issues
 
-An Issues panel for the Herdr desktop app, and a Claude Code plugin that works the same issues from Claude sessions.
-
+<!-- The demo GIF replaces this screenshot at docs/screenshots/demo.gif. -->
 ![The Issues panel listing a demo project's issues, grouped into In review, In progress and Blocked, with their labels and blockers](docs/screenshots/issues-list.png)
 
 ## What it is
 
-**The panel** lists the issues of the repository in the focused pane. Issues can live in either of two trackers, and the panel looks the same for each:
+An Issues panel for the Herdr desktop app, and a Claude Code plugin that works the same issues from Claude sessions.
 
-- a Linear team, with its triage queue, projects, milestones and optional saved views;
-- GitHub Issues, through the `gh` CLI.
+- **Your issues beside your terminals.** The Herdr mod's Issues panel lists the issues of the repository in the focused pane, from Linear or GitHub Issues, and lets you read and edit them in place.
+- **One click to start.** **Start** opens an issue's branch in its own worktree and Herdr space, with Claude already working the issue.
+- **Claude knows what you're looking at.** Claude sessions in Herdr know which issues the panel lists and which one is open, so "the issues" and "this issue" mean what you see.
+- **Skills for the whole loop.** The Claude Code plugin's `issues:*` skills create, plan, triage and work issues in whichever tracker the repository uses.
 
-From the panel you can:
+## Getting started
 
-- read an issue's status, priority, labels, assignee, delegate, pull requests and description, and edit them;
-- start work on an issue in its own worktree, opened as a Herdr space with Claude working the issue;
-- remove a finished worktree through a dialog that checks its branch is merged or pushed first.
+You need:
 
-The panel also tells Claude sessions in Herdr which issues it lists and which issue is open, so "the issues" and "this issue" mean what you see.
-
-**The Claude plugin** adds the `issues:*` skills, which create, plan, triage and work issues in whichever tracker the repository uses.
-
-## Requirements
-
-- Herdr (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
-- Claude Code (`claude`)
-- `jq`
-- `git`
-- Node.js (`node`) 22.15 or later, for the `issues` command
+- Herdr, opened at least once
+- Claude Code
+- `jq` and `git`
+- Node.js 22.15 or later
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
-
-## Installation
-
-Clone the repository and run its setup script:
 
 ```sh
 git clone https://github.com/kevinthompson/herdr-issues-mod.git
@@ -40,109 +28,25 @@ cd herdr-issues-mod
 ./setup
 ```
 
-The script:
+Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to show or hide the Issues panel.
 
-- links the checkout to `~/.config/herdr-app/mods/issues`, where Herdr loads it;
-- adds the panel's keys to `~/.config/herdr-app/keys.json`, keeping any key you already bound to something else;
-- adds the checkout as the `herdr-issues` plugin marketplace and installs the `issues@herdr-issues` plugin;
-- offers to add the Issues panel to the side panel of one of your layouts, or of a new copy of Herdr's `main` layout. Herdr's shipped layouts can't be changed, so it never edits them;
-- links the `issues` command to `~/.local/bin/issues`, warning if that folder isn't on your `PATH`.
+[Installation](docs/installation.md) explains what `./setup` changes and how to update.
 
-If you skipped the layout step or ran setup without a terminal, run `./setup` again, or follow the steps it printed.
+## Configuration
 
-Start a new Claude Code session afterwards to load the plugin. Running `./setup` again is safe; it is also how you update after pulling.
+The panel shows a setup view for a repository whose tracker it can't place: choose **GitHub Issues** or **Linear**, and how work gets into main. For options the panel doesn't offer, run `/issues:config` in a Claude Code session in the repository.
 
-To confirm the mod loads, run:
+Each tracker needs credentials:
 
-```sh
-herdr-app check ~/.config/herdr-app/mods/issues
-```
-
-## Choosing a tracker
-
-Without any setting, the panel looks for a Planning Center repository's Linear team. A repository it can't place shows a setup view in the panel instead: choose **GitHub Issues** or **Linear** (then a team), and the panel checks what that tracker needs, asks how work gets into main (below), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
-
-For saved Linear views, a GitHub repository other than origin's, and the other options the panel doesn't offer, run this in a Claude Code session in the repository:
-
-```
-/issues:config
-```
-
-It asks which tracker to use, checks the credentials it needs, and saves the choice in `~/.config/herdr-app/issues.json`, where the panel saves its choice too, keyed by the repository's main checkout so its worktrees share it. You can also name the tracker directly: `/issues:config linear <team key>` or `/issues:config github [owner/name]`.
-
-Each tracker needs:
-
-- **Linear**: a personal API key, created in Linear under Settings → Account → Security & access. Save it in `~/.config/herdr-app/linear.json`, readable only by you:
-
-  ```sh
-  echo '{ "apiKey": "lin_api_…" }' > ~/.config/herdr-app/linear.json
-  chmod 600 ~/.config/herdr-app/linear.json
-  ```
-
-  The Claude skills reach Linear through its MCP server, so add the Linear MCP server to Claude Code as well.
+- **Linear**: a personal API key in `~/.config/herdr-app/linear.json`, and the Linear MCP server in Claude Code.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
 
-An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2449`. To name a repository's issue spaces differently, add a `spaceName` template to its entry in `issues.json` by hand. It takes two placeholders: `<issueId>`, the issue's ID, and `<repo>`, the repository's name without its owner (the GitHub repository's name for GitHub Issues, else the main checkout's folder name). For example, this names issue #41's space `herdr-issues-mod#41`, which tells it apart from other GitHub repositories' `#41`:
+[Configuration](docs/configuration.md) covers creating the Linear key and every setting in `issues.json`.
 
-```json
-"~/Code/herdr-issues-mod": { "tracker": "github", "spaceName": "<repo><issueId>" }
-```
+## Further reading
 
-Two more settings in the same entry say how an issue's branch gets into main and when its work counts as complete. An issue is done once its branch is in main, whichever you choose.
-
-- `merge`: `auto` merges the branch into main locally without waiting; `review` merges it locally once you approve; `pull-request` lands it through a pull request. Without the setting, it's `pull-request` when the repository's origin is on GitHub, else `review`.
-- `complete`: when the work counts as complete, so a Claude session can stop and the issue's worktree is safe to remove. `merged` means once the branch is in main; `pull-request-open` means once the branch is pushed with an open pull request. Only `merge: "pull-request"` allows `pull-request-open`, and it's that setting's default; with `auto` or `review`, the work is complete once merged.
-
-```json
-"~/Code/herdr-issues-mod": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
-```
-
-The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
-
-`worktreeSetup` is a command to run in each new worktree, such as one that installs the branch's dependencies. `issues worktree` runs it once, in a worktree it has just created, before opening the worktree's space; it doesn't run again when it reuses a worktree. The command runs through your login shell (`$SHELL -lc`), so it finds the tools on your profile's `PATH` even when the Herdr app starts it, and its output is printed. When it fails, `issues worktree` says which command failed, keeps the worktree so you can finish setting it up by hand, and exits with an error without opening the space. For example, a Planning Center box app:
-
-```json
-"~/Code/people": { "tracker": "linear", "worktreeSetup": "box worktree-setup" }
-```
-
-A repository whose own git hook already sets up new worktrees, such as calendar, leaves `worktreeSetup` unset.
-
-## Using the panel
-
-Press **Cmd-Shift-I** to show or hide the panel. It shows the issues of the repository in the focused pane, grouped by status, and refreshes when issues change.
-
-**Scopes and labels.** When a tracker has more than one list of issues, a dropdown at the top of the panel picks which one it shows. For Linear, the default is every open issue assigned to you; the team's triage queue, its other issues, its saved views and each open project (narrowed to one of its milestones if you like) are the others. The **Label** dropdown narrows the list to issues with one label.
-
-![The label dropdown open over the panel, listing All labels and the repository's labels](docs/screenshots/scope-menu.png)
-
-**An issue.** Click an issue to open it in place of the list. Its status and priority are dropdowns, task-list checkboxes in its description check off in place, and **Edit** turns the description into a Markdown editor. **Save** or **Cmd-S** writes it back to the tracker.
-
-![An issue open in the panel, with its label, the issues it blocks, its branch, its status and priority dropdowns, and its description with checked-off criteria](docs/screenshots/issue-detail.png)
-
-**Starting work.** **Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue. **Continue** reopens an issue already in progress, and **Go to space** switches to the space that already shows it. When the work is finished, the Claude session ends with a message saying the worktree can be closed.
-
-**Removing a worktree.** The mod includes a dialog that removes a worktree and closes its space. It shows whether the branch is merged or pushed, and warns about uncommitted changes before anything is lost; the branch itself is kept. Open it from a key or another mod with:
-
-```js
-openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: spaceId, action: "remove" } });
-```
-
-![The Remove this worktree dialog, confirming the branch has nothing that isn't on main and is safe to remove](docs/screenshots/remove-worktree.png)
-
-## Claude skills
-
-Run these in a Claude Code session in the repository, for example `/issues:work #12`. Each works with the repository's tracker.
-
-| Skill | Use it to |
-| --- | --- |
-| `/issues:config` | Choose where a repository's issues are tracked (a Linear team or GitHub Issues), and check the credentials that tracker needs. |
-| `/issues:create` | Write issues for work that is already settled, as self-contained hand-offs. |
-| `/issues:plan` | Turn a prompt, a brief or a full spec into a series of issues by interviewing you. |
-| `/issues:triage` | Triage issues, the backlog or Linear's triage queue, making each one small and actionable enough to hand to an agent. |
-| `/issues:start` | Start one or more issues, or the next few, each in its own worktree space with a Claude session working it. |
-| `/issues:work` | Work an issue from start to finish in the current session. |
-| `/issues:delegate` | Hand a Linear issue to Cloud Agent. |
-
-## Contributing
-
-[AGENTS.md](AGENTS.md) describes how the repository is laid out, how to install it for development, how changes reach the running app and Claude Code, and the checks to run before committing.
+- [Installation](docs/installation.md): requirements, what `./setup` changes, updating and checking the mod loads.
+- [Configuration](docs/configuration.md): choosing a tracker, credentials and the `issues.json` settings.
+- [Using the panel](docs/using-the-panel.md): scopes and labels, an issue's detail view, starting work and removing a worktree.
+- [Claude skills](docs/skills.md): the `issues:*` skills.
+- [AGENTS.md](AGENTS.md): how the repository is laid out, how to install it for development, how changes reach the running app and Claude Code, and the checks to run before committing.
