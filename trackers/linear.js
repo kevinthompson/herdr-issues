@@ -367,7 +367,6 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     }),
     // Every Linear save is already final.
     async commitChecklists() {},
-    changed: null,
   };
   return tracker;
 }

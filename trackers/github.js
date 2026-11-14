@@ -226,6 +226,5 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     isDelegated: null,
     // Every GitHub save is already final.
     async commitChecklists() {},
-    changed: null,
   };
 }

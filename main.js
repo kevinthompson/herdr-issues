@@ -5,9 +5,7 @@
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
 // Claude session working the issue in its worktree. Clicking a task-list
-// checkbox in the body saves that one change at once, and the tracker records every checkbox
-// changed in a burst of clicks together, once they pause. Statuses picked in the status menu are
-// committed the same way.
+// checkbox in the body saves that one change at once.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notify, exec, run, watchFolder, appHome } from "herdr";
@@ -33,8 +31,7 @@ import { WorktreeDialog } from "./worktree-dialog.js";
 import { panelVisible } from "./visibility.js";
 
 const POLL_MS = 60 * 1000;
-// A local issues/ folder on a remote host can't be watched, but reading it is cheap.
-const LOCAL_POLL_MS = 10 * 1000;
+const REFRESH_CHECK_MS = 10 * 1000;
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
 const STALE_ON_RETURN_MS = 10 * 1000;
 // A Claude hook (claude-plugin/hooks/herdr-issues-created.sh) touches this file after Claude creates a remote issue.
@@ -108,7 +105,7 @@ export default class Issues extends View {
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx, { reuse: true });
-    cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); else this.refreshOnReturn(cx); });
+    cx.timer.every(REFRESH_CHECK_MS, (cx) => { if (this.pollDue()) this.refresh(cx); else this.refreshOnReturn(cx); });
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
@@ -145,24 +142,21 @@ export default class Issues extends View {
         const loads = loadsFor((group) => this.isExpanded(group));
         const unloaded = new Set((tracker?.deferred?.(scope) ?? []).filter((each) => !loads.has(each)));
         const project = { root, on: where.on }, listKey = `${scopeKey}\n${scope ?? ""}\n${[...loads].sort()}`;
-        // A polled tracker is slow to list, so a scope not shown yet starts from its last list.
-        const polled = Boolean(tracker) && !tracker.changed;
+        // A tracker is slow to list, so a scope not shown yet starts from its last list.
         this.listedScope = scope;
-        if (polled && this.listKey !== listKey) {
+        if (tracker && this.listKey !== listKey) {
           const last = await lastList(listKey);
           if (last && generation === this.generation) {
             Object.assign(this, { project, tracker, scopeKey, listKey, issues: last, unloaded, loaded: true });
             cx.notify();
           }
         }
-        const listIssues = () => tracker.list(scope, loads);
-        const issues = !tracker ? [] : polled ? await fetchList(listKey, listIssues, reuse && tracker.kind !== "local") : await listIssues();
+        const issues = tracker ? await fetchList(listKey, () => tracker.list(scope, loads), reuse) : [];
         if (generation !== this.generation) return;
         const leaving = this.openId && !issues.some((each) => each.id === this.openId) ? this.findIssue(this.openId) : null;
         Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null });
         if (leaving) this.holdOpenIssue(leaving, tracker, cx);
         publishScope(scopeKey, tracker, scope).catch(() => {});
-        this.watch(tracker, cx);
         this.scanRepository(project, generation, cx);
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
       finally { if (generation === this.generation) { this.loaded = true; this.refreshing = false; cx.notify(); } }
@@ -205,34 +199,15 @@ export default class Issues extends View {
     });
   }
 
-  // A watched tracker refreshes when it changes, so only unwatched ones poll.
   pollDue() {
-    if (this.tracker?.changed && this.watching) return false;
-    const interval = this.tracker?.kind === "local" ? LOCAL_POLL_MS : POLL_MS;
-    return Date.now() - this.refreshedAt >= interval;
+    return Date.now() - this.refreshedAt >= POLL_MS;
   }
 
-  // Polls can leave a remote list a minute old, so coming back to a panel that was out of sight refreshes it.
+  // Polls can leave a list a minute old, so coming back to a panel that was out of sight refreshes it.
   refreshOnReturn(cx) {
     const visible = panelVisible(), returned = visible && this.visible === false;
     this.visible = visible;
-    if (returned && this.tracker && this.tracker.kind !== "local" && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx, { reuse: true });
-  }
-
-  // Keyed by the tracker's kind too, so a repository that switches trackers stops watching the old one.
-  watch(tracker, cx) {
-    const key = tracker?.changed ? `${this.context}\n${tracker.kind}` : null;
-    if (this.watching === key) return;
-    this.watching = key;
-    if (!key) return;
-    cx.spawn(async (cx) => {
-      try {
-        while (this.watching === key) {
-          await tracker.changed();
-          if (this.watching === key) this.refresh(cx);
-        }
-      } catch { if (this.watching === key) this.watching = null; }
-    });
+    if (returned && this.tracker && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx, { reuse: true });
   }
 
   // issues.json picks each repository's tracker, and the created stamp says Claude just made an issue, so a change
@@ -373,7 +348,7 @@ export default class Issues extends View {
 
   // Opens a text file in the user's editor, and hands a URL or any other file to macOS `open`.
   openLink(issue, url, cx) {
-    const { file, url: address } = linkTarget(url, issue.path ?? `${this.project.root}/`);
+    const { file, url: address } = linkTarget(url, `${this.project.root}/`);
     if (file && this.project?.on) { this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`; cx.notify(); return; }
     this.detailError = null;
     cx.spawn(async (cx) => {
@@ -458,22 +433,15 @@ export default class Issues extends View {
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
-  // Without a branch, the worktree dialog asks for one. The worktree opens while the tracker saves the start,
-  // unless the tracker needs the start saved before the branch is made.
+  // Without a branch, the worktree dialog asks for one. The worktree opens while the tracker saves the start.
   startWork(issue, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
     this.detailError = null;
-    const opening = `Opening ${issue.id}'s worktree…`;
-    this.showOpening(issue, tracker.startPrecedesWorktree ? `Marking ${issue.id} in progress…` : opening, cx);
+    this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
         const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
-        if (tracker.startPrecedesWorktree) {
-          this.detailError = await starting;
-          if (this.detailError) return;
-          this.showOpening(issue, opening, cx);
-        }
         let openError = null;
         if (opensWithWt(issue, this.project)) openError = await this.openWithWt(issue, { unstarted: !hasPullRequestOnBranch(issue) });
         else this.openWorktreeDialog(issue);
@@ -717,7 +685,7 @@ export default class Issues extends View {
 
   emptyText() {
     if (!this.loaded) return "Loading…";
-    if (!this.tracker) return `No issues/ folder or Linear mapping for ${this.project?.root ?? "this folder"}`;
+    if (!this.tracker) return `No Linear team or GitHub repository for ${this.project?.root ?? "this folder"}`;
     return "No issues yet";
   }
 
@@ -781,8 +749,7 @@ export default class Issues extends View {
         .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
         .child(div().flex_1())
         .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
-        .when(Boolean(this.tracker) && this.tracker.kind !== "local", (e) => e.child(this.refreshButton(t)))
-        .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t))))
+        .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)).child(this.trackerLabel(t))))
       .when(Boolean(filterBar), (e) => e.child(filterBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
