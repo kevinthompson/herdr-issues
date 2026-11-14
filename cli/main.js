@@ -1,6 +1,7 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
 import { repositoryRoot } from "../location.js";
 import { trackerFor } from "../trackers/index.js";
+import { mergeSettings } from "../trackers/setting.js";
 import { needsNewBranch } from "../issue.js";
 import { issueSpaceName } from "../space-name.js";
 import { openWorktree } from "./worktree.js";
@@ -11,6 +12,7 @@ Commands:
   tracker [--json]         Print the tracker the repository's issues live in: its kind, name and Linear team
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
+  setting <key>            Print one of the repository's settings, with its default applied: merge or complete
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -24,6 +26,9 @@ const EXIT_USAGE = 2;
 
 // An answer the command refuses to give, printed as it is.
 class Refusal extends Error {}
+
+// A command run with arguments it doesn't take, which exits with the usage status.
+class UsageError extends Error {}
 
 async function currentProject() {
   const root = await repositoryRoot({ cwd: process.cwd(), on: null });
@@ -66,6 +71,14 @@ async function spaceName([id]) {
   console.log(await issueSpaceName(await currentProject(), id));
 }
 
+const SETTINGS = { merge: mergeSettings, complete: mergeSettings };
+
+async function setting([key]) {
+  const settings = SETTINGS[key];
+  if (!settings) throw new UsageError(`setting ${key ? `has no key ${key}` : "needs a key"}; it knows ${Object.keys(SETTINGS).join(", ")}`);
+  console.log((await settings(await currentProject()))[key]);
+}
+
 function worktreeOptions(args) {
   const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
   const valueAfter = (index) => {
@@ -96,7 +109,7 @@ async function worktree(args) {
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, worktree };
+const COMMANDS = { tracker, branch, "space-name": spaceName, setting, worktree };
 
 export async function main([command, ...args]) {
   if (command === "-h" || command === "--help") {
@@ -114,6 +127,6 @@ export async function main([command, ...args]) {
   } catch (error) {
     console.error(error instanceof Refusal ? error.message : `issues: ${error.message}`);
     if (error.fix) console.error(error.fix);
-    return EXIT_FAILED;
+    return error instanceof UsageError ? EXIT_USAGE : EXIT_FAILED;
   }
 }
