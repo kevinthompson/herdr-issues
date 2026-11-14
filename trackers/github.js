@@ -117,18 +117,22 @@ function originRepository(root, gh) {
   return originRepositories.get(root);
 }
 
+// Runs the GitHub CLI in the main checkout `root`, resolving with its output.
+const ghIn = (root) => async (args) => {
+  const result = await exec("gh", args, { cwd: root }).catch(() => null);
+  if (!result) throw ghMissing();
+  if (result.code !== 0) throw ghFailed(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
+  return result.stdout;
+};
+
+// The repository a GitHub-tracked main checkout's issues live in, as "owner/name".
+export const githubRepository = (root, setting) => setting.repo ?? originRepository(root, ghIn(root));
+
 export async function githubTracker({ root: projectRoot, on }, setting) {
   if (on != null) return null;
   const root = await mainCheckout(projectRoot, on);
-
-  async function gh(args) {
-    const result = await exec("gh", args, { cwd: root }).catch(() => null);
-    if (!result) throw ghMissing();
-    if (result.code !== 0) throw ghFailed(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
-    return result.stdout;
-  }
-
-  const repo = setting.repo ?? (await originRepository(root, gh));
+  const gh = ghIn(root);
+  const repo = await githubRepository(root, setting);
   const [owner, name] = repo.split("/");
 
   async function graphql(query, variables) {
