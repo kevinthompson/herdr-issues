@@ -14,6 +14,7 @@ import { button } from "./detail.js";
 import { openScopeMenu } from "./menu.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
 import { linearClient } from "./trackers/linear.js";
+import { forgetLookups } from "./lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./trackers/linear-team.js";
 import { ghMissing, ghLoggedOut, originNotOnGitHub } from "./trackers/problems.js";
 
@@ -106,6 +107,7 @@ export class TrackerSetup {
   check(cx) {
     const choice = this.choice;
     Object.assign(this, { checking: true, problem: null });
+    forgetLookups();
     cx.spawn(async (cx) => {
       try {
         const ready = choice === "github" ? checkGitHub(this.main) : linearTeams(this.main);

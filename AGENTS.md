@@ -18,6 +18,7 @@ Herdr loads the root folder as the `issues` mod. `mod.json` declares it, and `ma
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
 - `edits.js`, `tasks.js`, `changes.js`: field edits saved in the background, checkbox toggles in an issue's body, and the stamp that tells every panel to refresh.
 - `lists.js`, `avatars.js`, `file-key.js`: cached lists and avatars in the app's data folder.
+- `lookups.js`: the repository, main checkout and settings lookups kept between refreshes, forgotten when `issues.json` or `linear.json` changes.
 - `links.js`, `editor.js`, `neovim.js`: links in issue bodies and opening files in the person's editor.
 - `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
 - `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`.

@@ -13,7 +13,8 @@ import { theme, props, settings, nextCommand, openOverlay, shared, spaces, notif
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath } from "./trackers/setting.js";
-import { findScope } from "./trackers/linear.js";
+import { findScope, linearKeyPath } from "./trackers/linear.js";
+import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
@@ -254,13 +255,14 @@ export default class Issues extends View {
     return stale;
   }
 
-  // issues.json picks each repository's tracker, and the created stamp says Claude just made an issue, so a change
-  // to either refreshes the panel at once rather than at the next poll. The app's folder holds more than these
-  // files, so other changes there are ignored.
+  // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the created stamp says
+  // Claude just made an issue, so a change to any of them refreshes the panel at once rather than at the next
+  // poll, without the lookups kept from those files. The app's folder holds more than these files, so other
+  // changes there are ignored.
   watchAppFiles(cx) {
     if (this.watchingAppFiles) return;
     this.watchingAppFiles = true;
-    const folder = appHome(), files = [settingsPath(), createdStampPath()];
+    const folder = appHome(), files = [settingsPath(), linearKeyPath(), createdStampPath()];
     cx.spawn(async (cx) => {
       try {
         // Changes arrive under the folder's real path when the app's folder is reached through a symlink.
@@ -268,7 +270,7 @@ export default class Issues extends View {
         const watched = new Set([folder, realFolder, ...files, ...files.map((file) => `${realFolder}${file.slice(folder.length)}`)]);
         for (;;) {
           const paths = await watchFolder(folder);
-          if (paths.some((path) => watched.has(path))) this.refresh(cx);
+          if (paths.some((path) => watched.has(path))) { forgetLookups(); this.refresh(cx); }
         }
       } catch { this.watchingAppFiles = false; }
     });
@@ -763,7 +765,7 @@ export default class Issues extends View {
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
-    if (this.setup) return this.setup.render(t, { onRetry: (cx) => { this.refresh(cx); cx.notify(); }, header: this.header(t) });
+    if (this.setup) return this.setup.render(t, { onRetry: (cx) => { forgetLookups(); this.refresh(cx); cx.notify(); }, header: this.header(t) });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);

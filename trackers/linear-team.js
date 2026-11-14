@@ -2,6 +2,7 @@
 // of the issues its recent pull requests are attached to. Saved per repository in the app's data
 // folder, so a new space finds it at once; a repository with no answer is asked again a day later.
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
+import { cachedLookup } from "../lookups.js";
 
 const RECENT_PULL_REQUESTS = 50;
 // Fewer attached pull requests than this say too little about who owns the repository.
@@ -33,11 +34,15 @@ async function save(root, team) {
   await writeTextFile(savedPath(), JSON.stringify(saved, null, 2), previous);
 }
 
+const cachedRepoName = cachedLookup();
+
 // The repository's name when origin is in the planningcenter GitHub organization, else null.
-export async function planningCenterRepoName(root) {
-  const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: root }).catch(() => null);
-  if (origin?.code !== 0) return null;
-  return /github\.com[:/]planningcenter\/([^/\s]+?)(?:\.git)?\s*$/.exec(origin.stdout)?.[1] ?? null;
+export function planningCenterRepoName(root) {
+  return cachedRepoName(root, async () => {
+    const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: root }).catch(() => null);
+    if (origin?.code !== 0) return null;
+    return /github\.com[:/]planningcenter\/([^/\s]+?)(?:\.git)?\s*$/.exec(origin.stdout)?.[1] ?? null;
+  });
 }
 
 function mostCommonTeam(attachments) {
