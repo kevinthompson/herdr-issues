@@ -42,6 +42,10 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 - `cli/main.js`: the commands, each answering for the git repository holding the current folder. `issues tracker [--json]` prints the repository's tracker, as `trackerFor` chooses it. `issues branch <id> [--json]` prints the branch an issue is worked on, from `tracker.get`, and refuses an issue an unfinished issue blocks. `issues space-name <issue ID>` prints the name of the issue's worktree space, as the panel names it. `issues setting <key>` prints one of the repository's settings with its default applied, as `mergeSettings` in `trackers/setting.js` resolves it: `merge` or `complete`. `issues worktree <issue ID>` and `issues worktree --branch <branch> [--new]` take `--name` and `--claude` and open the branch in a worktree and a Herdr space, as the `wt` script did.
 - `cli/worktree.js`: `issues worktree`'s checkout and space: it reuses or creates the branch's worktree under `~/.herdr/worktrees/`, fetching origin as `--new` allows, runs the repository's `worktreeSetup` command in a checkout it created, then selects the space showing it or opens one, using `worktree.js`'s `worktreeFor` and `spaceShowing`. It takes the `wt-fetched` marker and `wt-spaces.lock` in the git common dir, which `wt` uses too.
 
+### Tests (`test/`)
+
+`npm test` runs every `test/**/*.test.js` with `node --test`. `test/support/register.js`, loaded before each file, points the mod's `herdr` imports at `test/support/herdr.js`, which re-exports the CLI's shim and lets one test replace `exec`, `spaces` and `panes` with `stubHerdr`; it also gives the process a temporary home, so tests never read or write the person's home folder, git configuration or `~/.config/herdr-app`. `test/support/repository.js` builds the temporary git repositories the worktree and merge rules run against, one per test.
+
 ### The Claude plugin (`claude-plugin/`)
 
 `.claude-plugin/marketplace.json` makes the repository the `herdr-issues` plugin marketplace, and `claude-plugin/` is its one plugin, `issues`.
@@ -77,6 +81,7 @@ Running it again is safe, and is how plugin changes are installed.
 
 ## Checks before committing
 
+- `npm test` runs the tests.
 - `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree itself: `herdr-app check "$PWD"`.
 - `bash -n setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
 - `shellcheck setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh`, if `shellcheck` is installed.

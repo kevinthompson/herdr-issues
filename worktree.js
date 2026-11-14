@@ -1,4 +1,5 @@
 import { exec, spaces, panes } from "herdr";
+import { mergeSettings } from "./trackers/setting.js";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -68,4 +69,53 @@ export async function deleteMergedBranches(branches, { main, on }) {
 export function worktreeSpace(repository, branch) {
   const worktree = branch && repository?.worktrees.find((each) => each.branch === branch);
   return worktree ? spaceShowing(worktree.path, worktree.on) : null;
+}
+
+// Whether merging HEAD into `base` would change nothing, which also catches squash merges and an
+// untouched branch.
+export async function isMergedInto(repo, base, on) {
+  const [mergedTree, baseTree] = await Promise.all([
+    git(repo.top, ["merge-tree", "--write-tree", base, "HEAD"], on),
+    git(repo.top, ["rev-parse", `${base}^{tree}`], on),
+  ]);
+  return mergedTree.ok && baseTree.ok && mergedTree.out.split("\n")[0] === baseTree.out;
+}
+
+// The URL of the branch's open or draft pull request when the repository counts a pushed branch with one as
+// complete, else null: also when the settings can't be read or gh can't answer, so the dialog asks for main.
+async function completingPullRequest(repo, branch, on) {
+  const { complete } = await mergeSettings({ root: repo.main, on }).catch(() => ({ complete: "merged" }));
+  if (complete !== "pull-request-open") return null;
+  const view = await exec("gh", ["pr", "view", branch, "--json", "state,url"], { cwd: repo.top, on }).catch(() => null);
+  if (view?.code !== 0) return null;
+  try {
+    const pullRequest = JSON.parse(view.stdout);
+    return pullRequest.state === "OPEN" ? pullRequest.url : null;
+  } catch { return null; }
+}
+
+// What removing a checkout would leave unsaved on its branch: { branch, bases, mergedInto, unpushed, pullRequest },
+// or null on a detached HEAD. The work is kept once it's merged into either the local default branch
+// (repos merged locally) or origin's, fetched just now (repos merged through pull requests):
+// `bases` lists those that exist, and `mergedInto` is the first one holding the branch, else null.
+// Unpushed counts commits on no origin branch, null without origin. pullRequest is completingPullRequest's.
+export async function branchState(repo, on) {
+  const branch = (await git(repo.top, ["branch", "--show-current"], on)).out;
+  if (!branch) return null;
+  const pullRequestLookup = completingPullRequest(repo, branch, on);
+  const hasOrigin = (await git(repo.top, ["remote", "get-url", "origin"], on)).ok;
+  let remoteBase = null;
+  if (hasOrigin) {
+    const head = await git(repo.top, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], on);
+    remoteBase = head.ok ? head.out : "origin/main";
+    await git(repo.top, ["fetch", "-q", "origin", remoteBase.slice("origin/".length)], on);
+  }
+  const localCandidates = remoteBase ? [remoteBase.slice("origin/".length)] : ["main", "master"];
+  const exists = async (ref) => (await git(repo.top, ["rev-parse", "--verify", "--quiet", ref], on)).ok;
+  const bases = [];
+  for (const base of [...localCandidates, remoteBase].filter(Boolean)) if (await exists(base)) bases.push(base);
+  const merged = await Promise.all(bases.map((base) => isMergedInto(repo, base, on)));
+  const mergedInto = bases.find((_base, index) => merged[index]) ?? null;
+  const unpushed = hasOrigin ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0 : null;
+  return { branch, bases, mergedInto, unpushed, pullRequest: await pullRequestLookup };
 }
