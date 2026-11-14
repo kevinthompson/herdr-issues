@@ -1,12 +1,15 @@
 // Each repository's choice of tracker, in ~/.config/herdr-app/issues.json, which /issues:config writes. Repositories
 // are keyed by their main checkout's path, ~ for the home folder, so worktrees share their repository's choice:
-// { "repos": {
+// { "pollSeconds": 120,                                             how often every panel polls its tracker
+//   "repos": {
 //     "~/Code/calendar": { "tracker": "linear", "team": "CAL",      a Linear team, with saved views as extra lists
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
 //     "~/Code/app":      { "tracker": "github", "repo": "owner/name",   its GitHub issues; repo defaults to origin's
 //                          "spaceName": "<repo><issueId>",            names issue spaces (space-name.js), here app#41
 //                          "merge": "pull-request", "complete": "merged",
-//                          "worktreeSetup": "box worktree-setup" } } }
+//                          "worktreeSetup": "box worktree-setup", "pollSeconds": 30 } } }
+// pollSeconds, at the top level and in any entry, is how often the panel asks the tracker for its list, a whole number
+// of seconds of at least 10; an entry's overrides the top level's, and pollSettings resolves it, 60 without either.
 // spaceName, merge, complete and worktreeSetup are optional in any entry. In spaceName, <issueId> is the issue's ID
 // and <repo> the repository's name without its owner; without it, an issue's space is named after its ID. merge is
 // how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
@@ -25,6 +28,8 @@ export const settingsPath = () => `${appHome()}/issues.json`;
 const TRACKERS = ["linear", "github"];
 const MERGES = ["auto", "review", "pull-request"];
 const COMPLETES = ["merged", "pull-request-open"];
+export const DEFAULT_POLL_SECONDS = 60;
+const MIN_POLL_SECONDS = 10;
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
 const abbreviateHome = (path) => (path.startsWith(`${home()}/`) ? `~${path.slice(home().length)}` : path);
 
@@ -38,10 +43,21 @@ const readSettings = () => cachedSettings("issues.json", async () => {
   return text === null ? null : parseSettings(text);
 });
 
+function checkPollSeconds(value, where) {
+  if (value == null || (Number.isInteger(value) && value >= MIN_POLL_SECONDS)) return;
+  throw badSetting(`${where} needs a pollSeconds that's a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
+}
+
+const readCheckedSettings = async () => {
+  const settings = await readSettings();
+  checkPollSeconds(settings?.pollSeconds, "issues.json");
+  return settings;
+};
+
 // The repository's entry, or null when it has none.
 export async function trackerSetting({ root, on }) {
   if (on != null) return null;
-  const settings = await readSettings();
+  const settings = await readCheckedSettings();
   if (settings === null) return null;
   const main = await mainCheckout(root, on);
   const [key, setting] = Object.entries(settings?.repos ?? {}).find(([path]) => expandHome(path) === main) ?? [];
@@ -49,6 +65,7 @@ export async function trackerSetting({ root, on }) {
   if (!TRACKERS.includes(setting.tracker)) throw badSetting(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
   if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
   if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
+  checkPollSeconds(setting.pollSeconds, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
@@ -56,6 +73,13 @@ export async function trackerSetting({ root, on }) {
     throw badMergeSetting(`issues.json's ${key} merges with ${setting.merge}, so its complete can only be merged`);
   }
   return setting;
+}
+
+// How often the panel asks the repository's tracker for its list: its entry's pollSeconds, else the top level's,
+// else 60.
+export async function pollSettings(project) {
+  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  return { pollSeconds: setting?.pollSeconds ?? settings?.pollSeconds ?? DEFAULT_POLL_SECONDS };
 }
 
 const hasGitHubOrigin = (main) => githubRepository(main, {}).then(() => true, () => false);

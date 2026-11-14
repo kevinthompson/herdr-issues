@@ -1,7 +1,7 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
 import { repositoryRoot } from "../location.js";
 import { trackerFor } from "../trackers/index.js";
-import { mergeSettings } from "../trackers/setting.js";
+import { mergeSettings, pollSettings } from "../trackers/setting.js";
 import { needsNewBranch } from "../issue.js";
 import { issueSpaceName } from "../space-name.js";
 import { openWorktree } from "./worktree.js";
@@ -12,7 +12,7 @@ Commands:
   tracker [--json]         Print the tracker the repository's issues live in: its kind, name, Linear team or GitHub repository
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
-  setting <key>            Print one of the repository's settings, with its default applied: merge or complete
+  setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -71,7 +71,7 @@ async function spaceName([id]) {
   console.log(await issueSpaceName(await currentProject(), id));
 }
 
-const SETTINGS = { merge: mergeSettings, complete: mergeSettings };
+const SETTINGS = { merge: mergeSettings, complete: mergeSettings, pollSeconds: pollSettings };
 
 async function setting([key]) {
   const settings = SETTINGS[key];
