@@ -23,7 +23,13 @@ Each tracker needs:
   chmod 600 ~/.config/herdr-app/linear.json
   ```
 
-  The Claude skills reach Linear through its MCP server, so add the Linear MCP server to Claude Code as well.
+  The Claude skills reach Linear through its MCP server instead, so add that to Claude Code as well, for every project:
+
+  ```sh
+  claude mcp add --transport http --scope user linear https://mcp.linear.app/mcp
+  ```
+
+  Then run `/mcp` in a Claude Code session, choose `linear` and sign in. A Linear connection on your Claude account at claude.ai works too.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
 
 ## The `issues.json` entry

@@ -21,6 +21,7 @@ You need:
 - `jq` and `git`
 - Node.js 22.15 or later
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
+- the Linear MCP server in Claude Code, for repositories tracked in Linear
 
 ```sh
 git clone https://github.com/kevinthompson/herdr-issues-mod.git
@@ -29,6 +30,18 @@ cd herdr-issues-mod
 ```
 
 Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** in Herdr to show or hide the Issues panel.
+
+### Linear
+
+The `issues:*` skills reach Linear through Linear's MCP server, so add it to Claude Code once for every project:
+
+```sh
+claude mcp add --transport http --scope user linear https://mcp.linear.app/mcp
+```
+
+Then start a Claude Code session, run `/mcp`, choose `linear` and sign in to Linear in the browser window it opens. If Linear is connected to your Claude account at claude.ai instead, its tools are already available and the skills use them.
+
+The panel also needs a personal Linear API key; [Configuration](docs/configuration.md#credentials) explains creating it.
 
 [Installation](docs/installation.md) explains what `./setup` changes and how to update.
 
