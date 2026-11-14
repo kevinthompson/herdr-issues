@@ -7,7 +7,7 @@
 #   - the issues@herdr-issues plugin and the herdr-issues marketplace
 # It asks before removing the Issues panel from personal layouts, the issues.json and linear.json settings,
 # and the cached lists and avatars; the default answer is no, and without a terminal it keeps all three.
-# Run from ~/.local/share/herdr-issues-mod, where the install command keeps its checkout, it deletes that
+# Run from ~/.local/share/herdr-issues, where the install command keeps its checkout, it deletes that
 # checkout last; it leaves any other checkout in place.
 #
 # Needs git and node.
@@ -24,7 +24,7 @@ uninstall() {
   keys_file="$herdr_home/keys.json"
   layouts_dir="$herdr_home/layouts"
   setup_json="$repo_root/scripts/setup-json.js"
-  installed_checkout="$HOME/.local/share/herdr-issues-mod"
+  installed_checkout="$HOME/.local/share/herdr-issues"
   local marketplace=herdr-issues plugin=issues@herdr-issues
   local removed=0 kept=()
 

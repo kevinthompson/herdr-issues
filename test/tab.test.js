@@ -99,7 +99,7 @@ for (const unnamed of ["Claude", "3"]) {
 
 test("tab rename prefixes the issue ID when the space isn't named after the issue", async (t) => {
   inRepository(t);
-  const calls = stubApp(t, listing("Claude", "herdr-issues-mod"));
+  const calls = stubApp(t, listing("Claude", "herdr-issues"));
   const { code } = await run(t, ["tab", "rename", "#72", "Tab names"]);
   assert.equal(code, 0);
   assert.deepEqual(calls, [["do", "tab.rename", "--id", "tab-session", "--name", "#72 Tab names"]]);

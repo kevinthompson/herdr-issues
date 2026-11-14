@@ -41,7 +41,7 @@ test("bootstrap clones the repository into the home folder and runs its install"
   const result = runBootstrap(home, origin);
 
   assert.equal(result.status, 0, result.stderr);
-  const checkout = join(home, ".local/share/herdr-issues-mod");
+  const checkout = join(home, ".local/share/herdr-issues");
   assert.equal(git(checkout, "rev-parse", "HEAD"), git(origin, "rev-parse", "main"));
   assert.equal(readFileSync(join(home, ".local/share/install-ran"), "utf8"), "install ran, no-terminal\n");
 });
@@ -49,7 +49,7 @@ test("bootstrap clones the repository into the home folder and runs its install"
 test("bootstrap runs an existing checkout's install without changing it, exiting with its status", (t) => {
   const folder = temporaryFolder(t);
   const home = join(folder, "home");
-  const checkout = join(home, ".local/share/herdr-issues-mod");
+  const checkout = join(home, ".local/share/herdr-issues");
   mkdirSync(checkout, { recursive: true });
   writeFileSync(join(checkout, "install"), recordingInstall(3), { mode: 0o755 });
 
@@ -69,5 +69,5 @@ test("bootstrap changes nothing when the clone fails", (t) => {
 
   assert.equal(result.status, 1);
   assert.match(result.stderr, /couldn't clone .*the repository must be reachable/);
-  assert.equal(existsSync(join(home, ".local/share/herdr-issues-mod")), false);
+  assert.equal(existsSync(join(home, ".local/share/herdr-issues")), false);
 });

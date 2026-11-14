@@ -63,10 +63,10 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 ### Repository tooling
 
-- `bootstrap`: the script the README's `curl … | bash` install command downloads. It clones the repository into `~/.local/share/herdr-issues-mod` when that folder isn't there (`HERDR_ISSUES_REPOSITORY_URL` overrides the URL, for tests), then runs that checkout's `install`, giving it `/dev/tty` as standard input when there is a terminal, since piped into `bash` its own standard input is the download. Its body is one function called on the last line, so a download cut short runs nothing.
-- `install`: the script `bootstrap` and the one-line `git clone` install command run, after cloning the repository into `~/.local/share/herdr-issues-mod` when it isn't there. It fast-forwards its checkout to `origin/main` and runs `setup`, changing nothing when the checkout has local changes, isn't on `main` or can't fast-forward, and asking before it repoints a mod link to another checkout (refusing when standard input isn't a terminal). Its body is one function, so a fast-forward that rewrites it doesn't change the script while it runs.
+- `bootstrap`: the script the README's `curl … | bash` install command downloads. It clones the repository into `~/.local/share/herdr-issues` when that folder isn't there (`HERDR_ISSUES_REPOSITORY_URL` overrides the URL, for tests), then runs that checkout's `install`, giving it `/dev/tty` as standard input when there is a terminal, since piped into `bash` its own standard input is the download. Its body is one function called on the last line, so a download cut short runs nothing.
+- `install`: the script `bootstrap` and the one-line `git clone` install command run, after cloning the repository into `~/.local/share/herdr-issues` when it isn't there. It fast-forwards its checkout to `origin/main` and runs `setup`, changing nothing when the checkout has local changes, isn't on `main` or can't fast-forward, and asking before it repoints a mod link to another checkout (refusing when standard input isn't a terminal). Its body is one function, so a fast-forward that rewrites it doesn't change the script while it runs.
 - `setup`: installs the mod and the plugin (see below).
-- `uninstall`: removes what `setup` installed from its checkout: the mod and CLI links when they point into it, the mod's keys still bound to the mod's actions, and the plugin and marketplace. It asks, defaulting to no, before removing the Issues panel from personal layouts, deleting `issues.json` and `linear.json`, and deleting the cached data in `data/issues/`, and keeps all three without a terminal. Run from `~/.local/share/herdr-issues-mod`, it deletes that checkout last, so like `install` its body is one function; it refuses in a linked worktree.
+- `uninstall`: removes what `setup` installed from its checkout: the mod and CLI links when they point into it, the mod's keys still bound to the mod's actions, and the plugin and marketplace. It asks, defaulting to no, before removing the Issues panel from personal layouts, deleting `issues.json` and `linear.json`, and deleting the cached data in `data/issues/`, and keeps all three without a terminal. Run from `~/.local/share/herdr-issues`, it deletes that checkout last, so like `install` its body is one function; it refuses in a linked worktree.
 - `scripts/setup-json.js`: the JSON reading and editing `setup`, `uninstall` and `scripts/demo-setup` do, so they need `node` and not `jq`.
 - `scripts/demo-setup`: builds the `blog` and `recipe-app` demo projects under `$DEMO_ROOT` (default `~/Demo`) for recording the panel. Each is a git repository with a committed `.claude/settings.json` whose status line prints nothing, its issues in a local Beads database, an entry of `{ "tracker": "beads", "merge": "auto" }` in `issues.json`, a Herdr space, and a nested worktree space for each issue in progress, opened with this checkout's `bin/issues worktree`; one of those branches is already merged into main, so its row shows as ready to close. Running it again tears the projects down and rebuilds them, and `--teardown` only tears them down: it closes their spaces, removes their worktrees, repositories and `issues.json` entries, and refuses to delete a project folder without the `.herdr-demo` marker it writes. [Recording the demo](CONTRIBUTING.md#recording-the-demo) gives the steps for a recording.
 - `.claude/settings.json` registers `.claude/hooks/reload-mod.sh`, which makes Herdr reload the mod after Claude edits one of its files in the checkout Herdr loads.
@@ -82,7 +82,7 @@ Run `./setup` from the main checkout; run from a linked worktree, it refuses and
 - offers to add the Issues panel in a column of its own beside the side panel (`panel`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal;
 - moves the Issues panel out of `panel-body` in a personal layout an earlier setup put it in, into that column of its own.
 
-Running it again is safe, and is how plugin changes are installed. A person who only uses the panel installs and updates with the README's `curl … | bash` command instead, whose checkout lives in `~/.local/share/herdr-issues-mod`.
+Running it again is safe, and is how plugin changes are installed. A person who only uses the panel installs and updates with the README's `curl … | bash` command instead, whose checkout lives in `~/.local/share/herdr-issues`.
 
 ## How changes reach the running app and Claude Code
 
@@ -102,7 +102,7 @@ Running it again is safe, and is how plugin changes are installed. A person who 
 
 ## Issues
 
-This repository's own issues are tracked in GitHub Issues at `kevinthompson/herdr-issues-mod`, as its entry in `~/.config/herdr-app/issues.json` says. Work them with the `issues:*` skills, for example `/issues:work #2`; an issue's branch is `<number>-<title as a slug>`.
+This repository's own issues are tracked in GitHub Issues at `kevinthompson/herdr-issues`, as its entry in `~/.config/herdr-app/issues.json` says. Work them with the `issues:*` skills, for example `/issues:work #2`; an issue's branch is `<number>-<title as a slug>`.
 
 ## Conventions
 

@@ -6,7 +6,7 @@ argument-hint: <issue ID or Linear URL>
 
 Work the issue named in `$ARGUMENTS` or the conversation until it is done, or until it needs a decision only the person can make.
 
-**The `issues` CLI.** This skill runs `issues`, which `./setup` in the herdr-issues-mod repository installs. When `command -v issues` fails, tell the person to run `./setup` from that repository, and stop.
+**The `issues` CLI.** This skill runs `issues`, which `./setup` in the herdr-issues repository installs. When `command -v issues` fails, tell the person to run `./setup` from that repository, and stop.
 
 **Outside the issue's worktree.** When the Herdr app is installed (`command -v herdr-app`) and the session isn't already in a linked worktree on the issue's branch, don't work the issue here: invoke `/issues:start <issue ID>` with the Skill tool as your first action, without loading the tracker's tools or reading the issue first, and stop once it reports. It opens the issue's worktree in its own Herdr space, where the next session works it.
 

@@ -202,14 +202,14 @@ test("uninstall skips the plugin when claude isn't installed", (t) => {
 
 test("uninstall deletes the install command's checkout last and finishes cleanly", (t) => {
   const folder = temporaryFolder(t);
-  const installed = installedHome(folder, { checkout: join(folder, "home/.local/share/herdr-issues-mod") });
+  const installed = installedHome(folder, { checkout: join(folder, "home/.local/share/herdr-issues") });
 
   const result = runUninstall(installed.checkout, installed);
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "");
   assert.equal(existsSync(installed.checkout), false);
-  assert.match(result.stdout, /Deleted .*herdr-issues-mod\n/);
+  assert.match(result.stdout, /Deleted .*herdr-issues\n/);
 });
 
 test("uninstall refuses in a linked worktree and changes nothing", (t) => {

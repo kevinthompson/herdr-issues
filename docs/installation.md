@@ -14,18 +14,18 @@
 Run this command:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues-mod/main/bootstrap | bash
+curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues/main/bootstrap | bash
 ```
 
-It downloads the repository's `bootstrap` script, which clones the repository into `~/.local/share/herdr-issues-mod` when it isn't there, then runs that checkout's `install` script, which brings it up to date with `origin/main` and runs its `setup` script. Keep the folder: Herdr loads the panel, the `issues` command and the Claude plugin from it.
+It downloads the repository's `bootstrap` script, which clones the repository into `~/.local/share/herdr-issues` when it isn't there, then runs that checkout's `install` script, which brings it up to date with `origin/main` and runs its `setup` script. Keep the folder: Herdr loads the panel, the `issues` command and the Claude plugin from it.
 
 If `curl` can't reach the repository, for example because GitHub needs your credentials to read it, run this command instead, which clones it with `git` and does the same:
 
 ```sh
-d="$HOME/.local/share/herdr-issues-mod"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues-mod.git "$d" && "$d/install"
+d="$HOME/.local/share/herdr-issues"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues.git "$d" && "$d/install"
 ```
 
-If the Issues panel is already linked to another clone, such as one you develop in, the command says so and asks before pointing everything at `~/.local/share/herdr-issues-mod`; without a terminal to ask in, it changes nothing.
+If the Issues panel is already linked to another clone, such as one you develop in, the command says so and asks before pointing everything at `~/.local/share/herdr-issues`; without a terminal to ask in, it changes nothing.
 
 The setup script:
 
@@ -43,7 +43,7 @@ Start a new Claude Code session afterwards to load the plugin.
 
 ## Updating
 
-Run the install command again. It fast-forwards `~/.local/share/herdr-issues-mod` to `origin/main` and runs setup again. When that checkout has local changes, isn't on `main` or has commits `origin/main` doesn't, it stops and says so, changing nothing.
+Run the install command again. It fast-forwards `~/.local/share/herdr-issues` to `origin/main` and runs setup again. When that checkout has local changes, isn't on `main` or has commits `origin/main` doesn't, it stops and says so, changing nothing.
 
 If you develop in your own clone, run `./setup` in it instead, after pulling; running it again is safe.
 
@@ -60,7 +60,7 @@ herdr-app check ~/.config/herdr-app/mods/issues
 Run this command:
 
 ```sh
-~/.local/share/herdr-issues-mod/uninstall
+~/.local/share/herdr-issues/uninstall
 ```
 
 If you installed from your own clone with `./setup`, run `./uninstall` in it instead; it leaves the clone in place.
@@ -70,7 +70,7 @@ The uninstall script removes:
 - the `~/.config/herdr-app/mods/issues` and `~/.local/bin/issues` links, when they point into the checkout it runs from; anything else at those paths stays, and it says so;
 - each of the panel's keys in `~/.config/herdr-app/keys.json` that is still bound to the panel's action, keeping any you rebound;
 - the `issues@herdr-issues` plugin and the `herdr-issues` plugin marketplace from Claude Code;
-- `~/.local/share/herdr-issues-mod` itself, last, when it runs from there.
+- `~/.local/share/herdr-issues` itself, last, when it runs from there.
 
 It asks before each of these, and keeps them unless you answer yes:
 
