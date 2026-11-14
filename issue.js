@@ -90,6 +90,8 @@ export function unfinishedBlockers(issue, issues) {
 const UNDERWAY_STATUSES = ["in-progress", "in-review"];
 export const canFinishWork = (issue) => UNDERWAY_STATUSES.includes(issue.status);
 
+export const hasPullRequestOnBranch = (issue) => (issue.pullRequests ?? []).some((pullRequest) => pullRequest.branch === issue.branch);
+
 export function canStartWork(issue, issues) {
   return isStartable(issue) && unfinishedBlockers(issue, issues).length === 0;
 }

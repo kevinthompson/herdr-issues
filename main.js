@@ -15,7 +15,7 @@ import { trackerFor } from "./trackers/index.js";
 import { settingsPath } from "./trackers/setting.js";
 import { findScope } from "./trackers/linear.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, hasPullRequestOnBranch, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
@@ -87,7 +87,6 @@ const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/
 const WT_TIMEOUT_MS = 10 * 60 * 1000;
 // wt works on this computer's checkouts and needs the issue's branch.
 const opensWithWt = (issue, project) => Boolean(issue.branch && project && !project.on);
-const hasPullRequestOnBranch = (issue) => (issue.pullRequests ?? []).some((pullRequest) => pullRequest.branch === issue.branch);
 // A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
 // otherwise halfway back to the panel's background.
 function rowHover(t) {
