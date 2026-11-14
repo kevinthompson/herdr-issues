@@ -49,7 +49,7 @@ prompt_text() {
 
 success() { print_in_color 1 32 "$@"; }
 info() { printf '%s\n' "$*"; }
-note() { print_in_color 1 1 "$@"; }
+note() { print_in_color 1 1 "$(cat)"; }
 prompt() { print_in_color 1 36 "$@"; }
 warning() { print_in_color 2 33 "$@"; }
 error() { print_in_color 2 31 "$@"; }
@@ -172,8 +172,7 @@ shipped_layout_names() {
 }
 
 print_manual_layout_steps() {
-  note "$(
-    cat <<EOF
+  note <<EOF
 To show the Issues panel, make a personal copy of a layout and add the mod to its side panel:
   herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
 Then add this block to the children of the node whose id is panel-body in $layouts_dir/main-issues.json:
@@ -181,7 +180,6 @@ Then add this block to the children of the node whose id is panel-body in $layou
 To keep the panel's share of the window as it resizes, give the node whose id is main "size": { "weight": 5 }
 and the node whose id is panel "size": { "weight": 2 }.
 EOF
-  )"
 }
 
 # Herdr stores a divider drag between weighted siblings as weights, so the panel keeps its share after one.
@@ -292,10 +290,8 @@ install_plugin
 add_panel_to_layout
 
 echo
-note "$(
-  cat <<EOF
+note <<EOF
 Done. Start a new Claude Code session to load the plugin.
 If you installed by hand before, remove the old links so skills and the scope hook don't load twice:
   ~/.claude/skills/issues, ~/.claude/hooks/herdr-issues-scope.sh and its UserPromptSubmit entry in ~/.claude/settings.json
 EOF
-)"
