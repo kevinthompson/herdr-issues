@@ -294,23 +294,28 @@ export default class Issues extends View {
   // A badge in the strip expands the panel to the list, with the badge's group open and scrolled to the top.
   expandToGroup(groupId, cx) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
-    else { this.closeIssue(); this.expanded[groupId] = true; this.revealing = { groupId, scrolledToEnd: false }; }
+    else { this.closeIssue(); this.expanded[groupId] = true; this.revealing = { groupId, step: "end" }; }
     this.toggleCollapsed();
     cx.notify();
   }
 
   // A scroll handle reveals a child with the least scroll it can, which would stop a group below the view at
-  // its bottom edge, so the list first scrolls to its end and on the next frame back up to the group.
-  revealGroup(groups, cx) {
+  // its bottom edge, so the list first scrolls to its end and, once that frame is laid out, back up to the
+  // group. A render can run again before layout, so only the list's size report, which comes after layout,
+  // moves on to the second scroll.
+  revealGroup(groups) {
     const revealing = this.revealing;
     if (!revealing) return;
     const index = groups.findIndex((group) => group.id === revealing.groupId);
-    if (index < 0 || revealing.scrolledToEnd) this.revealing = null;
-    if (index < 0) return;
-    if (revealing.scrolledToEnd) { this.listScroll.scroll_to_item(index); return; }
-    this.listScroll.scroll_to_item(groups.length - 1);
-    revealing.scrolledToEnd = true;
-    cx.spawn(async (cx) => cx.notify());
+    if (index < 0) { this.revealing = null; return; }
+    if (revealing.step === "end") { this.listScroll.scroll_to_item(groups.length - 1); revealing.step = "laying-out"; }
+    else if (revealing.step === "group") { this.listScroll.scroll_to_item(index); this.revealing = null; }
+  }
+
+  noticeListLaidOut(cx) {
+    if (this.revealing?.step !== "laying-out") return;
+    this.revealing.step = "group";
+    cx.notify();
   }
 
   // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the created stamp says
@@ -828,7 +833,7 @@ export default class Issues extends View {
   }
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
-  list(t, cx) {
+  list(t) {
     if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
     if (this.setup) {
       return this.setup.render(t, {
@@ -840,12 +845,12 @@ export default class Issues extends View {
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
-    this.revealGroup(groups, cx);
+    this.revealGroup(groups);
     return v_flex().size_full().min_h(0)
       .child(this.header(t))
       .when(Boolean(filterBar), (e) => e.child(filterBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
-      .child(v_flex().id("issues-list").track_scroll(this.listScroll).flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
+      .child(v_flex().id("issues-list").track_scroll(this.listScroll).on_size_change((_size, cx) => this.noticeListLaidOut(cx)).flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group, index) => this.group(group, shown[index], idColumnWidth, t)))
         .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
   }
@@ -920,7 +925,7 @@ export default class Issues extends View {
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t))
-      : this.list(t, cx);
+      : this.list(t);
     const avatarLoads = this.avatarLoads;
     if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });
     return this.frame(t)
