@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupIssues, holdingBlockers, waitingIssues } from "../mod/issue.js";
+import { canStartWork, groupIssues, holdingBlockers, stripBadges, waitingIssues } from "../mod/issue.js";
 
 const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
   ({ id, status, priority, blockedBy, labels: [], order: null, sla: null });
@@ -77,5 +77,41 @@ describe("waitingIssues", () => {
   test("lists none once the issue is done", () => {
     const issues = [issue("#1", "done"), issue("#2", "todo", { blockedBy: ["#1"] })];
     assert.deepEqual(waitingIssues(issues[0], issues), []);
+  });
+});
+
+describe("stripBadges", () => {
+  const issues = (status, count) => Array.from({ length: count }, (_, index) => issue(`#${status}-${index}`, status));
+
+  test("counts the active groups holding issues, in the list's order", () => {
+    const groups = groupIssues([...issues("todo", 2), ...issues("triage", 1), ...issues("in-review", 3)]);
+    assert.deepEqual(stripBadges(groups), [
+      { id: "triage", label: "Triage", count: 1, text: "1" },
+      { id: "in-review", label: "In review", count: 3, text: "3" },
+      { id: "todo", label: "Todo", count: 2, text: "2" },
+    ]);
+  });
+
+  test("leaves out Blocked, Backlog, Unknown status, Done and Canceled", () => {
+    const groups = groupIssues([
+      issue("#1", "in-progress"), issue("#2", "todo", { blockedBy: ["#1"] }), issue("#3", "backlog"),
+      issue("#4", "started"), issue("#5", "done"), issue("#6", "canceled"),
+    ]);
+    assert.deepEqual(stripBadges(groups).map((badge) => badge.id), ["in-progress"]);
+  });
+
+  test("returns no badges without issues in the active groups", () => {
+    assert.deepEqual(stripBadges(groupIssues([issue("#1", "backlog")])), []);
+    assert.deepEqual(stripBadges(groupIssues([])), []);
+  });
+
+  test("shows 99 issues as 99 and 100 or more as 99+", () => {
+    assert.equal(stripBadges(groupIssues(issues("todo", 99)))[0].text, "99");
+    assert.equal(stripBadges(groupIssues(issues("todo", 100)))[0].text, "99+");
+  });
+
+  test("counts only the issues carrying the label the list is narrowed to", () => {
+    const labeled = { ...issue("#2", "todo"), labels: ["bug"] };
+    assert.equal(stripBadges(groupIssues([issue("#1", "todo"), labeled], new Set(), "bug"))[0].count, 1);
   });
 });
