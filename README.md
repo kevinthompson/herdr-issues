@@ -88,6 +88,17 @@ An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2
 "~/Code/herdr-issues-mod": { "tracker": "github", "spaceName": "<repo><issueId>" }
 ```
 
+Two more settings in the same entry say how an issue's branch gets into main and when its work counts as complete. An issue is done once its branch is in main, whichever you choose.
+
+- `merge`: `auto` merges the branch into main locally without waiting; `review` merges it locally once you approve; `pull-request` lands it through a pull request. Without the setting, it's `pull-request` when the repository's origin is on GitHub, else `review`.
+- `complete`: when the work counts as complete, so a Claude session can stop and the issue's worktree is safe to remove. `merged` means once the branch is in main; `pull-request-open` means once the branch is pushed with an open pull request. Only `merge: "pull-request"` allows `pull-request-open`, and it's that setting's default; with `auto` or `review`, the work is complete once merged.
+
+```json
+"~/Code/herdr-issues-mod": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
+```
+
+`issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
+
 ## Using the panel
 
 Press **Cmd-Shift-I** to show or hide the panel. It shows the issues of the repository in the focused pane, grouped by status, and refreshes when issues change.
