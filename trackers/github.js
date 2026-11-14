@@ -95,6 +95,19 @@ function toIssue(node, repo) {
 // The signed-in GitHub user's login, read once.
 let viewerLogin = null;
 
+// Each main checkout's origin repository as "owner/name", looked up once while the mod runs; a failed
+// lookup is forgotten so the next refresh asks again.
+const originRepositories = new Map();
+
+function originRepository(root, gh) {
+  if (!originRepositories.has(root)) {
+    const lookup = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).then((stdout) => stdout.trim());
+    lookup.catch(() => originRepositories.delete(root));
+    originRepositories.set(root, lookup);
+  }
+  return originRepositories.get(root);
+}
+
 export async function githubTracker({ root: projectRoot, on }, setting) {
   if (on != null) return null;
   const root = await mainCheckout(projectRoot, on);
@@ -106,7 +119,7 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     return result.stdout;
   }
 
-  const repo = setting.repo ?? (await gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"])).trim();
+  const repo = setting.repo ?? (await originRepository(root, gh));
   const [owner, name] = repo.split("/");
 
   async function graphql(query, variables) {
