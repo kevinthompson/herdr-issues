@@ -5,11 +5,13 @@
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
 //     "~/Code/app":      { "tracker": "github", "repo": "owner/name",   its GitHub issues; repo defaults to origin's
 //                          "spaceName": "<repo><issueId>",            names issue spaces (space-name.js), here app#41
-//                          "merge": "pull-request", "complete": "merged" } } }
-// spaceName, merge and complete are optional in any entry. In spaceName, <issueId> is the issue's ID and <repo> the
-// repository's name without its owner; without it, an issue's space is named after its ID. merge is how an issue's
-// branch gets into main, and complete is when its work counts as complete; mergeSettings says what each value
-// means and resolves their defaults.
+//                          "merge": "pull-request", "complete": "merged",
+//                          "worktreeSetup": "box worktree-setup" } } }
+// spaceName, merge, complete and worktreeSetup are optional in any entry. In spaceName, <issueId> is the issue's ID
+// and <repo> the repository's name without its owner; without it, an issue's space is named after its ID. merge is
+// how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
+// each value means and resolves their defaults. worktreeSetup is a shell command `issues worktree` runs in each new
+// checkout (cli/worktree.js).
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in linear.json.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveTrackerSetting.
@@ -41,6 +43,7 @@ export async function trackerSetting({ root, on }) {
   if (!TRACKERS.includes(setting.tracker)) throw badSetting(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
   if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
   if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
+  if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
   if (setting.complete === "pull-request-open" && setting.merge && setting.merge !== "pull-request") {
