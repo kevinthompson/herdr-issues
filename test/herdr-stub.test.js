@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
-import { spaceShowing } from "../worktree.js";
+import { spaceShowing } from "../mod/worktree.js";
 
 const space = { id: "s1", machine: null, folder: "/elsewhere", tabs: [{ id: "t1" }] };
 

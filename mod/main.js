@@ -499,7 +499,7 @@ export default class Issues extends View {
   // Syncing while edits save, then fading out; an alert while any failed, which a click dismisses.
   syncIndicator(t) {
     const edits = this.projectEdits(), failed = edits.filter(([, edit]) => edit.failed);
-    const icon = (name, color) => svg(`mods/issues/${name}.svg`).size(SYNC_ICON_PX).text_color(color);
+    const icon = (name, color) => svg(`mods/issues/icons/${name}.svg`).size(SYNC_ICON_PX).text_color(color);
     const slot = div().id("issues-sync").flex_none().size(24).flex().items_center().justify_center();
     if (failed.length) {
       return slot.cursor_pointer().tooltip(`${failed.map(([, edit]) => edit.failed).join("\n")}\nClick to dismiss.`)
@@ -623,13 +623,13 @@ export default class Issues extends View {
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
           .when(Boolean(due), (e) => e.child(div().whitespace_nowrap().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
           .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
-            .child(svg(`mods/issues/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))))
+            .child(svg(`mods/issues/icons/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
           .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0 || pullRequestCount > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
             .children(labelChips(issue, t).slice(0, 3))
             .when(pullRequestCount > 0, (e) => e.child(h_flex().flex_none().gap(3).items_center()
-              .child(svg("mods/issues/pull-request.svg").flex_none().size(11))
+              .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(11))
               .child(div().child(String(pullRequestCount)))))
             .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
               .child(div().flex_none().child("Blocked by"))
@@ -661,7 +661,7 @@ export default class Issues extends View {
         .child(div().flex_none().child(">"))
         .child(delegateAvatar
           ? image(delegateAvatar).flex_none().size(AVATAR_PX).rounded(AVATAR_PX / 2)
-          : svg("mods/issues/cloud.svg").flex_none().size(AVATAR_PX).text_color(t.ansi4))
+          : svg("mods/issues/icons/cloud.svg").flex_none().size(AVATAR_PX).text_color(t.ansi4))
         .child(div().min_w(0).truncate().child(issue.delegate ?? "")));
   }
 
@@ -745,7 +745,7 @@ export default class Issues extends View {
       .border_1().border_color(t.border).bg(t.raised)
       .when(!this.refreshing, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover))
         .on_click((_e, cx) => { this.refresh(cx); cx.notify(); }))
-      .child(svg("mods/issues/rotate-cw.svg").size(REFRESH_ICON_PX).text_color(this.refreshing ? t.dim : t.foreground));
+      .child(svg("mods/issues/icons/rotate-cw.svg").size(REFRESH_ICON_PX).text_color(this.refreshing ? t.dim : t.foreground));
   }
 
   header(t) {

@@ -3,8 +3,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import { createRepository, temporaryFolder } from "./support/repository.js";
-import { forgetLookups } from "../lookups.js";
-import { pollSettings, settingsPath } from "../trackers/setting.js";
+import { forgetLookups } from "../mod/lookups.js";
+import { pollSettings, settingsPath } from "../mod/trackers/setting.js";
 
 function writeSettings(settings) {
   mkdirSync(join(settingsPath(), ".."), { recursive: true });

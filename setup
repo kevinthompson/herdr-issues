@@ -2,10 +2,10 @@
 # Usage: ./setup
 #
 # Installs this repository's Herdr issues mod and its Claude Code plugin:
-#   - links the repository to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues)
+#   - links the mod folder (mod/) to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues)
 #   - adds the repository as the herdr-issues plugin marketplace and installs issues@herdr-issues,
 #     which brings the issues:* skills and the Claude hooks
-#   - adds the mod's keys (keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
+#   - adds the mod's keys (mod/keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
 #     to something else
 #   - offers to add the Issues panel to a personal layout's side panel, unless a layout already shows it
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues
@@ -16,6 +16,7 @@
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+mod_root="$repo_root/mod"
 marketplace=herdr-issues
 plugin="issues@$marketplace"
 herdr_home="${HERDR_APP_HOME:-$HOME/.config/herdr-app}"
@@ -51,8 +52,8 @@ link_mod() {
     exit 1
   fi
   mkdir -p "$(dirname "$mod_link")"
-  ln -sfn "$repo_root" "$mod_link"
-  echo "Linked $mod_link -> $repo_root"
+  ln -sfn "$mod_root" "$mod_link"
+  echo "Linked $mod_link -> $mod_root"
 }
 
 link_cli() {
@@ -107,14 +108,14 @@ merge_keys() {
   fi
 
   local skipped merged
-  skipped=$(jq -r --slurpfile mod "$repo_root/keys.json" '
+  skipped=$(jq -r --slurpfile mod "$mod_root/keys.json" '
     . as $mine | $mod[0] | to_entries[] | .key as $section | .value | to_entries[]
     | select($mine[$section][.key] != null and $mine[$section][.key] != .value)
     | "setup: kept your \(.key) in \($section) (\($mine[$section][.key] | tojson)); the mod expects \(.value | tojson)"
   ' "$keys_file")
   [[ -z $skipped ]] || echo "$skipped" >&2
 
-  merged=$(jq --slurpfile mod "$repo_root/keys.json" '
+  merged=$(jq --slurpfile mod "$mod_root/keys.json" '
     reduce ($mod[0] | to_entries[]) as $section (.;
       reduce ($section.value | to_entries[]) as $key (.;
         if .[$section.key][$key.key] == null then .[$section.key][$key.key] = $key.value else . end))

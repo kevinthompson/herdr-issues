@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { commitFile, createClonedRepository, createRepository, git, temporaryFolder } from "./support/repository.js";
-import { branchState, isMergedInto } from "../worktree.js";
+import { branchState, isMergedInto } from "../mod/worktree.js";
 
 describe("isMergedInto", () => {
   // A repository on `feature`, a branch off main with one commit, after main gained a commit of its own.
