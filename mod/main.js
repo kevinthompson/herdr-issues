@@ -18,7 +18,7 @@ import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/set
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, stripBadges, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
@@ -90,6 +90,7 @@ function scopeDropdown(id, label, onClick, t) {
 
 const SCOPE_DROPDOWN_MAX_PX = 260;
 const SYNC_ICON_PX = 15;
+const STRIP_ICON_PX = 16;
 const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
@@ -829,12 +830,21 @@ export default class Issues extends View {
       .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
   }
 
-  // Centered on the expanded panel's header, which is 42px tall.
+  // The expand button, centered on the expanded panel's header, which is 42px tall, over a count of each
+  // active group's issues that matches its header in the list.
   strip(t) {
-    return this.frame(t).items_center().pt(8)
+    const label = this.shownLabel(this.listedLabels());
+    return this.frame(t).items_center().pt(8).gap(10)
       .child(div().id("issues-expand").flex_none().size(24).flex().items_center().justify_center().rounded(6)
         .cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => this.toggleCollapsed())
-        .child(svg("mods/issues/icons/issues.svg").size(16).text_color(t.foreground)));
+        .child(svg("mods/issues/icons/issues.svg").size(STRIP_ICON_PX).text_color(t.foreground)))
+      .children(stripBadges(groupIssues(this.issues, this.unloaded, label)).map((badge) => this.stripBadge(badge, t)));
+  }
+
+  stripBadge({ id, label, text }, t) {
+    return v_flex().id(`strip-${id}`).flex_none().items_center().gap(2).tooltip(label)
+      .child(image(`mods/issues/icons/linear-${id}.png`).size(STRIP_ICON_PX))
+      .child(div().text_size(10).text_color(t.muted).child(text));
   }
 
   // Moving to another repository, an issue change and a newly selected scope each refresh the list.
