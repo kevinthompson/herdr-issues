@@ -5,6 +5,7 @@ import { mergeSettings, pollSettings } from "../mod/trackers/setting.js";
 import { needsNewBranch } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
 import { openWorktree } from "./worktree.js";
+import { isUnnamed, issueTabName, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
 
@@ -13,6 +14,8 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
+  tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
+  tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -79,6 +82,27 @@ async function setting([key]) {
   console.log((await settings(await currentProject()))[key]);
 }
 
+async function tab(args) {
+  if (args[0] === "rename") return renameSessionTab(args.slice(1));
+  const { id, name, space } = await sessionTab();
+  if (args.includes("--json")) console.log(JSON.stringify({ id, name, space }));
+  else console.log([id, name, space].join("\t"));
+}
+
+async function renameSessionTab([issueId, ...words]) {
+  const name = words.join(" ");
+  if (!issueId || !name) throw new UsageError("tab rename needs an issue ID and a name");
+  const tab = await sessionTab();
+  if (!isUnnamed(tab.name)) {
+    console.log(`The tab keeps its name: ${tab.name}`);
+    return;
+  }
+  const issueSpace = await issueSpaceName(await currentProject(), issueId);
+  const newName = issueTabName({ tab, issueId, issueSpace, name });
+  await renameTab(tab, newName);
+  console.log(`Renamed the tab to ${newName}`);
+}
+
 function worktreeOptions(args) {
   const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
   const valueAfter = (index) => {
@@ -109,7 +133,7 @@ async function worktree(args) {
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, setting, worktree };
+const COMMANDS = { tracker, branch, "space-name": spaceName, setting, tab, worktree };
 
 export async function main([command, ...args]) {
   if (command === "-h" || command === "--help") {
