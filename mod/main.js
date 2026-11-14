@@ -18,7 +18,7 @@ import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
-import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
+import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
@@ -799,7 +799,8 @@ export default class Issues extends View {
       .when(Boolean(this.project), (e) => e.child(div().min_w(0).truncate().text_size(11).text_color(t.dim).child(folderName(this.project.root))))
       .child(div().flex_1())
       .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
-      .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)).child(this.trackerLabel(t)));
+      .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)).child(this.trackerLabel(t)))
+      .child(collapseButton(() => this.toggleCollapsed(), t));
   }
 
   // The panel's header over `content`, which stands in for the list.
@@ -810,7 +811,13 @@ export default class Issues extends View {
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
     if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
-    if (this.setup) return this.setup.render(t, { onRetry: (cx) => { forgetLookups(); this.refresh(cx); cx.notify(); }, header: this.header(t) });
+    if (this.setup) {
+      return this.setup.render(t, {
+        onRetry: (cx) => { forgetLookups(); this.refresh(cx); cx.notify(); },
+        header: this.header(t),
+        onCollapse: () => this.toggleCollapsed(),
+      });
+    }
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
@@ -864,6 +871,7 @@ export default class Issues extends View {
         assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
+        onCollapse: () => this.toggleCollapsed(),
         onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),
         onEdit: (cx) => this.edit(issue, cx),
         onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),

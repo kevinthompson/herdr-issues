@@ -10,7 +10,7 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex, TextView } from "gpui-base";
 import { exec, shared, setShared } from "herdr";
-import { button } from "./detail.js";
+import { button, collapseButton } from "./detail.js";
 import { openScopeMenu } from "./menu.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
 import { linearClient } from "./trackers/linear.js";
@@ -180,7 +180,8 @@ export class TrackerSetup {
   }
 
   // header: the panel's header, which a failure shows under; the steps draw their own bar in its place.
-  render(t, { onRetry, header }) {
+  render(t, { onRetry, header, onCollapse }) {
+    this.onCollapse = onCollapse;
     const content = v_flex().id("issues-setup").flex_1().min_h(0).overflow_y_scrollbar().p(14).gap(12);
     if (this.failure && !this.choosingAnother) {
       return v_flex().size_full().min_h(0).child(header).child(content
@@ -204,7 +205,8 @@ export class TrackerSetup {
         .child("‹ Back")))
       .when(!canGoBack, (e) => e.child(div().px(8).font_semibold().child("Set up issues")))
       .child(div().flex_1())
-      .child(div().px(4).text_size(12).text_color(t.dim).child(`Step ${index + 1} of ${steps.length}`));
+      .child(div().px(4).text_size(12).text_color(t.dim).child(`Step ${index + 1} of ${steps.length}`))
+      .child(collapseButton(this.onCollapse, t));
   }
 
   // A page's question, a sentence under it, and its options, each with what it means. The current answer is
