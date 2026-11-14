@@ -16,7 +16,7 @@ import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/set
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace } from "./worktree.js";
@@ -431,8 +431,7 @@ export default class Issues extends View {
   }
 
   // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
-  // Without a branch, the worktree dialog asks for one. The tracker saves the start once issues worktree has
-  // read the issue, since it branches an unstarted issue from the local main.
+  // Without a branch, the worktree dialog asks for one. The tracker saves the start while the worktree opens.
   startWork(issue, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
@@ -440,10 +439,11 @@ export default class Issues extends View {
     this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
-        let openError = null;
-        if (opensWithIssuesWorktree(issue, this.project)) openError = await this.openWithIssuesWorktree(issue);
-        else this.openWorktreeDialog(issue, await this.spaceName(issue));
-        const startError = await tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
+        const opening = opensWithIssuesWorktree(issue, this.project)
+          ? this.openWithIssuesWorktree(issue)
+          : this.spaceName(issue).then((spaceName) => { this.openWorktreeDialog(issue, spaceName); return null; });
+        const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
+        const [openError, startError] = await Promise.all([opening, starting]);
         this.detailError = startError ?? openError;
         this.refresh(cx);
       } finally { this.opening = null; cx.notify(); }
@@ -558,13 +558,15 @@ export default class Issues extends View {
     });
   }
 
-  // Opens the issue's worktree as `/issues:work` does: issues worktree reads the issue's branch from the tracker,
-  // switches to the space already showing it, or opens one nested under the repository's space with Claude
-  // working the issue. Returns an error message, or null. Without issues installed, the worktree dialog opens instead.
+  // Opens the issue's branch with issues worktree, which switches to the space already showing it, or opens one
+  // nested under the repository's space with Claude working the issue. Returns an error message, or null.
+  // Without issues installed, the worktree dialog opens instead.
   async openWithIssuesWorktree(issue) {
-    const args = ["worktree", issue.id, "--claude", workIssueSession(issue).task];
+    const isNew = needsNewBranch(issue);
+    const spaceName = await this.spaceName(issue);
+    const args = ["worktree", "--branch", issue.branch, ...(isNew ? ["--new"] : []), "--name", spaceName, "--claude", workIssueSession(issue).task];
     const result = await exec("issues", args, { cwd: this.project.root, timeout: ISSUES_WORKTREE_TIMEOUT_MS }).catch(() => null);
-    if (!result) { this.openWorktreeDialog(issue, await this.spaceName(issue)); return null; }
+    if (!result) { this.openWorktreeDialog(issue, spaceName); return null; }
     if (result.code === 0) return null;
     const lastLine = (result.stderr || result.stdout).trim().split("\n").pop();
     return `Could not open the worktree: ${lastLine || `issues worktree exited with ${result.code}`}`;
