@@ -22,8 +22,8 @@ describe("removalFindings", () => {
     assert.deepEqual(findings.map((finding) => finding.text), [
       "It has no uncommitted changes.",
       "Its submodules have no commits that aren't pushed.",
-      "feature has nothing that isn't on main.",
-      "feature is pushed to origin.",
+      "Worktree branch has nothing that isn't on main.",
+      "Worktree branch is pushed to origin.",
       "Its issue is still open.",
     ]);
   });
