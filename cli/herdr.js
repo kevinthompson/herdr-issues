@@ -74,6 +74,3 @@ export async function readLayout() {
 export const spaces = () => layout.spaces;
 export const panes = () => layout.panes;
 export const focused = () => null;
-// Agent navigation belongs to the app's window, which the CLI has none of.
-export const agents = () => [];
-export const setAgentOrder = () => null;
