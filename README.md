@@ -16,7 +16,7 @@ An Issues panel for the Herdr desktop app, and a Claude Code plugin that works t
 Install with one command:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues-mod/main/bootstrap | bash
+curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues/main/bootstrap | bash
 ```
 
 Run the same command again to update.
@@ -66,7 +66,7 @@ Each tracker needs credentials:
 Run this command:
 
 ```sh
-~/.local/share/herdr-issues-mod/uninstall
+~/.local/share/herdr-issues/uninstall
 ```
 
 It removes the panel, the `issues` command and the Claude plugin, and asks before removing the panel from your layouts and deleting your settings, Linear API key and cached lists. [Installation](docs/installation.md#removing) lists everything it removes.

@@ -2,7 +2,7 @@
 # Usage: ./install
 #
 # Updates this checkout to origin/main and runs its setup. The README's install command clones the
-# repository into ~/.local/share/herdr-issues-mod when it isn't there and runs this script, so the
+# repository into ~/.local/share/herdr-issues when it isn't there and runs this script, so the
 # same command installs and updates. It changes nothing when the checkout has local changes, isn't
 # on main or can't fast-forward, or when the issues mod is linked to another checkout and the person
 # doesn't agree to repoint it.

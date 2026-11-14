@@ -25,7 +25,7 @@ test("a space named with a bare Linear or GitHub ID names that issue", () => {
 });
 
 test("a space whose name isn't an issue ID names no issue", () => {
-  for (const name of ["herdr-issues-mod", "abc-12", "ABC-12 notes", "#12a", "12", "ABC-", ""]) {
+  for (const name of ["herdr-issues", "abc-12", "ABC-12 notes", "#12a", "12", "ABC-", ""]) {
     assert.equal(issueIdInSpaceName(name), undefined, name);
   }
 });

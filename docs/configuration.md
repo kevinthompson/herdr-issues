@@ -41,7 +41,7 @@ Each tracker needs:
 {
   "repos": {
     "~/Code/calendar": { "tracker": "linear", "team": "CAL" },
-    "~/Code/herdr-issues-mod": { "tracker": "github" }
+    "~/Code/herdr-issues": { "tracker": "github" }
   }
 }
 ```
@@ -62,10 +62,10 @@ Beads keeps its database out of git, so changing an issue's status, priority or 
 
 ### `spaceName`
 
-An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2449`. To name a repository's issue spaces differently, add a `spaceName` template to its entry in `issues.json` by hand. It takes two placeholders: `<issueId>`, the issue's ID, and `<repo>`, the repository's name without its owner (the GitHub repository's name for GitHub Issues, else the main checkout's folder name). For example, this names issue #41's space `herdr-issues-mod#41`, which tells it apart from other GitHub repositories' `#41`:
+An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2449`. To name a repository's issue spaces differently, add a `spaceName` template to its entry in `issues.json` by hand. It takes two placeholders: `<issueId>`, the issue's ID, and `<repo>`, the repository's name without its owner (the GitHub repository's name for GitHub Issues, else the main checkout's folder name). For example, this names issue #41's space `herdr-issues#41`, which tells it apart from other GitHub repositories' `#41`:
 
 ```json
-"~/Code/herdr-issues-mod": { "tracker": "github", "spaceName": "<repo><issueId>" }
+"~/Code/herdr-issues": { "tracker": "github", "spaceName": "<repo><issueId>" }
 ```
 
 ### `merge` and `complete`
@@ -76,7 +76,7 @@ These two settings say how an issue's branch gets into main and when its work co
 - `complete`: when the work counts as complete, so a Claude session can stop and the issue's worktree is safe to remove. `merged` means once the branch is in main; `pull-request-open` means once the branch is pushed with an open pull request. Only `merge: "pull-request"` allows `pull-request-open`, and it's that setting's default; with `auto` or `review`, the work is complete once merged.
 
 ```json
-"~/Code/herdr-issues-mod": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
+"~/Code/herdr-issues": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
 ```
 
 The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
@@ -99,7 +99,7 @@ How often the panel asks the tracker for its list of issues, in whole seconds, 1
 {
   "pollSeconds": 120,
   "repos": {
-    "~/Code/herdr-issues-mod": { "tracker": "github", "pollSeconds": 30 }
+    "~/Code/herdr-issues": { "tracker": "github", "pollSeconds": 30 }
   }
 }
 ```

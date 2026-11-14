@@ -7,7 +7,7 @@ allowed-tools: Bash(issues tracker:*), Bash(git rev-parse:*), Bash(git remote:*)
 
 Write one issue per distinct piece of work described in `$ARGUMENTS` or the conversation. Each issue is a **hand-off**: an agent holding only that issue and the repository must be able to finish the work and know it is finished.
 
-1. **Choose the destination.** Run `issues tracker --json` in the repository and act on its `kind`. When `issues` isn't installed (`command -v issues` fails), tell the person to run `./setup` from the herdr-issues-mod repository, and stop.
+1. **Choose the destination.** Run `issues tracker --json` in the repository and act on its `kind`. When `issues` isn't installed (`command -v issues` fails), tell the person to run `./setup` from the herdr-issues repository, and stop.
    - **`linear`**: Load the Linear tools with ToolSearch: `list_teams`, `list_issues`, `get_issue`, `list_issue_labels`, `list_issue_statuses` and `save_issue`, prefixed `mcp__linear__` or `mcp__claude_ai_Linear__` depending on how Linear is connected on this machine. Use its `team`. If the Linear tools are not available, stop and say so.
    - **`github`**: Use the GitHub CLI against its `repo`: `gh issue list`, `gh issue view` and `gh issue create`. If `gh auth status` fails, stop and tell the person to run `/issues:config`.
    - When it says the repository has no tracker, ask whether to use Linear or GitHub Issues, and record the answer with `/issues:config` before writing any issue. Any other failure: show what it printed and stop.

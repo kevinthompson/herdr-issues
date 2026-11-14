@@ -10,7 +10,7 @@ if ! command -v herdr-app > /dev/null; then
 fi
 
 if ! command -v issues > /dev/null; then
-  echo "issues not found: run ./setup from the herdr-issues-mod repository to install the issues CLI."
+  echo "issues not found: run ./setup from the herdr-issues repository to install the issues CLI."
   exit 0
 fi
 
