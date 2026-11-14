@@ -53,6 +53,8 @@ const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
+// Generous for any character of an ID at the list's 11px, so a short ID column never cuts an ID off.
+const ID_CHARACTER_PX = 7;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
 const contextKey = () => JSON.stringify(location());
@@ -582,7 +584,18 @@ export default class Issues extends View {
     return this.expanded[group.id] ?? !group.collapsed;
   }
 
-  row(issue, t) {
+  // Room for SLA and priority under the ID when the tracker shows them; otherwise just the longest listed ID.
+  idColumnWidth(groups) {
+    if (this.prioritized()) return ID_COLUMN_PX;
+    const longestId = groups.reduce((longest, group) => group.issues.reduce((most, issue) => Math.max(most, issue.id.length), longest), 0);
+    return longestId * ID_CHARACTER_PX;
+  }
+
+  prioritized() {
+    return this.tracker?.prioritized !== false;
+  }
+
+  row(issue, idColumnWidth, t) {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues), sla = slaStatus(issue), pullRequestCount = issue.pullRequests?.length ?? 0;
     const finishable = canFinishWork(issue), startable = canStartWork(issue, this.issues);
@@ -591,8 +604,8 @@ export default class Issues extends View {
       .hover((s) => s.bg(rowHover(t)))
       .on_mouse_up("left", (_e, cx) => { cx.stop_propagation(); this.openId = issue.id; cx.notify(); })
       .child(h_flex().gap(8).items_start()
-        .child(v_flex().flex_none().w(ID_COLUMN_PX).pt(1).gap(3).text_size(11)
-          .child(div().text_color(t.accent).child(issue.id))
+        .child(v_flex().flex_none().min_w(idColumnWidth).when(this.prioritized(), (e) => e.w(idColumnWidth)).pt(1).gap(3).text_size(11)
+          .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
           .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
             .child(svg(`mods/issues/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))))
@@ -632,7 +645,7 @@ export default class Issues extends View {
   }
 
   // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
-  group(group, shown, t) {
+  group(group, shown, idColumnWidth, t) {
     const expanded = this.isExpanded(group), hidden = group.issues.length - shown;
     const color = STATUS_COLORS[group.id];
     const fill = color ? tinted(color) : t.raised;
@@ -643,7 +656,7 @@ export default class Issues extends View {
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
         .child(div().font_semibold().child(group.label))
         .when(!group.unloaded || expanded, (e) => e.child(div().opacity(0.7).child(group.unloaded ? "…" : String(group.issues.length)))))
-      .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, t))))
+      .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, idColumnWidth, t))))
       .when(expanded && hidden > 0, (e) => e.child(div().id(`show-more-${group.id}`).flex_none().px(10).py(6).rounded(7)
         .cursor_pointer().text_size(12).text_color(t.accent).hover((s) => s.bg(t.hover))
         .on_click((_e, cx) => { this.rowLimit += ROW_LIMIT; cx.notify(); })
@@ -720,7 +733,7 @@ export default class Issues extends View {
   list(t) {
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
-    const shown = this.shownCounts(groups), syncIndicator = this.syncIndicator(t);
+    const shown = this.shownCounts(groups), syncIndicator = this.syncIndicator(t), idColumnWidth = this.idColumnWidth(groups);
     return v_flex().size_full().min_h(0)
       .child(h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().font_semibold().child("Issues"))
@@ -732,7 +745,7 @@ export default class Issues extends View {
       .when(Boolean(filterBar), (e) => e.child(filterBar))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
-        .children(groups.map((group, index) => this.group(group, shown[index], t)))
+        .children(groups.map((group, index) => this.group(group, shown[index], idColumnWidth, t)))
         .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
   }
 
@@ -751,7 +764,7 @@ export default class Issues extends View {
     this.avatarLoads = [];
     const content = issue
       ? (this.loadBody(issue, cx), issueDetail({
-        issue, writable: this.tracker?.writable, prioritized: this.tracker?.prioritized !== false,
+        issue, writable: this.tracker?.writable, prioritized: this.prioritized(),
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         syncIndicator: this.syncIndicator(t),
         assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
