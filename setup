@@ -292,6 +292,4 @@ add_panel_to_layout
 echo
 note <<EOF
 Done. Start a new Claude Code session to load the plugin.
-If you installed by hand before, remove the old links so skills and the scope hook don't load twice:
-  ~/.claude/skills/issues, ~/.claude/hooks/herdr-issues-scope.sh and its UserPromptSubmit entry in ~/.claude/settings.json
 EOF
