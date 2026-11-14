@@ -32,6 +32,7 @@ import { WorktreeDialog } from "./worktree-dialog.js";
 import { issueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
+import { AgentOrder } from "./agent-order.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
@@ -102,7 +103,7 @@ export default class Issues extends View {
     if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
     if (props()?.action) { this.worktreeDialog = new WorktreeDialog(cx); return; }
     this.issues = []; this.unloaded = new Set(); this.generation = 0; this.expanded = {};
-    this.rowLimit = ROW_LIMIT; this.shownByContext = new Map();
+    this.rowLimit = ROW_LIMIT; this.shownByContext = new Map(); this.agentOrder = new AgentOrder();
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx, { reuse: true });
@@ -772,6 +773,8 @@ export default class Issues extends View {
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
+    const drawnIssues = groups.flatMap((group, index) => group.issues.slice(0, shown[index]));
+    this.agentOrder.follow(drawnIssues.map((issue) => worktreeSpace(this.repository, issue.branch)));
     return v_flex().size_full().min_h(0)
       .child(this.header(t))
       .when(Boolean(filterBar), (e) => e.child(filterBar))
