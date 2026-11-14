@@ -132,9 +132,8 @@ export default class Issues extends View {
   refresh(cx, { reuse = false } = {}) {
     const context = contextKey();
     if (context !== this.context) {
-      this.context = context; this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.error = null; this.loaded = false; this.repository = null;
-      this.scopeKey = null; this.listedScope = undefined; this.listKey = null;
-      this.closeIssue(); this.focusHandled = null; this.rowLimit = ROW_LIMIT;
+      this.context = context; this.error = null;
+      this.closeIssue(); this.focusHandled = null;
     }
     const generation = ++this.generation;
     this.refreshedAt = Date.now();
@@ -146,6 +145,10 @@ export default class Issues extends View {
         if (!where.cwd) throw new Error("No folder in focus");
         const root = await projectRoot(where);
         const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
+        if (generation !== this.generation) return;
+        // Every checkout of a repository lists the same issues, so its list stays up across its spaces.
+        if (scopeKey !== this.scopeKey) { this.forgetList(); cx.notify(); }
+        this.project = { root, on: where.on };
         this.watchAppFiles(cx);
         const tracker = await trackerFor({ root, on: where.on });
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
@@ -172,6 +175,11 @@ export default class Issues extends View {
       } catch (e) { if (generation === this.generation) this.error = String(e.message ?? e); }
       finally { if (generation === this.generation) { this.loaded = true; this.refreshing = false; cx.notify(); } }
     });
+  }
+
+  forgetList() {
+    this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
+    this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT;
   }
 
   // Reads the repository's worktrees and branches for the issues just listed, after the list shows, marks the
