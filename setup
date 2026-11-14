@@ -4,7 +4,7 @@
 # Installs this repository's Herdr issues mod and its Claude Code plugin:
 #   - links the repository to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues)
 #   - adds the repository as the herdr-issues plugin marketplace and installs issues@herdr-issues,
-#     which brings the issues:* skills and the scope hook
+#     which brings the issues:* skills and the Claude hooks
 # Running it again re-links the mod and updates the plugin to this checkout's version.
 #
 # Needs herdr-app, claude, jq and git; gh is needed only for repositories tracked in GitHub Issues.

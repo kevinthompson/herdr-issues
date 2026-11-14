@@ -30,10 +30,15 @@ import { pendingStatusCommits, takePendingStatusCommits, commitStatuses, queueSt
 import { mixColors, STATUS_COLORS, tinted } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
+import { panelVisible } from "./visibility.js";
 
 const POLL_MS = 60 * 1000;
 // A local issues/ folder on a remote host can't be watched, but reading it is cheap.
 const LOCAL_POLL_MS = 10 * 1000;
+// A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
+const STALE_ON_RETURN_MS = 10 * 1000;
+// A Claude hook (claude-plugin/hooks/herdr-issues-created.sh) touches this file after Claude creates a remote issue.
+const createdStampPath = () => `${appHome()}/data/issues/created`;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
 // team at once is too slow.
 const ROW_LIMIT = 100;
@@ -100,7 +105,7 @@ export default class Issues extends View {
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx);
-    cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); });
+    cx.timer.every(LOCAL_POLL_MS, (cx) => { if (this.pollDue()) this.refresh(cx); else this.refreshOnReturn(cx); });
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
@@ -126,7 +131,7 @@ export default class Issues extends View {
         if (!where.cwd) throw new Error("No folder in focus");
         const root = await projectRoot(where);
         const scopeKey = await mainCheckout(root, where.on), scope = selectedScope(scopeKey);
-        this.watchSettings(cx);
+        this.watchAppFiles(cx);
         const tracker = await trackerFor({ root, on: where.on });
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
         const loads = loadsFor((group) => this.isExpanded(group));
@@ -175,6 +180,13 @@ export default class Issues extends View {
     return Date.now() - this.refreshedAt >= interval;
   }
 
+  // Polls can leave a remote list a minute old, so coming back to a panel that was out of sight refreshes it.
+  refreshOnReturn(cx) {
+    const visible = panelVisible(), returned = visible && this.visible === false;
+    this.visible = visible;
+    if (returned && this.tracker && this.tracker.kind !== "local" && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx);
+  }
+
   // Keyed by the tracker's kind too, so a repository that switches trackers stops watching the old one.
   watch(tracker, cx) {
     const key = tracker?.changed ? `${this.context}\n${tracker.kind}` : null;
@@ -191,22 +203,23 @@ export default class Issues extends View {
     });
   }
 
-  // issues.json picks each repository's tracker, so changing it refreshes the panel at once rather than at the
-  // next poll. The app's folder holds more than the file, so other changes there are ignored.
-  watchSettings(cx) {
-    if (this.watchingSettings) return;
-    this.watchingSettings = true;
-    const folder = appHome(), file = settingsPath();
+  // issues.json picks each repository's tracker, and the created stamp says Claude just made an issue, so a change
+  // to either refreshes the panel at once rather than at the next poll. The app's folder holds more than these
+  // files, so other changes there are ignored.
+  watchAppFiles(cx) {
+    if (this.watchingAppFiles) return;
+    this.watchingAppFiles = true;
+    const folder = appHome(), files = [settingsPath(), createdStampPath()];
     cx.spawn(async (cx) => {
       try {
         // Changes arrive under the folder's real path when the app's folder is reached through a symlink.
         const realFolder = (await exec("pwd", ["-P"], { cwd: folder })).stdout.trim();
-        const watched = new Set([folder, file, realFolder, `${realFolder}${file.slice(folder.length)}`]);
+        const watched = new Set([folder, realFolder, ...files, ...files.map((file) => `${realFolder}${file.slice(folder.length)}`)]);
         for (;;) {
           const paths = await watchFolder(folder);
           if (paths.some((path) => watched.has(path))) this.refresh(cx);
         }
-      } catch { this.watchingSettings = false; }
+      } catch { this.watchingAppFiles = false; }
     });
   }
 
@@ -729,6 +742,7 @@ export default class Issues extends View {
     if (contextKey() !== this.context) this.refresh(cx);
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
     else if (this.scopeKey && selectedScope(this.scopeKey) !== this.listedScope) { this.listedScope = selectedScope(this.scopeKey); this.rowLimit = ROW_LIMIT; this.refresh(cx); }
+    else this.refreshOnReturn(cx);
     this.scheduleStatusCommits(cx);
     this.openRequestedIssue();
     this.applyFieldEdits(cx);
