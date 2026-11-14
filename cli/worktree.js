@@ -13,9 +13,8 @@ const GIT_TIMEOUT_MS = 10 * 60 * 1000;
 const RECENT_FETCH_MS = 60 * 1000;
 const FETCH_RETRY_DELAY_MS = 2000;
 const LOCK_POLL_MS = 200;
-// Shared with the wt script this command replaces, so the two take turns while both are in use.
-const FETCHED_MARKER = "wt-fetched";
-const SPACES_LOCK = "wt-spaces.lock";
+const FETCHED_MARKER = "issues-worktree-fetched";
+const SPACES_LOCK = "issues-worktree-spaces.lock";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const lastLine = (text) => text.trim().split("\n").pop();
