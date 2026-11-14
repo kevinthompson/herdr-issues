@@ -106,7 +106,7 @@ export default class Issues extends View {
     this.editing = null; this.saving = false; this.detailError = null;
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.refresh(cx, { reuse: true });
-    cx.timer.every(REFRESH_CHECK_MS, (cx) => { if (this.pollDue()) this.refresh(cx); else this.refreshOnReturn(cx); });
+    cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
     cx.spawn(async (cx) => {
       for (; ;) {
         if (await nextCommand() === "save") this.save(cx);
@@ -237,15 +237,21 @@ export default class Issues extends View {
     });
   }
 
+  // A panel out of sight skips its polls, and refreshes once when it comes back instead.
+  poll(cx) {
+    if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
+  }
+
   pollDue() {
     return Date.now() - this.refreshedAt >= POLL_MS;
   }
 
-  // Polls can leave a list a minute old, so coming back to a panel that was out of sight refreshes it.
   refreshOnReturn(cx) {
     const visible = panelVisible(), returned = visible && this.visible === false;
     this.visible = visible;
-    if (returned && this.tracker && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS) this.refresh(cx, { reuse: true });
+    const stale = returned && this.tracker && Date.now() - this.refreshedAt >= STALE_ON_RETURN_MS;
+    if (stale) this.refresh(cx, { reuse: true });
+    return stale;
   }
 
   // issues.json picks each repository's tracker, and the created stamp says Claude just made an issue, so a change
