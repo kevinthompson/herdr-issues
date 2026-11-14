@@ -108,4 +108,4 @@ This repository's own issues are tracked in GitHub Issues at `kevinthompson/herd
 
 - Commits follow Conventional Commits. Mod and skill changes have used the `issues` scope; recent commits name the narrower area instead, such as `skills`, `worktree`, `github` or `list`.
 - Each commit is one vertical slice: it does one thing end to end, and the subjects read in order explain the change.
-- The repository has one contributor, so a finished branch is merged into main locally.
+- The repository has one contributor, so a finished branch is merged into main locally, once the person approves it: its entry in `issues.json` sets `merge` to `review`.
