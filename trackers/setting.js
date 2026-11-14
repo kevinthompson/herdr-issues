@@ -64,15 +64,17 @@ export async function mergeSettings(project) {
   return { merge, complete };
 }
 
-// Makes `setting` the entry of the repository whose main checkout is `main`, in place of any entry it has
-// under either spelling of its path, and keeps every other repository's.
+// Makes `setting`, a tracker and its team or repo, the tracker of the repository whose main checkout is `main`,
+// replacing the tracker of any entry it has under either spelling of its path but keeping that entry's other
+// keys, and keeps every other repository's entry.
 export async function saveTrackerSetting(main, setting) {
   const previous = await readTextFile(settingsPath()).catch(() => null);
   const settings = previous === null ? {} : parseSettings(previous);
   const entries = Object.entries(settings.repos ?? {}), key = abbreviateHome(main);
   const existing = entries.findIndex(([path]) => expandHome(path) === main);
+  const { tracker: _tracker, team: _team, repo: _repo, ...kept } = existing === -1 ? {} : entries[existing][1];
   const others = entries.filter(([path]) => expandHome(path) !== main);
-  others.splice(existing === -1 ? others.length : existing, 0, [key, setting]);
+  others.splice(existing === -1 ? others.length : existing, 0, [key, { ...setting, ...kept }]);
   const text = `${JSON.stringify({ ...settings, repos: Object.fromEntries(others) }, null, 2)}\n`;
   await writeTextFile(settingsPath(), text, previous);
 }
