@@ -44,19 +44,10 @@ The script:
 
 - links the checkout to `~/.config/herdr-app/mods/issues`, where Herdr loads it;
 - adds the panel's keys to `~/.config/herdr-app/keys.json`, keeping any key you already bound to something else;
-- adds the checkout as the `herdr-issues` plugin marketplace and installs the `issues@herdr-issues` plugin.
+- adds the checkout as the `herdr-issues` plugin marketplace and installs the `issues@herdr-issues` plugin;
+- offers to add the Issues panel to the side panel of one of your layouts, or of a new copy of Herdr's `main` layout. Herdr's shipped layouts can't be changed, so it never edits them.
 
-Herdr's shipped layout has a side panel holding the Files and Changes mods, but not this one. To add the Issues panel beside them, make your own copy of the layout:
-
-```sh
-herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
-```
-
-Then, in `~/.config/herdr-app/layouts/main-issues.json`, add this block to the `children` of the node whose `id` is `panel-body`, and save:
-
-```json
-{ "id": "issues", "type": "block", "content": { "mod": "issues" } }
-```
+If you skipped the layout step or ran setup without a terminal, run `./setup` again, or follow the steps it printed.
 
 Start a new Claude Code session afterwards to load the plugin. Running `./setup` again is safe; it is also how you update after pulling.
 

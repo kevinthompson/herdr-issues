@@ -54,7 +54,8 @@ Run `./setup` from the main checkout. It needs `herdr-app`, `claude`, `jq` and `
 
 - links the checkout to `~/.config/herdr-app/mods/issues`;
 - merges `keys.json` into `~/.config/herdr-app/keys.json`, keeping any key the person bound to something else;
-- adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`.
+- adds the checkout as the `herdr-issues` marketplace and installs or updates `issues@herdr-issues`;
+- offers to add the Issues panel to the side panel (`panel-body`) of a personal layout, or of a new copy of `main`, unless a layout already shows it; it never writes a shipped layout, and asks nothing when standard input isn't a terminal.
 
 Running it again is safe, and is how plugin changes are installed.
 

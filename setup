@@ -7,6 +7,7 @@
 #     which brings the issues:* skills and the Claude hooks
 #   - adds the mod's keys (keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
 #     to something else
+#   - offers to add the Issues panel to a personal layout's side panel, unless a layout already shows it
 # Running it again re-links the mod and updates the plugin to this checkout's version.
 #
 # Needs herdr-app, claude, jq and git; gh is needed only for repositories tracked in GitHub Issues.
@@ -99,9 +100,115 @@ merge_keys() {
   echo "Added the mod's keys to $keys_file"
 }
 
+layout_shows_mod() {
+  jq -e 'any(.. | objects; .content.mod? == "issues")' "$1" >/dev/null 2>&1
+}
+
+layout_has_panel_body() {
+  jq -e 'any(.. | objects; .id? == "panel-body")' "$1" >/dev/null 2>&1
+}
+
+shipped_layout_names() {
+  jq -r 'keys[] | select(startswith("layout:")) | ltrimstr("layout:")' "$herdr_home/installed.json" 2>/dev/null || true
+}
+
+print_manual_layout_steps() {
+  cat <<EOF
+To show the Issues panel, make a personal copy of a layout and add the mod to its side panel:
+  herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
+Then add this block to the children of the node whose id is panel-body in $layouts_dir/main-issues.json:
+  { "id": "issues", "type": "block", "content": { "mod": "issues" } }
+EOF
+}
+
+# Redirecting into the path writes through a symlinked layout instead of replacing the link.
+add_block_to_panel_body() {
+  local layout_file=$1 updated
+  updated=$(jq --argjson block "$issues_block" '(.. | objects | select(.id? == "panel-body") | .children) += [$block]' "$layout_file")
+  printf '%s\n' "$updated" >"$layout_file"
+}
+
+# Writes the copy itself instead of running layout.clone, which needs an open window and switches it to the copy.
+copy_main_layout() {
+  local name version
+  while true; do
+    read -r -p "Name for the new layout [main-issues]: " name || return 1
+    name=${name:-main-issues}
+    if [[ ! $name =~ ^[A-Za-z0-9._-]+$ ]]; then
+      echo "Use only letters, numbers, dots, dashes and underscores."
+    elif [[ -e $layouts_dir/$name.json ]]; then
+      echo "$layouts_dir/$name.json already exists; choose another name."
+    else
+      break
+    fi
+  done
+  version=$(herdr-app --version | awk '{ print $NF }')
+  jq --arg version "$version" '. + { cloned_from: { name: "main", version: $version } }' "$layouts_dir/main.json" >"$layouts_dir/$name.json"
+  add_block_to_panel_body "$layouts_dir/$name.json"
+  echo "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
+  echo "Switch to it with: herdr-app do layout.switch '{\"name\":\"$name\"}'"
+}
+
+# Adds the Issues panel to a personal layout the person picks; Herdr restores any edited shipped layout at its next start.
+add_panel_to_layout() {
+  layouts_dir="$herdr_home/layouts"
+  issues_block='{ "id": "issues", "type": "block", "content": { "mod": "issues" } }'
+  if [[ ! -d $layouts_dir ]]; then
+    echo "setup: $layouts_dir not found; open Herdr once and run setup again to add the Issues panel" >&2
+    return
+  fi
+
+  local layout_file name shipped showing=() candidates=()
+  shipped=$(shipped_layout_names)
+  for layout_file in "$layouts_dir"/*.json; do
+    [[ -f $layout_file ]] || continue
+    name=$(basename "$layout_file" .json)
+    if layout_shows_mod "$layout_file"; then
+      showing+=("$name")
+    elif ! grep -qxF "$name" <<<"$shipped" && layout_has_panel_body "$layout_file"; then
+      candidates+=("$name")
+    fi
+  done
+
+  if ((${#showing[@]})); then
+    echo "The Issues panel is already in the ${showing[*]} layout"
+    return
+  fi
+
+  if [[ ! -t 0 ]]; then
+    print_manual_layout_steps
+    return
+  fi
+
+  local copy_choice="Copy main into a new layout" skip_choice="Skip" choices=() choice
+  ((${#candidates[@]})) && choices+=("${candidates[@]}")
+  [[ -f $layouts_dir/main.json ]] && choices+=("$copy_choice")
+  choices+=("$skip_choice")
+
+  echo
+  echo "Which layout should show the Issues panel?"
+  PS3="Choose a number: "
+  select choice in "${choices[@]}"; do
+    [[ -n $choice ]] && break
+  done
+  case ${choice:-$skip_choice} in
+    "$skip_choice")
+      print_manual_layout_steps
+      ;;
+    "$copy_choice")
+      copy_main_layout || print_manual_layout_steps
+      ;;
+    *)
+      add_block_to_panel_body "$layouts_dir/$choice.json"
+      echo "Added the Issues panel to the $choice layout"
+      ;;
+  esac
+}
+
 link_mod
 merge_keys
 install_plugin
+add_panel_to_layout
 
 cat <<EOF
 
