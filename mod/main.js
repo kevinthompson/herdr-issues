@@ -581,11 +581,13 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // Picks up an issue already in progress: its space when one is open, else a new space on its worktree,
-  // else a new worktree on its branch, fetched from origin when the work began elsewhere.
+  // Picks up an issue already in progress: its space when one is open, selected at once, else a new space on
+  // its worktree, else a new worktree on its branch, fetched from origin when the work began elsewhere.
   continueWork(issue, cx) {
     const project = this.project;
     this.detailError = null;
+    const space = worktreeSpace(this.repository, issue.branch);
+    if (space) { run("space.select", { id: space.id }); return; }
     this.showOpening(issue, `Opening ${issue.id}'s worktree…`, cx);
     cx.spawn(async (cx) => {
       try {
