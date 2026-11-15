@@ -45,7 +45,7 @@ claude mcp add --transport http --scope user linear https://mcp.linear.app/mcp
 
 Then start a Claude Code session, run `/mcp`, choose `linear` and sign in to Linear in the browser window it opens. If Linear is connected to your Claude account at claude.ai instead, its tools are already available and the skills use them.
 
-The panel also needs a personal Linear API key; [Configuration](docs/configuration.md#credentials) explains creating it.
+The panel also needs a personal Linear API key: create one on [Linear's Security & access settings](https://linear.app/settings/account/security), then paste it in the field the panel shows when you choose Linear.
 
 [Installation](docs/installation.md) explains what the install command changes and how to update.
 
@@ -55,7 +55,7 @@ The panel shows a setup view for a repository whose tracker it can't place: choo
 
 Each tracker needs credentials:
 
-- **Linear**: a personal API key in `~/.config/herdr-app/linear.json`, and the Linear MCP server in Claude Code.
+- **Linear**: a personal API key, created on [Linear's Security & access settings](https://linear.app/settings/account/security) and saved from the panel's setup view, and the Linear MCP server in Claude Code.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
 - **Beads**: none; it needs `bd` installed and a database in the repository's main checkout, which the setup view and `/issues:config` offer to make with `bd init`. The panel lists its issues and edits their status, priority and body, and none of it makes a git commit. Every `issues:*` skill but `/issues:delegate`, which is for Linear only, works its issues too.
 

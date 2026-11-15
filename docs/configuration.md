@@ -16,7 +16,9 @@ It asks which tracker to use, checks the credentials it needs, and saves the cho
 
 Each tracker needs:
 
-- **Linear**: a personal API key, created in Linear under Settings → Account → Security & access. Save it in `~/.config/herdr-app/linear.json`, readable only by you:
+- **Linear**: a personal API key, created in Linear under Settings → Account → Security & access ([linear.app/settings/account/security](https://linear.app/settings/account/security)). Choosing Linear in the panel's setup view without a key shows a field for it, with a link to that page: paste the key and choose **Save key**. The panel checks the key with Linear, saves it in `~/.config/herdr-app/linear.json` readable only by you, and moves on to choosing the team. A repository whose key goes missing or stops working shows the same field. The panel never shows the key again once it's saved.
+
+  To save the key yourself instead, write it to `~/.config/herdr-app/linear.json`, readable only by you:
 
   ```sh
   echo '{ "apiKey": "lin_api_…" }' > ~/.config/herdr-app/linear.json

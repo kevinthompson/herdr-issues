@@ -11,8 +11,10 @@ export class SetupProblem extends Error {
   }
 }
 
-const LINEAR_KEY_FIX = "Create a personal API key in Linear under **Settings → Account → Security & access**, and save it in "
-  + '`~/.config/herdr-app/linear.json` as `{ "apiKey": "lin_api_…" }`. Then check again.';
+export const LINEAR_KEY_PAGE = "https://linear.app/settings/account/security";
+const LINEAR_KEY_FIX = `Create a personal API key in Linear under **Settings → Account → Security & access** (${LINEAR_KEY_PAGE}), paste it in the Issues panel's API key field `
+  + "and choose **Save key**. Or save it yourself in `~/.config/herdr-app/linear.json` as `{ \"apiKey\": \"lin_api_…\" }`, "
+  + "readable only by you (`chmod 600`), then check again.";
 
 // Installing a missing tool with the person's package managers, or as `instructions` say when they have none.
 async function installFix(packageName, instructions) {
@@ -35,9 +37,10 @@ export const beadsNotInitialized = () => new SetupProblem("This repository has n
   "Run `bd init` in the repository's main checkout, then check again.", BEADS_NOT_INITIALIZED);
 export const bdFailed = (message) => new SetupProblem(message,
   "Check that `bd list` works in the repository's main checkout, then check again.");
-export const linearKeyMissing = () => new SetupProblem("No Linear API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);
-export const linearKeyUnreadable = () => new SetupProblem("~/.config/herdr-app/linear.json isn't valid JSON", LINEAR_KEY_FIX);
-export const linearKeyInvalid = () => new SetupProblem("Linear refused the API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);
+export const LINEAR_KEY_PROBLEM = "linear-key";
+export const linearKeyMissing = () => new SetupProblem("No Linear API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+export const linearKeyUnreadable = () => new SetupProblem("~/.config/herdr-app/linear.json isn't valid JSON", LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+export const linearKeyInvalid = () => new SetupProblem("Linear refused the API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
 export const badSetting = (message) => new SetupProblem(message,
   "Fix the repository's entry in `~/.config/herdr-app/issues.json`, or choose a different tracker to replace it.");
 export const badMergeSetting = (message) => new SetupProblem(message,

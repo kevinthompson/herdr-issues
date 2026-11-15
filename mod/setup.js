@@ -6,20 +6,22 @@
 // complete; and a review of the choices. Only Save on the review writes the repository's entry in issues.json
 // (setting.js), and the panel lists the issues. How work lands proposes the repository's current or default
 // settings. A configured tracker that fails to load with a SetupProblem (trackers/problems.js) shows the
-// problem and its fix, with Check again and a way to choose a different tracker. Linear's team dropdown is a
+// problem and its fix, with Check again and a way to choose a different tracker. A Linear API key that is
+// missing, unreadable or refused, at either point, comes with a masked field that saves a key Linear accepts
+// (linear.js), and a link to the page where Linear creates one. Linear's team dropdown is a
 // scope menu popup (menu.js), whose pick comes back through shared state.
 import { div } from "gpui-kit";
-import { v_flex, h_flex, TextView } from "gpui-base";
+import { v_flex, h_flex, TextView, Input, InputState } from "gpui-base";
 import { exec, shared, setShared } from "herdr";
 import { button, collapseButton } from "./detail.js";
 import { openScopeMenu } from "./menu.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
-import { linearClient } from "./trackers/linear.js";
+import { linearClient, saveLinearKey } from "./trackers/linear.js";
 import { checkGitHubLogin } from "./trackers/github.js";
 import { checkBeads, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./trackers/linear-team.js";
-import { originNotOnGitHub, BEADS_NOT_INITIALIZED } from "./trackers/problems.js";
+import { originNotOnGitHub, BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM, LINEAR_KEY_PAGE } from "./trackers/problems.js";
 
 const TEAM_PICKS = "issues.setupTeams";
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
@@ -73,6 +75,12 @@ export class TrackerSetup {
     this.step = "tracker"; this.checking = false; this.problem = null;
     // The answers so far, and the proposed merge and complete once the tracker is ready.
     this.choice = null; this.teams = null; this.team = null; this.merge = null; this.complete = null; this.proposed = null;
+    // The Linear API key being entered, which is never kept once saved.
+    this.keyInput = InputState.new({ placeholder: "lin_api_…" });
+    this.keyInput.set_masked(true);
+    this.keyText = ""; this.savingKey = false; this.keyError = null;
+    this.keyInput.on("change", (_e, cx) => { this.keyText = this.keyInput.value(); this.keyError = null; cx.notify(); });
+    this.keyInput.on("submit", (_e, cx) => this.saveKey(cx));
   }
 
   // The configured tracker's SetupProblem, or null when the repository has no tracker.
@@ -172,6 +180,37 @@ export class TrackerSetup {
     cx.notify();
   }
 
+  // Saves the entered key, then checks again as `onKeySaved` says: the chosen tracker's check, or the failure's.
+  saveKey(cx) {
+    const apiKey = this.keyText.trim();
+    if (!apiKey || this.savingKey) return;
+    Object.assign(this, { savingKey: true, keyError: null });
+    cx.spawn(async (cx) => {
+      try {
+        await saveLinearKey(apiKey);
+        this.keyInput.set_value("");
+        this.keyText = "";
+        this.onKeySaved?.(cx);
+      } catch (e) { this.keyError = String(e.message ?? e); }
+      finally { this.savingKey = false; cx.notify(); }
+    });
+    cx.notify();
+  }
+
+  keyForm(id, t) {
+    return v_flex().flex_none().gap(6)
+      .child(div().text_size(12).font_semibold().child("Linear API key"))
+      .child(h_flex().gap(6).items_center()
+        .child(Input.new(this.keyInput).flex_1().min_w(0).h(26).px(8).items_center().rounded(7).border(1).border_color(t.input)
+          .bg(t.surface).text_size(12).text_color(t.foreground))
+        .child(button(`${id}-save-key`, this.savingKey ? "Saving…" : "Save key", (cx) => this.saveKey(cx), t,
+          { primary: true, enabled: !this.savingKey && Boolean(this.keyText.trim()) })))
+      .child(div().id(`${id}-key-page`).flex_none().text_size(12).text_color(t.accent).cursor_pointer().hover((s) => s.underline())
+        .on_click((_e, cx) => cx.open_url(LINEAR_KEY_PAGE))
+        .child("Create a personal API key in Linear ↗"))
+      .when(Boolean(this.keyError), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.keyError ?? "")));
+  }
+
   openTeamMenu() {
     const scopes = this.teams.map(({ key, name }) => ({ id: key, label: `${name} (${key})` }));
     openScopeMenu(scopes, this.team, this.main, TEAM_PICKS);
@@ -192,10 +231,14 @@ export class TrackerSetup {
     return team ? `${team.name} (${team.key})` : this.team ?? "";
   }
 
+  // A Linear key problem asks for the key, and saving one runs onCheckAgain.
   problemView(id, problem, onCheckAgain, t, extra = null) {
+    const asksForKey = problem.code === LINEAR_KEY_PROBLEM;
+    if (asksForKey) this.onKeySaved = onCheckAgain;
     return v_flex().flex_none().gap(8)
       .child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(problem.message))
-      .when(Boolean(problem.fix), (e) => e.child(markdown(`${id}-fix`, problem.fix ?? "", t.foreground)))
+      .when(asksForKey, (e) => e.child(this.keyForm(id, t)))
+      .when(Boolean(problem.fix), (e) => e.child(markdown(`${id}-fix`, problem.fix ?? "", t.foreground).on_link_click((url, cx) => cx.open_url(url))))
       .child(h_flex().gap(6).child(button(`${id}-check`, "Check again", onCheckAgain, t, { primary: true })).when(Boolean(extra), (e) => e.child(extra)));
   }
 
