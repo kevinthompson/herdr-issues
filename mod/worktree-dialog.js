@@ -1,14 +1,20 @@
 // Worktree dialog, a dialog of this mod with props { space, action: "new" | "open" | "remove" } or
 // { folder, machine } for a repo without a space; optional { branch, name, tab, argv, task }, and { behind: true }
 // to open the new worktree's space behind what's shown.
-// Remove takes an optional { warning }: work outside the checkout that removing it would leave behind.
+// Remove takes an optional { warning }: work outside the checkout that removing it would leave behind. It removes
+// the checkout without asking when removesWithoutAsking (removal.js) says so, and otherwise waits for Enter.
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { run, props, closeOverlay, theme, spaces, panes, terminals, exec, home, updates } from "herdr";
-import { branchState } from "./worktree.js";
+import { run, props, closeOverlay, theme, spaces, panes, terminals, exec, home, updates, openOverlay } from "herdr";
+import { branchState, checkouts as repositoryCheckouts } from "./worktree.js";
 import { openBehindArgs } from "./open-behind.js";
-import { checksAnswered, removalFindings, removalVerdict, runChecks, sessionComplete, PASS, LOSS } from "./removal.js";
+import { checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks, sessionComplete, PASS, LOSS } from "./removal.js";
+
+// Opens the dialog that removes the space's worktree and closes the space.
+export function openRemovalDialog(spaceId) {
+  openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: spaceId, action: "remove" } });
+}
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s, all = panes()) {
@@ -126,6 +132,18 @@ async function submodules(top, on) {
   return { mods, unpushed };
 }
 
+// The other spaces the sidebar nests under this one, which closing it closes too: when the space shows or starts
+// in the repository's main checkout, every other space showing one of its linked worktrees.
+async function nestedWorktreeSpaces(space, repo, on) {
+  const [main, ...linked] = await repositoryCheckouts(repo.main, on);
+  const paneList = panes();
+  const inside = (folder, path) => folder === path || Boolean(folder?.startsWith(`${path}/`));
+  const inLinked = (folder) => linked.some((checkout) => inside(folder, checkout.path));
+  const inMain = (folder) => Boolean(main) && inside(folder, main.path) && !inLinked(folder);
+  if (!inMain(place(space, paneList)) && !inMain(space.folder)) return [];
+  return spaces().filter((other) => other.id !== space.id && (other.machine ?? null) === (on ?? null) && inLinked(place(other, paneList)));
+}
+
 // The repo a folder belongs to: its main checkout and name, and whether
 // the folder is itself a linked worktree. null outside git.
 async function repoOf(folder, on) {
@@ -158,6 +176,7 @@ export class WorktreeDialog {
     this.error = "";
     this.repo = undefined; // undefined: looking, null: not in git
     this.checks = {}; // remove: the checks removal.js reads, each filled in as it answers
+    this.nestedSpaces = null; // remove: the spaces closing this one closes too, once looked up
     this.handle = cx.focus_handle();
     if (props()?.action === "remove") this.handle.focus();
     cx.spawn(async (cx) => {
@@ -174,7 +193,10 @@ export class WorktreeDialog {
         if (repo && this.opening) this.list = await checkouts(repo, this.on);
         this.repo = repo;
         cx.notify();
-        if (repo?.linked && props().action === "remove") await this.check(repo, cx);
+        if (repo?.linked && props().action === "remove") {
+          await this.check(repo, cx);
+          if (removesWithoutAsking({ ...this.checks, warning: props().warning }, this.nestedSpaces.length)) await this.work(cx);
+        }
         if (props().branch) await this.work(cx);
       } catch (error) { this.repo = null; this.error = String(error); cx.notify(); }
     });
@@ -183,16 +205,19 @@ export class WorktreeDialog {
   // Runs removal's checks, showing each answer as it lands.
   async check(repo, cx) {
     this.checks.complete = sessionComplete(this.space(), panes(), terminals());
-    await runChecks({
-      dirty: () => uncommitted(repo.top, this.on),
-      submodules: async () => (await submodules(repo.top, this.on)).unpushed,
-      branch: () => branchState(repo, this.on),
-    }, this.checks, (name, result) => { this.checks[name] = result; cx.notify(); });
+    await Promise.all([
+      runChecks({
+        dirty: () => uncommitted(repo.top, this.on),
+        submodules: async () => (await submodules(repo.top, this.on)).unpushed,
+        branch: () => branchState(repo, this.on),
+      }, this.checks, (name, result) => { this.checks[name] = result; cx.notify(); }),
+      nestedWorktreeSpaces(this.space(), repo, this.on).catch(() => []).then((nested) => { this.nestedSpaces = nested; cx.notify(); }),
+    ]);
   }
 
   // Enter removes only once every check has answered, so nobody confirms before seeing the verdict.
   checking() {
-    return props()?.action === "remove" && Boolean(this.repo?.linked) && !checksAnswered(this.checks);
+    return props()?.action === "remove" && Boolean(this.repo?.linked) && (!checksAnswered(this.checks) || this.nestedSpaces === null);
   }
 
   space() {
@@ -372,8 +397,10 @@ export class WorktreeDialog {
       .child(div().flex_none().text_color(result === PASS ? t.ansi2 : result === LOSS ? t.blocked : t.working).child(result === PASS ? "✓" : "✗"))
       .child(div().flex_1().min_w(0).text_color(t.foreground).child(text));
     const verdict = this.checking() ? null : removalVerdict(findings);
+    const nested = this.nestedSpaces?.length ?? 0;
     return v_flex().gap(4)
       .children(findings.map(row))
+      .when(nested > 0, (el) => el.child(div().text_color(t.working).child(`Closing this space also closes ${nested === 1 ? "1 space" : `${nested} spaces`} nested under it.`)))
       .when(this.checking(), (el) => el.child(div().text_color(t.dim).child("Checking the worktree's state…")))
       .when(Boolean(verdict), (el) => el.child(div().pt(4).font_semibold().text_color(t.foreground).child(`${verdict.mark} ${verdict.text}`)));
   }

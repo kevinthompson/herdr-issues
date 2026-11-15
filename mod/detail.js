@@ -163,7 +163,7 @@ const workActions = (view, t) => workButton("issue", view, t, { compact: true })
 // Merges the issue's finished branch into main, for a repository that merges locally.
 function mergeButton({ issue, merging, opening, onMerge }, t) {
   return button("issue-merge", merging ? "Merging…" : "Merge", onMerge, t, {
-    enabled: !opening, tooltip: `Merge ${issue.branch} into main and mark ${issue.id} done`,
+    enabled: !opening, tooltip: `Merge ${issue.branch} into main, mark ${issue.id} done and remove its worktree`,
   });
 }
 

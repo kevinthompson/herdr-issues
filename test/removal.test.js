@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict, runChecks, sessionComplete } from "../mod/removal.js";
+import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks, sessionComplete } from "../mod/removal.js";
 
 const mergedBranch = { branch: "feature", bases: ["main", "origin/main"], mergedInto: "main", unpushed: 0, pullRequest: null };
 const cleanChecks = { dirty: false, submodules: [], branch: mergedBranch };
@@ -39,6 +39,40 @@ describe("removalFindings", () => {
 
   test("reports a branch check that failed rather than a detached HEAD", () => {
     assert.deepEqual(removalFindings({ branch: { error: "fetch failed" } }), [{ result: CAUTION, text: "Couldn't check the branch: fetch failed" }]);
+  });
+});
+
+describe("removesWithoutAsking", () => {
+  test("is true when every check passes and no space nests under it", () => {
+    assert.equal(removesWithoutAsking(cleanChecks, 0), true);
+  });
+
+  test("is true for a complete session without a branch check", () => {
+    assert.equal(removesWithoutAsking({ dirty: false, submodules: [], complete: true }, 0), true);
+  });
+
+  test("is false while a check runs", () => {
+    assert.equal(removesWithoutAsking({ dirty: false, submodules: [] }, 0), false);
+  });
+
+  test("is false when a finding loses work", () => {
+    assert.equal(removesWithoutAsking({ ...cleanChecks, dirty: true }, 0), false);
+  });
+
+  test("is false for a branch neither merged nor in review", () => {
+    assert.equal(removesWithoutAsking({ ...cleanChecks, branch: { ...mergedBranch, mergedInto: null } }, 0), false);
+  });
+
+  test("is false when a check couldn't run", () => {
+    assert.equal(removesWithoutAsking({ ...cleanChecks, dirty: { error: "no git" } }, 0), false);
+  });
+
+  test("is false with a warning", () => {
+    assert.equal(removesWithoutAsking({ ...cleanChecks, warning: "Its issue is still open." }, 0), false);
+  });
+
+  test("is false when other spaces nest under it", () => {
+    assert.equal(removesWithoutAsking(cleanChecks, 1), false);
   });
 });
 
