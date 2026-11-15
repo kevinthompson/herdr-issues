@@ -19,8 +19,11 @@
 // createModel and createEffort, at the top level and in any entry, an entry's winning, are the model and effort
 // /issues:create writes issues on in the background: createModel is inherit (the session's own model), sonnet,
 // opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
-// max, default without either. createSettings resolves them. Any model or effort the mod or its skills choose is
-// a setting like these, with a default.
+// max, default without either. createSettings resolves them. workModel and workEffort, set the same way, are the
+// model and effort of the Claude sessions Start, Continue and `issues worktree --claude` open to work an issue:
+// workModel is inherit (the person's own Claude Code model), a model alias such as sonnet, or a model's full name;
+// workEffort takes createEffort's values; inherit and default without either. workSettings resolves them. Any model
+// or effort the mod or its skills choose is a setting like these, with a default.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices.
@@ -40,6 +43,8 @@ const CREATE_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
 const CREATE_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
 export const DEFAULT_CREATE_MODEL = "sonnet";
 export const DEFAULT_CREATE_EFFORT = "default";
+export const DEFAULT_WORK_MODEL = "inherit";
+export const DEFAULT_WORK_EFFORT = "default";
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
 const abbreviateHome = (path) => (path.startsWith(`${home()}/`) ? `~${path.slice(home().length)}` : path);
 
@@ -67,10 +72,19 @@ function checkCreateSettings(settings, where) {
   checkChoice(settings?.createEffort, "createEffort", CREATE_EFFORTS, where);
 }
 
+function checkWorkSettings(settings, where) {
+  const model = settings?.workModel;
+  if (model != null && !(typeof model === "string" && /^\S+$/.test(model))) {
+    throw badSetting(`${where} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`);
+  }
+  checkChoice(settings?.workEffort, "workEffort", CREATE_EFFORTS, where);
+}
+
 const readCheckedSettings = async () => {
   const settings = await readSettings();
   checkPollSeconds(settings?.pollSeconds, "issues.json");
   checkCreateSettings(settings, "issues.json");
+  checkWorkSettings(settings, "issues.json");
   return settings;
 };
 
@@ -87,6 +101,7 @@ export async function trackerSetting({ root, on }) {
   if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
   checkPollSeconds(setting.pollSeconds, `issues.json's ${key}`);
   checkCreateSettings(setting, `issues.json's ${key}`);
+  checkWorkSettings(setting, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
@@ -110,6 +125,16 @@ export async function createSettings(project) {
   return {
     createModel: setting?.createModel ?? settings?.createModel ?? DEFAULT_CREATE_MODEL,
     createEffort: setting?.createEffort ?? settings?.createEffort ?? DEFAULT_CREATE_EFFORT,
+  };
+}
+
+// The model and effort of the Claude sessions that work the repository's issues: the entry's workModel and
+// workEffort, else the top level's, else inherit and default.
+export async function workSettings(project) {
+  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  return {
+    workModel: setting?.workModel ?? settings?.workModel ?? DEFAULT_WORK_MODEL,
+    workEffort: setting?.workEffort ?? settings?.workEffort ?? DEFAULT_WORK_EFFORT,
   };
 }
 
