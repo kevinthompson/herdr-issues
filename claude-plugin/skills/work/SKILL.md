@@ -51,7 +51,7 @@ Then name the session's tab as step 3 says, and summarize as step 5 says. Read t
      - with `pull-request-open`, the branch is merged into main, or is pushed with no unpushed commits and has an open pull request (`gh pr view --json state,url`) whose checks pass or whose failures are recorded in an issue comment as not caused by the branch; or
    - the person explicitly canceled the work.
 
-   If so, end your final message with this block, set apart from everything above it, filling in the issue ID, the reason, and the merge or PR result, and write nothing after it:
+   If so, run `issues complete <issue ID>`, which labels the session's terminal and marks its Herdr tab with ✅ so Herdr's agents list shows the session is finished; skip it without comment when `$HC_TERMINAL_ID` is empty or `herdr-app` isn't installed. Then end your final message with this block, set apart from everything above it, filling in the issue ID, the reason, and the merge or PR result, and write nothing after it:
 
    ```
    ---
