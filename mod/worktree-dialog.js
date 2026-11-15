@@ -1,11 +1,13 @@
 // Worktree dialog, a dialog of this mod with props { space, action: "new" | "open" | "remove" } or
-// { folder, machine } for a repo without a space; optional { branch, name, tab, argv, task }.
+// { folder, machine } for a repo without a space; optional { branch, name, tab, argv, task }, and { behind: true }
+// to open the new worktree's space behind what's shown.
 // Remove takes an optional { warning }: work outside the checkout that removing it would leave behind.
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { run, props, closeOverlay, theme, spaces, panes, exec, home } from "herdr";
+import { run, props, closeOverlay, theme, spaces, panes, exec, home, updates } from "herdr";
 import { branchState } from "./worktree.js";
+import { openBehindArgs } from "./open-behind.js";
 import { checksAnswered, removalFindings, removalVerdict, PASS, LOSS } from "./removal.js";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
@@ -237,7 +239,8 @@ export class WorktreeDialog {
     if (!r.ok) return r.err || "git worktree add failed.";
     const p = props();
     // Unnamed spaces follow the checkout folder; nesting under the repo comes from the checkout either way.
-    run("space.new", { name: p.name, folder: path, machine: this.on, tab: p.tab, argv: p.argv, task: p.task });
+    const behind = p.behind ? openBehindArgs(updates().app.version) : {};
+    run("space.new", { name: p.name, folder: path, machine: this.on, tab: p.tab, argv: p.argv, task: p.task, ...behind });
     return "";
   }
 

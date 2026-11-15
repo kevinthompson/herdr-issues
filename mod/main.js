@@ -12,7 +12,7 @@
 // tracker, and the issues.refresh key command fetches it at once.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState, ScrollHandle } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, spaces, focused, notify, exec, run, watchFolder, appHome } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, spaces, focused, notify, exec, run, watchFolder, appHome, updates } from "herdr";
 import { location, repositoryRoot, mainCheckout } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
@@ -38,6 +38,7 @@ import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
+import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
@@ -647,7 +648,7 @@ export default class Issues extends View {
           const spaceName = await this.spaceName(issue);
           const worktree = project && await worktreeFor(issue.branch, project);
           if (worktree?.space) run("space.select", { id: worktree.space.id });
-          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...await workIssueSession(issue, project) });
+          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...await workIssueSession(issue, project), ...openBehindArgs(updates().app.version) });
           else await this.openWorktreeDialog(issue, spaceName);
         }
       } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
@@ -681,7 +682,7 @@ export default class Issues extends View {
       mod: "issues", kind: "dialog", width: 440, height: 260,
       props: {
         folder: project?.root, machine: project?.on ?? null, action: "new",
-        branch: issue.branch ?? undefined, name: spaceName, ...session,
+        branch: issue.branch ?? undefined, name: spaceName, ...session, behind: true,
       },
     });
   }
