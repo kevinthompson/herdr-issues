@@ -193,16 +193,16 @@ const statusRank = (project) => {
   return rank === -1 ? PROJECT_STATUS_ORDER.length : rank;
 };
 
-// The issue lists a repository can show: { id, label, group?, subgroup?, milestones? }, its default first.
-// My issues stands alone, then the team's lists and saved views under the team's name, then its projects,
-// grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
-function scopesFor({ views }, { name: teamName, projects }) {
+// The issue lists a repository can show: { id, label, team?, group?, subgroup?, milestones? }, its default
+// first. My issues stands alone, then the team's lists and saved views under the team's name, then its
+// projects, grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
+export function scopesFor({ views }, { name: teamName, projects }) {
   const mine = { id: "mine", label: "My issues" };
   const teamScopes = [{ id: "triage", label: "Triage" }, { id: "team", label: "Issues" },
-    ...views.map((view) => ({ id: `view:${view.id}`, label: view.name }))].map((scope) => ({ ...scope, group: teamName }));
+    ...views.map((view) => ({ id: `view:${view.id}`, label: view.name }))].map((scope) => ({ ...scope, team: teamName, group: teamName }));
   const byStatusAndPriority = [...projects].sort((a, b) => statusRank(a) - statusRank(b) || priorityRank(a) - priorityRank(b));
   const projectScopes = byStatusAndPriority.map((project) => ({
-    id: `project:${project.id}`, label: project.name, group: `${teamName} Projects`, subgroup: project.status?.name, url: project.url,
+    id: `project:${project.id}`, label: project.name, team: teamName, group: `${teamName} Projects`, subgroup: project.status?.name, url: project.url,
     milestones: [...project.projectMilestones.nodes].sort((a, b) => a.sortOrder - b.sortOrder)
       .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
   }));

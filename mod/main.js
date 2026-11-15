@@ -19,6 +19,7 @@ import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/set
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
+import { listedScopeName } from "./listed-scope.js";
 import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
@@ -903,7 +904,7 @@ export default class Issues extends View {
     const label = this.shownLabel(this.listedLabels());
     return this.frame(t).items_center().pt(8).gap(10)
       .child(div().id("issues-expand").flex_none().size(24).flex().items_center().justify_center().rounded(6)
-        .cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => this.toggleCollapsed())
+        .tooltip(listedScopeName(this.tracker, this.listedScope)).cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => this.toggleCollapsed())
         .child(svg("mods/issues/icons/issues.svg").size(STRIP_ICON_PX).text_color(t.foreground)))
       .children(stripBadges(groupIssues(this.issues, this.unloaded, label)).map((badge) => this.stripBadge(badge, t)));
   }
