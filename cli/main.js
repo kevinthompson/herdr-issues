@@ -7,6 +7,7 @@ import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
+import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { openWorktree } from "./worktree.js";
 import { isUnnamed, issueTabName, renameTab, sessionTab } from "./tab.js";
 
@@ -25,6 +26,8 @@ Commands:
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
+  merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
+                           refuse, changing nothing, when it can't merge cleanly or the repository uses pull requests
 
 Options:
   -h, --help               Print this help`;
@@ -154,10 +157,23 @@ async function worktree(args) {
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, setting, auth, tab, worktree };
+async function merge(args) {
+  if (args.length !== 1 || args[0].startsWith("-")) throw new UsageError("merge needs one issue ID");
+  const issue = await issueToWork(args[0]);
+  try {
+    const mainBranch = await mergeIssue(issue, await currentTracker(), await currentProject());
+    console.log(`Merged ${issue.branch} into ${mainBranch} and marked ${issue.id} done`);
+  } catch (error) {
+    throw error instanceof MergeRefusal ? new Refusal(error.message) : error;
+  }
+}
+
+const COMMANDS = { tracker, branch, "space-name": spaceName, setting, auth, tab, worktree, merge };
+
+const HELP_FLAGS = ["-h", "--help"];
 
 export async function main([command, ...args]) {
-  if (command === "-h" || command === "--help") {
+  if (HELP_FLAGS.includes(command) || HELP_FLAGS.includes(args[0])) {
     console.log(USAGE);
     return 0;
   }

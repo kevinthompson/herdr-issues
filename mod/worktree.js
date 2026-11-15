@@ -10,7 +10,7 @@ async function git(cwd, args, on) {
 }
 
 // Every checkout of the repository, the main one first: { path, branch }.
-async function checkouts(root, on) {
+export async function checkouts(root, on) {
   const listing = await git(root, ["worktree", "list", "--porcelain"], on);
   if (!listing.ok) return [];
   return listing.out.split(/\n\n+/).map((block) => ({
@@ -49,7 +49,7 @@ export async function isLinkedWorktree(folder, on) {
 }
 
 const lines = (text) => text.split("\n").filter(Boolean);
-const MAIN_BRANCHES = ["main", "master"];
+export const MAIN_BRANCHES = ["main", "master"];
 
 // What the repository holds for the listed issues:
 // - worktrees: its linked worktrees;
