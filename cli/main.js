@@ -12,7 +12,7 @@ import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, editIssueBody, setIssueStatus, startIssue } from "./change.js";
-import { isUnnamed, issueTabName, renameTab, sessionTab } from "./tab.js";
+import { completedTabName, isUnnamed, issueTabName, labelComplete, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
 
@@ -37,6 +37,8 @@ Commands:
                            default one: ID and title; fewer when fewer qualify
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
+  complete <id>            Mark the session finished: label $HC_TERMINAL_ID issues.complete=<id> and prefix its tab's
+                           name with ✅, even a name the person chose, once
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -162,6 +164,15 @@ async function renameSessionTab([issueId, ...words]) {
   const newName = issueTabName({ tab, issueId, issueSpace, name });
   await renameTab(tab, newName);
   console.log(`Renamed the tab to ${newName}`);
+}
+
+async function complete([issueId]) {
+  if (!issueId) throw new UsageError("complete needs an issue ID");
+  const tab = await sessionTab();
+  await labelComplete(tab, issueId);
+  const newName = completedTabName(tab.name);
+  if (newName !== tab.name) await renameTab(tab, newName);
+  console.log(`Marked ${issueId} complete in the tab ${newName}`);
 }
 
 // Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
@@ -336,7 +347,7 @@ async function edit(args) {
   console.log(`Saved the body of ${issue.id}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, worktree, merge, status, start, edit };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, worktree, merge, status, start, edit };
 
 const HELP_FLAGS = ["-h", "--help"];
 
