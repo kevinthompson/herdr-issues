@@ -6,10 +6,10 @@
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { run, props, closeOverlay, theme, spaces, panes, exec, home, updates, openOverlay } from "herdr";
+import { run, props, closeOverlay, theme, spaces, panes, terminals, exec, home, updates, openOverlay } from "herdr";
 import { branchState, checkouts as repositoryCheckouts } from "./worktree.js";
 import { openBehindArgs } from "./open-behind.js";
-import { checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, PASS, LOSS } from "./removal.js";
+import { checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks, sessionComplete, PASS, LOSS } from "./removal.js";
 
 // Opens the dialog that removes the space's worktree and closes the space.
 export function openRemovalDialog(spaceId) {
@@ -202,15 +202,15 @@ export class WorktreeDialog {
     });
   }
 
-  // Runs removal's checks side by side, showing each answer as it lands.
+  // Runs removal's checks, showing each answer as it lands.
   async check(repo, cx) {
-    const answer = (name, lookup) => lookup()
-      .catch((error) => ({ error: String(error?.message ?? error) }))
-      .then((result) => { this.checks[name] = result; cx.notify(); });
+    this.checks.complete = sessionComplete(this.space(), panes(), terminals());
     await Promise.all([
-      answer("dirty", () => uncommitted(repo.top, this.on)),
-      answer("submodules", async () => (await submodules(repo.top, this.on)).unpushed),
-      answer("branch", () => branchState(repo, this.on)),
+      runChecks({
+        dirty: () => uncommitted(repo.top, this.on),
+        submodules: async () => (await submodules(repo.top, this.on)).unpushed,
+        branch: () => branchState(repo, this.on),
+      }, this.checks, (name, result) => { this.checks[name] = result; cx.notify(); }),
       nestedWorktreeSpaces(this.space(), repo, this.on).catch(() => []).then((nested) => { this.nestedSpaces = nested; cx.notify(); }),
     ]);
   }
