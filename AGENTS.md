@@ -16,6 +16,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `space-name.js`: the name of an issue's worktree space, from the repository's `spaceName` setting, and the issue ID read back out of a space's name, so switching to an issue's space opens its issue.
 - `issue.js`: statuses, priorities and the rules for grouping issues and whether work can start or finish.
 - `scope-context.js`: publishes the listed scope and open issue for the Claude scope hook.
+- `work-session.js`: what Start opens in an issue's new worktree space: a Claude session working the issue when `claude` runs, checked once, or else a plain shell tab.
 - `edits.js`, `tasks.js`, `changes.js`: field edits saved in the background, checkbox toggles in an issue's body, and the stamp that tells every panel to refresh.
 - `lists.js`, `avatars.js`, `file-key.js`: cached lists and avatars in the app's data folder.
 - `lookups.js`: the repository, main checkout and settings lookups kept between refreshes, forgotten when `issues.json` or `linear.json` changes.
@@ -73,7 +74,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 ## Installing for development
 
-Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `claude`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It:
+Run `./setup` from the main checkout; run from a linked worktree, it refuses and changes nothing, since it would point the mod, the CLI and the plugin at a folder that goes away when the worktree closes. It needs `herdr-app`, `git` and `node`, `claude` for the plugin, which it skips with a warning without it, and `gh` for repositories tracked in GitHub Issues. It:
 
 - links the checkout's `mod/` folder to `~/.config/herdr-app/mods/issues`, repointing a link an older install made to the checkout itself;
 - links `bin/issues` to `~/.local/bin/issues`, refusing to replace a file there that isn't a link;

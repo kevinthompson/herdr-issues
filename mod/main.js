@@ -3,8 +3,8 @@
 // number of rows, and Show more draws more. Status and priority dropdowns are popups of this same mod
 // with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
-// Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open a
-// Claude session working the issue in its worktree. Clicking a task-list
+// Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open the
+// issue's worktree, with a Claude session working it when `claude` runs (work-session.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list. The issues.toggle key command and the
 // strip's button collapse the panel to a thin strip and expand it again (collapse.js). The list polls its
@@ -35,6 +35,7 @@ import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
+import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
@@ -98,7 +99,6 @@ const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
 const NOT_A_REPOSITORY = "The issues panel tracks issues for git repositories, and this folder isn't in one.";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
 
-const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/issues:work ${issue.id}` });
 // issues worktree sets up new checkouts, which can take minutes in a box app.
 const ISSUES_WORKTREE_TIMEOUT_MS = 10 * 60 * 1000;
 // issues worktree works on this computer's checkouts and needs the issue's branch.
@@ -497,7 +497,7 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // A fresh Claude session in a new worktree space on the issue's branch, working the issue with /issues:work.
+  // A fresh Claude session, or a shell without Claude Code, in a new worktree space on the issue's branch, working the issue with /issues:work.
   // Without a branch, the worktree dialog asks for one. The tracker saves the start while the worktree opens.
   startWork(issue, cx) {
     const tracker = this.tracker;
@@ -508,7 +508,7 @@ export default class Issues extends View {
       try {
         const opening = opensWithIssuesWorktree(issue, this.project)
           ? this.openWithIssuesWorktree(issue)
-          : this.spaceName(issue).then((spaceName) => { this.openWorktreeDialog(issue, spaceName); return null; });
+          : this.spaceName(issue).then((spaceName) => this.openWorktreeDialog(issue, spaceName)).then(() => null);
         const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
         const [openError, startError] = await Promise.all([opening, starting]);
         this.detailError = startError ?? openError;
@@ -618,8 +618,8 @@ export default class Issues extends View {
           const spaceName = await this.spaceName(issue);
           const worktree = project && await worktreeFor(issue.branch, project);
           if (worktree?.space) run("space.select", { id: worktree.space.id });
-          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...workIssueSession(issue) });
-          else this.openWorktreeDialog(issue, spaceName);
+          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...await workIssueSession(issue) });
+          else await this.openWorktreeDialog(issue, spaceName);
         }
       } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
       this.opening = null;
@@ -628,14 +628,13 @@ export default class Issues extends View {
   }
 
   // Opens the issue's branch with issues worktree, which switches to the space already showing it, or opens one
-  // nested under the repository's space with Claude working the issue. Returns an error message, or null.
+  // nested under the repository's space with Claude working the issue when it runs. Returns an error message, or null.
   // Without issues installed, the worktree dialog opens instead.
   async openWithIssuesWorktree(issue) {
-    const isNew = needsNewBranch(issue);
     const spaceName = await this.spaceName(issue);
-    const args = ["worktree", "--branch", issue.branch, ...(isNew ? ["--new"] : []), "--name", spaceName, "--claude", workIssueSession(issue).task];
+    const args = await issuesWorktreeArgs(issue, { spaceName, isNew: needsNewBranch(issue) });
     const result = await exec("issues", args, { cwd: this.project.root, timeout: ISSUES_WORKTREE_TIMEOUT_MS }).catch(() => null);
-    if (!result) { this.openWorktreeDialog(issue, spaceName); return null; }
+    if (!result) { await this.openWorktreeDialog(issue, spaceName); return null; }
     if (result.code === 0) return null;
     const lastLine = (result.stderr || result.stdout).trim().split("\n").pop();
     return `Could not open the worktree: ${lastLine || `issues worktree exited with ${result.code}`}`;
@@ -646,13 +645,14 @@ export default class Issues extends View {
     return this.project ? issueSpaceName(this.project, issue.id).catch(() => issue.id) : Promise.resolve(issue.id);
   }
 
-  openWorktreeDialog(issue, spaceName) {
+  async openWorktreeDialog(issue, spaceName) {
     const project = this.project;
+    const session = await workIssueSession(issue);
     openOverlay({
       mod: "issues", kind: "dialog", width: 440, height: 260,
       props: {
         folder: project?.root, machine: project?.on ?? null, action: "new",
-        branch: issue.branch ?? undefined, name: spaceName, ...workIssueSession(issue),
+        branch: issue.branch ?? undefined, name: spaceName, ...session,
       },
     });
   }

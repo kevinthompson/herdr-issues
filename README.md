@@ -28,7 +28,7 @@ Start a new Claude Code session to load the plugin, then press **Cmd-Shift-I** i
 You need:
 
 - Herdr, opened at least once
-- Claude Code
+- Claude Code, only for the `issues:*` skills and the Claude hooks; the panel works without it
 - `git`, with access to the GitHub repository
 - Node.js 22.15 or later
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues

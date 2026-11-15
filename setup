@@ -1,10 +1,10 @@
 #!/bin/bash
 # Usage: ./setup
 #
-# Installs this repository's Herdr issues mod and its Claude Code plugin:
+# Installs this repository's Herdr issues mod and, when Claude Code is installed, its Claude Code plugin:
 #   - links the mod folder (mod/) to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues)
 #   - adds the repository as the herdr-issues plugin marketplace and installs issues@herdr-issues,
-#     which brings the issues:* skills and the Claude hooks
+#     which brings the issues:* skills and the Claude hooks; without claude it skips the plugin with a warning
 #   - adds the mod's keys (mod/keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
 #     to something else
 #   - offers to add the Issues panel beside a personal layout's side panel, unless a layout already shows it,
@@ -12,7 +12,8 @@
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
-# Needs herdr-app, claude, git and node; gh is needed only for repositories tracked in GitHub Issues.
+# Needs herdr-app, git and node. Claude Code (claude) is needed only for the issues:* skills and hooks, and gh
+# only for repositories tracked in GitHub Issues.
 
 set -euo pipefail
 
@@ -57,7 +58,7 @@ warning() { print_in_color 2 33 "$@"; }
 error() { print_in_color 2 31 "$@"; }
 
 missing=()
-for command in herdr-app claude git node; do
+for command in herdr-app git node; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
@@ -111,6 +112,11 @@ plugin_installed() {
 }
 
 install_plugin() {
+  if ! command -v claude >/dev/null; then
+    warning "setup: warning: claude is not installed, so the Claude plugin with the issues:* skills and hooks was skipped; install Claude Code and run setup again to add it"
+    return
+  fi
+
   local registered_path
   registered_path=$(marketplace_path)
   if [[ -n $registered_path && $registered_path != "$repo_root" ]]; then
@@ -271,6 +277,8 @@ install_plugin
 add_panel_to_layout
 
 echo
-note <<EOF
-Done. Start a new Claude Code session to load the plugin.
-EOF
+if command -v claude >/dev/null; then
+  note <<<"Done. Start a new Claude Code session to load the plugin."
+else
+  note <<<"Done."
+fi

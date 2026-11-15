@@ -3,7 +3,7 @@
 ## Requirements
 
 - Herdr (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
-- Claude Code (`claude`)
+- Claude Code (`claude`), only for the `issues:*` skills and the Claude hooks; without it, setup installs the panel and the `issues` command and skips the plugin with a warning, and running setup again after installing Claude Code adds it
 - `git`, with access to the GitHub repository
 - Node.js (`node`) 22.15 or later, for the `issues` command
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
@@ -41,7 +41,7 @@ Setup puts the Issues panel in a column of its own beside the side panel that ho
 
 The Issues panel's `issues-panel` column has a weight of 1 beside the terminals' `main` node at 2, so the panel keeps its share of the window as the window resizes, after you drag its divider, and after you collapse it to its 32px strip and expand it again; Files and Changes keep Herdr's own sizing. Setup gives a layout an earlier setup fixed at 368px those weights.
 
-Start a new Claude Code session afterwards to load the plugin.
+With Claude Code installed, start a new Claude Code session afterwards to load the plugin.
 
 ## Updating
 
