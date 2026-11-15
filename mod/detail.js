@@ -57,7 +57,8 @@ function iconFact(icon, name, value, t) {
     .child(div().flex_1().min_w(0).min_h(FACT_ROW_PX).flex().items_center().child(value));
 }
 
-const linkedFact = (key, label, ids, view, t) => fact(label, issueLinks(key, ids, view, t, t.accent), t);
+const linkedFact = (key, icon, name, ids, view, t) =>
+  iconFact(icon, name, fact(`${name}:`, issueLinks(key, ids, view, t, t.accent), t), t);
 
 // A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
 function labelChip(label, color, t) {
@@ -74,8 +75,8 @@ function facts(view, t) {
   return v_flex().gap(2).text_size(11).text_color(t.muted)
     .when(Boolean(assignee), (e) => e.child(iconFact("user", "Assignee", assignee, t)))
     .when(Boolean(due), (e) => e.child(iconFact("calendar", "Due", div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text), t)))
-    .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
-    .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
+    .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "ban", "Blocked by", blockedBy, view, t)))
+    .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "circle-arrow-right", "Blocking", blocking, view, t)))
     .when(Boolean(branch), (e) => e.child(iconFact("git-branch", "Branch", div().min_w(0).truncate().child(branch), t)))
     .when(attached?.length > 0, (e) => e.child(iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t)))
     .when(view.issue.labels.length > 0, (e) => e.child(h_flex().pt(4).flex_wrap().gap(4).items_center().children(labelChips(view.issue, t))));
