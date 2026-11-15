@@ -17,6 +17,7 @@ import { bdMissing, bdFailed, beadsNotInitialized } from "./problems.js";
 const RECENTLY_CLOSED = 20;
 const BRANCH_SLUG_LENGTH = 50;
 const UNFINISHED_STATUSES = "open,in_progress,blocked,deferred";
+const BD_INIT_TIMEOUT_MS = 120_000;
 
 const STATUS_FROM_BEADS = { open: "todo", in_progress: "in-progress", blocked: "todo", deferred: "backlog", closed: "done" };
 const STATUS_TO_BEADS = { backlog: "deferred", todo: "open", "in-progress": "in_progress", done: "closed" };
@@ -72,6 +73,15 @@ export async function checkBeads(root) {
   await checkInstalled(root);
   const metadata = await readTextFile(`${root}/.beads/metadata.json`).catch(() => null);
   if (metadata === null) throw beadsNotInitialized();
+}
+
+// Makes a Beads database in the main checkout `root`, kept out of git through .git/info/exclude, without the
+// agent instructions or git hooks `bd init` adds by default.
+export async function initializeBeads(root) {
+  const args = ["init", "--non-interactive", "--quiet", "--skip-agents", "--skip-hooks", "--setup-exclude"];
+  const result = await exec("bd", args, { cwd: root, timeout: BD_INIT_TIMEOUT_MS }).catch(() => null);
+  if (!result || result.code === 127) throw await bdMissing();
+  if (result.code !== 0) throw bdFailed(result.stderr.trim().split("\n").pop() || "bd init failed");
 }
 
 export async function beadsTracker({ root: projectRoot, on }) {

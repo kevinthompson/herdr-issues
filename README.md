@@ -57,7 +57,7 @@ Each tracker needs credentials:
 
 - **Linear**: a personal API key in `~/.config/herdr-app/linear.json`, and the Linear MCP server in Claude Code.
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
-- **Beads**: none; it needs `bd` installed and a database made with `bd init` in the repository. The setup view doesn't offer Beads yet, so add `{ "tracker": "beads" }` as the repository's entry in `issues.json` by hand. The panel lists its issues and edits their status, priority and body, and none of it makes a git commit. The `issues:*` skills don't work Beads issues yet.
+- **Beads**: none; it needs `bd` installed and a database in the repository's main checkout, which the setup view and `/issues:config` offer to make with `bd init`. The panel lists its issues and edits their status, priority and body, and none of it makes a git commit. The `issues:*` skills don't work Beads issues yet.
 
 [Configuration](docs/configuration.md) covers creating the Linear key and every setting in `issues.json`.
 

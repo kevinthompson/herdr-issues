@@ -1,7 +1,8 @@
 // The panel's view for a repository whose issues it can't list. With no tracker, it walks through one question
 // per page, with Back at the top left and the step at the top right, as an open issue's view has its way back:
-// the tracker, GitHub Issues or Linear, which it checks (gh installed and logged in with origin on GitHub, or a
-// Linear API key that works); Linear's team; how work gets into main; for a pull request, when the work is
+// the tracker, GitHub Issues, Linear or Beads, which it checks (gh installed and logged in with origin on GitHub, a
+// Linear API key that works, or bd installed with a database in the main checkout, which it offers to make);
+// Linear's team; how work gets into main; for a pull request, when the work is
 // complete; and a review of the choices. Only Save on the review writes the repository's entry in issues.json
 // (setting.js), and the panel lists the issues. How work lands proposes the repository's current or default
 // settings. A configured tracker that fails to load with a SetupProblem (trackers/problems.js) shows the
@@ -15,13 +16,14 @@ import { openScopeMenu } from "./menu.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
 import { linearClient } from "./trackers/linear.js";
 import { checkGitHubLogin } from "./trackers/github.js";
+import { checkBeads, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./trackers/linear-team.js";
-import { originNotOnGitHub } from "./trackers/problems.js";
+import { originNotOnGitHub, BEADS_NOT_INITIALIZED } from "./trackers/problems.js";
 
 const TEAM_PICKS = "issues.setupTeams";
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
-const TRACKERS = [{ id: "github", label: "GitHub Issues" }, { id: "linear", label: "Linear" }];
+const TRACKERS = [{ id: "github", label: "GitHub Issues" }, { id: "linear", label: "Linear" }, { id: "beads", label: "Beads" }];
 const TEAM_DROPDOWN_MAX_PX = 280;
 const ANSWER_LABEL_PX = 80;
 const CONFIG_HINT = "For saved Linear views, changing how work lands later, and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
@@ -34,6 +36,9 @@ const COMPLETE_CHOICES = [
   { id: "pull-request-open", label: "Once the pull request is open", detail: "The session can finish and the worktree close while the pull request waits for review." },
   { id: "merged", label: "Once it merges", detail: "The work stays open until the pull request merges into main." },
 ];
+
+// What each tracker checks before setup moves on; Linear's check answers with the teams the key can see.
+const READINESS_CHECKS = { github: checkGitHub, linear: linearTeams, beads: checkBeads };
 
 async function checkGitHub(main) {
   await checkGitHubLogin();
@@ -108,12 +113,27 @@ export class TrackerSetup {
     forgetLookups();
     cx.spawn(async (cx) => {
       try {
-        const ready = choice === "github" ? checkGitHub(this.main) : linearTeams(this.main);
-        const [teams, proposed] = await Promise.all([ready, this.proposeLanding()]);
+        const [teams, proposed] = await Promise.all([READINESS_CHECKS[choice](this.main), this.proposeLanding()]);
         if (this.choice !== choice) return;
         Object.assign(this, { teams: teams ?? null, proposed, step: choice === "linear" ? "team" : "merge" });
       } catch (e) { if (this.choice === choice) this.problem = e; }
       finally { if (this.choice === choice) this.checking = false; cx.notify(); }
+    });
+    cx.notify();
+  }
+
+  // Makes the Beads database the check found missing, then checks again.
+  makeBeadsDatabase(cx) {
+    const choice = this.choice;
+    Object.assign(this, { checking: true, problem: null });
+    cx.spawn(async (cx) => {
+      try {
+        await initializeBeads(this.main);
+        if (this.choice === choice) this.check(cx);
+      } catch (e) {
+        if (this.choice === choice) Object.assign(this, { problem: e, checking: false });
+        cx.notify();
+      }
     });
     cx.notify();
   }
@@ -229,7 +249,8 @@ export class TrackerSetup {
     return this.question(content, "Where do this repository's issues live?", sentence, t)
       .child(this.options("tracker", TRACKERS, { chosen: this.checking ? null : this.choice, onChoose: (id, cx) => this.choose(id, cx), enabled: !this.checking }, t))
       .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Checking…")))
-      .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t)))
+      .when(!this.checking && Boolean(this.problem), (e) => e.child(this.problemView("setup-problem", this.problem ?? {}, (cx) => this.check(cx), t,
+        this.problem?.code === BEADS_NOT_INITIALIZED ? button("setup-beads-init", "Run bd init", (cx) => this.makeBeadsDatabase(cx), t) : null)))
       .child(markdown("setup-hint", CONFIG_HINT, t.dim));
   }
 
