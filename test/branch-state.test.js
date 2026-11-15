@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { describe, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { commitFile, createClonedRepository, createRepository, git, temporaryFolder } from "./support/repository.js";
+import { forgetLookups } from "../mod/lookups.js";
+import { settingsPath } from "../mod/trackers/setting.js";
 import { branchState, isMergedInto } from "../mod/worktree.js";
 
 describe("isMergedInto", () => {
@@ -116,6 +120,57 @@ describe("branchState", () => {
       const state = await branchState({ top, main: top }, null);
       assert.deepEqual(state, { branch: "feature", bases: [base], mergedInto: base, unpushed: null, pullRequest: null });
     }
+  });
+
+  describe("in a repository complete once a pull request is open", () => {
+    const PULL_REQUEST = "https://github.com/owner/name/pull/1";
+
+    // A clone whose issues.json entry merges through pull requests, with gh answering that the branch has an
+    // open one. Returns the repository and the commands run, as "git fetch …" or "gh pr …".
+    function reviewedClone(t) {
+      const commands = [];
+      stubHerdr(t, {
+        exec: (command, args, options) => {
+          commands.push([command, ...args].join(" "));
+          return command === "gh" ? Promise.resolve({ code: 0, stdout: JSON.stringify({ state: "OPEN", url: PULL_REQUEST }), stderr: "" })
+            : defaults.exec(command, args, options);
+        },
+      });
+      const { clone: top } = createClonedRepository(temporaryFolder(t));
+      mkdirSync(dirname(settingsPath()), { recursive: true });
+      writeFileSync(settingsPath(), JSON.stringify({ repos: { [top]: { tracker: "github", repo: "owner/name", merge: "pull-request" } } }));
+      forgetLookups();
+      t.after(() => { rmSync(settingsPath(), { force: true }); forgetLookups(); });
+      git(top, "switch", "-q", "-c", "feature");
+      commitFile(top, "feature.txt", "feature\n");
+      return { repo: { top, main: top }, commands };
+    }
+
+    const networkCommands = (commands) => commands.filter((command) => command.startsWith("git fetch") || command.startsWith("gh pr view"));
+
+    test("skips origin and the pull request when the local default branch holds the branch", async (t) => {
+      const { repo, commands } = reviewedClone(t);
+      git(repo.top, "switch", "-q", "main");
+      git(repo.top, "merge", "-q", "feature");
+      git(repo.top, "switch", "-q", "feature");
+      const state = await branchState(repo, null);
+      assert.deepEqual(networkCommands(commands), []);
+      assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: "main", unpushed: 1, pullRequest: null });
+    });
+
+    test("fetches origin and looks up the pull request when the local default branch lacks the branch", async (t) => {
+      const { repo, commands } = reviewedClone(t);
+      git(repo.top, "push", "-q", "origin", "feature:main");
+      const state = await branchState(repo, null);
+      assert.deepEqual(networkCommands(commands), ["git fetch -q origin main", "gh pr view feature --json state,url"]);
+      assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: "origin/main", unpushed: 0, pullRequest: PULL_REQUEST });
+    });
+
+    test("names the pull request when the branch is merged nowhere", async (t) => {
+      const { repo } = reviewedClone(t);
+      const state = await branchState(repo, null);
+      assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: null, unpushed: 1, pullRequest: PULL_REQUEST });
+    });
   });
 
   test("is null on a detached HEAD", async (t) => {

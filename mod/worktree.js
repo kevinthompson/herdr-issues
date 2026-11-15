@@ -107,26 +107,40 @@ async function completingPullRequest(repo, branch, on) {
 
 // What removing a checkout would leave unsaved on its branch: { branch, bases, mergedInto, unpushed, pullRequest },
 // or null on a detached HEAD. The work is kept once it's merged into either the local default branch
-// (repos merged locally) or origin's, fetched just now (repos merged through pull requests):
-// `bases` lists those that exist, and `mergedInto` is the first one holding the branch, else null.
-// Unpushed counts commits on no origin branch, null without origin. pullRequest is completingPullRequest's.
+// (repos merged locally) or origin's (repos merged through pull requests): `bases` lists those that exist, and
+// `mergedInto` is the first one holding the branch, else null. Only a branch the local default branch doesn't
+// hold waits on the network: origin's default branch is fetched, and pullRequest is completingPullRequest's;
+// otherwise pullRequest is null. Unpushed counts commits on no origin branch, null without origin.
 export async function branchState(repo, on) {
   const branch = (await git(repo.top, ["branch", "--show-current"], on)).out;
   if (!branch) return null;
-  const pullRequestLookup = completingPullRequest(repo, branch, on);
   const hasOrigin = (await git(repo.top, ["remote", "get-url", "origin"], on)).ok;
   let remoteBase = null;
   if (hasOrigin) {
     const head = await git(repo.top, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], on);
     remoteBase = head.ok ? head.out : "origin/main";
-    await git(repo.top, ["fetch", "-q", "origin", remoteBase.slice("origin/".length)], on);
   }
-  const localCandidates = remoteBase ? [remoteBase.slice("origin/".length)] : ["main", "master"];
-  const exists = async (ref) => (await git(repo.top, ["rev-parse", "--verify", "--quiet", ref], on)).ok;
-  const bases = [];
-  for (const base of [...localCandidates, remoteBase].filter(Boolean)) if (await exists(base)) bases.push(base);
-  const merged = await Promise.all(bases.map((base) => isMergedInto(repo, base, on)));
-  const mergedInto = bases.find((_base, index) => merged[index]) ?? null;
-  const unpushed = hasOrigin ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0 : null;
-  return { branch, bases, mergedInto, unpushed, pullRequest: await pullRequestLookup };
+  const existing = async (refs) => {
+    const found = await Promise.all(refs.map((ref) => git(repo.top, ["rev-parse", "--verify", "--quiet", ref], on)));
+    return refs.filter((_ref, index) => found[index].ok);
+  };
+  const firstHolding = async (bases) => {
+    const merged = await Promise.all(bases.map((base) => isMergedInto(repo, base, on)));
+    return bases.find((_base, index) => merged[index]) ?? null;
+  };
+  const countUnpushed = async () => hasOrigin
+    ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0 : null;
+
+  const localBases = await existing(remoteBase ? [remoteBase.slice("origin/".length)] : MAIN_BRANCHES);
+  const mergedLocally = await firstHolding(localBases);
+  if (mergedLocally) {
+    const bases = [...localBases, ...await existing(remoteBase ? [remoteBase] : [])];
+    return { branch, bases, mergedInto: mergedLocally, unpushed: await countUnpushed(), pullRequest: null };
+  }
+
+  const pullRequestLookup = completingPullRequest(repo, branch, on);
+  if (remoteBase) await git(repo.top, ["fetch", "-q", "origin", remoteBase.slice("origin/".length)], on);
+  const remoteBases = await existing(remoteBase ? [remoteBase] : []);
+  const bases = [...localBases, ...remoteBases];
+  return { branch, bases, mergedInto: await firstHolding(remoteBases), unpushed: await countUnpushed(), pullRequest: await pullRequestLookup };
 }
