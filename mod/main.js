@@ -133,12 +133,10 @@ function scopeDropdown(id, label, onClick, t) {
 }
 
 const SCOPE_DROPDOWN_MAX_PX = 260;
-const SYNC_ICON_PX = 15;
+const REFRESH_ICON_PX = 15, ALERT_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
 const SYNC_SPIN_MS = 1000;
-// A saved edit's sync icon fades out over this long, a step at a time.
-const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
 const NOT_A_REPOSITORY = "not-a-repository";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
 
@@ -170,7 +168,7 @@ export default class Issues extends View {
         const command = await nextCommand();
         if (command === "save") this.save(cx);
         else if (command === "toggle") this.toggleCollapsed();
-        else if (command === "refresh" && !this.refreshing) this.refresh(cx);
+        else if (command === "refresh" && !this.busy()) this.refreshView(cx);
         else if (command === "close-space") closeFocusedSpace(cx).catch((error) => notify({ title: "Could not close the space", body: String(error) }));
         cx.notify();
       }
@@ -671,7 +669,6 @@ export default class Issues extends View {
         if (!issue) throw new Error(`${edit.issueId} was not found`);
         await tracker.update(issue, trackerFields(edit));
         forgetEdits([id]);
-        this.fadeSyncIcon(cx);
         announceIssueChange();
       } catch (e) {
         markEditFailed(id, `Could not change the ${edit.field} of ${edit.issueId}: ${e.message ?? e}`);
@@ -680,32 +677,44 @@ export default class Issues extends View {
     });
   }
 
-  fadeSyncIcon(cx) {
-    this.syncFade?.task.cancel();
-    const started = Date.now();
-    const task = cx.timer.every(SYNC_FADE_STEP_MS, (cx) => {
-      const opacity = 1 - (Date.now() - started) / SYNC_FADE_MS;
-      if (opacity > 0) this.syncFade = { task, opacity };
-      else { task.cancel(); this.syncFade = null; }
-      cx.notify();
+  // Re-lists the issues and, with an issue open, reads that issue again in full, even when the list kept its body.
+  refreshView(cx) {
+    const issue = this.findIssue(this.openId), tracker = this.tracker;
+    this.refresh(cx);
+    if (!issue || !tracker) return;
+    this.refreshingIssue = issue.id;
+    cx.spawn(async (cx) => {
+      try {
+        const current = await tracker.get(issue.id);
+        if (!current) throw new Error(`${issue.id} was not found`);
+        if (tracker !== this.tracker) return;
+        if (this.heldIssue?.id === current.id) this.heldIssue = current;
+        this.issues = this.issues.map((each) => each.id === current.id ? current : each);
+      } catch (e) { this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`; }
+      finally { if (this.refreshingIssue === issue.id) this.refreshingIssue = null; cx.notify(); }
     });
-    this.syncFade = { task, opacity: 1 };
   }
 
-  // Syncing while edits save, then fading out; an alert while any failed, which a click dismisses.
-  syncIndicator(t) {
-    const edits = this.projectEdits(), failed = edits.filter(([, edit]) => edit.failed);
-    const icon = (name, color) => svg(`mods/issues/icons/${name}.svg`).size(SYNC_ICON_PX).text_color(color);
-    const slot = div().id("issues-sync").flex_none().size(24).flex().items_center().justify_center();
-    if (failed.length) {
-      return slot.cursor_pointer().tooltip(`${failed.map(([, edit]) => edit.failed).join("\n")}\nClick to dismiss.`)
-        .on_click((_e, cx) => { forgetEdits(failed.map(([id]) => id)); cx.notify(); })
-        .child(icon("circle-alert", t.ansi1));
-    }
-    const spinner = () => icon("loader-circle", t.dim).spin(SYNC_SPIN_MS);
-    if (edits.length) return slot.tooltip("Saving to the tracker…").child(spinner());
-    if (this.syncFade) return slot.opacity(this.syncFade.opacity).child(spinner());
-    return null;
+  // A refresh running or an edit saving.
+  busy() {
+    return Boolean(this.refreshing || this.refreshingIssue || this.projectEdits().some(([, edit]) => !edit.failed));
+  }
+
+  refreshButton(t) {
+    const busy = this.busy(), icon = svg("mods/issues/icons/rotate-cw.svg").size(REFRESH_ICON_PX);
+    return div().id("issues-refresh").flex_none().size(24).flex().items_center().justify_center().rounded(6).tooltip("Refresh")
+      .when(!busy, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => { this.refreshView(cx); cx.notify(); }))
+      .child(busy ? icon.text_color(t.dim).spin(SYNC_SPIN_MS) : icon.text_color(t.foreground));
+  }
+
+  // An alert while any edit failed to save, which a click dismisses.
+  failedEditAlert(t) {
+    const failed = this.projectEdits().filter(([, edit]) => edit.failed);
+    if (!failed.length) return null;
+    return div().id("issues-edit-failed").flex_none().size(24).flex().items_center().justify_center()
+      .cursor_pointer().tooltip(`${failed.map(([, edit]) => edit.failed).join("\n")}\nClick to dismiss.`)
+      .on_click((_e, cx) => { forgetEdits(failed.map(([id]) => id)); cx.notify(); })
+      .child(svg("mods/issues/icons/circle-alert.svg").size(ALERT_ICON_PX).text_color(t.ansi1));
   }
 
   // Starting and continuing work wait on the tracker and issues worktree, so the footer says what they're doing meanwhile.
@@ -978,12 +987,13 @@ export default class Issues extends View {
   }
 
   header(t) {
-    const syncIndicator = this.syncIndicator(t);
+    const failedEditAlert = this.failedEditAlert(t);
     return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
       .child(div().flex_none().font_semibold().child("Issues"))
       .when(Boolean(this.tracker), (e) => this.headerTitle(e, t))
       .child(div().flex_1())
-      .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
+      .when(Boolean(failedEditAlert), (e) => e.child(failedEditAlert))
+      .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)))
       .when(this.canOpenSettings(), (e) => e.child(settingsButton((cx) => this.openSettings(cx), t)))
       .child(collapseButton(() => this.toggleCollapsed(), t));
   }
@@ -1069,7 +1079,8 @@ export default class Issues extends View {
       ? (this.loadBody(issue, cx), issueDetail({
         issue, writable: this.tracker?.writable, prioritized: this.prioritized(),
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
-        syncIndicator: this.syncIndicator(t),
+        failedEditAlert: this.failedEditAlert(t),
+        refreshButton: this.refreshButton(t),
         assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
