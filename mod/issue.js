@@ -1,3 +1,6 @@
+// The statuses and priorities every tracker maps its issues onto, and the rules for grouping issues in the
+// list and for whether work on one can start or finish.
+
 export const STATUSES = ["triage", "backlog", "todo", "in-progress", "in-review", "done", "canceled"];
 export const STATUS_LABELS = { triage: "Triage", backlog: "Backlog", todo: "Todo", "in-progress": "In progress", "in-review": "In review", done: "Done", canceled: "Canceled" };
 export const PRIORITIES = ["None", "Urgent", "High", "Medium", "Low"];

@@ -1,7 +1,8 @@
 // The `herdr` module for the issues CLI (bin/issues), which runs the panel's modules in Node rather than in
 // the app. It exports every name those modules import, following the app's contract in gpui-kit.d.ts, for
 // this computer only: a call with a machine (`on`) rejects, and there are no spaces or panes until readLayout
-// reads them from the running app.
+// reads them from the running app. A module the CLI loads that imports a new name from `herdr` needs this
+// file to export it too.
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFile, rename, writeFile } from "node:fs/promises";
