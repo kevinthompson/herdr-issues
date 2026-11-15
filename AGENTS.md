@@ -20,7 +20,7 @@ Herdr loads `mod/` as the `issues` mod, and every path in this section is inside
 - `lists.js`, `avatars.js`, `file-key.js`: cached lists and avatars in the app's data folder.
 - `lookups.js`: the repository, main checkout and settings lookups kept between refreshes, forgotten when `issues.json` or `linear.json` changes.
 - `links.js`, `editor.js`, `neovim.js`: links in issue bodies and opening files in the person's editor.
-- `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and blended theme colors.
+- `location.js`, `visibility.js`, `colors.js`: the focused project, whether the panel is visible, and the colors the theme doesn't name: blends of its colors, and the shades that differ between light and dark themes.
 - `collapse.js`: collapsing the panel to a thin strip and expanding it again, by resizing the layout node that holds it.
 - `keys.json`: the mod's key bindings, which the setup script merges into Herdr's `keys.json`. `cmd-shift-w` sends `close-space`, which closes the focused space, through the worktree dialog's removal when the space shows a linked worktree. Herdr delivers a mod's commands only to a shown copy, so the key does nothing in a layout without the panel.
 - `icons/`: the panel's icons, drawn by their path in Herdr's mods folder, such as `mods/issues/icons/issues.svg`.
