@@ -14,11 +14,10 @@ import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { button, collapseButton } from "./detail.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
-import { TrackerChoice, TRACKERS, markdown } from "./tracker-choice.js";
+import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 
 const TEAM_PICKS = "issues.setupTeams";
 const ANSWER_LABEL_PX = 80;
-const CONFIG_HINT = "For saved Linear views, or GitHub issues from a repository other than origin's, run `/issues:config` in Claude instead.";
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 export const MERGE_CHOICES = [
   { id: "auto", label: "Merge automatically", detail: "The branch merges into main on this computer as soon as its work is done." },
@@ -171,8 +170,7 @@ export class TrackerSetup {
       return v_flex().size_full().min_h(0).child(header).child(content
         .child(div().font_semibold().child("Issues can't load"))
         .child(this.tracker.problemView("setup-failure", this.failure, onRetry, t,
-          button("setup-choose-another", "Choose a different tracker", (cx) => { this.choosingAnother = true; cx.notify(); }, t)))
-        .child(markdown("setup-hint", CONFIG_HINT, t.dim)));
+          button("setup-choose-another", "Choose a different tracker", (cx) => { this.choosingAnother = true; cx.notify(); }, t))));
     }
     if (!this.failure && !this.settingUp) {
       return v_flex().size_full().min_h(0).child(header).child(blankState({
@@ -220,8 +218,7 @@ export class TrackerSetup {
     const sentence = this.failure ? "Choose a different issue tracker for this repository." : "This repository has no issue tracker yet. Choose where its issues live.";
     const page = this.question(content, "Where do this repository's issues live?", sentence, t)
       .child(this.options("tracker", TRACKERS, { chosen: tracker.checking ? null : tracker.choice, onChoose: (id, cx) => tracker.choose(id, cx), enabled: !tracker.checking }, t));
-    return tracker.withCheckStatus(page, "setup-problem", t)
-      .child(markdown("setup-hint", CONFIG_HINT, t.dim));
+    return tracker.withCheckStatus(page, "setup-problem", t);
   }
 
   teamPage(content, t) {
