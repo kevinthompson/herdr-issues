@@ -17,7 +17,7 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
-  credentials <tracker>    Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
+  auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout)
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
@@ -109,7 +109,7 @@ async function renameSessionTab([issueId, ...words]) {
 }
 
 // Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
-const CREDENTIAL_CHECKS = {
+const AUTH_CHECKS = {
   linear: linearClient,
   github: checkGitHubLogin,
   beads: async () => {
@@ -118,9 +118,9 @@ const CREDENTIAL_CHECKS = {
   },
 };
 
-async function credentials([kind, ...rest]) {
-  const check = CREDENTIAL_CHECKS[kind];
-  if (!check || rest.length) throw new UsageError(`credentials needs one tracker: ${Object.keys(CREDENTIAL_CHECKS).join(", ")}`);
+async function auth([kind, ...rest]) {
+  const check = AUTH_CHECKS[kind];
+  if (!check || rest.length) throw new UsageError(`auth needs one tracker: ${Object.keys(AUTH_CHECKS).join(", ")}`);
   await check();
 }
 
@@ -154,7 +154,7 @@ async function worktree(args) {
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, setting, credentials, tab, worktree };
+const COMMANDS = { tracker, branch, "space-name": spaceName, setting, auth, tab, worktree };
 
 export async function main([command, ...args]) {
   if (command === "-h" || command === "--help") {

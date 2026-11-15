@@ -1,6 +1,6 @@
 // Issues in Linear, for repositories whose entry in issues.json names a team (setting.js) and Planning Center
-// repositories, whose team linear-team.js finds. The API key is the one secret, kept apart from issues.json in
-// ~/.config/herdr-app/linear.json: { "apiKey": "lin_api_…" }.
+// repositories, whose team linear-team.js finds. The API key is the one secret, kept in the macOS Keychain, where
+// a dotfiles repository tracking the app's folder can't commit it.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
 // default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
 // open projects are scopes too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
@@ -10,7 +10,7 @@ import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
-import { linearKeyMissing, linearKeyUnreadable, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
+import { KEYCHAIN, linearKeyMissing, linearKeyUnreadable, linearKeyUnsaved, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
 
 const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
@@ -98,40 +98,90 @@ function repoConfig(root, { team, views = {} }) {
   return { teamKey: team, path: root, views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
 }
 
+// The key file: where the key lived before the Keychain, and where it lives on a system without `security`.
 export const linearKeyPath = () => `${appHome()}/linear.json`;
+const KEY_FILE_NAME = "~/.config/herdr-app/linear.json";
 
-const cachedApiKey = cachedLookup();
-const readApiKey = () => cachedApiKey("linear.json", async () => {
+const KEYCHAIN_ITEM = ["-s", "herdr-issues", "-a", "linear"];
+const KEYCHAIN_ITEM_NOT_FOUND = 44;
+
+// Runs macOS's `security` with `args`, resolving with its result, or null where it isn't installed.
+async function security(args) {
+  const result = await exec("security", args).catch(() => null);
+  return !result || result.code === 127 ? null : result;
+}
+
+// Saves the key in the Keychain, resolving false where there's no Keychain. Herdr's exec can't pass standard
+// input, so the key is briefly in the command's arguments, visible only to processes running as the person.
+async function saveInKeychain(apiKey) {
+  const saved = await security(["add-generic-password", "-U", ...KEYCHAIN_ITEM, "-w", apiKey]);
+  if (!saved) return false;
+  if (saved.code !== 0) throw linearKeyUnsaved(saved.stderr.trim());
+  return true;
+}
+
+// The key in the Keychain, null when it holds none, or undefined where there's no Keychain.
+async function keychainKey() {
+  const found = await security(["find-generic-password", ...KEYCHAIN_ITEM, "-w"]);
+  if (!found) return undefined;
+  if (found.code === KEYCHAIN_ITEM_NOT_FOUND) return null;
+  if (found.code !== 0) throw linearKeyUnreadable(found.stderr.trim());
+  return found.stdout.trim() || null;
+}
+
+// The key file's text and fields, which are none when it's missing or isn't a JSON object.
+async function readKeyFile() {
   const text = await readTextFile(linearKeyPath()).catch(() => null);
-  if (text === null) return null;
-  try { return JSON.parse(text).apiKey ?? null; } catch { throw linearKeyUnreadable(); }
+  try {
+    const fields = JSON.parse(text ?? "{}");
+    return { text, fields: fields && typeof fields === "object" && !Array.isArray(fields) ? fields : {}, valid: true };
+  } catch { return { text, fields: {}, valid: false }; }
+}
+
+// Takes the key out of the key file, deleting the file when the key is all it holds.
+async function removeKeyFromFile({ text, fields: { apiKey, ...otherFields } }) {
+  if (apiKey === undefined) return;
+  if (!Object.keys(otherFields).length) await exec("rm", ["-f", linearKeyPath()]);
+  else await writeTextFile(linearKeyPath(), `${JSON.stringify(otherFields, null, 2)}\n`, text);
+}
+
+// Writes the key to the key file, keeping its other fields, readable only by the person.
+async function saveInKeyFile(apiKey, { text, fields }) {
+  const path = linearKeyPath();
+  await exec("mkdir", ["-p", appHome()]);
+  await writeTextFile(path, `${JSON.stringify({ ...fields, apiKey }, null, 2)}\n`, text);
+  const restricted = await exec("chmod", ["600", path]);
+  if (restricted.code !== 0) throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
+}
+
+// The key from the Keychain, after moving a key the key file still holds there, or from the key file where
+// there's no Keychain: { apiKey, store }, where store names where it's kept.
+const cachedApiKey = cachedLookup();
+const readApiKey = () => cachedApiKey("apiKey", async () => {
+  const keyFile = await readKeyFile();
+  const { apiKey: fileKey } = keyFile.fields;
+  if (fileKey && await saveInKeychain(fileKey)) await removeKeyFromFile(keyFile);
+  const apiKey = await keychainKey();
+  if (apiKey !== undefined) return { apiKey, store: KEYCHAIN };
+  if (!keyFile.valid) throw linearKeyUnreadable("it isn't valid JSON", KEY_FILE_NAME);
+  return { apiKey: fileKey ?? null, store: KEY_FILE_NAME };
 });
 
 // A function that asks Linear's API a query with the person's API key: (query, variables) → its data.
 export async function linearClient() {
-  const apiKey = await readApiKey();
-  if (!apiKey) throw linearKeyMissing();
-  return (query, variables = {}) => request(apiKey, query, variables);
+  const { apiKey, store } = await readApiKey();
+  if (!apiKey) throw linearKeyMissing(store);
+  return (query, variables = {}) => request(apiKey, query, variables, store);
 }
 
-// The fields linear.json already holds besides the key, or none when it's missing or isn't a JSON object.
-function otherKeyFileFields(text) {
-  try {
-    const fields = JSON.parse(text ?? "{}");
-    return fields && typeof fields === "object" && !Array.isArray(fields) ? fields : {};
-  } catch { return {}; }
-}
-
-// Saves the API key in linear.json once Linear accepts it, keeping the file's other fields, readable only by
-// the person. A key Linear refuses rejects and writes nothing.
+// Saves the API key in the Keychain once Linear accepts it, taking any key out of the key file so it can't
+// replace this one, or in the key file where there's no Keychain. A key Linear refuses rejects and saves nothing.
 export async function saveLinearKey(apiKey) {
   try { await request(apiKey, VIEWER, {}); }
   catch (e) { throw e.code === LINEAR_KEY_PROBLEM ? new Error("Linear refused this API key, so it wasn't saved.") : e; }
-  const path = linearKeyPath(), previous = await readTextFile(path);
-  await exec("mkdir", ["-p", appHome()]);
-  await writeTextFile(path, `${JSON.stringify({ ...otherKeyFileFields(previous), apiKey }, null, 2)}\n`, previous);
-  const restricted = await exec("chmod", ["600", path]);
-  if (restricted.code !== 0) throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
+  const keyFile = await readKeyFile();
+  if (await saveInKeychain(apiKey)) await removeKeyFromFile(keyFile);
+  else await saveInKeyFile(apiKey, keyFile);
   forgetLookups();
 }
 
@@ -169,16 +219,16 @@ export function findScope(scopes, scopeId) {
   return null;
 }
 
-async function request(apiKey, query, variables) {
+async function request(apiKey, query, variables, store = KEYCHAIN) {
   const response = await fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: apiKey },
     body: JSON.stringify({ query, variables }),
   });
-  if (response.status === 401) throw linearKeyInvalid();
+  if (response.status === 401) throw linearKeyInvalid(store);
   const json = /** @type {any} */ (JSON.parse(await response.text()));
   const error = json?.errors?.[0];
-  if (error?.extensions?.code === "AUTHENTICATION_ERROR") throw linearKeyInvalid();
+  if (error?.extensions?.code === "AUTHENTICATION_ERROR") throw linearKeyInvalid(store);
   if (error) throw new Error(error.extensions?.userPresentableMessage ?? error.message);
   if (!response.ok) throw new Error(`Linear answered ${response.status}`);
   return json.data;

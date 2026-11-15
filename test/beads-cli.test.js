@@ -35,26 +35,26 @@ function runIn(t, folder) {
   t.after(() => process.chdir(previous));
 }
 
-async function credentials(t) {
+async function auth(t) {
   const out = [];
   const err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
-  const code = await main(["credentials", "beads"]);
+  const code = await main(["auth", "beads"]);
   return { code, out: out.join("\n"), err: err.join("\n") };
 }
 
-test("credentials beads exits 0 when bd runs and the main checkout has a Beads database", async (t) => {
+test("auth beads exits 0 when bd runs and the main checkout has a Beads database", async (t) => {
   const repository = createRepository(temporaryFolder(t));
   initializeBeads(repository);
   stubBd(t);
   runIn(t, repository);
-  const { code, err } = await credentials(t);
+  const { code, err } = await auth(t);
   assert.equal(code, 0);
   assert.equal(err, "");
 });
 
-test("credentials beads checks the main checkout's database from a linked worktree", async (t) => {
+test("auth beads checks the main checkout's database from a linked worktree", async (t) => {
   const folder = temporaryFolder(t);
   const repository = createRepository(folder);
   initializeBeads(repository);
@@ -62,35 +62,35 @@ test("credentials beads checks the main checkout's database from a linked worktr
   git(repository, "worktree", "add", "-q", "-b", "feature", worktree);
   const folders = stubBd(t);
   runIn(t, worktree);
-  const { code } = await credentials(t);
+  const { code } = await auth(t);
   assert.equal(code, 0);
   assert.deepEqual(folders, [repository]);
 });
 
-test("credentials beads prints bdMissing and its fix and exits 1 when bd isn't installed", async (t) => {
+test("auth beads prints bdMissing and its fix and exits 1 when bd isn't installed", async (t) => {
   const repository = createRepository(temporaryFolder(t));
   initializeBeads(repository);
   stubBd(t, { installed: false });
   runIn(t, repository);
-  const { code, err } = await credentials(t);
+  const { code, err } = await auth(t);
   assert.equal(code, 1);
   assert.match(err, /The Beads CLI \(bd\) isn't installed/);
   assert.match(err, /Install it/);
 });
 
-test("credentials beads prints beadsNotInitialized and its fix and exits 1 without a Beads database", async (t) => {
+test("auth beads prints beadsNotInitialized and its fix and exits 1 without a Beads database", async (t) => {
   const repository = createRepository(temporaryFolder(t));
   stubBd(t);
   runIn(t, repository);
-  const { code, err } = await credentials(t);
+  const { code, err } = await auth(t);
   assert.equal(code, 1);
   assert.match(err, /This repository has no Beads database/);
   assert.match(err, /bd init/);
 });
 
-test("--help lists credentials beads", async (t) => {
+test("--help lists auth beads", async (t) => {
   const out = [];
   t.mock.method(console, "log", (line) => out.push(line));
   assert.equal(await main(["--help"]), 0);
-  assert.match(out.join("\n"), /credentials <tracker>[\s\S]*beads/);
+  assert.match(out.join("\n"), /auth <tracker>[\s\S]*beads/);
 });

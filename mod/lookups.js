@@ -1,6 +1,6 @@
 // Answers that stay put while the mod runs, such as a folder's repository or a parsed settings file, kept so
 // each panel refresh doesn't run git or read the file again. forgetLookups clears them all, for when issues.json
-// or linear.json changes or the setup view checks again.
+// or the Linear key file changes or the setup view checks again.
 const caches = [];
 
 // A function (key, lookup) that runs lookup once per key and answers its promise from then on. A lookup that
