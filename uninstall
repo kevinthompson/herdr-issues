@@ -5,8 +5,9 @@
 #   - the $HERDR_APP_HOME/mods/issues and ~/.local/bin/issues links, when they point into this checkout
 #   - the mod's keys in $HERDR_APP_HOME/keys.json still bound to the mod's actions
 #   - the issues@herdr-issues plugin and the herdr-issues marketplace
-# It asks before removing the Issues panel from personal layouts, the issues.json and linear.json settings,
-# and the cached lists and avatars; the default answer is no, and without a terminal it keeps all three.
+# It asks before removing the Issues panel from personal layouts, the issues.json settings (and linear.json,
+# where a system without the Keychain keeps the Linear API key), the Linear API key in the macOS Keychain, and
+# the cached lists and avatars; the default answer is no, and without a terminal it keeps all four.
 # Run from ~/.local/share/herdr-issues, where the install command keeps its checkout, it deletes that
 # checkout last; it leaves any other checkout in place.
 #
@@ -149,6 +150,19 @@ uninstall() {
     fi
   }
 
+  remove_keychain_key() {
+    local item=(-s herdr-issues -a linear)
+    command -v security >/dev/null || return 0
+    security find-generic-password "${item[@]}" >/dev/null 2>&1 || return 0
+    if confirm "Delete the Linear API key from the macOS Keychain?"; then
+      security delete-generic-password "${item[@]}" >/dev/null
+      printf 'Deleted the Linear API key from the macOS Keychain\n'
+      removed=1
+    else
+      kept+=("the Linear API key in the macOS Keychain; delete it with: security delete-generic-password ${item[*]}")
+    fi
+  }
+
   remove_cached_data() {
     local data_dir="$herdr_home/data/issues"
     [[ -e $data_dir ]] || return 0
@@ -167,6 +181,7 @@ uninstall() {
   remove_plugin
   remove_panel_from_layouts
   remove_settings
+  remove_keychain_key
   remove_cached_data
 
   if [[ $repo_root == "$(cd "$installed_checkout" 2>/dev/null && pwd -P)" ]]; then
