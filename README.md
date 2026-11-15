@@ -29,7 +29,7 @@ You need:
 
 - [Herdr](https://herdr.dev/), opened at least once
 - [Claude Code](https://claude.com/product/claude-code), only for the `issues:*` skills and the Claude hooks; the panel works without it
-- `git`, with access to the GitHub repository
+- `git`
 - Node.js 22.15 or later
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear
@@ -81,3 +81,7 @@ It removes the panel, the `issues` command and the Claude plugin, and asks befor
 - [Claude skills](docs/skills.md): the `issues:*` skills.
 - [Contributing](CONTRIBUTING.md): setting up for development, checking and committing a change, and recording the demo.
 - [AGENTS.md](AGENTS.md): how the repository is laid out, how to install it for development, how changes reach the running app and Claude Code, and the checks to run before committing.
+
+## License
+
+[MIT](LICENSE)

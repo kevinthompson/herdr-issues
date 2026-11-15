@@ -20,8 +20,8 @@ See [How changes reach the running app and Claude Code](AGENTS.md#how-changes-re
 ```sh
 npm test
 herdr-app check ~/.config/herdr-app/mods/issues   # in a worktree: herdr-app check "$PWD/mod"
-bash -n install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
-shellcheck install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
+bash -n bootstrap install setup uninstall scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
+shellcheck bootstrap install setup uninstall scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
 ```
 
 `shellcheck` is optional. See [Checks before committing](AGENTS.md#checks-before-committing).
@@ -29,6 +29,10 @@ shellcheck install setup scripts/demo-setup .claude/hooks/reload-mod.sh claude-p
 ## Commit conventions
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org), and each commit is one vertical slice: it does one thing end to end, so the subjects read in order explain the change. See [Conventions](AGENTS.md#conventions).
+
+## Pull requests
+
+Open a pull request against `main` from a branch of your fork. Say what the change does and why, how you checked it, and, for a change to the panel, include before-and-after screenshots.
 
 ## Recording the demo
 

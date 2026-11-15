@@ -37,11 +37,11 @@ Running it again is safe, and is how plugin changes are installed. A person who 
 
 ## Issues
 
-This repository's own issues are tracked in GitHub Issues at `kevinthompson/herdr-issues`, as its entry in `~/.config/herdr-app/issues.json` says. Work them with the `issues:*` skills, for example `/issues:work #2`; an issue's branch is `<number>-<title as a slug>`.
+This repository's own issues are tracked in GitHub Issues at `kevinthompson/herdr-issues`, so its entry in `~/.config/herdr-app/issues.json` sets `"tracker": "github"`. Work them with the `issues:*` skills, for example `/issues:work #2`; an issue's branch is `<number>-<title as a slug>`.
 
 ## Conventions
 
 - Commits follow Conventional Commits. Mod and skill changes have used the `issues` scope; recent commits name the narrower area instead, such as `skills`, `worktree`, `github` or `list`.
 - Each commit is one vertical slice: it does one thing end to end, and the subjects read in order explain the change.
 - Any model or effort the mod or its skills choose, such as `/issues:create`'s background agent's, is an `issues.json` setting with a default, checked in `mod/trackers/setting.js` and read with `issues setting <key>`; nothing hard-codes one.
-- The repository has one contributor, so a finished branch is merged into main locally, once the person approves it: its entry in `issues.json` sets `merge` to `review`.
+- Changes from contributors arrive as pull requests against `main`. The maintainer merges their own finished branches into main locally once they approve them, so the maintainer's entry in `issues.json` sets `merge` to `review`; a contributor's sets it to `pull-request`.

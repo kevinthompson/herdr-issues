@@ -4,7 +4,7 @@
 
 - Herdr (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
 - Claude Code (`claude`), only for the `issues:*` skills and the Claude hooks; without it, setup installs the panel and the `issues` command and skips the plugin with a warning, and running setup again after installing Claude Code adds it
-- `git`, with access to the GitHub repository
+- `git`
 - Node.js (`node`) 22.15 or later, for the `issues` command; setup offers to install it with Homebrew or devbox (see below)
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear; [Configuration](configuration.md#credentials) explains adding it
@@ -19,7 +19,7 @@ curl -fsSL https://raw.githubusercontent.com/kevinthompson/herdr-issues/main/boo
 
 It downloads the repository's `bootstrap` script, which clones the repository into `~/.local/share/herdr-issues` when it isn't there, then runs that checkout's `install` script, which brings it up to date with `origin/main` and runs its `setup` script. Keep the folder: Herdr loads the panel, the `issues` command and the Claude plugin from it.
 
-If `curl` can't reach the repository, for example because GitHub needs your credentials to read it, run this command instead, which clones it with `git` and does the same:
+To read the scripts before running them, clone the repository yourself and run its `install` script, which does the same:
 
 ```sh
 d="$HOME/.local/share/herdr-issues"; [ -d "$d" ] || git clone https://github.com/kevinthompson/herdr-issues.git "$d" && "$d/install"
