@@ -74,6 +74,49 @@ test("setup adds the marketplace and installs the plugin when claude is installe
   assert.doesNotMatch(result.stderr, /Claude plugin .* was skipped/);
 });
 
+// Runs setup with the marketplace already pointing at the checkout and the plugin installed, `enabled` or not,
+// and returns the claude commands it ran.
+function runSetupWithInstalledPlugin(t, { enabled }) {
+  const folder = temporaryFolder(t);
+  const checkout = createCheckout(join(folder, "clone"));
+  const home = join(folder, "home");
+  const appHome = join(home, ".config/herdr-app");
+  const bin = binWithoutClaude(folder);
+  const log = join(folder, "claude.log");
+  const marketplaces = JSON.stringify([{ name: "herdr-issues", path: checkout }]);
+  const plugins = JSON.stringify([{ id: "issues@herdr-issues", scope: "user", enabled }]);
+  writeFileSync(join(bin, "claude"), `#!/bin/sh
+echo "$*" >>"${log}"
+case "$*" in
+  "plugin marketplace list --json") echo '${marketplaces}' ;;
+  "plugin list --json") echo '${plugins}' ;;
+esac
+`, { mode: 0o755 });
+
+  const result = spawnSync(join(checkout, "setup"), {
+    encoding: "utf8",
+    input: "",
+    env: { HOME: home, HERDR_APP_HOME: appHome, PATH: [bin, "/usr/bin", "/bin"].join(":") },
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  return { commands: readFileSync(log, "utf8"), stdout: result.stdout };
+}
+
+test("setup updates an installed plugin and turns it on when it was turned off", (t) => {
+  const { commands, stdout } = runSetupWithInstalledPlugin(t, { enabled: false });
+
+  assert.match(commands, /plugin update issues@herdr-issues\n(.*\n)*plugin enable issues@herdr-issues --scope user\n/);
+  assert.match(stdout, /issues@herdr-issues plugin was turned off; turning it on/);
+});
+
+test("setup updates an installed plugin that is turned on without enabling it again", (t) => {
+  const { commands } = runSetupWithInstalledPlugin(t, { enabled: true });
+
+  assert.match(commands, /plugin update issues@herdr-issues\n/);
+  assert.doesNotMatch(commands, /plugin enable/);
+});
+
 // Answers each question setup asks on a pseudo-terminal with the next answer: a [y/N] question or a numbered
 // choice. Node has no pseudo-terminal of its own, so Python's pty module drives it.
 const answerInTerminal = `
