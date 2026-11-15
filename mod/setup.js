@@ -2,7 +2,8 @@
 // Set Up Issues button walks through one question per page, with Back at the top left and the step and Cancel,
 // which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
 // back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; how work
-// gets into main; for a pull request, when the work is complete; and a review of the choices. Only Save on the
+// gets into main; for a pull request, when the work is complete; and a review of the choices, which points to the
+// gear's settings (settings.js) for the rest. Only Save on the
 // review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. How work lands
 // proposes the repository's current or default settings. A configured tracker that fails to load with a
 // SetupProblem (trackers/problems.js) shows the problem and its fix, with Check again and a way to choose a
@@ -16,7 +17,8 @@ import { TrackerChoice, TRACKERS, markdown } from "./tracker-choice.js";
 
 const TEAM_PICKS = "issues.setupTeams";
 const ANSWER_LABEL_PX = 80;
-const CONFIG_HINT = "For saved Linear views, changing how work lands later, and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
+const CONFIG_HINT = "For saved Linear views, or GitHub issues from a repository other than origin's, run `/issues:config` in Claude instead.";
+const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 export const MERGE_CHOICES = [
   { id: "auto", label: "Merge automatically", detail: "The branch merges into main on this computer as soon as its work is done." },
   { id: "review", label: "Merge after I review", detail: "The branch merges into main on this computer once you approve it." },
@@ -239,6 +241,7 @@ export class TrackerSetup {
         .child(div().flex_1().whitespace_normal().text_color(t.foreground).child(value)))))
       .when(this.saving, (e) => e.child(div().text_size(12).text_color(t.dim).child("Saving…")))
       .when(!this.saving && Boolean(this.saveProblem), (e) => e.child(this.tracker.problemView("setup-problem", this.saveProblem ?? {}, (cx) => this.save(cx), t)))
-      .when(!this.saving && !this.saveProblem, (e) => e.child(h_flex().child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true }))));
+      .when(!this.saving && !this.saveProblem, (e) => e.child(h_flex().child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true }))))
+      .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(GEAR_HINT));
   }
 }
