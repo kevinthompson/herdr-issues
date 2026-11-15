@@ -14,13 +14,13 @@ function writeLinearKey(text) {
   writeFileSync(linearKeyPath(), text);
 }
 
-// Runs `issues credentials …`, resolving with its exit code and everything it printed.
-async function credentials(t, ...args) {
+// Runs `issues auth …`, resolving with its exit code and everything it printed.
+async function auth(t, ...args) {
   const printed = [];
   const capture = (...parts) => { printed.push(parts.join(" ")); };
   t.mock.method(console, "log", capture);
   t.mock.method(console, "error", capture);
-  const code = await main(["credentials", ...args]);
+  const code = await main(["auth", ...args]);
   return { code, output: printed.join("\n") };
 }
 
@@ -41,10 +41,10 @@ function stubGh(t, { installed = true, loggedIn = true } = {}) {
 
 beforeEach(() => forgetLookups());
 
-describe("issues credentials linear", () => {
+describe("issues auth linear", () => {
   test("passes silently when linear.json holds an API key", async (t) => {
     writeLinearKey(JSON.stringify({ apiKey: API_KEY }));
-    const { code, output } = await credentials(t, "linear");
+    const { code, output } = await auth(t, "linear");
     assert.equal(code, 0);
     assert.ok(!output.includes(API_KEY));
   });
@@ -57,7 +57,7 @@ describe("issues credentials linear", () => {
     test(`reports the missing key and its fix when ${situation}`, async (t) => {
       if (text === null) rmSync(linearKeyPath(), { force: true });
       else writeLinearKey(text);
-      const { code, output } = await credentials(t, "linear");
+      const { code, output } = await auth(t, "linear");
       assert.equal(code, 1);
       assert.match(output, /No Linear API key/);
       assert.match(output, /Settings → Account → Security & access/);
@@ -66,7 +66,7 @@ describe("issues credentials linear", () => {
 
   test("reports an unreadable file when linear.json isn't valid JSON", async (t) => {
     writeLinearKey(`{ "apiKey": "${API_KEY}"`);
-    const { code, output } = await credentials(t, "linear");
+    const { code, output } = await auth(t, "linear");
     assert.equal(code, 1);
     assert.match(output, /isn't valid JSON/);
     assert.match(output, /Settings → Account → Security & access/);
@@ -74,15 +74,15 @@ describe("issues credentials linear", () => {
   });
 });
 
-describe("issues credentials github", () => {
+describe("issues auth github", () => {
   test("passes when gh is logged in", async (t) => {
     stubGh(t);
-    assert.equal((await credentials(t, "github")).code, 0);
+    assert.equal((await auth(t, "github")).code, 0);
   });
 
   test("reports gh missing and how to install it", async (t) => {
     stubGh(t, { installed: false });
-    const { code, output } = await credentials(t, "github");
+    const { code, output } = await auth(t, "github");
     assert.equal(code, 1);
     assert.match(output, /isn't installed/);
     assert.match(output, /brew install gh/);
@@ -90,17 +90,17 @@ describe("issues credentials github", () => {
 
   test("reports gh logged out and how to log in", async (t) => {
     stubGh(t, { loggedIn: false });
-    const { code, output } = await credentials(t, "github");
+    const { code, output } = await auth(t, "github");
     assert.equal(code, 1);
     assert.match(output, /isn't logged in/);
     assert.match(output, /gh auth login/);
   });
 });
 
-describe("issues credentials usage", () => {
+describe("issues auth usage", () => {
   for (const args of [[], ["jira"], ["github", "extra"]]) {
     test(`exits with the usage status for ${JSON.stringify(args)}`, async (t) => {
-      assert.equal((await credentials(t, ...args)).code, 2);
+      assert.equal((await auth(t, ...args)).code, 2);
     });
   }
 
@@ -108,6 +108,6 @@ describe("issues credentials usage", () => {
     const printed = [];
     t.mock.method(console, "log", (text) => printed.push(text));
     await main(["--help"]);
-    assert.match(printed.join("\n"), /credentials <tracker>/);
+    assert.match(printed.join("\n"), /auth <tracker>/);
   });
 });
