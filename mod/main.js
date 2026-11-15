@@ -943,15 +943,15 @@ export default class Issues extends View {
     return labels.includes(label) ? label : null;
   }
 
-  // Each filter that narrows the list (filters.js) as its own section: a sub-heading over its dropdown.
+  // Each filter that narrows the list (filters.js) as its own row: its heading beside its dropdown.
   filterSections(labels, label, t) {
     const scope = this.tracker?.scopes ? this.currentScope() : {};
     const openMenu = { scope: openScopeMenu, label: openLabelMenu };
     return listFilters(scope, labels, label).map((filter) =>
-      v_flex().flex_none().px(14).py(8).gap(4).border_b(1).border_color(t.border)
-        .child(div().text_size(11).font_semibold().text_color(t.dim).child(filter.heading))
+      h_flex().flex_none().px(14).py(8).gap(8).items_center().border_b(1).border_color(t.border)
+        .child(div().flex_none().text_size(11).font_semibold().text_color(t.dim).child(`${filter.heading}:`))
         .child(scopeDropdown(filter.id, filter.shown, () => openMenu[filter.menu](filter.options, filter.selected, this.scopeKey), t)
-          .self_start().max_w(SCOPE_DROPDOWN_MAX_PX)));
+          .flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX)));
   }
 
   header(t) {
