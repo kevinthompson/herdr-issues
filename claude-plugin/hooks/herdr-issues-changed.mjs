@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // PostToolUse hook: after Claude creates or changes a GitHub issue with `gh issue`, merges a pull request
-// that may close one, or creates or changes a Linear issue with the Linear MCP's save_issue, touches
-// ~/.config/herdr-app/data/issues/changed, which every copy of the Herdr issues panel watches, so a remote
-// list shows the change, such as an issue closed once its branch merged, without waiting for its poll.
+// that may close one, creates or changes a Beads issue with `bd`, or creates or changes a Linear issue with
+// the Linear MCP's save_issue, touches ~/.config/herdr-app/data/issues/changed, which every copy of the
+// Herdr issues panel watches, so its list shows the change, such as an issue closed once its branch merged,
+// without waiting for its poll.
 // The plugin's hooks.json registers it for PostToolUse with the matcher "Bash|mcp__.*__save_issue". Without the
 // plugin, the same entry goes in ~/.claude/settings.json under hooks.PostToolUse:
 //   { "matcher": "Bash|mcp__.*__save_issue",
@@ -14,8 +15,13 @@ import { join } from "node:path";
 
 const GITHUB_ISSUE_CHANGE = /\bgh\s+(issue\s+(create|close|reopen|edit|delete|transfer)|pr\s+merge)\b/;
 
+const BEADS_ISSUE_CHANGE = /\bbd\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(create|update|close|reopen|dep\s+(add|remove|rm))\b/;
+
 const changedGithubIssue = ({ tool_name, tool_input }) =>
   tool_name === "Bash" && GITHUB_ISSUE_CHANGE.test(tool_input?.command ?? "");
+
+const changedBeadsIssue = ({ tool_name, tool_input }) =>
+  tool_name === "Bash" && BEADS_ISSUE_CHANGE.test(tool_input?.command ?? "");
 
 const changedLinearIssue = ({ tool_name }) => /^mcp__.*__save_issue$/.test(tool_name ?? "");
 
@@ -32,7 +38,7 @@ try {
   process.exit(0);
 }
 
-if (input && (changedGithubIssue(input) || changedLinearIssue(input))) {
+if (input && (changedGithubIssue(input) || changedBeadsIssue(input) || changedLinearIssue(input))) {
   const dataFolder = join(process.env.HERDR_APP_HOME || join(homedir(), ".config/herdr-app"), "data/issues");
   mkdirSync(dataFolder, { recursive: true });
   touch(join(dataFolder, "changed"));

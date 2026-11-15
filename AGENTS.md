@@ -60,7 +60,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 - `claude-plugin/hooks/hooks.json` registers the hooks:
   - `herdr-terminal-env.sh` (SessionStart) exports `HC_TERMINAL_ID` into the Bash tool's environment, so `issues:work` can rename the session's Herdr tab after the issue.
   - `herdr-issues-scope.mjs` (UserPromptSubmit) tells a session in a Herdr terminal which issues the panel lists and which issue it has open.
-  - `herdr-issues-changed.mjs` (PostToolUse) touches a stamp after Claude creates or changes a GitHub or Linear issue, such as closing one whose branch merged, so the panel refreshes at once.
+  - `herdr-issues-changed.mjs` (PostToolUse) touches a stamp after Claude creates or changes a GitHub, Linear or Beads issue, such as closing one whose branch merged, so the panel refreshes at once.
 
 ### Repository tooling
 
