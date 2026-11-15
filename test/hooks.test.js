@@ -18,11 +18,12 @@ test("the changed hook leaves the stamp alone after a gh command that changes no
 
   runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh issue list" } }, { HERDR_APP_HOME: appHome });
   runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh pr view 3" } }, { HERDR_APP_HOME: appHome });
+  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "bd -C /repo show notes-a1b --json" } }, { HERDR_APP_HOME: appHome });
 
   assert.equal(existsSync(changedStamp(appHome)), false);
 });
 
-for (const command of ["gh issue create --title x", "gh issue close 12 --reason completed", "gh issue edit 12 --body-file b.md", "gh pr merge 3"]) {
+for (const command of ["gh issue create --title x", "gh issue close 12 --reason completed", "gh issue edit 12 --body-file b.md", "gh pr merge 3", "bd -C \"/Users/me/My Notes\" update notes-a1b --status in_progress", "bd create --title x --json", "bd -C /repo close notes-a1b", "bd -C /repo dep add notes-b2c notes-a1b"]) {
   test(`the changed hook touches the stamp after \`${command}\``, (t) => {
     const appHome = join(temporaryFolder(t), "herdr-app");
 
