@@ -5,10 +5,10 @@
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
-import { run, props, closeOverlay, theme, spaces, panes, exec, home, updates } from "herdr";
+import { run, props, closeOverlay, theme, spaces, panes, terminals, exec, home, updates } from "herdr";
 import { branchState } from "./worktree.js";
 import { openBehindArgs } from "./open-behind.js";
-import { checksAnswered, removalFindings, removalVerdict, PASS, LOSS } from "./removal.js";
+import { checksAnswered, removalFindings, removalVerdict, runChecks, sessionComplete, PASS, LOSS } from "./removal.js";
 
 // Where a space is now: its first terminal's live folder, else where it was made.
 function place(s, all = panes()) {
@@ -180,16 +180,14 @@ export class WorktreeDialog {
     });
   }
 
-  // Runs removal's checks side by side, showing each answer as it lands.
+  // Runs removal's checks, showing each answer as it lands.
   async check(repo, cx) {
-    const answer = (name, lookup) => lookup()
-      .catch((error) => ({ error: String(error?.message ?? error) }))
-      .then((result) => { this.checks[name] = result; cx.notify(); });
-    await Promise.all([
-      answer("dirty", () => uncommitted(repo.top, this.on)),
-      answer("submodules", async () => (await submodules(repo.top, this.on)).unpushed),
-      answer("branch", () => branchState(repo, this.on)),
-    ]);
+    this.checks.complete = sessionComplete(this.space(), panes(), terminals());
+    await runChecks({
+      dirty: () => uncommitted(repo.top, this.on),
+      submodules: async () => (await submodules(repo.top, this.on)).unpushed,
+      branch: () => branchState(repo, this.on),
+    }, this.checks, (name, result) => { this.checks[name] = result; cx.notify(); });
   }
 
   // Enter removes only once every check has answered, so nobody confirms before seeing the verdict.
