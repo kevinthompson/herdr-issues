@@ -660,7 +660,7 @@ export default class Issues extends View {
           const spaceName = await this.spaceName(issue);
           const worktree = project && await worktreeFor(issue.branch, project);
           if (worktree?.space) run("space.select", { id: worktree.space.id });
-          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...await workIssueSession(issue) });
+          else if (worktree) run("space.new", { name: spaceName, folder: worktree.path, machine: worktree.on, ...await workIssueSession(issue, project) });
           else await this.openWorktreeDialog(issue, spaceName);
         }
       } catch (e) { this.detailError = `Could not continue: ${e.message ?? e}`; }
@@ -689,7 +689,7 @@ export default class Issues extends View {
 
   async openWorktreeDialog(issue, spaceName) {
     const project = this.project;
-    const session = await workIssueSession(issue);
+    const session = await workIssueSession(issue, project);
     openOverlay({
       mod: "issues", kind: "dialog", width: 440, height: 260,
       props: {

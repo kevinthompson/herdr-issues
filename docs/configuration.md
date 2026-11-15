@@ -122,3 +122,21 @@ How often the panel asks the tracker for its list of issues, in whole seconds, 1
 ```
 
 `issues setting createModel` and `issues setting createEffort` print a repository's settings, with their defaults applied, and `/issues:config` shows and changes them.
+
+### `workModel` and `workEffort`
+
+The panel's Start and Continue, and `/issues:start` through `issues worktree --claude`, open a Claude session that works the issue. These two settings choose that session's model and effort, at the top level or in a repository's entry, which overrides the top level's. Without them, the session runs on your own Claude Code model and effort.
+
+- `workModel`: a model alias such as `sonnet`, `opus` or `haiku`, a model's full name, or `inherit` (the default) for your own model. It's passed to `claude --model`.
+- `workEffort`: `low`, `medium`, `high`, `xhigh` or `max`, or `default` (the default) for your own effort. It's passed to `claude --effort`.
+
+```json
+{
+  "workEffort": "high",
+  "repos": {
+    "~/Code/notes": { "tracker": "beads", "workModel": "sonnet" }
+  }
+}
+```
+
+`issues setting workModel` and `issues setting workEffort` print a repository's settings, with their defaults applied, and `/issues:config` shows and changes them. A change applies to sessions started after it.
