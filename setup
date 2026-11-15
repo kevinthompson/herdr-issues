@@ -210,12 +210,18 @@ link_cli() {
   esac
 }
 
+# bootstrap gives setup a standard input opened from /dev/tty, which macOS's kqueue rejects, and the
+# claude binary crashes trying to watch it; its plugin commands never read input.
+claude_plugin() {
+  claude plugin "$@" </dev/null
+}
+
 marketplace_path() {
-  claude plugin marketplace list --json | node "$setup_json" marketplace-path "$marketplace"
+  claude_plugin marketplace list --json | node "$setup_json" marketplace-path "$marketplace"
 }
 
 plugin_installed() {
-  claude plugin list --json | node "$setup_json" plugin-installed "$plugin"
+  claude_plugin list --json | node "$setup_json" plugin-installed "$plugin"
 }
 
 install_plugin() {
@@ -228,20 +234,20 @@ install_plugin() {
   registered_path=$(marketplace_path)
   if [[ -n $registered_path && $registered_path != "$repo_root" ]]; then
     info "The $marketplace marketplace points to $registered_path; pointing it to $repo_root"
-    claude plugin marketplace remove "$marketplace"
+    claude_plugin marketplace remove "$marketplace"
     registered_path=""
   fi
 
   if [[ -z $registered_path ]]; then
-    claude plugin marketplace add "$repo_root"
+    claude_plugin marketplace add "$repo_root"
   else
-    claude plugin marketplace update "$marketplace"
+    claude_plugin marketplace update "$marketplace"
   fi
 
   if plugin_installed; then
-    claude plugin update "$plugin"
+    claude_plugin update "$plugin"
   else
-    claude plugin install "$plugin"
+    claude_plugin install "$plugin"
   fi
 }
 
