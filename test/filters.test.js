@@ -31,3 +31,24 @@ test("a picked milestone and label are shown and selected", () => {
   assert.deepEqual({ shown: labels.shown, menu: labels.menu, options: labels.options, selected: labels.selected },
     { shown: "bug", menu: "label", options: ["bug"], selected: "bug" });
 });
+
+const scopes = [{ id: "mine", label: "My issues" }, { id: "triage", label: "Triage" }, project];
+
+test("a tracker without scopes shows no View filter", () => {
+  assert.deepEqual(listFilters({ project }, ["bug"], null).map(({ heading }) => heading), ["Milestone", "Label"]);
+});
+
+test("a tracker with scopes shows View first, then Milestone and Label", () => {
+  const filters = listFilters({ scopes, scope: scopes[1], project: null, milestone: null }, ["bug"], null);
+  assert.deepEqual(filters.map(({ heading }) => heading), ["View", "Label"]);
+  const [view] = filters;
+  assert.deepEqual(view, { id: "issues-scope", heading: "View", shown: "Triage", menu: "scope", options: scopes, selected: "triage" });
+  assert.deepEqual(listFilters({ scopes, scope: scopes[0], project, milestone: null }, ["bug"], null).map(({ heading }) => heading),
+    ["View", "Milestone", "Label"]);
+});
+
+test("the View filter shows and selects a milestone's project", () => {
+  const [view] = listFilters({ scopes, scope: scopes[0], project, milestone: project.milestones[0] }, [], null);
+  assert.equal(view.shown, "Checkout");
+  assert.equal(view.selected, "p1");
+});

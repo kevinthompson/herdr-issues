@@ -923,13 +923,8 @@ export default class Issues extends View {
     return findScope(scopes, this.listedScope) ?? { scope: scopes[0], project: null, milestone: null };
   }
 
-  // The tracker's repository or name, or a dropdown of the scopes it can list, showing the one listed now: a
-  // milestone shows its project, and the milestone filter below narrows it.
   trackerLabel(t) {
-    const { scopes } = this.tracker;
-    if (!scopes) return div().min_w(0).truncate().text_color(t.dim).child(trackerTitle(this.tracker));
-    const { scope, project } = this.currentScope(), shown = project ?? scope;
-    return scopeDropdown("issues-scope", shown.label, () => openScopeMenu(scopes, shown.id, this.scopeKey), t).flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX);
+    return div().min_w(0).truncate().text_color(t.dim).child(trackerTitle(this.tracker));
   }
 
   // Every label on the listed issues, by name.
@@ -945,9 +940,10 @@ export default class Issues extends View {
 
   // Each filter that narrows the list (filters.js) as its own row: its heading beside its dropdown.
   filterSections(labels, label, t) {
-    const scope = this.tracker?.scopes ? this.currentScope() : {};
+    const { scopes } = this.tracker ?? {};
+    const listed = scopes ? { scopes, ...this.currentScope() } : {};
     const openMenu = { scope: openScopeMenu, label: openLabelMenu };
-    return listFilters(scope, labels, label).map((filter) =>
+    return listFilters(listed, labels, label).map((filter) =>
       h_flex().flex_none().px(14).py(8).gap(8).items_center().border_b(1).border_color(t.border)
         .child(div().flex_none().text_size(11).font_semibold().text_color(t.dim).child(`${filter.heading}:`))
         .child(scopeDropdown(filter.id, filter.shown, () => openMenu[filter.menu](filter.options, filter.selected, this.scopeKey), t)

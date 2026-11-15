@@ -1,10 +1,15 @@
-// The filters that narrow the panel's list, each shown as its own section under the header: a project's
-// milestones, when the listed project has any, and the labels the listed issues carry, when they carry any.
-// Each is { id, heading, shown, menu, options, selected }: menu "scope" opens openScopeMenu with options as
-// scopes, and menu "label" opens openLabelMenu with options as label names (menu.js).
+// The filters that narrow the panel's list, each shown as its own row under the header: the scope listed,
+// for a tracker with scopes, a project's milestones, when the listed project has any, and the labels the
+// listed issues carry, when they carry any. Each is { id, heading, shown, menu, options, selected }: menu
+// "scope" opens openScopeMenu with options as scopes, and menu "label" opens openLabelMenu with options as
+// label names (menu.js).
 
-export function listFilters({ project, milestone } = {}, labels, label) {
+export function listFilters({ scopes, scope, project, milestone } = {}, labels, label) {
   const filters = [];
+  if (scopes) {
+    const listed = project ?? scope;
+    filters.push({ id: "issues-scope", heading: "View", shown: listed.label, menu: "scope", options: scopes, selected: listed.id });
+  }
   if (project?.milestones.length) {
     const allMilestones = { id: project.id, label: "All milestones" };
     filters.push({
