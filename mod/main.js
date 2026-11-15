@@ -7,13 +7,14 @@
 // issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge lands a
 // finished branch in main (merge.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
-// can't load, shows the setup view (setup.js) in place of the list. The issues.toggle key command and the
+// can't load, shows the setup view (setup.js) in place of the list, and a folder outside a git repository
+// shows a button that initializes one there. The issues.toggle key command and the
 // strip's button collapse the panel to a thin strip and expand it again (collapse.js). The list polls its
 // tracker, and the issues.refresh key command fetches it at once.
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState, ScrollHandle } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, spaces, focused, notify, exec, run, watchFolder, appHome, updates } from "herdr";
-import { location, repositoryRoot, mainCheckout } from "./location.js";
+import { location, repositoryRoot, mainCheckout, initializeRepository } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
 import { findScope, linearKeyPath } from "./trackers/linear.js";
@@ -36,7 +37,7 @@ import { WorktreeDialog } from "./worktree-dialog.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
-import { TrackerSetup, untrackableView } from "./setup.js";
+import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
@@ -104,7 +105,7 @@ const STATUS_ICON_PX = 14;
 const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
-const NOT_A_REPOSITORY = "The issues panel tracks issues for git repositories, and this folder isn't in one.";
+const NOT_A_REPOSITORY = "not-a-repository";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
 
 // issues worktree sets up new checkouts, which can take minutes in a box app.
@@ -214,7 +215,19 @@ export default class Issues extends View {
 
   showUntrackable(where, context) {
     this.forgetList(); this.closeIssue();
-    Object.assign(this, { setup: null, error: null, resolvedContext: context, untrackable: where.on == null ? NOT_A_REPOSITORY : ON_ANOTHER_MACHINE });
+    if (this.untrackedFolder !== where.cwd) this.initializeError = null;
+    Object.assign(this, { setup: null, error: null, resolvedContext: context, untrackable: where.on == null ? NOT_A_REPOSITORY : ON_ANOTHER_MACHINE, untrackedFolder: where.cwd });
+  }
+
+  // Runs git init in the folder outside a repository, then lists it, which leads into choosing a tracker.
+  initializeUntrackedFolder(cx) {
+    const folder = this.untrackedFolder;
+    this.initializing = true; this.initializeError = null; cx.notify();
+    cx.spawn(async (cx) => {
+      try { await initializeRepository(folder); this.refresh(cx); }
+      catch (e) { this.initializeError = e.message; }
+      finally { this.initializing = false; cx.notify(); }
+    });
   }
 
   // A space shown before shows its last list at once, while the lookups that confirm it run again.
@@ -859,6 +872,9 @@ export default class Issues extends View {
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
   list(t) {
+    if (this.untrackable === NOT_A_REPOSITORY) {
+      return this.listFrame(notARepositoryView({ initializing: this.initializing, error: this.initializeError, onInitialize: (cx) => this.initializeUntrackedFolder(cx) }, t), t);
+    }
     if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
     if (this.setup) {
       return this.setup.render(t, {
