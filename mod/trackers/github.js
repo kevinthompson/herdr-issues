@@ -15,6 +15,7 @@ const MAX_PAGES = 20;
 const RECENTLY_CLOSED = 20;
 const BLOCKERS = 20;
 const BRANCH_SLUG_LENGTH = 50;
+const MAX_LABELS = 200;
 
 const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateReason milestone { dueOn }
   labels(first: 20) { nodes { name color } }
@@ -206,6 +207,9 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     },
     deferred: () => ["done", "canceled"],
     get,
+    async labels() {
+      return JSON.parse(await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)])).map((label) => label.name);
+    },
     // A new body only saves over the body `issue` was read with, so edits made on GitHub meanwhile are
     // never overwritten. Priority and order have nowhere to go.
     async update(issue, { status, body }) {

@@ -13,6 +13,8 @@
 //                                 it has only one
 //   tracker.list(scopeId)       → Issue[] in that scope, or the default one
 //   tracker.get(id)             → Issue, or null
+//   tracker.labels()            → the names of the labels new issues can take, for GitHub; Linear's come from
+//                                 its MCP server, and Beads has none to choose from
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
 //   tracker.start(issue)        → marks the issue in progress

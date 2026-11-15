@@ -21,6 +21,9 @@ Commands:
                            pollSeconds, createModel or createEffort
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
+  context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
+                           credentials as auth does, its labels (GitHub's; null elsewhere) and up to 10 of its listed
+                           issues whose titles share the most words with <words>
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   worktree <id> [--name <space name>] [--claude <first message>]
@@ -128,6 +131,28 @@ async function auth([kind, ...rest]) {
   await check();
 }
 
+const MAX_SIMILAR_ISSUES = 10;
+const MIN_MATCHED_WORD_LENGTH = 4;
+const titleWords = (text) => new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= MIN_MATCHED_WORD_LENGTH));
+
+function similarIssues(issues, searchWords) {
+  const wanted = titleWords(searchWords.join(" "));
+  return issues
+    .map((issue) => ({ issue, shared: [...titleWords(issue.title)].filter((word) => wanted.has(word)).length }))
+    .filter(({ shared }) => shared > 0)
+    .sort((a, b) => b.shared - a.shared)
+    .slice(0, MAX_SIMILAR_ISSUES)
+    .map(({ issue: { id, title, status } }) => ({ id, title, status }));
+}
+
+async function context(searchWords) {
+  const tracker = await currentTracker();
+  await AUTH_CHECKS[tracker.kind]();
+  const [labels, issues] = await Promise.all([tracker.labels?.() ?? null, tracker.list()]);
+  const { kind, name, team = null, repo = null } = tracker;
+  console.log(JSON.stringify({ tracker: { kind, name, team, repo }, labels, similarIssues: similarIssues(issues, searchWords) }));
+}
+
 function worktreeOptions(args) {
   const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
   const valueAfter = (index) => {
@@ -169,7 +194,7 @@ async function merge(args) {
   }
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, setting, auth, tab, worktree, merge };
+const COMMANDS = { tracker, branch, "space-name": spaceName, setting, auth, context, tab, worktree, merge };
 
 const HELP_FLAGS = ["-h", "--help"];
 
