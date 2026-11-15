@@ -29,7 +29,8 @@
 // or effort the mod or its skills choose is a setting like these, with a default.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
-// view (setup.js) writes an entry too, with saveSetupChoices.
+// view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
+// merge and complete with saveMergeSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -198,5 +199,26 @@ export async function saveSetupChoices(main, setting) {
   await changeEntry(main, (entry) => {
     const kept = Object.fromEntries(Object.entries(entry ?? {}).filter(([name]) => !SETUP_KEYS.includes(name)));
     return { ...setting, ...kept };
+  });
+}
+
+function checkMergeChoice(merge, complete) {
+  if (!MERGES.includes(merge)) throw badMergeSetting(`merge must be one of ${MERGES.join(", ")}`);
+  if (complete != null && !COMPLETES.includes(complete)) throw badMergeSetting(`complete must be one of ${COMPLETES.join(", ")}`);
+  if (complete === "pull-request-open" && merge !== "pull-request") {
+    throw badMergeSetting(`Work that merges with ${merge} is complete only once merged`);
+  }
+}
+
+// Sets how the repository whose main checkout is `main` lands its work: `merge`, and `complete`, which null
+// removes so its default applies. It changes only those two keys of the repository's existing entry, and
+// writes nothing for a combination trackerSetting would refuse or a repository without an entry.
+export async function saveMergeSettings(main, { merge, complete = null }) {
+  checkMergeChoice(merge, complete);
+  await changeEntry(main, (entry) => {
+    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
+    const changed = { ...entry, merge, complete };
+    if (complete == null) delete changed.complete;
+    return changed;
   });
 }
