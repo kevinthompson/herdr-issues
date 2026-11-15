@@ -15,6 +15,12 @@ export function location() {
 const cachedRoot = cachedLookup((root) => root !== null);
 const cachedMainCheckout = cachedLookup((main) => main !== null);
 
+// Makes `folder` on this computer a git repository, throwing git's last error line when it can't.
+export async function initializeRepository(folder) {
+  const result = await exec("git", ["init"], { cwd: folder }).catch((e) => ({ code: 1, stderr: e.message ?? "" }));
+  if (result.code !== 0) throw new Error(result.stderr.trim().split("\n").pop() || "git init failed");
+}
+
 // The git repository's top folder, or null outside a repository.
 export function repositoryRoot({ cwd, on }) {
   return cachedRoot(`${on}\n${cwd}`, async () => {
