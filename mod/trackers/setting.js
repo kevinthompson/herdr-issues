@@ -30,7 +30,7 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// merge and complete with saveMergeSettings.
+// tracker with saveTrackerChoice and its merge and complete with saveMergeSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -199,6 +199,21 @@ export async function saveSetupChoices(main, setting) {
   await changeEntry(main, (entry) => {
     const kept = Object.fromEntries(Object.entries(entry ?? {}).filter(([name]) => !SETUP_KEYS.includes(name)));
     return { ...setting, ...kept };
+  });
+}
+
+const TRACKER_KEYS = ["tracker", "team", "repo"];
+
+// Makes `tracker` the issue source of the repository whose main checkout is `main`: Linear with its `team`, GitHub
+// Issues with an optional `repo`, or Beads. It replaces only those three keys, so a key the new tracker doesn't
+// take, such as Linear's team when switching to Beads, goes, and keeps the entry's other keys.
+export async function saveTrackerChoice(main, { tracker, team = null, repo = null }) {
+  if (!TRACKERS.includes(tracker)) throw badSetting(`tracker must be one of ${TRACKERS.join(", ")}`);
+  if (tracker === "linear" && !team) throw badSetting("Linear needs a team's key");
+  const chosen = { tracker, ...(tracker === "linear" && { team }), ...(tracker === "github" && repo && { repo }) };
+  await changeEntry(main, (entry) => {
+    const kept = Object.fromEntries(Object.entries(entry ?? {}).filter(([name]) => !TRACKER_KEYS.includes(name)));
+    return { ...chosen, ...kept };
   });
 }
 
