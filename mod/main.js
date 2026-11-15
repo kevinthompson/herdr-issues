@@ -24,7 +24,7 @@ import { offeredUpdate, dismissUpdate, installTab, finishedUpdate } from "./upda
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { listedScopeName } from "./listed-scope.js";
+import { listedScopeName, trackerTitle } from "./listed-scope.js";
 import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
@@ -922,11 +922,11 @@ export default class Issues extends View {
     return findScope(scopes, this.listedScope) ?? { scope: scopes[0], project: null, milestone: null };
   }
 
-  // The tracker's name, or a dropdown of the scopes it can list, showing the one listed now: a milestone
-  // shows its project, and the filter bar below narrows it.
+  // The tracker's repository or name, or a dropdown of the scopes it can list, showing the one listed now: a
+  // milestone shows its project, and the milestone filter below narrows it.
   trackerLabel(t) {
-    const { scopes, name } = this.tracker;
-    if (!scopes) return div().flex_none().text_color(t.dim).child(name);
+    const { scopes } = this.tracker;
+    if (!scopes) return div().min_w(0).truncate().text_color(t.dim).child(trackerTitle(this.tracker));
     const { scope, project } = this.currentScope(), shown = project ?? scope;
     return scopeDropdown("issues-scope", shown.label, () => openScopeMenu(scopes, shown.id, this.scopeKey), t).flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX);
   }
