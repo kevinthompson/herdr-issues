@@ -12,7 +12,7 @@ import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, editIssueBody, setIssueStatus, startIssue } from "./change.js";
-import { completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameTab, sessionTab } from "./tab.js";
+import { clearCloseRequest, completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
 
@@ -41,6 +41,7 @@ Commands:
                            name with ✅, even a name the person chose, once
   close <id>               Ask the issues panel to close the session's space once $HC_TERMINAL_ID is idle: label it
                            issues.close=<id>; the panel removes the worktree without asking only when every check passes
+  close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -178,9 +179,18 @@ async function complete([issueId]) {
 }
 
 async function close(args) {
-  if (args.length !== 1 || args[0].startsWith("-")) throw new UsageError("close needs one issue ID");
+  const cancel = args[0] === "--cancel";
+  const [issueId, ...rest] = cancel ? args.slice(1) : args;
+  if (!issueId || rest.length || issueId.startsWith("-")) {
+    throw new UsageError(cancel ? "close --cancel needs one issue ID" : "close needs one issue ID");
+  }
   const tab = await sessionTab();
-  await labelCloseRequest(tab, args[0]);
+  if (cancel) {
+    await clearCloseRequest(tab);
+    console.log(`Withdrew the request to close ${issueId}'s space; the worktree stays open`);
+    return;
+  }
+  await labelCloseRequest(tab, issueId);
   console.log("Asked the issues panel to close the space once this session is idle; if it stays open, press cmd+shift+w");
 }
 
