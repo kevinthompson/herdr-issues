@@ -11,7 +11,7 @@ import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herd
 import { requestFieldEdit } from "./edits.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
 
-const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 16;
+const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 16, ICON_GAP = 6, CHECK_GAP = 9;
 // The theme's text color at this opacity, so the band follows light and dark themes.
 const HEADING_TINT_ALPHA = "0a";
 const headingTint = (t) => (/^#[0-9a-f]{6}$/i.test(t.foreground) ? t.foreground + HEADING_TINT_ALPHA : "transparent");
@@ -46,11 +46,11 @@ function optionList(options, current, onPick) {
       : option.subheading
       ? div().id(`subheading-${option.subheading}`).h(ROW).px(PADDING + TEXT_INSET).flex_none().flex().items_end().pb(4)
         .text_size(11).text_color(t.dim).child(option.subheading)
-      : h_flex().id(`option-${option.value}`).h(ROW).mx(PADDING).px(TEXT_INSET).gap(9).flex_none().items_center()
+      : h_flex().id(`option-${option.value}`).h(ROW).mx(PADDING).px(TEXT_INSET).gap(ICON_GAP).flex_none().items_center()
       .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
       .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
       .child(div().flex_1().truncate().child(option.label))
-      .child(div().flex_none().text_color(t.muted).child(option.value === current ? "✓" : ""))));
+      .child(div().flex_none().ml(CHECK_GAP - ICON_GAP).text_color(t.muted).child(option.value === current ? "✓" : ""))));
 }
 
 // The scope each repository lists, and the label it narrows the list to, by its main checkout:
