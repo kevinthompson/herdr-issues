@@ -16,7 +16,8 @@
 #     opens with, or says how to switch
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues, refusing to replace a file there that isn't a link
 # It refuses in a linked worktree, whose folder goes away when the worktree closes.
-# Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
+# Running it again re-links the mod and the CLI and updates the plugin to this checkout's version, turning it
+# back on if it was turned off.
 #
 # Needs herdr-app, git and node 22.15 or later, which it offers to install with devbox or Homebrew. Claude Code
 # (claude) is needed only for the issues:* skills and hooks, and gh only for repositories tracked in GitHub Issues.
@@ -226,6 +227,10 @@ plugin_installed() {
   claude_plugin list --json | node "$setup_json" plugin-installed "$plugin"
 }
 
+plugin_enabled() {
+  claude_plugin list --json | node "$setup_json" plugin-enabled "$plugin"
+}
+
 install_plugin() {
   if ! command -v claude >/dev/null; then
     warning "setup: warning: claude is not installed, so the Claude plugin with the issues:* skills and hooks was skipped; install Claude Code and run setup again to add it"
@@ -248,6 +253,10 @@ install_plugin() {
 
   if plugin_installed; then
     claude_plugin update "$plugin"
+    if ! plugin_enabled; then
+      info "The $plugin plugin was turned off; turning it on"
+      claude_plugin enable "$plugin" --scope user
+    fi
   else
     claude_plugin install "$plugin"
   fi

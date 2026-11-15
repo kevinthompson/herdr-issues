@@ -239,14 +239,17 @@ test("shipped-layouts lists the layouts in installed.json, and nothing without i
   assert.equal(run(["shipped-layouts", join(folder, "missing.json")]).stdout, "");
 });
 
-test("marketplace-path and plugin-installed read Claude's JSON listings", () => {
+test("marketplace-path, plugin-installed and plugin-enabled read Claude's JSON listings", () => {
   const marketplaces = JSON.stringify([{ name: "other", path: "/x" }, { name: "herdr-issues", installLocation: "/repo" }]);
   assert.equal(run(["marketplace-path", "herdr-issues"], marketplaces).stdout, "/repo\n");
   assert.equal(run(["marketplace-path", "missing"], marketplaces).stdout, "");
 
-  const plugins = JSON.stringify([{ id: "issues@herdr-issues" }]);
+  const plugins = JSON.stringify([{ id: "issues@herdr-issues", enabled: false }, { id: "other@herdr-issues", enabled: true }]);
   assert.equal(run(["plugin-installed", "issues@herdr-issues"], plugins).status, 0);
-  assert.equal(run(["plugin-installed", "other@herdr-issues"], plugins).status, 1);
+  assert.equal(run(["plugin-installed", "missing@herdr-issues"], plugins).status, 1);
+  assert.equal(run(["plugin-enabled", "issues@herdr-issues"], plugins).status, 1);
+  assert.equal(run(["plugin-enabled", "other@herdr-issues"], plugins).status, 0);
+  assert.equal(run(["plugin-enabled", "missing@herdr-issues"], plugins).status, 1);
 });
 
 test("window-layout prints the layout in `herdr-app status`, and nothing when no window reported one", () => {

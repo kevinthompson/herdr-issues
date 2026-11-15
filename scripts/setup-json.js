@@ -3,6 +3,7 @@
 //
 //   marketplace-path <name>           prints the path of the named marketplace in `claude plugin marketplace list --json` on stdin
 //   plugin-installed <id>             succeeds when `claude plugin list --json` on stdin lists the plugin
+//   plugin-enabled <id>               succeeds when `claude plugin list --json` on stdin lists the plugin as enabled
 //   merge-keys <keys.json> <mod keys> adds each mod key the person hasn't bound, printing one line per key kept;
 //                                     exits 0 after adding keys and 10 when the file already had them
 //   unmerge-keys <keys.json> <mod keys>
@@ -206,6 +207,7 @@ const commands = {
     if (path) console.log(path);
   },
   "plugin-installed": (id) => (readStdinJson().some((plugin) => plugin.id === id) ? 0 : 1),
+  "plugin-enabled": (id) => (readStdinJson().some((plugin) => plugin.id === id && plugin.enabled) ? 0 : 1),
   "merge-keys": (keysPath, modKeysPath) => {
     const mine = readJson(keysPath);
     const { merged, kept } = mergeKeys(mine, readJson(modKeysPath));
