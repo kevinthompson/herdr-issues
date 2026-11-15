@@ -38,7 +38,8 @@ import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
-import { WorktreeDialog, openRemovalDialog } from "./worktree-dialog.js";
+import { WorktreeDialog } from "./worktree-dialog.js";
+import { closeWorktreeSpace } from "./worktree-removal.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
@@ -76,13 +77,13 @@ const ID_CHARACTER_PX = 7;
 const ACTION_COLUMN_PX = 32;
 const contextKey = () => JSON.stringify(location());
 
-// Closes the focused space, through the remove-worktree dialog when it shows a linked worktree, so
-// the checkout goes with it once the dialog has checked for unsaved work.
-async function closeFocusedSpace() {
+// Closes the focused space, removing the checkout with it when it shows a linked worktree once removal's checks
+// pass, and asking through the remove-worktree dialog when they don't.
+async function closeFocusedSpace(cx) {
   const space = spaces().find((candidate) => candidate.id === focused()?.space);
   if (!space) return;
   if (await isLinkedWorktree(focused()?.cwd ?? space.folder, space.machine)) {
-    openRemovalDialog(space.id);
+    await closeWorktreeSpace(space.id, { sleep: (ms) => cx.sleep(ms) });
   } else {
     run("space.close", { id: space.id });
   }
@@ -92,13 +93,14 @@ async function closeFocusedSpace() {
 // second dialog.
 const closingTerminals = new Set();
 
-// Opens the removal dialog for each finished session that asked with `issues close` and is now idle.
-function closeFinishedSessions() {
+// Closes the space of each finished session that asked with `issues close` and is now idle, removing its worktree.
+function closeFinishedSessions(cx) {
   for (const request of readyCloseRequests(terminals(), spaces(), panes())) {
     if (closingTerminals.has(request.terminal)) continue;
     closingTerminals.add(request.terminal);
     hc(["label", request.terminal, `${CLOSE_LABEL}=`]).catch(() => {}).finally(() => closingTerminals.delete(request.terminal));
-    openRemovalDialog(request.space, { ask: request.ask });
+    closeWorktreeSpace(request.space, { ask: request.ask, sleep: (ms) => cx.sleep(ms) })
+      .catch((error) => notify({ title: "Could not remove the worktree", body: String(error) }));
   }
 }
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
@@ -160,7 +162,7 @@ export default class Issues extends View {
     this.update = null; this.updated = false; this.updateCheckedAt = null; this.updateCheckMs = DEFAULT_UPDATE_CHECK_HOURS * HOUR_MS;
     this.checkForUpdate(cx);
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
-    cx.timer.every(CLOSE_REQUEST_CHECK_MS, () => closeFinishedSessions());
+    cx.timer.every(CLOSE_REQUEST_CHECK_MS, (cx) => closeFinishedSessions(cx));
     // Herdr delivers a mod's commands only to a shown copy, so the keys in keys.json, such as cmd-shift-w's
     // close-space, do nothing in a layout without the panel.
     cx.spawn(async (cx) => {
@@ -169,7 +171,7 @@ export default class Issues extends View {
         if (command === "save") this.save(cx);
         else if (command === "toggle") this.toggleCollapsed();
         else if (command === "refresh" && !this.refreshing) this.refresh(cx);
-        else if (command === "close-space") closeFocusedSpace().catch((error) => notify({ title: "Could not close the space", body: String(error) }));
+        else if (command === "close-space") closeFocusedSpace(cx).catch((error) => notify({ title: "Could not close the space", body: String(error) }));
         cx.notify();
       }
     });
@@ -733,7 +735,7 @@ export default class Issues extends View {
   }
 
   // Merges the issue's branch into main and marks it done, through the same module as `issues merge`, then removes
-  // its worktree and closes the space showing it through the removal dialog, which asks first only when a check fails.
+  // its worktree and closes the space showing it, through the removal dialog only when a check fails.
   mergeBranch(issue, cx) {
     const tracker = this.tracker, project = this.project;
     this.detailError = null;
@@ -743,7 +745,8 @@ export default class Issues extends View {
       try {
         await mergeIssue(issue, tracker, project);
         const space = worktreeSpace(this.repository, issue.branch);
-        if (space) openRemovalDialog(space.id);
+        if (space) closeWorktreeSpace(space.id, { sleep: (ms) => cx.sleep(ms) })
+          .catch((error) => notify({ title: "Could not remove the worktree", body: String(error) }));
       } catch (e) { this.detailError = e instanceof MergeRefusal ? e.message : `Could not merge: ${e.message ?? e}`; }
       this.opening = null;
       this.refresh(cx);
