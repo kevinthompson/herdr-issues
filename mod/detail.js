@@ -6,20 +6,18 @@ import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
-import { DUE_COLORS, statusTints, fieldBar, isLightTheme } from "./colors.js";
+import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
 
 const STATUS_ICON_PX = 14;
 
-// The status dropdown takes the status's color, as the list's status headers do.
+// The status dropdown is colored only by its status's icon.
 function dropdown(field, label, { issue, writable, onMenu }, t) {
   const icon = field === "status" ? statusIcon(issue.status) : null;
-  const tints = field === "status" ? statusTints(issue.status, t) : null;
-  const { fill, border, hover: hoverFill } = tints ?? { fill: t.raised, border: t.border, hover: t.hover };
   return h_flex().gap(6).items_center().text_size(11)
     .child(div().text_color(t.dim).child(label))
-    .child(h_flex().id(`field-${field}`).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(border)
-      .text_color(t.foreground).bg(fill)
-      .when(writable, (e) => e.cursor_pointer().hover((s) => s.bg(hoverFill)).on_click((_e, cx) => onMenu(field, cx)))
+    .child(h_flex().id(`field-${field}`).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
+      .text_color(t.foreground).bg(t.raised)
+      .when(writable, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => onMenu(field, cx)))
       .when(Boolean(icon), (e) => e.child(image(icon ?? "").flex_none().size(STATUS_ICON_PX)))
       .child(optionLabel(field, issue[field]))
       .when(writable, (e) => e.child(div().text_color(t.dim).child("▾"))));
