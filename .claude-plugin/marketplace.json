@@ -11,7 +11,7 @@
     {
       "name": "issues",
       "source": "./claude-plugin",
-      "description": "Plan, write, work and delegate issues tracked in a repository's issues/ folder, in Linear or in GitHub Issues."
+      "description": "Plan, write, work and delegate issues tracked in Linear, in GitHub Issues or in a local Beads database."
     }
   ]
 }
