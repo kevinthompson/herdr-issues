@@ -249,6 +249,34 @@ test("marketplace-path and plugin-installed read Claude's JSON listings", () => 
   assert.equal(run(["plugin-installed", "other@herdr-issues"], plugins).status, 1);
 });
 
+test("window-layout prints the layout in `herdr-app status`, and nothing when no window reported one", () => {
+  assert.equal(run(["window-layout"], JSON.stringify({ layout: "development", errors: [] })).stdout, "development\n");
+  assert.equal(run(["window-layout"], JSON.stringify({ errors: [] })).stdout, "");
+  assert.equal(run(["window-layout"], "").stdout, "");
+  assert.equal(run(["window-layout"], "no window is open\n").status, 0);
+});
+
+test("shown-layout prints the layout Herdr shows, and main before Herdr has recorded one", (t) => {
+  const folder = temporaryFolder(t);
+  const shared = join(folder, "shared.json");
+  assert.equal(run(["shown-layout", shared]).stdout, "main\n");
+
+  writeJson(shared, { layout: "development", "sidebar.width": 268 });
+  assert.equal(run(["shown-layout", shared]).stdout, "development\n");
+});
+
+test("show-layout records the layout Herdr shows at its next start, keeping its other shared state", (t) => {
+  const folder = temporaryFolder(t);
+  const shared = join(folder, "shared.json");
+  writeJson(shared, { layout: "main", "sidebar.width": 268 });
+
+  run(["show-layout", shared, "main-issues"]);
+
+  assert.deepEqual(readJson(shared), { layout: "main-issues", "sidebar.width": 268 });
+  run(["show-layout", join(folder, "missing.json"), "main-issues"]);
+  assert.deepEqual(readJson(join(folder, "missing.json")), { layout: "main-issues" });
+});
+
 test("set-repo writes a repository's entry under its ~ path and keeps every other entry", (t) => {
   const folder = temporaryFolder(t);
   const settings = join(folder, "issues.json");

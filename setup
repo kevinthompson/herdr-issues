@@ -12,6 +12,8 @@
 #   - offers to add the Issues panel in a column of its own beside the side panel of a personal layout, or of a
 #     new copy of main, unless a layout already shows it, and moves the panel out of the side panel of a layout
 #     an earlier setup put it in; it never writes a shipped layout, and asks nothing without a terminal
+#   - when the layout with the Issues panel isn't the one Herdr shows, offers to switch to it, which Herdr then
+#     opens with, or says how to switch
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues, refusing to replace a file there that isn't a link
 # It refuses in a linked worktree, whose folder goes away when the worktree closes.
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
@@ -307,6 +309,36 @@ move_panel_out_of_panel_body() {
   esac
 }
 
+shown_layout() {
+  node "$setup_json" shown-layout "$herdr_home/shared.json"
+}
+
+# Herdr keeps showing the layout it last showed, so the layout switched to stays the one it opens with.
+show_layout() {
+  local window_layout
+  window_layout=$(herdr-app status 2>/dev/null </dev/null | node "$setup_json" window-layout)
+  if [[ -n $window_layout ]]; then
+    herdr-app do layout.switch "{\"name\":\"$1\"}" >/dev/null
+  else
+    node "$setup_json" show-layout "$herdr_home/shared.json" "$1"
+  fi
+  success "Herdr now shows the $1 layout, and opens with it until you switch layouts"
+}
+
+switch_layout_command() {
+  printf "herdr-app do layout.switch '{\"name\":\"%s\"}'" "$1"
+}
+
+# Asks to show the layout with the Issues panel in place of the one Herdr shows, or says how to switch to it.
+offer_to_show_layout() {
+  local shown=$1 with_panel=$2
+  if confirm "Herdr shows the $shown layout, which has no Issues panel. Switch to $with_panel, which has it, and open with it from now on?"; then
+    show_layout "$with_panel"
+  else
+    warning "The Issues panel is in the $with_panel layout, but Herdr shows the $shown layout; switch to it with: $(switch_layout_command "$with_panel")"
+  fi
+}
+
 # Writes the copy itself instead of running layout.clone, which needs an open window and switches it to the copy.
 copy_main_layout() {
   local name version
@@ -324,7 +356,7 @@ copy_main_layout() {
   version=$(herdr-app --version | awk '{ print $NF }')
   node "$setup_json" copy-layout "$layouts_dir/main.json" "$layouts_dir/$name.json" "$version"
   success "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
-  info "Switch to it with: herdr-app do layout.switch '{\"name\":\"$name\"}'"
+  layout_with_panel=$name
 }
 
 # Adds the Issues panel to a personal layout the person picks; Herdr restores any edited shipped layout at its next start.
@@ -335,8 +367,9 @@ add_panel_to_layout() {
     return
   fi
 
-  local layout_file name shipped showing=() candidates=()
+  local layout_file name shipped shown showing=() candidates=()
   shipped=$(shipped_layout_names)
+  shown=$(shown_layout)
   for layout_file in "$layouts_dir"/*.json; do
     [[ -f $layout_file ]] || continue
     name=$(basename "$layout_file" .json)
@@ -344,12 +377,20 @@ add_panel_to_layout() {
       showing+=("$name")
       grep -qxF "$name" <<<"$shipped" || move_panel_out_of_panel_body "$layout_file"
     elif ! grep -qxF "$name" <<<"$shipped" && layout_has_panel_body "$layout_file"; then
-      candidates+=("$name")
+      if [[ $name == "$shown" ]]; then
+        candidates=("$name" ${candidates[@]+"${candidates[@]}"})
+      else
+        candidates+=("$name")
+      fi
     fi
   done
 
   if ((${#showing[@]})); then
-    success "The Issues panel is already in the ${showing[*]} layout"
+    if printf '%s\n' "${showing[@]}" | grep -qxF "$shown"; then
+      success "The Issues panel is in the $shown layout, which Herdr shows"
+    else
+      offer_to_show_layout "$shown" "${showing[0]}"
+    fi
     return
   fi
 
@@ -358,17 +399,20 @@ add_panel_to_layout() {
     return
   fi
 
-  local copy_choice="Copy main into a new layout" skip_choice="Skip" choices=() choice
-  ((${#candidates[@]})) && choices+=("${candidates[@]}")
-  [[ -f $layouts_dir/main.json ]] && choices+=("$copy_choice")
-  choices+=("$skip_choice")
+  local copy_choice="Copy main into a new layout" skip_choice="Skip" labels=() choice
+  for name in ${candidates[@]+"${candidates[@]}"}; do
+    if [[ $name == "$shown" ]]; then labels+=("$name (shown now)"); else labels+=("$name"); fi
+  done
+  [[ -f $layouts_dir/main.json ]] && labels+=("$copy_choice")
+  labels+=("$skip_choice")
 
   echo
-  prompt "Which layout should show the Issues panel?"
+  prompt "Herdr shows the $shown layout. Which layout should show the Issues panel?"
   PS3=$(prompt_text "Choose a number: ")
-  select choice in "${choices[@]}"; do
+  select choice in "${labels[@]}"; do
     [[ -n $choice ]] && break
   done
+  local layout_with_panel=""
   case ${choice:-$skip_choice} in
     "$skip_choice")
       print_manual_layout_steps
@@ -377,10 +421,12 @@ add_panel_to_layout() {
       copy_main_layout || print_manual_layout_steps
       ;;
     *)
-      add_panel_beside_panel_body "$layouts_dir/$choice.json"
-      success "Added the Issues panel to the $choice layout"
+      layout_with_panel=${candidates[REPLY - 1]}
+      add_panel_beside_panel_body "$layouts_dir/$layout_with_panel.json"
+      success "Added the Issues panel to the $layout_with_panel layout"
       ;;
   esac
+  [[ -z $layout_with_panel || $layout_with_panel == "$shown" ]] || offer_to_show_layout "$shown" "$layout_with_panel"
 }
 
 link_mod
