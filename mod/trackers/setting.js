@@ -20,8 +20,8 @@
 // each value means and resolves their defaults. worktreeSetup is a shell command `issues worktree` runs in each new
 // checkout (cli/worktree.js).
 // createModel and createEffort, at the top level and in any entry, an entry's winning, are the model and effort
-// /issues:create writes issues on in the background: createModel is inherit (the session's own model), sonnet,
-// opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
+// the issue-writer agent files issues on in the background for /issues:create, /issues:plan and /issues:triage:
+// createModel is inherit (the session's own model), sonnet, opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
 // max, default without either. createSettings resolves them. workModel and workEffort, set the same way, are the
 // model and effort of the Claude sessions Start, Continue and `issues worktree --claude` open to work an issue:
 // workModel is inherit (the person's own Claude Code model), a model alias such as sonnet, or a model's full name;

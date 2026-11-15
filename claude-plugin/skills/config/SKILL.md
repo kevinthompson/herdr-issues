@@ -38,7 +38,7 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
 
 `issues setting merge` and `issues setting complete`, run in the repository, print the settings with their defaults applied.
 
-`createModel` and `createEffort` are optional, at the top level of `issues.json` for every repository or in the repository's entry, which wins. They choose the model and effort of the background agent `/issues:create` writes issues with:
+`createModel` and `createEffort` are optional, at the top level of `issues.json` for every repository or in the repository's entry, which wins. They choose the model and effort of the background agent `/issues:create`, `/issues:plan` and `/issues:triage` write new issues with:
 
 - `createModel`: `sonnet` (the default), `opus`, `haiku` or `fable`, or `inherit` for the session's own model.
 - `createEffort`: `low`, `medium`, `high`, `xhigh` or `max`, or `default` (the default) to leave the effort unset.
