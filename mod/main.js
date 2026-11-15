@@ -10,19 +10,21 @@
 // can't load, shows the setup view (setup.js) in place of the list, and a folder outside a git repository
 // shows a button that initializes one there. The issues.toggle key command and the
 // strip's button collapse the panel to a thin strip and expand it again (collapse.js). The list polls its
-// tracker, and the issues.refresh key command fetches it at once.
+// tracker, and the issues.refresh key command fetches it at once. Every updateCheckHours, the panel checks the
+// checkout it runs from for an update, and its footer offers one with an Update button (update.js).
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState, ScrollHandle } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, spaces, focused, notify, exec, run, watchFolder, appHome, updates } from "herdr";
 import { location, repositoryRoot, mainCheckout, initializeRepository } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/setting.js";
+import { settingsPath, pollSettings, updateSettings, DEFAULT_POLL_SECONDS, DEFAULT_UPDATE_CHECK_HOURS } from "./trackers/setting.js";
+import { offeredUpdate, dismissUpdate, installTab, finishedUpdate } from "./update.js";
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName } from "./listed-scope.js";
 import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
-import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
+import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
@@ -43,6 +45,8 @@ import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
+const HOUR_MS = 60 * 60 * 1000;
+const UPDATED_NOTE = "Updated. New Claude Code sessions pick up the plugin's update.";
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
 const STALE_ON_RETURN_MS = 10 * 1000;
 // A Claude hook (claude-plugin/hooks/herdr-issues-changed.mjs) touches this file after Claude creates or changes a remote issue.
@@ -125,6 +129,8 @@ export default class Issues extends View {
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.noticeSpaceSwitch();
     this.refresh(cx, { reuse: true });
+    this.update = null; this.updated = false; this.updateCheckedAt = null; this.updateCheckMs = DEFAULT_UPDATE_CHECK_HOURS * HOUR_MS;
+    this.checkForUpdate(cx);
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
     // Herdr delivers a mod's commands only to a shown copy, so the keys in keys.json, such as cmd-shift-w's
     // close-space, do nothing in a layout without the panel.
@@ -281,6 +287,40 @@ export default class Issues extends View {
   poll(cx) {
     this.noticeSpaceSwitch();
     if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
+    this.checkForUpdate(cx);
+  }
+
+  // Checks the mod's own checkout for an update when the panel loads and every updateCheckHours after, and
+  // notices an update Update started having landed. Any failure is silent: the footer just shows nothing.
+  checkForUpdate(cx) {
+    if (this.checkingUpdate || Date.now() - (this.updateCheckedAt ?? -Infinity) < this.updateCheckMs) return;
+    this.checkingUpdate = true;
+    cx.spawn(async (cx) => {
+      const settings = await updateSettings().catch(() => null);
+      if (settings) this.updateCheckMs = settings.updateCheckHours * HOUR_MS;
+      if (await finishedUpdate().catch(() => false)) this.updated = true;
+      this.update = await offeredUpdate().catch(() => null);
+      this.updateCheckedAt = Date.now(); this.checkingUpdate = false;
+      cx.notify();
+    });
+  }
+
+  startUpdate(cx) {
+    const update = this.update, { space } = focused() ?? {};
+    if (!space) { this.detailError = "Focus a space to run the update in"; cx.notify(); return; }
+    this.update = null;
+    cx.spawn(async (cx) => {
+      try { run("tab.new", { space, ...await installTab(update) }); }
+      catch (e) { this.detailError = `Could not start the update: ${e.message ?? e}`; }
+      cx.notify();
+    });
+  }
+
+  dismissUpdate(cx) {
+    const update = this.update;
+    this.update = null;
+    dismissUpdate(update).catch(() => {});
+    cx.notify();
   }
 
   pollDue() {
@@ -612,6 +652,20 @@ export default class Issues extends View {
   openingFooter(t) {
     return h_flex().flex_none().h(30).px(14).items_center().border_t(1).border_color(t.border)
       .text_size(11).text_color(t.dim).child(div().min_w(0).truncate().child(this.opening.status));
+  }
+
+  // An available update, with Update and a dismiss control, or the note that an update finished.
+  updateFooter(t) {
+    const dismiss = (id, onDismiss) => div().id(id).flex_none().size(20).flex().items_center().justify_center().rounded(5)
+      .tooltip("Dismiss").cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => onDismiss(cx)).child("×");
+    const row = h_flex().flex_none().h(30).px(14).gap(8).items_center().border_t(1).border_color(t.border).text_size(11).text_color(t.dim);
+    if (!this.update) {
+      return row.child(div().flex_1().min_w(0).truncate().child(UPDATED_NOTE))
+        .child(dismiss("issues-updated-dismiss", (cx) => { this.updated = false; cx.notify(); }));
+    }
+    return row.child(div().flex_1().min_w(0).truncate().child("Update available"))
+      .child(button("issues-update", "Update", (cx) => this.startUpdate(cx), t, { primary: true }).h(22).px(8).text_size(11))
+      .child(dismiss("issues-update-dismiss", (cx) => this.dismissUpdate(cx)));
   }
 
   // Whether the issue view offers Merge for the open issue, checked again for each list the panel reads. The last
@@ -971,6 +1025,7 @@ export default class Issues extends View {
     if (avatarLoads.length) cx.spawn(async (cx) => { await Promise.all(avatarLoads); cx.notify(); });
     return this.frame(t)
       .child(v_flex().flex_1().min_h(0).child(content))
-      .when(Boolean(this.opening), (e) => e.child(this.openingFooter(t)));
+      .when(Boolean(this.opening), (e) => e.child(this.openingFooter(t)))
+      .when(!this.opening && Boolean(this.update || this.updated), (e) => e.child(this.updateFooter(t)));
   }
 }
