@@ -1,14 +1,14 @@
 // The focused repository's settings, which the gear in the panel's header opens in place of the list, with Back
 // at the top left as the setup view (setup.js) has. Each setting is a select menu (select.js) whose open list says
-// what each option means, and a field shows only when it applies to the choices above it (settings-fields.js):
-// where its issues live, its tracker, which a different choice checks as the setup view does (tracker-choice.js)
-// before it can be saved, with Linear's team once Linear is checked; how its work gets into main, and, only for a
-// pull request, when the work is complete, its merge and complete in issues.json; what a finished session does
-// about its worktree, its close; the name of the space on its main checkout, its name, typed in with the default as
-// placeholder, where emptying the field removes it from the entry; then the model and effort of the background agent that writes issues and of the
-// sessions that work them, its createModel, createEffort, workModel and workEffort. It opens on the settings in
-// effect, defaults applied, as `issues setting` prints them, and says where each model and effort comes from when
-// the repository's entry doesn't set it. Each model and effort offers its allowed values and a choice that removes
+// what each option means, a field shows only when it applies to the choices above it (settings-fields.js), and
+// each setting's description sits below its controls: the name of the space on its main checkout, its name, typed
+// in with the default as placeholder, where emptying the field removes it from the entry; where its issues live,
+// its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be saved,
+// with Linear's team once Linear is checked; how its work gets into main, and, only for a pull request, when the
+// work is complete, its merge and complete in issues.json; what a finished session does about its worktree, its
+// close; then the model and effort of the background agent that writes issues and of the sessions that work them,
+// its createModel, createEffort, workModel and workEffort. It opens on the settings in effect, defaults applied,
+// as `issues setting` prints them. Each model and effort offers its allowed values and a choice that removes
 // it from the entry, so issues.json's top level or the default applies; workModel's Other takes another model alias
 // or full name typed in. Save waits for a different tracker's check to pass and, for Linear, a team, writes only the
 // changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting and saveAgentSettings in setting.js) and goes
@@ -51,7 +51,6 @@ const AGENT_QUESTIONS = [
   { key: "workEffort", title: "Issue sessions' effort", sentence: null, choices: CREATE_EFFORTS },
 ];
 const OTHER_WORK_MODEL_OPTION = { id: OTHER_WORK_MODEL, label: "Other…", detail: "Another model alias or full name, typed in." };
-const SOURCE_PHRASES = { repository: "set for this repository", "top level": "from issues.json's top level, for every repository", default: "the default" };
 
 // Where the listed issues come from now, such as "Linear team WEB".
 function currentTrackerLabel({ kind, team, repo }) {
@@ -252,16 +251,17 @@ export class SettingsView {
 
   form(content, t) {
     const fields = this.fields();
-    return this.trackerSection(content, fields, t)
-      .child(this.question(v_flex().flex_none().gap(8).pt(4), "How does work get into main?", null, t)
+    return content
+      .when(Boolean(this.nameInput), (e) => e.child(this.question("Repository name", NAME_SENTENCE, t,
+        (controls) => controls.child(this.textField(this.nameInput, t)))))
+      .child(this.trackerSection(fields, t))
+      .child(this.question("How does work get into main?", null, t, (controls) => controls
         .child(this.selects.merge.render(t, { options: MERGE_CHOICES, value: this.merge, onChoose: (id, cx) => this.chooseMerge(id, cx), enabled: !this.saving }))
-        .when(fields.mergedNote, (e) => e.child(this.note(COMPLETE_WITHOUT_PULL_REQUEST, t))))
-      .when(fields.completeSelect, (e) => e.child(this.question(v_flex().flex_none().gap(8).pt(4), "When is the work complete?", COMPLETE_SENTENCE, t)
-        .child(this.selects.complete.render(t, { options: COMPLETE_CHOICES, value: this.complete, onChoose: (id, cx) => this.chooseComplete(id, cx), enabled: !this.saving }))))
-      .child(this.question(v_flex().flex_none().gap(8).pt(4), "When the work is complete, close the worktree?", CLOSE_SENTENCE, t)
-        .child(this.selects.close.render(t, { options: CLOSE_CHOICES, value: this.close, onChoose: (id, cx) => this.chooseClose(id, cx), enabled: !this.saving })))
-      .when(Boolean(this.nameInput), (e) => e.child(this.question(v_flex().flex_none().gap(8).pt(4), "Repository name", NAME_SENTENCE, t)
-        .child(this.textField(this.nameInput, t))))
+        .when(fields.mergedNote, (e) => e.child(this.note(COMPLETE_WITHOUT_PULL_REQUEST, t)))))
+      .when(fields.completeSelect, (e) => e.child(this.question("When is the work complete?", COMPLETE_SENTENCE, t, (controls) => controls
+        .child(this.selects.complete.render(t, { options: COMPLETE_CHOICES, value: this.complete, onChoose: (id, cx) => this.chooseComplete(id, cx), enabled: !this.saving })))))
+      .child(this.question("When the work is complete, close the worktree?", CLOSE_SENTENCE, t, (controls) => controls
+        .child(this.selects.close.render(t, { options: CLOSE_CHOICES, value: this.close, onChoose: (id, cx) => this.chooseClose(id, cx), enabled: !this.saving }))))
       .when(Boolean(this.savedAgent), (e) => e.children(AGENT_QUESTIONS.map((question) => this.agentQuestion(question, fields, t))))
       .when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")))
       .child(h_flex().gap(8).items_center()
@@ -269,16 +269,17 @@ export class SettingsView {
   }
 
   // The tracker in use, the chosen one's check, and Linear's team once Linear is checked.
-  trackerSection(content, fields, t) {
+  trackerSection(fields, t) {
     const { choice, checking } = this.tracker;
-    const section = this.question(content, "Where do this repository's issues live?", `The panel lists issues from ${currentTrackerLabel(this.current)}.`, t)
-      .child(this.selects.tracker.render(t, { options: TRACKERS, value: choice ?? this.current.kind, onChoose: (id, cx) => this.chooseTracker(id, cx), enabled: !this.saving && !checking }));
-    return this.tracker.withCheckStatus(section, "settings-tracker-problem", t)
-      .when(fields.teamSelect, (e) => e.child(this.tracker.teamDropdown("settings-team", t)));
+    return this.question("Where do this repository's issues live?", `The panel lists issues from ${currentTrackerLabel(this.current)}.`, t, (controls) =>
+      this.tracker.withCheckStatus(controls
+        .child(this.selects.tracker.render(t, { options: TRACKERS, value: choice ?? this.current.kind, onChoose: (id, cx) => this.chooseTracker(id, cx), enabled: !this.saving && !checking })),
+      "settings-tracker-problem", t)
+        .when(fields.teamSelect, (e) => e.child(this.tracker.teamDropdown("settings-team", t))));
   }
 
-  question(content, title, sentence, t) {
-    return content.child(div().font_semibold().child(title))
+  question(title, sentence, t, addControls) {
+    return addControls(v_flex().flex_none().gap(8).pt(4).child(div().font_semibold().child(title)))
       .when(Boolean(sentence), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.muted).child(sentence ?? "")));
   }
 
@@ -286,19 +287,18 @@ export class SettingsView {
     return div().whitespace_normal().text_size(12).text_color(t.dim).child(text);
   }
 
-  // The setting in effect and where it comes from, then a select of its values led by the one that removes it from
-  // the entry, labeled with what then applies; workModel's ends with Other, which shows the typed model.
+  // A select of the setting's values led by the one that removes it from the entry, labeled with what then applies;
+  // workModel's ends with Other, which shows the typed model.
   agentQuestion({ key, title, sentence, choices }, fields, t) {
-    const { value, source, topLevel } = this.savedAgent[key];
+    const { topLevel } = this.savedAgent[key];
     const clearLabel = topLevel != null ? `Top level (${topLevel})` : `Default (${AGENT_DEFAULTS[key]})`;
     const isWorkModel = key === "workModel";
     const options = [{ id: CLEAR_CHOICE, label: clearLabel }, ...choices.map((id) => ({ id, label: id })), ...(isWorkModel ? [OTHER_WORK_MODEL_OPTION] : [])];
     const chosen = isWorkModel ? workModelChoice(this.agentEntry.workModel, this.otherWorkModelPicked) : this.agentEntry[key] ?? CLEAR_CHOICE;
-    return this.question(v_flex().flex_none().gap(8).pt(4), title, sentence, t)
-      .child(this.note(`Now ${value}, ${SOURCE_PHRASES[source]}.`, t))
+    return this.question(title, sentence, t, (controls) => controls
       .child(this.selects[key].render(t, { options, value: chosen, enabled: !this.saving,
         onChoose: (id, cx) => this.chooseAgent(key, id === CLEAR_CHOICE ? null : id, cx) }))
-      .when(isWorkModel && fields.workModelInput, (e) => e.child(this.textField(this.workModelInput, t)));
+      .when(isWorkModel && fields.workModelInput, (e) => e.child(this.textField(this.workModelInput, t))));
   }
 
   textField(state, t) {
