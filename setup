@@ -12,8 +12,8 @@
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
-# Needs herdr-app, git and node 22.15 or later. Claude Code (claude) is needed only for the issues:* skills and
-# hooks, and gh only for repositories tracked in GitHub Issues.
+# Needs herdr-app, git and node 22.15 or later, which it offers to install with devbox or Homebrew. Claude Code
+# (claude) is needed only for the issues:* skills and hooks, and gh only for repositories tracked in GitHub Issues.
 
 set -euo pipefail
 
@@ -58,7 +58,7 @@ warning() { print_in_color 2 33 "$@"; }
 error() { print_in_color 2 31 "$@"; }
 
 missing=()
-for command in herdr-app git node; do
+for command in herdr-app git; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
@@ -68,19 +68,105 @@ fi
 
 # bin/issues calls module.registerHooks, which Node added in 22.15.
 minimum_node_version=22.15
-refuse_old_node() {
+
+# Prints why node can't run the issues CLI, or nothing when it can.
+node_problem() {
   local found_version minimum_major=${minimum_node_version%.*} minimum_minor=${minimum_node_version#*.}
+  if ! command -v node >/dev/null; then
+    echo "node is not installed"
+    return
+  fi
   found_version=$(node --version)
   found_version=${found_version#v}
   if [[ $found_version =~ ^([0-9]+)\.([0-9]+) ]]; then
     local major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]}
     ((major > minimum_major || (major == minimum_major && minor >= minimum_minor))) && return
   fi
-  error "setup: node $found_version is too old; the issues CLI needs Node $minimum_node_version or later"
-  error "setup: install a newer Node, then run setup again"
+  echo "node $found_version is too old"
+}
+
+# Answers no without asking when standard input isn't a terminal.
+confirm() {
+  local answer
+  [[ -t 0 ]] || return 1
+  read -r -p "$(prompt_text "$1 [y/N] ")" answer || return 1
+  [[ $answer == [yY]* ]]
+}
+
+devbox_lists_packages() {
+  command -v devbox >/dev/null && devbox global list 2>/dev/null | grep -q '^\* '
+}
+
+node_install_command() {
+  case $1 in
+    devbox) echo "devbox global add nodejs" ;;
+    brew) echo "brew install node" ;;
+  esac
+}
+
+# Herdr and Claude Code find devbox's global packages only through a shell profile that evaluates its shellenv.
+warn_unless_profile_evaluates_devbox() {
+  local zsh_home=${ZDOTDIR:-$HOME} profile
+  for profile in "$zsh_home/.zshenv" "$zsh_home/.zprofile" "$zsh_home/.zshrc" "$HOME/.bash_profile" "$HOME/.bashrc" \
+    "$HOME/.profile" "$HOME/.config/fish/config.fish"; do
+    grep -qs 'devbox global shellenv' "$profile" && return
+  done
+  warning "setup: warning: your shell profile doesn't evaluate devbox global shellenv, so Herdr and Claude Code won't find node; add this line to it: eval \"\$(devbox global shellenv)\""
+}
+
+install_node_with() {
+  local manager=$1 command
+  command=$(node_install_command "$manager")
+  info "Running $command"
+  if ! $command; then
+    error "setup: $command failed"
+    return 1
+  fi
+  if [[ $manager == devbox ]]; then
+    eval "$(devbox global shellenv)"
+    warn_unless_profile_evaluates_devbox
+  fi
+  hash -r
+}
+
+# Offers to install Node with the person's package manager; fails when nothing was installed.
+offer_node_install() {
+  [[ -t 0 ]] || return 1
+  local managers=() manager choice choices=() decline_choice="Don't install"
+  devbox_lists_packages && managers+=(devbox)
+  command -v brew >/dev/null && managers+=(brew)
+  ((${#managers[@]})) || return 1
+
+  prompt "setup: $1; the issues CLI needs Node $minimum_node_version or later."
+  if ((${#managers[@]} == 1)); then
+    manager=${managers[0]}
+    confirm "Install it with $manager ($(node_install_command "$manager"))?" || return 1
+  else
+    for manager in "${managers[@]}"; do
+      choices+=("$manager ($(node_install_command "$manager"))")
+    done
+    prompt "Which package manager should install Node?"
+    PS3=$(prompt_text "Choose a number: ")
+    select choice in "${choices[@]}" "$decline_choice"; do
+      [[ -n $choice ]] && break
+    done
+    [[ -n $choice && $choice != "$decline_choice" ]] || return 1
+    manager=${choice%% *}
+  fi
+  install_node_with "$manager"
+}
+
+require_node() {
+  local problem
+  problem=$(node_problem)
+  [[ -z $problem ]] && return
+  offer_node_install "$problem" && problem=$(node_problem)
+  [[ -z $problem ]] && return
+  error "setup: $problem; the issues CLI needs Node $minimum_node_version or later"
+  error "setup: install it, then run setup again"
   exit 1
 }
-refuse_old_node
+require_node
 
 command -v gh >/dev/null || warning "setup: warning: gh is not installed; repositories tracked in GitHub Issues need it"
 
