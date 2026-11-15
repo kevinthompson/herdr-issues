@@ -1,11 +1,13 @@
 // What stops a tracker from loading that the person can fix: each is an Error whose `fix` says what to do,
-// in Markdown. The panel shows these in its setup view (setup.js) rather than as a line above the list.
+// in Markdown, and whose `code`, when set, names a problem the setup view can fix itself. The panel shows these
+// in its setup view (setup.js) rather than as a line above the list.
 import { installCommands, packageManagers } from "../package-managers.js";
 
 export class SetupProblem extends Error {
-  constructor(message, fix) {
+  constructor(message, fix, code = null) {
     super(message);
     this.fix = fix;
+    this.code = code;
   }
 }
 
@@ -28,8 +30,9 @@ export const originNotOnGitHub = () => new SetupProblem("This repository's origi
   "Add the repository's GitHub copy as the `origin` remote, then check again. To track issues in another GitHub repository, run `/issues:config` in Claude.");
 export const bdMissing = async () => new SetupProblem("The Beads CLI (bd) isn't installed",
   await installFix("beads", "as [Beads' README](https://github.com/steveyegge/beads) says"));
+export const BEADS_NOT_INITIALIZED = "beads-not-initialized";
 export const beadsNotInitialized = () => new SetupProblem("This repository has no Beads database",
-  "Run `bd init` in the repository's main checkout, then check again.");
+  "Run `bd init` in the repository's main checkout, then check again.", BEADS_NOT_INITIALIZED);
 export const bdFailed = (message) => new SetupProblem(message,
   "Check that `bd list` works in the repository's main checkout, then check again.");
 export const linearKeyMissing = () => new SetupProblem("No Linear API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);

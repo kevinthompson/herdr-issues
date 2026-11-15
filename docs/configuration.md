@@ -52,7 +52,7 @@ The examples below show one entry each.
 
 `linear`, `github` or `beads`. A `linear` entry also needs `team`, the Linear team's key, and can list saved views as extra lists in `views`, each a name and the view's URL. A `github` entry can name a repository other than origin's in `repo`, as `owner/name`.
 
-`beads` lists the issues in the repository's own [Beads](https://github.com/steveyegge/beads) database, which `bd init` makes in the main checkout's `.beads/` folder; every worktree shares it. Neither the setup view nor `/issues:config` offers it yet, so write the entry by hand:
+`beads` lists the issues in the repository's own [Beads](https://github.com/steveyegge/beads) database, which `bd init` makes in the main checkout's `.beads/` folder; every worktree shares it. Choose it in the panel's setup view or with `/issues:config`, which check that `bd` is installed and offer to make the database when the main checkout has none, keeping it out of git. Its entry names no team or repository:
 
 ```json
 "~/Code/notes": { "tracker": "beads" }
