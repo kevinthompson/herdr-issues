@@ -40,9 +40,14 @@ function scopeText(published) {
   }[scope.kind]?.() ?? `the saved view "${scope.label}"`;
   const trackerName = tracker ? tracker[0].toUpperCase() + tracker.slice(1) : "";
   const teamClause = team && scope.kind !== "mine" ? `, team ${team}` : "";
+  // A scope published before the panel added its ID can't be named, so the list of scopes stands in.
+  const listCommand = scope.id
+    ? `\`issues list ${scope.id}\` prints its open issues`
+    : "`issues scopes` names the panel's lists and `issues list <scope>` prints one's open issues";
   return (
     `The Herdr issues panel for this repository lists ${what} in ${trackerName}${teamClause}. ` +
     "Open means not completed, canceled, a duplicate or in a state named Merged. " +
+    `${listCommand}, exactly as the panel lists them. ` +
     "When I refer to the issues, the project or the milestone without naming one, or ask to start the next issues, I mean this scope."
   );
 }

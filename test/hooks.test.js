@@ -51,7 +51,7 @@ test("the scope hook announces the listed scope and the open issue once, and whe
   mkdirSync(join(appHome, "data/issues/scope"), { recursive: true });
   writeFileSync(
     join(appHome, "data/issues/scope/a.json"),
-    JSON.stringify({ repo: repository, tracker: "linear", team: "CAL", scope: { kind: "project", project: { name: "Launch", url: "https://l/p" } } }),
+    JSON.stringify({ repo: repository, tracker: "linear", team: "CAL", scope: { id: "project:p1", kind: "project", project: { name: "Launch", url: "https://l/p" } } }),
   );
   writeFileSync(
     join(appHome, "data/issues/open.json"),
@@ -64,6 +64,7 @@ test("the scope hook announces the listed scope and the open issue once, and whe
     first,
     'The Herdr issues panel for this repository lists the project "Launch" (https://l/p) in Linear, team CAL. ' +
       "Open means not completed, canceled, a duplicate or in a state named Merged. " +
+      "`issues list project:p1` prints its open issues, exactly as the panel lists them. " +
       "When I refer to the issues, the project or the milestone without naming one, or ask to start the next issues, I mean this scope.\n" +
       'The Herdr issues panel has CAL-7 open: "Fix it" (https://l/CAL-7). When I say "this issue" without naming one, I mean CAL-7.\n',
   );
@@ -74,6 +75,19 @@ test("the scope hook announces the listed scope and the open issue once, and whe
     runHook("herdr-issues-scope.mjs", input, env).stdout,
     'The Herdr issues panel no longer has an issue open, so "this issue" no longer refers to one from it.\n',
   );
+});
+
+test("the scope hook names `issues scopes` for a scope published without its ID", (t) => {
+  const folder = temporaryFolder(t);
+  const repository = createRepository(folder);
+  const appHome = join(folder, "herdr-app");
+  const env = { HERDR_APP_HOME: appHome, HC_TERMINAL_ID: "terminal-1", TMPDIR: join(folder, "tmp") };
+  mkdirSync(join(appHome, "data/issues/scope"), { recursive: true });
+  writeFileSync(join(appHome, "data/issues/scope/a.json"), JSON.stringify({ repo: repository, tracker: "linear", team: "CAL", scope: { kind: "team" } }));
+
+  const { stdout } = runHook("herdr-issues-scope.mjs", { session_id: "session-1", cwd: repository }, env);
+
+  assert.match(stdout, /`issues scopes` names the panel's lists and `issues list <scope>` prints one's open issues, exactly as the panel lists them\./);
 });
 
 test("the scope hook stays quiet outside a Herdr terminal", (t) => {
