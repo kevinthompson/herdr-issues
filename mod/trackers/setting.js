@@ -206,6 +206,12 @@ export async function closeSettings(project) {
   return { close: (await trackerSetting(project))?.close ?? DEFAULT_CLOSE };
 }
 
+// The repository's name without its owner: the GitHub repository's for GitHub, else the main checkout's folder's.
+export async function repositoryName(main, setting) {
+  if (setting?.tracker === "github") return (await githubRepository(main, setting)).split("/").pop();
+  return main.split("/").pop();
+}
+
 const SETUP_KEYS =["tracker", "team", "repo", "merge", "complete"];
 
 // Writes `change(entry)` as the entry of the repository whose main checkout is `main`, in the place of any entry
