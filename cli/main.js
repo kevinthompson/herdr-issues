@@ -5,10 +5,11 @@ import { createSettings, mergeSettings, pollSettings, workSettings } from "../mo
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
-import { needsNewBranch } from "../mod/issue.js";
+import { needsNewBranch, STATUSES } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
 import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { openWorktree } from "./worktree.js";
+import { ChangeRefusal, setIssueStatus, startIssue } from "./change.js";
 import { isUnnamed, issueTabName, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
@@ -37,6 +38,9 @@ Commands:
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
                            refuse, changing nothing, when it can't merge cleanly or the repository uses pull requests
+  status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
+                           The statuses: ${STATUSES.join(", ")}
+  start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
 
 Options:
   -h, --help               Print this help`;
@@ -261,7 +265,29 @@ async function merge(args) {
   }
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, tab, worktree, merge };
+async function refusingChanges(change) {
+  try {
+    return await change();
+  } catch (error) {
+    throw error instanceof ChangeRefusal ? new Refusal(error.message) : error;
+  }
+}
+
+async function status(args) {
+  if (args.length !== 2 || args.some((arg) => arg.startsWith("-"))) throw new UsageError("status needs an issue ID and a status");
+  const [id, newStatus] = args;
+  if (!STATUSES.includes(newStatus)) throw new UsageError(`status ${newStatus} isn't one of ${STATUSES.join(", ")}`);
+  const issue = await refusingChanges(async () => setIssueStatus(await currentTracker(), id, newStatus));
+  console.log(`Set ${issue.id} to ${newStatus}`);
+}
+
+async function start(args) {
+  if (args.length !== 1 || args[0].startsWith("-")) throw new UsageError("start needs one issue ID");
+  const issue = await refusingChanges(async () => startIssue(await currentTracker(), args[0]));
+  console.log(`Started ${issue.id}`);
+}
+
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, tab, worktree, merge, status, start };
 
 const HELP_FLAGS = ["-h", "--help"];
 
