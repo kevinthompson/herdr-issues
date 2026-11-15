@@ -32,16 +32,25 @@ export function untrackableView(sentence, t) {
   return v_flex().p(14).child(div().whitespace_normal().text_color(t.dim).child(sentence));
 }
 
-const NOT_A_REPOSITORY_ICON_PX = 40;
+const BLANK_STATE_ICON_PX = 40;
 
-// Centered in place of the list for a folder outside a git repository, with a button that makes it one.
-export function notARepositoryView({ initializing, error, onInitialize }, t) {
+// Centered in place of the list: an icon, why there are no issues, the button that fixes it, and how to put
+// the panel away instead.
+function blankState({ id, sentence, label, enabled = true, error = null, onClick }, t) {
   return v_flex().flex_1().min_h(0).p(24).gap(12).items_center().justify_center()
-    .child(svg("mods/issues/icons/file-text.svg").size(NOT_A_REPOSITORY_ICON_PX).text_color(t.dim))
-    .child(div().whitespace_normal().text_center().text_color(t.muted).child("Issues currently only works in git repositories."))
-    .child(button("initialize-repository", initializing ? "Initializing…" : "Initialize Repository", onInitialize, t, { primary: true, enabled: !initializing }))
+    .child(svg("mods/issues/icons/file-text.svg").size(BLANK_STATE_ICON_PX).text_color(t.dim))
+    .child(div().whitespace_normal().text_center().text_color(t.muted).child(sentence))
+    .child(button(id, label, onClick, t, { primary: true, enabled }))
     .when(Boolean(error), (e) => e.child(div().whitespace_normal().text_center().text_size(12).text_color(t.ansi1).child(error ?? "")))
     .child(div().whitespace_normal().text_center().text_size(12).text_color(t.dim).child("Press ⌘⇧I to collapse this panel."));
+}
+
+// For a folder outside a git repository, with a button that makes it one.
+export function notARepositoryView({ initializing, error, onInitialize }, t) {
+  return blankState({
+    id: "initialize-repository", sentence: "Issues currently only works in git repositories.",
+    label: initializing ? "Initializing…" : "Initialize Repository", enabled: !initializing, error, onClick: onInitialize,
+  }, t);
 }
 
 const answerLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label ?? "";
