@@ -41,7 +41,7 @@ import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
-import { MergeSettingsView } from "./settings.js";
+import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
@@ -265,7 +265,7 @@ export default class Issues extends View {
 
   // Saved settings refresh the list at once, so the panel acts on them without waiting for the next poll.
   openSettings(cx) {
-    const view = new MergeSettingsView(this.project, this.scopeKey, {
+    const view = new SettingsView(this.project, this.scopeKey, {
       onBack: (cx) => { if (this.settingsView === view) this.settingsView = null; cx.notify(); },
       onSaved: (cx) => { if (this.settingsView === view) this.settingsView = null; this.refresh(cx); },
     });
