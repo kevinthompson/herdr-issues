@@ -4,7 +4,8 @@
 // with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open the
-// issue's worktree, with a Claude session working it when `claude` runs (work-session.js). Clicking a task-list
+// issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge lands a
+// finished branch in main (merge.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list. The issues.toggle key command and the
 // strip's button collapse the panel to a thin strip and expand it again (collapse.js). The list polls its
@@ -36,6 +37,7 @@ import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { TrackerSetup, untrackableView } from "./setup.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
+import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
@@ -610,6 +612,38 @@ export default class Issues extends View {
     cx.notify();
   }
 
+  // Whether the issue view offers Merge for the open issue, checked again for each list the panel reads. The last
+  // answer for the same issue stands meanwhile, so the button doesn't flicker on every poll.
+  mergeOffered(issue, cx) {
+    const key = `${issue.id}\n${issue.branch}\n${this.generation}`;
+    if (this.mergeOffer?.key === key) return this.mergeOffer.offered;
+    const project = this.project, kept = this.mergeOffer?.id === issue.id && this.mergeOffer.offered;
+    const offer = this.mergeOffer = { key, id: issue.id, offered: kept };
+    if (!this.tracker?.writable || !project) { offer.offered = false; return false; }
+    cx.spawn(async (cx) => {
+      const offered = await canOfferMerge(issue.branch, project).catch(() => false);
+      if (this.mergeOffer !== offer || offer.offered === offered) return;
+      offer.offered = offered;
+      cx.notify();
+    });
+    return kept;
+  }
+
+  // Merges the issue's branch into main and marks it done, through the same module as `issues merge`.
+  mergeBranch(issue, cx) {
+    const tracker = this.tracker, project = this.project;
+    this.detailError = null;
+    this.showOpening(issue, `Merging ${issue.branch} into main…`, cx);
+    this.opening.merging = true;
+    cx.spawn(async (cx) => {
+      try { await mergeIssue(issue, tracker, project); }
+      catch (e) { this.detailError = e instanceof MergeRefusal ? e.message : `Could not merge: ${e.message ?? e}`; }
+      this.opening = null;
+      this.refresh(cx);
+      cx.notify();
+    });
+  }
+
   // Picks up an issue already in progress: its space when one is open, selected at once, else a new space on
   // its worktree, else a new worktree on its branch, fetched from origin when the work began elsewhere.
   continueWork(issue, cx) {
@@ -921,6 +955,9 @@ export default class Issues extends View {
         finishable: canFinishWork(issue),
         ...this.spaceShowingWorktree(issue),
         onContinue: (cx) => this.continueWork(issue, cx),
+        mergeable: this.mergeOffered(issue, cx),
+        merging: Boolean(this.opening?.merging && this.opening.id === issue.id),
+        onMerge: (cx) => this.mergeBranch(issue, cx),
         onDelegate: this.tracker?.delegate && ((cx) => this.delegateToCloudAgent(issue, cx)),
         delegated: Boolean(this.tracker?.isDelegated?.(issue)),
         delegating: this.delegating === issue.id,

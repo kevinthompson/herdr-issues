@@ -1,5 +1,6 @@
 // One issue, drawn inside the panel in place of the list: a way back, its status and priority
-// (each a dropdown), its other details and its Markdown body, which Edit swaps for an editor.
+// (each a dropdown), its other details and its Markdown body, which Edit swaps for an editor. Merge shows
+// when the issue's finished branch can merge into main from here (merge.js).
 // Task-list items in the body are checkboxes that check off in place.
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
@@ -169,6 +170,13 @@ const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).
 // Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
 const workActions = (view, t) => workButton("issue", view, t, { compact: true });
 
+// Merges the issue's finished branch into main, for a repository that merges locally.
+function mergeButton({ issue, merging, opening, onMerge }, t) {
+  return button("issue-merge", merging ? "Merging…" : "Merge", onMerge, t, {
+    enabled: !opening, tooltip: `Merge ${issue.branch} into main and mark ${issue.id} done`,
+  });
+}
+
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
   if (!writable) return div();
   if (!editor) return button("issue-edit", icon("pencil"), onEdit, t, { enabled: issue.body !== null, tooltip: "Edit" });
@@ -213,6 +221,7 @@ export function issueDetail(view, t) {
     .child(h_flex().h(38).flex_none().px(10).gap(8).items_center().justify_end().border_b(1).border_color(t.border)
       .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
       .child(editActions(view, t))
+      .when(!view.editor && view.mergeable, (e) => e.child(mergeButton(view, t)))
       .when(!view.editor, (e) => e.child(workActions(view, t))))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
