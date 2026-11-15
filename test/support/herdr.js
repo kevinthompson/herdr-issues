@@ -8,6 +8,7 @@ export * from "../../cli/herdr.js";
 export const defaults = {
   exec: shim.exec, spaces: shim.spaces, panes: shim.panes,
   layout: () => null, run: () => null, shared: () => undefined, setShared: () => null,
+  terminals: () => [], hc: async () => ({ code: 1, stdout: "", stderr: "" }),
 };
 let current = { ...defaults };
 
@@ -18,8 +19,10 @@ export const layout = () => current.layout();
 export const run = (...args) => current.run(...args);
 export const shared = (...args) => current.shared(...args);
 export const setShared = (...args) => current.setShared(...args);
+export const terminals = () => current.terminals();
+export const hc = (...args) => current.hc(...args);
 
-// Replaces any of exec, spaces, panes, layout, run, shared and setShared until the test `t` ends.
+// Replaces any of exec, spaces, panes, layout, run, shared, setShared, terminals and hc until the test `t` ends.
 export function stubHerdr(t, replacements) {
   current = { ...defaults, ...replacements };
   t.after(() => { current = { ...defaults }; });

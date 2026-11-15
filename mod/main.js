@@ -24,7 +24,7 @@ import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedS
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
-import { isTextFile, openInEditor } from "./editor.js";
+import { isTextFile, openInEditor, prefetchEditor } from "./editor.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
@@ -451,6 +451,7 @@ export default class Issues extends View {
   filesInBody(issue, cx) {
     const { root, on } = this.project, key = `${root}\n${issue.body}`;
     if (issue.body === null) return new Set();
+    if (!on) prefetchEditor();
     if (this.bodyFiles?.key === key) return this.bodyFiles.files;
     const bodyFiles = this.bodyFiles = { key, files: new Set() }, paths = codeSpanPaths(issue.body);
     if (!paths.length) return bodyFiles.files;
