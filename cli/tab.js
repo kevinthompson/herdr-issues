@@ -1,7 +1,7 @@
 // `issues tab`: the Herdr tab holding this session's terminal ($HC_TERMINAL_ID), and renaming it after the
 // issue the session works, as /issues:work does. A tab the person named keeps its name. `issues complete` labels
 // the terminal and marks the tab, whatever its name, with ✅ once the session's work is finished, and `issues close`
-// labels it to ask the panel to close the session's space.
+// labels it to ask the panel to close the session's space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
 
 async function herdrApp(args) {
@@ -44,3 +44,6 @@ export const labelComplete = (tab, issueId) => labelTerminal(tab.terminal, `issu
 
 // The panel watches for this label and closes the space once the terminal is idle (mod/close-request.js).
 export const labelCloseRequest = (tab, issueId) => labelTerminal(tab.terminal, `issues.close=${issueId}`);
+
+// hc removes a label set to an empty value.
+export const clearCloseRequest = (tab) => labelTerminal(tab.terminal, "issues.close=");

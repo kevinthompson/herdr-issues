@@ -178,9 +178,38 @@ test("close needs one issue ID", async (t) => {
   assert.deepEqual(calls, []);
 });
 
-test("--help lists close", async (t) => {
+test("close --cancel removes the close request label from the session's terminal", async (t) => {
+  const calls = stubApp(t, listing("✅ Review"));
+  const { code, out } = await run(t, ["close", "--cancel", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["hc", "label", "t2", "issues.close="]]);
+  assert.equal(out, "Withdrew the request to close #72's space; the worktree stays open");
+});
+
+for (const args of [["close", "--cancel"], ["close", "--cancel", "--all"], ["close", "--cancel", "#72", "#73"]]) {
+  test(`${args.join(" ")} fails with a usage error`, async (t) => {
+    const calls = stubApp(t, listing("Claude"));
+    const { code, err } = await run(t, args);
+    assert.equal(code, 2);
+    assert.match(err, /close --cancel needs one issue ID/);
+    assert.deepEqual(calls, []);
+  });
+}
+
+for (const args of [["close", "--keep", "#72"], ["close", "#72", "#73"]]) {
+  test(`${args.join(" ")} fails with a usage error`, async (t) => {
+    const calls = stubApp(t, listing("Claude"));
+    const { code, err } = await run(t, args);
+    assert.equal(code, 2);
+    assert.match(err, /close needs one issue ID/);
+    assert.deepEqual(calls, []);
+  });
+}
+
+test("--help lists close and close --cancel", async (t) => {
   const { out } = await run(t, ["--help"]);
   assert.match(out, /^ {2}close <id> /m);
+  assert.match(out, /^ {2}close --cancel <id> /m);
 });
 
 test("complete never renames the space", async (t) => {
