@@ -40,8 +40,8 @@ import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 const REFRESH_CHECK_MS = 10 * 1000;
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
 const STALE_ON_RETURN_MS = 10 * 1000;
-// A Claude hook (claude-plugin/hooks/herdr-issues-created.sh) touches this file after Claude creates a remote issue.
-const createdStampPath = () => `${appHome()}/data/issues/created`;
+// A Claude hook (claude-plugin/hooks/herdr-issues-changed.mjs) touches this file after Claude creates or changes a remote issue.
+const changedStampPath = () => `${appHome()}/data/issues/changed`;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
 // team at once is too slow.
 const ROW_LIMIT = 100;
@@ -312,14 +312,14 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the created stamp says
-  // Claude just made an issue, so a change to any of them refreshes the panel at once rather than at the next
+  // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the changed stamp says
+  // Claude just made or changed an issue, so a change to any of them refreshes the panel at once rather than at the next
   // poll, without the lookups kept from those files. The app's folder holds more than these files, so other
   // changes there are ignored.
   watchAppFiles(cx) {
     if (this.watchingAppFiles) return;
     this.watchingAppFiles = true;
-    const folder = appHome(), files = [settingsPath(), linearKeyPath(), createdStampPath()];
+    const folder = appHome(), files = [settingsPath(), linearKeyPath(), changedStampPath()];
     cx.spawn(async (cx) => {
       try {
         // Changes arrive under the folder's real path when the app's folder is reached through a symlink.

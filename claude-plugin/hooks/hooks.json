@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/herdr-issues-created.mjs\"",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/herdr-issues-changed.mjs\"",
             "timeout": 10
           }
         ]

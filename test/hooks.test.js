@@ -11,34 +11,36 @@ const hook = (name) => fileURLToPath(new URL(`../claude-plugin/hooks/${name}`, i
 const runHook = (name, input, env) =>
   spawnSync(hook(name), { input: JSON.stringify(input), encoding: "utf8", env: { ...process.env, ...env } });
 
-test("the created hook touches the stamp after gh creates an issue, and not otherwise", (t) => {
-  const appHome = join(temporaryFolder(t), "herdr-app");
-  const stamp = join(appHome, "data/issues/created");
-  const env = { HERDR_APP_HOME: appHome };
+const changedStamp = (appHome) => join(appHome, "data/issues/changed");
 
-  runHook("herdr-issues-created.mjs", { tool_name: "Bash", tool_input: { command: "gh issue list" }, tool_response: { stdout: "" } }, env);
-  runHook("herdr-issues-created.mjs", { tool_name: "mcp__linear__save_issue", tool_input: { id: "ABC-1" } }, env);
-  assert.equal(existsSync(stamp), false);
-
-  runHook(
-    "herdr-issues-created.mjs",
-    {
-      tool_name: "Bash",
-      tool_input: { command: "gh issue create --title x" },
-      tool_response: { stdout: "https://github.com/owner/repo/issues/12\n" },
-    },
-    env,
-  );
-  assert.equal(existsSync(stamp), true);
-});
-
-test("the created hook touches the stamp after save_issue creates a Linear issue", (t) => {
+test("the changed hook leaves the stamp alone after a gh command that changes no issue", (t) => {
   const appHome = join(temporaryFolder(t), "herdr-app");
 
-  runHook("herdr-issues-created.mjs", { tool_name: "mcp__linear__save_issue", tool_input: { title: "x" } }, { HERDR_APP_HOME: appHome });
+  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh issue list" } }, { HERDR_APP_HOME: appHome });
+  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh pr view 3" } }, { HERDR_APP_HOME: appHome });
 
-  assert.equal(existsSync(join(appHome, "data/issues/created")), true);
+  assert.equal(existsSync(changedStamp(appHome)), false);
 });
+
+for (const command of ["gh issue create --title x", "gh issue close 12 --reason completed", "gh issue edit 12 --body-file b.md", "gh pr merge 3"]) {
+  test(`the changed hook touches the stamp after \`${command}\``, (t) => {
+    const appHome = join(temporaryFolder(t), "herdr-app");
+
+    runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command } }, { HERDR_APP_HOME: appHome });
+
+    assert.equal(existsSync(changedStamp(appHome)), true);
+  });
+}
+
+for (const [change, tool_input] of [["creates", { title: "x" }], ["updates", { id: "ABC-1", state: "Done" }]]) {
+  test(`the changed hook touches the stamp after save_issue ${change} a Linear issue`, (t) => {
+    const appHome = join(temporaryFolder(t), "herdr-app");
+
+    runHook("herdr-issues-changed.mjs", { tool_name: "mcp__linear__save_issue", tool_input }, { HERDR_APP_HOME: appHome });
+
+    assert.equal(existsSync(changedStamp(appHome)), true);
+  });
+}
 
 test("the scope hook announces the listed scope and the open issue once, and when the issue closes", (t) => {
   const folder = temporaryFolder(t);
