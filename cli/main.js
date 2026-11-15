@@ -1,4 +1,5 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
+import { readFile } from "node:fs/promises";
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
 import { createSettings, mergeSettings, pollSettings, workSettings } from "../mod/trackers/setting.js";
@@ -10,7 +11,7 @@ import { issueSpaceName } from "../mod/space-name.js";
 import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
-import { ChangeRefusal, setIssueStatus, startIssue } from "./change.js";
+import { bodyHash, ChangeRefusal, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import { isUnnamed, issueTabName, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
@@ -18,7 +19,7 @@ const USAGE = `Usage: issues <command> [options]
 Commands:
   tracker [--json]         Print the tracker the repository's issues live in: its kind, name, Linear team or GitHub repository
   show <id> [--json]       Print an issue as the tracker reads it: title, status, labels, blockers, branch, pull requests
-                           and body; --json: the whole issue. Comments aren't included
+                           and body; --json: the whole issue, with the bodyHash edit needs. Comments aren't included
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete,
@@ -45,6 +46,9 @@ Commands:
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
                            The statuses: ${STATUSES.join(", ")}
   start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
+  edit <id> --body-file <file> --body-hash <hash>
+                           Save the file as the issue's body and refresh the panels; <hash> is the bodyHash show --json
+                           printed, and the edit is refused, changing nothing, when the body changed since then
 
 Options:
   -h, --help               Print this help`;
@@ -104,7 +108,7 @@ async function show(args) {
   const [id, ...rest] = args.filter((arg) => arg !== "--json");
   if (!id || rest.length || id.startsWith("-")) throw new UsageError("show needs one issue ID");
   const issue = await foundIssue(id);
-  console.log(args.includes("--json") ? JSON.stringify(issue) : issueText(issue));
+  console.log(args.includes("--json") ? JSON.stringify({ ...issue, bodyHash: bodyHash(issue.body) }) : issueText(issue));
 }
 
 // The trackers list only an issue's unfinished blockers, so any blocker left holds the work back.
@@ -305,7 +309,34 @@ async function start(args) {
   console.log(`Started ${issue.id}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, worktree, merge, status, start };
+function editOptions(args) {
+  const options = { id: null, bodyFile: null, readBodyHash: null };
+  const flags = { "--body-file": "bodyFile", "--body-hash": "readBodyHash" };
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (flags[arg]) {
+      if (index + 1 >= args.length) throw new UsageError(`edit: ${arg} needs a value`);
+      options[flags[arg]] = args[++index];
+    } else if (arg.startsWith("-") || options.id) throw new UsageError(`edit: unexpected ${arg}`);
+    else options.id = arg;
+  }
+  if (!options.id || !options.bodyFile) throw new UsageError("edit needs an issue ID and --body-file <file>");
+  if (!options.readBodyHash) {
+    throw new UsageError("edit needs --body-hash <hash>, the bodyHash issues show --json printed, so it can refuse when the body changed since it was read");
+  }
+  return options;
+}
+
+async function edit(args) {
+  const { id, bodyFile, readBodyHash } = editOptions(args);
+  const body = await readFile(bodyFile, "utf8").catch(() => null);
+  if (body === null) throw new Refusal(`${bodyFile}: can't be read`);
+  if (!body.trim()) throw new Refusal(`${bodyFile}: is empty`);
+  const issue = await refusingChanges(async () => editIssueBody(await currentTracker(), id, { body, readBodyHash }));
+  console.log(`Saved the body of ${issue.id}`);
+}
+
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, worktree, merge, status, start, edit };
 
 const HELP_FLAGS = ["-h", "--help"];
 
