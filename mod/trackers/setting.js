@@ -1,6 +1,7 @@
 // Each repository's choice of tracker, in ~/.config/herdr-app/issues.json, which /issues:config writes. Repositories
 // are keyed by their main checkout's path, ~ for the home folder, so worktrees share their repository's choice:
 // { "pollSeconds": 120,                                             how often every panel polls its tracker
+//   "updateCheckHours": 6,                                          how often the panel checks for its own update
 //   "repos": {
 //     "~/Code/web":      { "tracker": "linear", "team": "WEB",      a Linear team, with saved views as extra lists
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
@@ -11,6 +12,8 @@
 //     "~/Code/notes":    { "tracker": "beads" } } }                   the Beads database in its .beads folder
 // pollSeconds, at the top level and in any entry, is how often the panel asks the tracker for its list, a whole number
 // of seconds of at least 10; an entry's overrides the top level's, and pollSettings resolves it, 60 without either.
+// updateCheckHours, at the top level only, is how often the panel fetches its own checkout's origin to offer an
+// update (update.js), a whole number of hours of at least 1; updateSettings resolves it, 6 without it.
 // spaceName, merge, complete and worktreeSetup are optional in any entry. In spaceName, <issueId> is the issue's ID
 // and <repo> the repository's name without its owner; without it, an issue's space is named after its ID. merge is
 // how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
@@ -39,6 +42,8 @@ const MERGES = ["auto", "review", "pull-request"];
 const COMPLETES = ["merged", "pull-request-open"];
 export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
+export const DEFAULT_UPDATE_CHECK_HOURS = 6;
+const MIN_UPDATE_CHECK_HOURS = 1;
 const CREATE_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
 const CREATE_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
 export const DEFAULT_CREATE_MODEL = "sonnet";
@@ -63,6 +68,11 @@ function checkPollSeconds(value, where) {
   throw badSetting(`${where} needs a pollSeconds that's a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
 }
 
+function checkUpdateCheckHours(value) {
+  if (value == null || (Number.isInteger(value) && value >= MIN_UPDATE_CHECK_HOURS)) return;
+  throw badSetting(`issues.json needs an updateCheckHours that's a whole number of hours, ${MIN_UPDATE_CHECK_HOURS} or more`);
+}
+
 function checkChoice(value, name, choices, where) {
   if (value != null && !choices.includes(value)) throw badSetting(`${where} needs a ${name} of ${choices.join(", ")}`);
 }
@@ -83,6 +93,7 @@ function checkWorkSettings(settings, where) {
 const readCheckedSettings = async () => {
   const settings = await readSettings();
   checkPollSeconds(settings?.pollSeconds, "issues.json");
+  checkUpdateCheckHours(settings?.updateCheckHours);
   checkCreateSettings(settings, "issues.json");
   checkWorkSettings(settings, "issues.json");
   return settings;
@@ -116,6 +127,13 @@ export async function trackerSetting({ root, on }) {
 export async function pollSettings(project) {
   const setting = await trackerSetting(project), settings = await readCheckedSettings();
   return { pollSeconds: setting?.pollSeconds ?? settings?.pollSeconds ?? DEFAULT_POLL_SECONDS };
+}
+
+// How often the panel checks for its own update: the top level's updateCheckHours, else 6. It takes a project,
+// as the other settings do, but no repository's entry changes it.
+export async function updateSettings() {
+  const settings = await readCheckedSettings();
+  return { updateCheckHours: settings?.updateCheckHours ?? DEFAULT_UPDATE_CHECK_HOURS };
 }
 
 // The model and effort /issues:create writes issues on: the entry's createModel and createEffort, else the top
