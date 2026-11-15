@@ -31,7 +31,7 @@ export const priorityRank = (issue) => issue.priority || PRIORITIES.length;
 const slaBreachTime = (issue) => (issue.sla ? Date.parse(issue.sla.breachesAt) : Infinity);
 const byId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
 
-function byPosition(a, b) {
+export function byPosition(a, b) {
   const byPriority = priorityRank(a) - priorityRank(b);
   if (byPriority) return byPriority;
   const [aBreach, bBreach] = [slaBreachTime(a), slaBreachTime(b)];

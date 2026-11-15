@@ -18,10 +18,12 @@
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
 //   tracker.start(issue)        → marks the issue in progress
+//   tracker.viewerId()          → the person's Linear user ID, for Linear
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
 //          branch, created, body (null until loaded: tracker.get loads it), updated (when the tracker
 //          can say), labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
+//          assigneeId (the assignee's user ID, or null, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
 //          due (a YYYY-MM-DD date, or null: Linear's due date, or the due date of a GitHub issue's milestone),

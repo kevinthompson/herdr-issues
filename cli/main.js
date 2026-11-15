@@ -8,6 +8,7 @@ import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch, STATUSES } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
 import { mergeIssue, MergeRefusal } from "../mod/merge.js";
+import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { ChangeRefusal, setIssueStatus, startIssue } from "./change.js";
 import { isUnnamed, issueTabName, renameTab, sessionTab } from "./tab.js";
@@ -30,6 +31,9 @@ Commands:
   scopes [--json]          Print the issue lists the panel can show, default first: each one's ID, label and group,
                            a project's milestones grouped under it
   list [<scope>] [--json]  Print the open issues the panel lists in a scope, or the default one: ID, status and title
+  next <n> [<scope>] [--json]
+                           Print the n highest-ranked issues ready to start, nothing blocking them, in a scope or the
+                           default one: ID and title; fewer when fewer qualify
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   worktree <id> [--name <space name>] [--claude <first message>]
@@ -208,6 +212,15 @@ async function scopes(args) {
   else for (const { id, label, group } of scopeRows(scopes)) console.log([id, label, group].filter(Boolean).join("\t"));
 }
 
+// The scope ID to list the tracker's issues in: undefined for its default scope, or for a tracker with one list.
+function listedScopeId(tracker, scopeId) {
+  const rows = scopeRows(trackerScopes(tracker));
+  if (scopeId && !rows.some((scope) => scope.id === scopeId)) {
+    throw new Refusal(`${scopeId}: no such scope; the scopes are ${rows.map((scope) => scope.id).join(", ")}`);
+  }
+  return tracker.scopes ? scopeId : undefined;
+}
+
 // The panel's Backlog group, collapsed at first, still holds open issues, so they're listed too.
 const OPEN_GROUPS_TO_LOAD = new Set(["backlog"]);
 
@@ -215,13 +228,18 @@ async function list(args) {
   const [scopeId, ...extra] = args.filter((arg) => !arg.startsWith("--"));
   if (extra.length) throw new UsageError("list takes at most one scope");
   const tracker = await currentTracker();
-  const rows = scopeRows(trackerScopes(tracker));
-  if (scopeId && !rows.some((scope) => scope.id === scopeId)) {
-    throw new Refusal(`${scopeId}: no such scope; the scopes are ${rows.map((scope) => scope.id).join(", ")}`);
-  }
-  const issues = await tracker.list(tracker.scopes ? scopeId : undefined, OPEN_GROUPS_TO_LOAD);
+  const issues = await tracker.list(listedScopeId(tracker, scopeId), OPEN_GROUPS_TO_LOAD);
   if (args.includes("--json")) console.log(JSON.stringify(issues));
   else for (const { id, status, title } of issues) console.log([id, status, title].join("\t"));
+}
+
+async function next(args) {
+  const [count, scopeId, ...extra] = args.filter((arg) => !arg.startsWith("--"));
+  if (!/^[1-9]\d*$/.test(count ?? "") || extra.length) throw new UsageError("next needs a positive number of issues and at most one scope");
+  const tracker = await currentTracker();
+  const issues = await nextIssues(tracker, Number(count), listedScopeId(tracker, scopeId));
+  if (args.includes("--json")) console.log(JSON.stringify(issues));
+  else for (const { id, title } of issues) console.log([id, title].join("\t"));
 }
 
 function worktreeOptions(args) {
@@ -287,7 +305,7 @@ async function start(args) {
   console.log(`Started ${issue.id}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, tab, worktree, merge, status, start };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, worktree, merge, status, start };
 
 const HELP_FLAGS = ["-h", "--help"];
 

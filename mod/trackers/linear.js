@@ -23,7 +23,7 @@ const TEAM_TTL_MS = 10 * 60 * 1000;
 
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt dueDate url
-  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { name avatarUrl } delegate { id name avatarUrl }
+  slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { id name avatarUrl } delegate { id name avatarUrl }
   state { type name } team { id }
   labels(first: 10) { nodes { name color } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type name } } } }
@@ -266,6 +266,7 @@ function toIssue(node, repoName) {
       .filter((relation) => relation.type === "blocks" && !isFinished(relation.issue.state))
       .map((relation) => relation.issue.identifier),
     branch: workBranch(node, pullRequests, repoName),
+    assigneeId: node.assignee?.id ?? null,
     assignee: node.assignee?.name ?? "Unassigned",
     assigneeAvatar: node.assignee?.avatarUrl ?? null,
     due: node.dueDate ?? null,
@@ -414,6 +415,9 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     },
     deferred: (scopeId) => deferredGroups((findScope(scopes, scopeId)?.scope ?? scopes[0]).id),
     get,
+    async viewerId() {
+      return (await linear(VIEWER, {})).viewer.id;
+    },
     // A new body only saves over the description `issue` was read with, so edits made in Linear
     // meanwhile are never overwritten.
     async update(issue, fields) {
