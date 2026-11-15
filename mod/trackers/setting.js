@@ -27,7 +27,10 @@
 // workModel and workEffort, at the top level and in any entry, an entry's winning, are the model and effort of the
 // Claude sessions Start, Continue and `issues worktree --claude` open to work an issue: workModel is inherit (the
 // person's own Claude Code model), a model alias such as sonnet, or a model's full name; workEffort is default
-// (left unset), low, medium, high, xhigh or max; inherit and default without either. workSettings resolves them.
+// (left unset), low, medium, high, xhigh or max; inherit and default without either. workPrompt, also at the top
+// level and in any entry, an entry's winning, is text appended to those sessions' system prompt with
+// --append-system-prompt, standing instructions such as house rules for tests; none without it, or when it's blank.
+// workSettings resolves all three.
 // Any model or effort the mod or its skills choose is a setting like these, with a default. Keys it doesn't know,
 // such as retired settings, are ignored and kept when an entry is saved.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
@@ -92,6 +95,7 @@ function checkWorkSettings(settings, where) {
     throw badSetting(`${where} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`);
   }
   checkChoice(settings?.workEffort, "workEffort", EFFORTS, where);
+  if (settings?.workPrompt != null && typeof settings.workPrompt !== "string") throw badSetting(`${where} has a workPrompt that isn't text`);
 }
 
 const readCheckedSettings = async () => {
@@ -140,13 +144,15 @@ export async function updateSettings() {
   return { updateCheckHours: settings?.updateCheckHours ?? DEFAULT_UPDATE_CHECK_HOURS };
 }
 
-// The model and effort of the Claude sessions that work the repository's issues: the entry's workModel and
-// workEffort, else the top level's, else inherit and default.
+// The model, effort and appended system prompt of the Claude sessions that work the repository's issues: the
+// entry's workModel, workEffort and workPrompt, else the top level's, else inherit, default and no prompt ("").
+// A blank workPrompt counts as unset.
 export async function workSettings(project) {
   const setting = await trackerSetting(project), settings = await readCheckedSettings();
   return {
     workModel: setting?.workModel ?? settings?.workModel ?? DEFAULT_WORK_MODEL,
     workEffort: setting?.workEffort ?? settings?.workEffort ?? DEFAULT_WORK_EFFORT,
+    workPrompt: setting?.workPrompt?.trim() || settings?.workPrompt?.trim() || "",
   };
 }
 

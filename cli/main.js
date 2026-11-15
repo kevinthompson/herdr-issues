@@ -23,7 +23,7 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete, close, name,
-                           pollSeconds, updateCheckHours, workModel or workEffort
+                           pollSeconds, updateCheckHours, workModel, workEffort or workPrompt
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
@@ -143,13 +143,14 @@ async function spaceName([id]) {
 
 const SETTINGS = {
   merge: mergeSettings, complete: mergeSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
-  workModel: workSettings, workEffort: workSettings,
+  workModel: workSettings, workEffort: workSettings, workPrompt: workSettings,
 };
 
 async function setting([key]) {
   const settings = SETTINGS[key];
   if (!settings) throw new UsageError(`setting ${key ? `has no key ${key}` : "needs a key"}; it knows ${Object.keys(SETTINGS).join(", ")}`);
-  console.log((await settings(await currentProject()))[key]);
+  const value = (await settings(await currentProject()))[key];
+  if (value !== "") console.log(value);
 }
 
 async function tab(args) {

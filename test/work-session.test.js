@@ -82,3 +82,34 @@ describe("the Claude session's model and effort", () => {
     assert.deepEqual(await workSessionArgv({ root: repository, on: null }), ["claude", "--effort", "max"]);
   });
 });
+
+describe("the Claude session's work prompt", () => {
+  beforeEach(() => forgetLookups());
+
+  test("appends the repository's workPrompt to the system prompt as one argument", async (t) => {
+    stubClaude(t, { installed: true });
+    const repository = createRepository(temporaryFolder(t));
+    const workPrompt = `Run "npm test" before each commit.\nDon't use 'git stash'.`;
+    writeSettings({ workPrompt: "Top level", repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt } } });
+    const project = { root: repository, on: null };
+    assert.deepEqual(await workSessionArgv(project), ["claude", "--append-system-prompt", workPrompt]);
+    assert.deepEqual((await workIssueSession(issue, project)).argv, ["claude", "--append-system-prompt", workPrompt]);
+  });
+
+  test("uses the top level's workPrompt without the repository's", async (t) => {
+    stubClaude(t, { installed: true });
+    const repository = createRepository(temporaryFolder(t));
+    writeSettings({ workPrompt: "Top level", repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt: "  " } } });
+    assert.deepEqual(await workSessionArgv({ root: repository, on: null }), ["claude", "--append-system-prompt", "Top level"]);
+  });
+
+  test("adds nothing for a blank or missing workPrompt", async (t) => {
+    stubClaude(t, { installed: true });
+    const repository = createRepository(temporaryFolder(t));
+    writeSettings({ repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt: " \n " } } });
+    assert.deepEqual(await workSessionArgv({ root: repository, on: null }), ["claude"]);
+    forgetLookups();
+    writeSettings({ repos: {} });
+    assert.deepEqual(await workSessionArgv({ root: repository, on: null }), ["claude"]);
+  });
+});
