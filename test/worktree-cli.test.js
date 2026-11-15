@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -36,4 +36,16 @@ test("issues worktree starts a new branch from main in a repository without orig
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(git(repository, "rev-parse", "new-work"), git(repository, "rev-parse", "main"));
+});
+
+test("issues worktree copies the main checkout's local Claude settings into a new worktree", (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  mkdirSync(join(repository, ".claude"));
+  writeFileSync(join(repository, ".claude/settings.local.json"), '{ "disableClaudeAiConnectors": true }\n');
+
+  const result = runIssues(repository, ["worktree", "--branch", "local-settings"]);
+
+  assert.equal(result.status, 0, result.stderr);
+  const worktree = join(process.env.HOME, ".herdr/worktrees/repo/local-settings");
+  assert.equal(readFileSync(join(worktree, ".claude/settings.local.json"), "utf8"), '{ "disableClaudeAiConnectors": true }\n');
 });

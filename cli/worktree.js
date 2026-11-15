@@ -1,9 +1,10 @@
 // `issues worktree`: opens a branch in a worktree of the repository holding a folder and, in Herdr, opens it
 // behind what's shown in a space nested under the repository's space. The worktree is the branch's existing one, else a new
 // checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. With --claude, the space
-// opens a Claude session on the repository's workModel and workEffort settings.
+// opens a Claude session on the repository's workModel and workEffort settings. A new worktree gets a copy of the main
+// checkout's .claude/settings.local.json before the repository's worktreeSetup command runs.
 import { spawn } from "node:child_process";
-import { access, mkdir, readFile, rename, rmdir, stat, writeFile } from "node:fs/promises";
+import { access, copyFile, mkdir, readFile, rename, rmdir, stat, writeFile } from "node:fs/promises";
 import { rmdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { exec, home, readLayout } from "./herdr.js";
@@ -143,6 +144,15 @@ async function runWorktreeSetup(path, main) {
   }
 }
 
+// Git leaves the main checkout's git-ignored .claude/settings.local.json behind, so Claude sessions in the worktree
+// would otherwise miss the person's own settings for the repository, such as the MCP servers they turned off.
+async function copyLocalClaudeSettings(path, main) {
+  const settings = join(".claude", "settings.local.json");
+  if (!(await exists(join(main, settings)))) return;
+  await mkdir(join(path, ".claude"), { recursive: true });
+  await copyFile(join(main, settings), join(path, settings));
+}
+
 // A space's shell loads .envrc as soon as it opens. Content already allowed in the main checkout is trusted.
 async function allowEnvrc(path, main) {
   if (!(await exists(join(path, ".envrc"))) || !(await isInstalled("direnv"))) return;
@@ -210,7 +220,10 @@ export async function openWorktree({ cwd, branch, isNew = false, name = branch, 
   if (!commonDir.ok) throw new Error("not in a git repository");
   const common = commonDir.out, main = dirname(common);
   const { path, created } = await checkoutFolder({ branch, isNew, main, common });
-  if (created) await runWorktreeSetup(path, main);
+  if (created) {
+    await copyLocalClaudeSettings(path, main);
+    await runWorktreeSetup(path, main);
+  }
   await allowEnvrc(path, main);
   if (await isInstalled("herdr-app") && await isInstalled("hc")) await showInSpace({ branch, path, main, common, name, claudeMessage });
   console.log(`cd ${path}`);

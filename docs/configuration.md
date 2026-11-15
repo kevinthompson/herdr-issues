@@ -92,6 +92,8 @@ The panel's setup view asks for both when it sets up a repository's tracker, pro
 
 A repository whose own git hook already sets up new worktrees leaves `worktreeSetup` unset.
 
+You don't need `worktreeSetup` to carry your own Claude Code settings into worktrees: before it runs, `issues worktree` copies the main checkout's `.claude/settings.local.json`, which git ignores, into each worktree it creates. A worktree it reuses keeps the copy it got when it was created.
+
 ### `pollSeconds`
 
 How often the panel asks the tracker for its list of issues, in whole seconds, 10 or more; without it, every 60 seconds. Set it at the top level of `issues.json` for every repository, or in an entry for one repository, which overrides the top level's:
