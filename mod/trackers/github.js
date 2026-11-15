@@ -114,7 +114,7 @@ function originRepository(root, gh) {
 // Runs the GitHub CLI in the main checkout `root`, resolving with its output.
 const ghIn = (root) => async (args) => {
   const result = await exec("gh", args, { cwd: root }).catch(() => null);
-  if (!result) throw ghMissing();
+  if (!result) throw await ghMissing();
   if (result.code !== 0) throw ghFailed(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
   return result.stdout;
 };
@@ -122,7 +122,7 @@ const ghIn = (root) => async (args) => {
 // Throws the problem that stops the GitHub CLI from answering as the person: not installed, or not logged in.
 export async function checkGitHubLogin() {
   const installed = await exec("gh", ["--version"]).catch(() => null);
-  if (installed?.code !== 0) throw ghMissing();
+  if (installed?.code !== 0) throw await ghMissing();
   const auth = await exec("gh", ["auth", "status", "--hostname", "github.com"]).catch(() => null);
   if (auth?.code !== 0) throw ghLoggedOut();
 }

@@ -55,7 +55,7 @@ function toIssue(record, blockedBy, { detailed = false } = {}) {
 // Runs `bd` in the main checkout `root`, resolving with its parsed JSON output.
 const bdIn = (root) => async (args) => {
   const result = await exec("bd", [...args, "--json"], { cwd: root }).catch(() => null);
-  if (!result || result.code === 127) throw bdMissing();
+  if (!result || result.code === 127) throw await bdMissing();
   if (result.code !== 0) throw bdFailed(result.stderr.trim().split("\n").pop() || `bd ${args[0]} failed`);
   return JSON.parse(result.stdout || "null");
 };
@@ -64,7 +64,7 @@ const bdIn = (root) => async (args) => {
 const cachedInstalls = cachedLookup();
 const checkInstalled = (root) => cachedInstalls(root, async () => {
   const result = await exec("bd", ["version"], { cwd: root }).catch(() => null);
-  if (!result || result.code === 127) throw bdMissing();
+  if (!result || result.code === 127) throw await bdMissing();
 });
 
 export async function beadsTracker({ root: projectRoot, on }) {

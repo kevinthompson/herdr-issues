@@ -167,7 +167,7 @@ describe("Beads tracker", () => {
   });
 
   test("asks for bd to be installed when it can't run", async (t) => {
-    await assert.rejects(trackerWith(t, [], { installed: false }), (e) => /isn't installed/.test(e.message) && /brew install beads/.test(e.fix));
+    await assert.rejects(trackerWith(t, [], { installed: false }), (e) => /isn't installed/.test(e.message) && /Beads' README/.test(e.fix));
   });
 
   test("asks for bd init when the main checkout has no Beads database", async (t) => {

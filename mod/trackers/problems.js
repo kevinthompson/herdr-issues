@@ -1,5 +1,7 @@
 // What stops a tracker from loading that the person can fix: each is an Error whose `fix` says what to do,
 // in Markdown. The panel shows these in its setup view (setup.js) rather than as a line above the list.
+import { installCommands, packageManagers } from "../package-managers.js";
+
 export class SetupProblem extends Error {
   constructor(message, fix) {
     super(message);
@@ -10,16 +12,22 @@ export class SetupProblem extends Error {
 const LINEAR_KEY_FIX = "Create a personal API key in Linear under **Settings → Account → Security & access**, and save it in "
   + '`~/.config/herdr-app/linear.json` as `{ "apiKey": "lin_api_…" }`. Then check again.';
 
-export const ghMissing = () => new SetupProblem("The GitHub CLI (gh) isn't installed",
-  "Install it from [cli.github.com](https://cli.github.com) or with `brew install gh`, then check again.");
+// Installing a missing tool with the person's package managers, or as `instructions` say when they have none.
+async function installFix(packageName, instructions) {
+  const commands = installCommands(await packageManagers(), packageName);
+  return `Install it ${commands ? `with ${commands}` : instructions}, then check again.`;
+}
+
+export const ghMissing = async () => new SetupProblem("The GitHub CLI (gh) isn't installed",
+  await installFix("gh", "from [cli.github.com](https://cli.github.com)"));
 export const ghLoggedOut = () => new SetupProblem("The GitHub CLI (gh) isn't logged in",
   "Run `gh auth login` in a terminal, then check again.");
 export const ghFailed = (message) => new SetupProblem(message,
   "Check that `gh auth status` shows you logged in and that your GitHub account can see the repository, then check again.");
 export const originNotOnGitHub = () => new SetupProblem("This repository's origin isn't on GitHub",
   "Add the repository's GitHub copy as the `origin` remote, then check again. To track issues in another GitHub repository, run `/issues:config` in Claude.");
-export const bdMissing = () => new SetupProblem("The Beads CLI (bd) isn't installed",
-  "Install it with `brew install beads`, or as [Beads' README](https://github.com/steveyegge/beads) says, then check again.");
+export const bdMissing = async () => new SetupProblem("The Beads CLI (bd) isn't installed",
+  await installFix("beads", "as [Beads' README](https://github.com/steveyegge/beads) says"));
 export const beadsNotInitialized = () => new SetupProblem("This repository has no Beads database",
   "Run `bd init` in the repository's main checkout, then check again.");
 export const bdFailed = (message) => new SetupProblem(message,
