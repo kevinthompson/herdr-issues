@@ -4,13 +4,14 @@
 // where its issues live, its tracker, which a different choice checks as the setup view does (tracker-choice.js)
 // before it can be saved, with Linear's team once Linear is checked; how its work gets into main, and, only for a
 // pull request, when the work is complete, its merge and complete in issues.json; what a finished session does
-// about its worktree, its close; then the model and effort of the background agent that writes issues and of the
+// about its worktree, its close; the name of the space on its main checkout, its name, typed in with the default as
+// placeholder, where emptying the field removes it from the entry; then the model and effort of the background agent that writes issues and of the
 // sessions that work them, its createModel, createEffort, workModel and workEffort. It opens on the settings in
 // effect, defaults applied, as `issues setting` prints them, and says where each model and effort comes from when
 // the repository's entry doesn't set it. Each model and effort offers its allowed values and a choice that removes
 // it from the entry, so issues.json's top level or the default applies; workModel's Other takes another model alias
 // or full name typed in. Save waits for a different tracker's check to pass and, for Linear, a team, writes only the
-// changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting and saveAgentSettings in setting.js) and goes
+// changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting and saveAgentSettings in setting.js) and goes
 // back to the list; a failed save shows its error and stays. Back writes nothing.
 import { div } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
@@ -21,7 +22,8 @@ import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, settingsFields, workM
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
   AGENT_DEFAULTS, CREATE_EFFORTS, CREATE_MODELS, SUGGESTED_WORK_MODELS,
-  agentSettings, closeSettings, mergeSettings, saveAgentSettings, saveCloseSetting, saveMergeSettings, saveTrackerChoice,
+  agentSettings, closeSettings, mergeSettings, nameSettings,
+  saveAgentSettings, saveCloseSetting, saveMergeSettings, saveNameSetting, saveTrackerChoice,
 } from "./trackers/setting.js";
 
 const TEAM_PICKS = "issues.settingsTeams";
@@ -40,6 +42,7 @@ const CLOSE_CHOICES = [
   { id: "manual", label: "I'll close it", detail: "The session tells you to close the worktree with cmd+shift+w." },
 ];
 const CLOSE_SENTENCE = "What a finished session does about its worktree. A worktree that might lose work, or that has other spaces nested under it, always shows the removal dialog first.";
+const NAME_SENTENCE = "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
 
 const AGENT_QUESTIONS = [
   { key: "createModel", title: "Issue writer's model", sentence: "The model of the background agent that writes issues for /issues:create, /issues:plan and /issues:triage.", choices: CREATE_MODELS },
@@ -70,6 +73,7 @@ export class SettingsView {
     });
     this.saved = null; this.merge = null; this.complete = null;
     this.savedClose = null; this.close = null;
+    this.savedName = null; this.nameInput = null;
     this.savedAgent = null; this.agentEntry = {}; this.otherWorkModelPicked = false;
     this.selects = null;
     this.loading = true; this.saving = false; this.error = null;
@@ -88,9 +92,15 @@ export class SettingsView {
     };
     cx.spawn(async (cx) => {
       try {
-        const [merge, { close }, agent] = await Promise.all([mergeSettings(this.project), closeSettings(this.project), agentSettings(this.project)]);
+        const [merge, { close }, name, agent] = await Promise.all([
+          mergeSettings(this.project), closeSettings(this.project), nameSettings(this.project), agentSettings(this.project),
+        ]);
         this.saved = merge; Object.assign(this, merge);
         this.savedClose = close; this.close = close;
+        this.savedName = name.entry;
+        this.nameInput = InputState.new({ placeholder: name.defaultName, value: name.entry ?? "" });
+        this.nameInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
+        this.nameInput.on("submit", (_e, cx) => this.save(cx));
         this.savedAgent = agent;
         this.agentEntry = Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry]));
         if (isTypedWorkModel(this.agentEntry.workModel)) this.workModelInput.set_value(this.agentEntry.workModel);
@@ -170,6 +180,15 @@ export class SettingsView {
     return Boolean(this.close) && this.close !== this.savedClose;
   }
 
+  // The typed name, or null when the field is empty, so the repository's name applies.
+  typedName() {
+    return this.nameInput?.value().trim() || null;
+  }
+
+  nameChanged() {
+    return Boolean(this.nameInput) && this.typedName() !== this.savedName;
+  }
+
   agentChanges() {
     return Object.fromEntries(Object.keys(AGENT_DEFAULTS)
       .filter((key) => this.savedAgent && (this.agentEntry[key] ?? null) !== this.savedAgent[key].entry)
@@ -177,7 +196,7 @@ export class SettingsView {
   }
 
   changed() {
-    return Boolean(this.trackerChange()) || this.mergeChanged() || this.closeChanged() || Object.keys(this.agentChanges()).length > 0;
+    return Boolean(this.trackerChange()) || this.mergeChanged() || this.closeChanged() || this.nameChanged() || Object.keys(this.agentChanges()).length > 0;
   }
 
   canSave() {
@@ -189,6 +208,7 @@ export class SettingsView {
     const trackerChoice = this.trackerChange();
     const mergeChoice = this.mergeChanged() ? { merge: this.merge, complete: this.merge === "pull-request" ? this.complete : null } : null;
     const closeChoice = this.closeChanged() ? this.close : null;
+    const nameChanged = this.nameChanged(), name = this.typedName();
     const agentChanges = this.agentChanges();
     Object.assign(this, { saving: true, error: null });
     cx.spawn(async (cx) => {
@@ -196,6 +216,7 @@ export class SettingsView {
         if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
         if (mergeChoice) await saveMergeSettings(this.main, mergeChoice);
         if (closeChoice) await saveCloseSetting(this.main, closeChoice);
+        if (nameChanged) await saveNameSetting(this.main, name);
         if (Object.keys(agentChanges).length > 0) await saveAgentSettings(this.main, agentChanges);
         this.onSaved(cx);
       } catch (e) { this.error = `Could not save: ${e.message ?? e}`; }
@@ -239,6 +260,8 @@ export class SettingsView {
         .child(this.selects.complete.render(t, { options: COMPLETE_CHOICES, value: this.complete, onChoose: (id, cx) => this.chooseComplete(id, cx), enabled: !this.saving }))))
       .child(this.question(v_flex().flex_none().gap(8).pt(4), "When the work is complete, close the worktree?", CLOSE_SENTENCE, t)
         .child(this.selects.close.render(t, { options: CLOSE_CHOICES, value: this.close, onChoose: (id, cx) => this.chooseClose(id, cx), enabled: !this.saving })))
+      .when(Boolean(this.nameInput), (e) => e.child(this.question(v_flex().flex_none().gap(8).pt(4), "Repository name", NAME_SENTENCE, t)
+        .child(this.textField(this.nameInput, t))))
       .when(Boolean(this.savedAgent), (e) => e.children(AGENT_QUESTIONS.map((question) => this.agentQuestion(question, fields, t))))
       .when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")))
       .child(h_flex().gap(8).items_center()
@@ -275,7 +298,11 @@ export class SettingsView {
       .child(this.note(`Now ${value}, ${SOURCE_PHRASES[source]}.`, t))
       .child(this.selects[key].render(t, { options, value: chosen, enabled: !this.saving,
         onChoose: (id, cx) => this.chooseAgent(key, id === CLEAR_CHOICE ? null : id, cx) }))
-      .when(isWorkModel && fields.workModelInput, (e) => e.child(Input.new(this.workModelInput).min_w(0).max_w(280).h(26).px(8).items_center()
-        .rounded(7).border(1).border_color(t.input).bg(t.surface).text_size(12).text_color(t.foreground)));
+      .when(isWorkModel && fields.workModelInput, (e) => e.child(this.textField(this.workModelInput, t)));
+  }
+
+  textField(state, t) {
+    return Input.new(state).min_w(0).max_w(280).h(26).px(8).items_center()
+      .rounded(7).border(1).border_color(t.input).bg(t.surface).text_size(12).text_color(t.foreground);
   }
 }

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
-import { nameSettings, settingsPath } from "../mod/trackers/setting.js";
+import { nameSettings, saveNameSetting, settingsPath } from "../mod/trackers/setting.js";
 import { main } from "../cli/main.js";
 
 function writeSettings(settings) {
@@ -13,6 +13,7 @@ function writeSettings(settings) {
   writeFileSync(settingsPath(), JSON.stringify(settings));
 }
 
+const readSettings = () => JSON.parse(readFileSync(settingsPath(), "utf8"));
 const githubEntry = (extra = {}) => ({ tracker: "github", repo: "owner/name", ...extra });
 
 const startingFolder = process.cwd();
@@ -73,6 +74,35 @@ test("a repository without an entry uses its main checkout's folder's name", asy
   const repository = repositoryNamed(t, "plain");
   writeSettings({ repos: {} });
   assert.equal(await nameSetting(t, repository), "plain");
+});
+
+test("saving a name keeps the entry's other keys and every other repository's entry", async (t) => {
+  const repository = repositoryNamed(t, "checkout");
+  const entry = githubEntry({ merge: "auto" }), other = { tracker: "beads", name: "Other" };
+  writeSettings({ pollSeconds: 30, repos: { "/elsewhere": other, [repository]: entry } });
+
+  await saveNameSetting(repository, "  Saved  ");
+
+  assert.deepEqual(readSettings(), { pollSeconds: 30, repos: { "/elsewhere": other, [repository]: { ...entry, name: "Saved" } } });
+  assert.equal(await nameSetting(t, repository), "Saved");
+});
+
+test("saving an empty name removes the key", async (t) => {
+  const repository = repositoryNamed(t, "checkout");
+  writeSettings({ repos: { [repository]: githubEntry({ name: "Old" }) } });
+
+  await saveNameSetting(repository, " ");
+
+  assert.deepEqual(readSettings().repos[repository], githubEntry());
+});
+
+test("a repository without an entry gets none from saving a name", async (t) => {
+  const repository = repositoryNamed(t, "checkout");
+  writeSettings({ repos: {} });
+  const before = readFileSync(settingsPath(), "utf8");
+
+  await assert.rejects(saveNameSetting(repository, "Name"), /no entry in issues\.json/);
+  assert.equal(readFileSync(settingsPath(), "utf8"), before);
 });
 
 test("a name that isn't text is refused", async (t) => {

@@ -35,8 +35,8 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, and
-// its model and effort settings with saveAgentSettings.
+// tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, its
+// name with saveNameSetting, and its model and effort settings with saveAgentSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -301,6 +301,19 @@ export async function saveCloseSetting(main, close) {
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
     return { ...entry, close };
+  });
+}
+
+// Sets the name of the space on the main checkout `main`. A blank or null name removes the key, so the
+// repository's name applies. It changes only name in the repository's existing entry, and writes nothing for a
+// repository without an entry.
+export async function saveNameSetting(main, name) {
+  const trimmed = name?.trim() || null;
+  await changeEntry(main, (entry) => {
+    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
+    const changed = { ...entry, name: trimmed };
+    if (!trimmed) delete changed.name;
+    return changed;
   });
 }
 
