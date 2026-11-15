@@ -32,18 +32,16 @@ async function setting(t, repository, key) {
 
 test("saving model and effort settings writes only those keys and keeps every other repository's entry", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  const entry = { tracker: "github", repo: "owner/name", views: { Mine: "https://example.com" }, merge: "auto", createEffort: "low" };
+  const entry = { tracker: "github", repo: "owner/name", views: { Mine: "https://example.com" }, merge: "auto" };
   const other = { tracker: "beads", workModel: "opus" };
   writeSettings({ pollSeconds: 30, workEffort: "high", repos: { "/elsewhere": other, [repository]: entry } });
 
-  await saveAgentSettings(repository, { createModel: "opus", workModel: "claude-opus-5-5", workEffort: "max" });
+  await saveAgentSettings(repository, { workModel: "claude-opus-5-5", workEffort: "max" });
 
   assert.deepEqual(readSettings(), {
     pollSeconds: 30, workEffort: "high",
-    repos: { "/elsewhere": other, [repository]: { ...entry, createModel: "opus", workModel: "claude-opus-5-5", workEffort: "max" } },
+    repos: { "/elsewhere": other, [repository]: { ...entry, workModel: "claude-opus-5-5", workEffort: "max" } },
   });
-  assert.equal(await setting(t, repository, "createModel"), "opus");
-  assert.equal(await setting(t, repository, "createEffort"), "low");
   assert.equal(await setting(t, repository, "workModel"), "claude-opus-5-5");
   assert.equal(await setting(t, repository, "workEffort"), "max");
   assert.deepEqual(await workSessionArgv({ root: repository }), ["claude", "--model", "claude-opus-5-5", "--effort", "max"]);
@@ -51,16 +49,14 @@ test("saving model and effort settings writes only those keys and keeps every ot
 
 test("clearing a setting removes it, so the top level's value or the default applies", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workEffort: "high", repos: { [repository]: { tracker: "beads", createModel: "haiku", workModel: "opus", workEffort: "low" } } });
+  writeSettings({ workEffort: "high", repos: { [repository]: { tracker: "beads", workModel: "opus", workEffort: "low" } } });
 
-  await saveAgentSettings(repository, { createModel: null, workEffort: null });
+  await saveAgentSettings(repository, { workEffort: null });
 
   assert.deepEqual(readSettings().repos[repository], { tracker: "beads", workModel: "opus" });
-  assert.equal(await setting(t, repository, "createModel"), "sonnet");
   assert.equal(await setting(t, repository, "workEffort"), "high");
   forgetLookups();
   const settings = await agentSettings({ root: repository });
-  assert.deepEqual(settings.createModel, { value: "sonnet", source: "default", entry: null, topLevel: null });
   assert.deepEqual(settings.workModel, { value: "opus", source: "repository", entry: "opus", topLevel: null });
   assert.deepEqual(settings.workEffort, { value: "high", source: "top level", entry: null, topLevel: "high" });
 });
@@ -70,8 +66,7 @@ test("a value the settings would refuse is not written", async (t) => {
   writeSettings({ repos: { [repository]: { tracker: "beads" } } });
   const before = readFileSync(settingsPath(), "utf8");
 
-  await assert.rejects(saveAgentSettings(repository, { createModel: "claude-opus-5-5" }), /createModel must be one of/);
-  await assert.rejects(saveAgentSettings(repository, { createEffort: "extreme" }), /createEffort must be one of/);
+  await assert.rejects(saveAgentSettings(repository, { workEffort: "extreme" }), /workEffort must be one of/);
   await assert.rejects(saveAgentSettings(repository, { workModel: "two words" }), /workModel must be/);
   await assert.rejects(saveAgentSettings(repository, { merge: "auto" }), /isn't a model or effort setting/);
   assert.equal(readFileSync(settingsPath(), "utf8"), before);

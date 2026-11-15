@@ -123,24 +123,6 @@ How often the panel asks the tracker for its list of issues, in whole seconds, 1
 }
 ```
 
-### `createModel` and `createEffort`
-
-`/issues:create` settles what the work is with you, then writes and files the issues in a background agent, so you can keep working. `/issues:plan` hands its approved breakdown to the same agent, and `/issues:triage` the new slices of an issue it splits. These two settings choose that agent's model and effort. Set them at the top level of `issues.json` for every repository, or in an entry for one repository, which overrides the top level's.
-
-- `createModel`: `sonnet` (the default), `opus`, `haiku` or `fable`, or `inherit` to use the session's own model.
-- `createEffort`: `low`, `medium`, `high`, `xhigh` or `max`, or `default` (the default) to leave the agent at its usual effort.
-
-```json
-{
-  "createModel": "opus",
-  "repos": {
-    "~/Code/herdr-issues": { "tracker": "github", "createModel": "inherit", "createEffort": "high" }
-  }
-}
-```
-
-`issues setting createModel` and `issues setting createEffort` print a repository's settings, with their defaults applied, and `/issues:config` shows and changes them.
-
 ### `workModel` and `workEffort`
 
 The panel's Start and Continue, and `/issues:start` through `issues worktree --claude`, open a Claude session that works the issue. These two settings choose that session's model and effort, at the top level or in a repository's entry, which overrides the top level's. Without them, the session runs on your own Claude Code model and effort.

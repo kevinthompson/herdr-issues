@@ -24,14 +24,12 @@
 // name, also optional in any entry, names the space `issues worktree` and the worktree dialog open on the main
 // checkout, which the sidebar nests worktree spaces under; nameSettings resolves it, the repository's name without
 // its owner without it or when it's blank.
-// createModel and createEffort, at the top level and in any entry, an entry's winning, are the model and effort
-// the issue-writer agent files issues on in the background for /issues:create, /issues:plan and /issues:triage:
-// createModel is inherit (the session's own model), sonnet, opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
-// max, default without either. createSettings resolves them. workModel and workEffort, set the same way, are the
-// model and effort of the Claude sessions Start, Continue and `issues worktree --claude` open to work an issue:
-// workModel is inherit (the person's own Claude Code model), a model alias such as sonnet, or a model's full name;
-// workEffort takes createEffort's values; inherit and default without either. workSettings resolves them. Any model
-// or effort the mod or its skills choose is a setting like these, with a default.
+// workModel and workEffort, at the top level and in any entry, an entry's winning, are the model and effort of the
+// Claude sessions Start, Continue and `issues worktree --claude` open to work an issue: workModel is inherit (the
+// person's own Claude Code model), a model alias such as sonnet, or a model's full name; workEffort is default
+// (left unset), low, medium, high, xhigh or max; inherit and default without either. workSettings resolves them.
+// Any model or effort the mod or its skills choose is a setting like these, with a default. Keys it doesn't know,
+// such as retired settings, are ignored and kept when an entry is saved.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
@@ -53,11 +51,8 @@ export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
 export const DEFAULT_UPDATE_CHECK_HOURS = 6;
 const MIN_UPDATE_CHECK_HOURS = 1;
-export const CREATE_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
-export const CREATE_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
+export const EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
 export const SUGGESTED_WORK_MODELS = ["inherit", "sonnet", "opus", "haiku"];
-export const DEFAULT_CREATE_MODEL = "sonnet";
-export const DEFAULT_CREATE_EFFORT = "default";
 export const DEFAULT_WORK_MODEL = "inherit";
 export const DEFAULT_WORK_EFFORT = "default";
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
@@ -87,11 +82,6 @@ function checkChoice(value, name, choices, where) {
   if (value != null && !choices.includes(value)) throw badSetting(`${where} needs a ${name} of ${choices.join(", ")}`);
 }
 
-function checkCreateSettings(settings, where) {
-  checkChoice(settings?.createModel, "createModel", CREATE_MODELS, where);
-  checkChoice(settings?.createEffort, "createEffort", CREATE_EFFORTS, where);
-}
-
 const isModelName = (model) => typeof model === "string" && /^\S+$/.test(model);
 
 function checkWorkSettings(settings, where) {
@@ -99,14 +89,13 @@ function checkWorkSettings(settings, where) {
   if (model != null && !isModelName(model)) {
     throw badSetting(`${where} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`);
   }
-  checkChoice(settings?.workEffort, "workEffort", CREATE_EFFORTS, where);
+  checkChoice(settings?.workEffort, "workEffort", EFFORTS, where);
 }
 
 const readCheckedSettings = async () => {
   const settings = await readSettings();
   checkPollSeconds(settings?.pollSeconds, "issues.json");
   checkUpdateCheckHours(settings?.updateCheckHours);
-  checkCreateSettings(settings, "issues.json");
   checkWorkSettings(settings, "issues.json");
   return settings;
 };
@@ -123,7 +112,6 @@ export async function trackerSetting({ root, on }) {
   if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
   if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
   checkPollSeconds(setting.pollSeconds, `issues.json's ${key}`);
-  checkCreateSettings(setting, `issues.json's ${key}`);
   checkWorkSettings(setting, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
   if (setting.name != null && typeof setting.name !== "string") throw badSetting(`issues.json's ${key} has a name that isn't text`);
@@ -150,16 +138,6 @@ export async function updateSettings() {
   return { updateCheckHours: settings?.updateCheckHours ?? DEFAULT_UPDATE_CHECK_HOURS };
 }
 
-// The model and effort /issues:create writes issues on: the entry's createModel and createEffort, else the top
-// level's, else sonnet and default.
-export async function createSettings(project) {
-  const setting = await trackerSetting(project), settings = await readCheckedSettings();
-  return {
-    createModel: setting?.createModel ?? settings?.createModel ?? DEFAULT_CREATE_MODEL,
-    createEffort: setting?.createEffort ?? settings?.createEffort ?? DEFAULT_CREATE_EFFORT,
-  };
-}
-
 // The model and effort of the Claude sessions that work the repository's issues: the entry's workModel and
 // workEffort, else the top level's, else inherit and default.
 export async function workSettings(project) {
@@ -170,13 +148,9 @@ export async function workSettings(project) {
   };
 }
 
-export const AGENT_DEFAULTS = {
-  createModel: DEFAULT_CREATE_MODEL, createEffort: DEFAULT_CREATE_EFFORT,
-  workModel: DEFAULT_WORK_MODEL, workEffort: DEFAULT_WORK_EFFORT,
-};
+export const AGENT_DEFAULTS = { workModel: DEFAULT_WORK_MODEL, workEffort: DEFAULT_WORK_EFFORT };
 
-// The four agent settings, each as { value, source, entry, topLevel }: the value createSettings or workSettings
-// resolves, where it comes from ("repository", "top level" or "default"), and the repository's entry's and the
+// The agent settings, each as { value, source, entry, topLevel }: the value workSettings resolves, where it comes from ("repository", "top level" or "default"), and the repository's entry's and the
 // top level's own values, null where unset.
 export async function agentSettings(project) {
   const setting = await trackerSetting(project), settings = await readCheckedSettings();
@@ -325,13 +299,11 @@ function checkAgentChanges(changes) {
       if (!isModelName(value)) throw badSetting("workModel must be inherit, a model alias such as sonnet, or a model's full name");
       continue;
     }
-    const choices = key === "createModel" ? CREATE_MODELS : CREATE_EFFORTS;
-    if (!choices.includes(value)) throw badSetting(`${key} must be one of ${choices.join(", ")}`);
+    if (!EFFORTS.includes(value)) throw badSetting(`${key} must be one of ${EFFORTS.join(", ")}`);
   }
 }
 
-// Sets the model and effort settings in `changes`, { createModel, createEffort, workModel, workEffort } or any of
-// them, in the existing entry of the repository whose main checkout is `main`. A null value removes the key, so the
+// Sets the model and effort settings in `changes`, { workModel, workEffort } or either of them, in the existing entry of the repository whose main checkout is `main`. A null value removes the key, so the
 // top level's value or the default applies. It changes no other key, and writes nothing for a value
 // trackerSetting would refuse or a repository without an entry.
 export async function saveAgentSettings(main, changes) {

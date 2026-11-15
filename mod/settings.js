@@ -6,8 +6,7 @@
 // its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be saved,
 // with Linear's team once Linear is checked; how its work gets into main, and, only for a pull request, when the
 // work is complete, its merge and complete in issues.json; what a finished session does about its worktree, its
-// close; then the model and effort of the background agent that writes issues and of the sessions that work them,
-// its createModel, createEffort, workModel and workEffort. It opens on the settings in effect, defaults applied,
+// close; then the model and effort of the sessions that work its issues, its workModel and workEffort. It opens on the settings in effect, defaults applied,
 // as `issues setting` prints them. Each model and effort offers its allowed values and a choice that removes
 // it from the entry, so issues.json's top level or the default applies; workModel's Other takes another model alias
 // or full name typed in. Save waits for a different tracker's check to pass and, for Linear, a team, writes only the
@@ -21,7 +20,7 @@ import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, settingsFields, workModelChoice } from "./settings-fields.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
-  AGENT_DEFAULTS, CREATE_EFFORTS, CREATE_MODELS, SUGGESTED_WORK_MODELS,
+  AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS,
   agentSettings, closeSettings, mergeSettings, nameSettings,
   saveAgentSettings, saveCloseSetting, saveMergeSettings, saveNameSetting, saveTrackerChoice,
 } from "./trackers/setting.js";
@@ -45,10 +44,8 @@ const CLOSE_SENTENCE = "What a finished session does about its worktree. A workt
 const NAME_SENTENCE = "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
 
 const AGENT_QUESTIONS = [
-  { key: "createModel", title: "Issue writer's model", sentence: "The model of the background agent that writes issues for /issues:create, /issues:plan and /issues:triage.", choices: CREATE_MODELS },
-  { key: "createEffort", title: "Issue writer's effort", sentence: null, choices: CREATE_EFFORTS },
   { key: "workModel", title: "Issue sessions' model", sentence: "The model of the Claude sessions Start and Continue open to work an issue. inherit uses your own Claude Code model.", choices: SUGGESTED_WORK_MODELS },
-  { key: "workEffort", title: "Issue sessions' effort", sentence: null, choices: CREATE_EFFORTS },
+  { key: "workEffort", title: "Issue sessions' effort", sentence: null, choices: EFFORTS },
 ];
 const OTHER_WORK_MODEL_OPTION = { id: OTHER_WORK_MODEL, label: "Other…", detail: "Another model alias or full name, typed in." };
 
