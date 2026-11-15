@@ -1,7 +1,8 @@
 // Tells Claude sessions which issues the panel lists for a repository, and which issue it has open. Each
 // repository's scope is a JSON file in the app's data folder, keyed by its main checkout, which a Claude hook
 // (claude-plugin/hooks/herdr-issues-scope.mjs) adds to the context of sessions working in it:
-// { repo, tracker, team, scope: { kind, label, project: { name, url }, milestone: { name } } }.
+// { repo, tracker, team, scope: { id, kind, label, project: { name, url }, milestone: { name } } }, id being
+// the scope's ID for `issues list`.
 // The open issue is data/issues/open.json, which the same hook reads: { root, id, title, link }, root being
 // the checkout the panel shows, or null while the panel shows its list.
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
@@ -14,6 +15,7 @@ function describe(tracker, scopeId) {
   const { scope, project, milestone } = findScope(tracker.scopes, scopeId) ?? { scope: tracker.scopes[0] };
   const kind = milestone ? "milestone" : project ? "project" : scope.id.startsWith("view:") ? "view" : scope.id;
   return {
+    id: scope.id,
     kind,
     label: scope.label,
     project: project ? { name: project.label, url: project.url } : null,
