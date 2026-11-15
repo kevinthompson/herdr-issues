@@ -12,8 +12,8 @@
 #   - links the issues CLI (bin/issues) to ~/.local/bin/issues
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
-# Needs herdr-app, git and node. Claude Code (claude) is needed only for the issues:* skills and hooks, and gh
-# only for repositories tracked in GitHub Issues.
+# Needs herdr-app, git and node 22.15 or later. Claude Code (claude) is needed only for the issues:* skills and
+# hooks, and gh only for repositories tracked in GitHub Issues.
 
 set -euo pipefail
 
@@ -65,6 +65,23 @@ if ((${#missing[@]})); then
   error "setup: missing required commands: ${missing[*]}"
   exit 1
 fi
+
+# bin/issues calls module.registerHooks, which Node added in 22.15.
+minimum_node_version=22.15
+refuse_old_node() {
+  local found_version minimum_major=${minimum_node_version%.*} minimum_minor=${minimum_node_version#*.}
+  found_version=$(node --version)
+  found_version=${found_version#v}
+  if [[ $found_version =~ ^([0-9]+)\.([0-9]+) ]]; then
+    local major=${BASH_REMATCH[1]} minor=${BASH_REMATCH[2]}
+    ((major > minimum_major || (major == minimum_major && minor >= minimum_minor))) && return
+  fi
+  error "setup: node $found_version is too old; the issues CLI needs Node $minimum_node_version or later"
+  error "setup: install a newer Node, then run setup again"
+  exit 1
+}
+refuse_old_node
+
 command -v gh >/dev/null || warning "setup: warning: gh is not installed; repositories tracked in GitHub Issues need it"
 
 refuse_linked_worktree() {
