@@ -251,3 +251,78 @@ test("setup installs nothing without a terminal, even with a package manager", (
   assert.doesNotMatch(output, /Install it with|Which package manager/);
   assert.match(result.stderr, /node is not installed; the issues CLI needs Node 22\.15 or later/);
 });
+
+const sidePanelLayout = (withIssues = false) => ({
+  id: "root",
+  children: [
+    { id: "main" },
+    { id: "panel", children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+    ...(withIssues ? [{ id: "issues-panel", type: "column", size: { weight: 1 }, children: [{ id: "issues", type: "block", content: { mod: "issues" } }] }] : []),
+  ],
+});
+
+// Runs setup, without claude, against Herdr's `layouts` (name: shows the Issues panel), main being shipped, with
+// Herdr showing `shown`; `answers` runs it on a pseudo-terminal. The herdr-app stub reports no open window.
+function runSetupWithLayouts(t, { layouts, shown, answers = null }) {
+  const folder = temporaryFolder(t);
+  const checkout = createCheckout(join(folder, "clone"));
+  const home = join(folder, "home");
+  const appHome = join(home, ".config/herdr-app");
+  mkdirSync(join(appHome, "layouts"), { recursive: true });
+  for (const [name, withIssues] of Object.entries(layouts)) {
+    writeFileSync(join(appHome, "layouts", `${name}.json`), JSON.stringify(sidePanelLayout(withIssues)));
+  }
+  writeFileSync(join(appHome, "installed.json"), JSON.stringify({ "layout:main": "1.0.0" }));
+  writeFileSync(join(appHome, "shared.json"), JSON.stringify({ layout: shown, "sidebar.width": 268 }));
+  writeFileSync(join(appHome, "keys.json"), "{}");
+
+  const env = { HOME: home, HERDR_APP_HOME: appHome, PATH: [binWithoutClaude(folder), "/usr/bin", "/bin"].join(":") };
+  const setup = join(checkout, "setup");
+  const result = answers
+    ? spawnSync("python3", ["-c", answerInTerminal, setup, ...answers], { encoding: "utf8", env })
+    : spawnSync(setup, { encoding: "utf8", input: "", env });
+  const readAppJson = (path) => JSON.parse(readFileSync(join(appHome, path), "utf8"));
+  return { result, output: result.stdout + result.stderr, readAppJson };
+}
+
+test("setup says how to switch when the Issues panel is in a layout Herdr doesn't show", (t) => {
+  const { result, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, development: true }, shown: "main" });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /The Issues panel is in the development layout, but Herdr shows the main layout; switch to it with: herdr-app do layout\.switch '\{"name":"development"\}'/);
+  assert.equal(readAppJson("shared.json").layout, "main");
+});
+
+test("setup says nothing about switching when Herdr shows the layout with the Issues panel", (t) => {
+  const { result } = runSetupWithLayouts(t, { layouts: { main: false, development: true }, shown: "development" });
+
+  assert.match(result.stdout, /The Issues panel is in the development layout, which Herdr shows/);
+  assert.doesNotMatch(result.stderr, /switch to it/);
+});
+
+terminalTest("setup switches to the layout with the Issues panel when the person agrees, keeping Herdr's shared state", (t) => {
+  const { output, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, development: true }, shown: "main", answers: ["y"] });
+
+  assert.match(output, /Herdr shows the main layout, which has no Issues panel\. Switch to development/);
+  assert.match(output, /Herdr now shows the development layout/);
+  assert.deepEqual(readAppJson("shared.json"), { layout: "development", "sidebar.width": 268 });
+});
+
+terminalTest("setup lists the layout Herdr shows first and doesn't offer to switch after adding the panel to it", (t) => {
+  const { output, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, alpha: false, work: false }, shown: "work", answers: ["1"] });
+
+  assert.match(output, /Herdr shows the work layout\. Which layout should show the Issues panel\?/);
+  assert.match(output, /1\) work \(shown now\)/);
+  assert.match(output, /2\) alpha/);
+  assert.match(output, /Added the Issues panel to the work layout/);
+  assert.doesNotMatch(output, /\[y\/N\]/);
+  assert.equal(readAppJson("shared.json").layout, "work");
+});
+
+terminalTest("setup offers to switch to the layout it added the panel to when Herdr shows another", (t) => {
+  const { output, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, work: false }, shown: "main", answers: ["1", "y"] });
+
+  assert.match(output, /Added the Issues panel to the work layout/);
+  assert.match(output, /Switch to work, which has it, and open with it from now on\? \[y\/N\]/);
+  assert.equal(readAppJson("shared.json").layout, "work");
+});

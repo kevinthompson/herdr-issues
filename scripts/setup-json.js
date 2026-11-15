@@ -17,6 +17,9 @@
 //                                     changing the layout and 10 when there was nothing to change
 //   remove-panel <layout>             removes the issues block and a column holding only it;
 //                                     exits 0 after removing it and 10 when the layout didn't show it
+//   window-layout                     prints the layout in `herdr-app status` on stdin, and nothing without an open window
+//   shown-layout <shared.json>        prints the layout Herdr shows, which it keeps across restarts (main by default)
+//   show-layout <shared.json> <name>  records the layout Herdr shows at its next start, for when no window is open
 //   copy-layout <from> <to> <version> copies a layout, records what it was cloned from, and adds the issues block
 //   set-repo <issues.json> <main checkout> <entry>
 //                                     replaces the repository's entry in issues.json with the entry's JSON, under
@@ -239,6 +242,25 @@ const commands = {
     if (!removePanel(layout)) return panelAbsentExitCode;
     writeJson(layoutPath, layout);
     return panelRemovedExitCode;
+  },
+  "window-layout": () => {
+    let status;
+    try {
+      status = readStdinJson();
+    } catch {
+      return;
+    }
+    if (typeof status?.layout === "string") console.log(status.layout);
+  },
+  "shown-layout": (sharedPath) => {
+    let shared = {};
+    try {
+      shared = readJson(sharedPath);
+    } catch {}
+    console.log(typeof shared.layout === "string" ? shared.layout : "main");
+  },
+  "show-layout": (sharedPath, name) => {
+    writeJson(sharedPath, { ...(existsSync(sharedPath) ? readJson(sharedPath) : {}), layout: name });
   },
   "copy-layout": (fromPath, toPath, version) => {
     const copy = { ...readJson(fromPath), cloned_from: { name: "main", version } };
