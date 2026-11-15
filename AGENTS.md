@@ -49,7 +49,7 @@ A tracker is where a repository's issues live. Every backend returns the same sh
 
 ### Tests (`test/`)
 
-`npm test` runs every `test/**/*.test.js` with `node --test`. `test/support/register.js`, loaded before each file, points the mod's `herdr` imports at `test/support/herdr.js`, which re-exports the CLI's shim and lets one test replace `exec`, `spaces` and `panes` with `stubHerdr`; it also gives the process a temporary home, so tests never read or write the person's home folder, git configuration or `~/.config/herdr-app`. `test/support/repository.js` builds the temporary git repositories the worktree and merge rules run against, one per test.
+`npm test` runs every `test/**/*.test.js` with `node --test`. `test/support/register.js`, loaded before each file, points the mod's `herdr` imports at `test/support/herdr.js`, which re-exports the CLI's shim and lets one test replace `exec`, `spaces` and `panes` with `stubHerdr`; it also gives the process a temporary home, so tests never read or write the person's home folder, git configuration or `~/.config/herdr-app`, and puts `test/support/bin/security` first on the `PATH`, a stand-in for macOS's `security` that keeps Keychain items as files in that home, so tests never reach the person's Keychain. `test/support/keychain.js` reads and writes those items. `test/support/repository.js` builds the temporary git repositories the worktree and merge rules run against, one per test.
 
 ### The Claude plugin (`claude-plugin/`)
 
