@@ -176,20 +176,27 @@ export async function resolveMergeSettings(main, setting) {
 
 const SETUP_KEYS = ["tracker", "team", "repo", "merge", "complete"];
 
-// Makes `setting`, a tracker with its team or repo and how work lands (merge, and complete for a pull request),
-// the choices of the repository whose main checkout is `main`. It replaces those keys in any entry the
-// repository has under either spelling of its path but keeps that entry's other keys, and keeps every other
-// repository's entry.
-export async function saveSetupChoices(main, setting) {
+// Writes `change(entry)` as the entry of the repository whose main checkout is `main`, in the place of any entry
+// it has under either spelling of its path, and keeps every other repository's entry. `entry` is null without one.
+async function changeEntry(main, change) {
   const previous = await readTextFile(settingsPath()).catch(() => null);
   const settings = previous === null ? {} : parseSettings(previous);
   const entries = Object.entries(settings.repos ?? {}), key = abbreviateHome(main);
   const existing = entries.findIndex(([path]) => expandHome(path) === main);
-  const kept = Object.fromEntries(Object.entries(existing === -1 ? {} : entries[existing][1])
-    .filter(([name]) => !SETUP_KEYS.includes(name)));
+  const changed = change(existing === -1 ? null : entries[existing][1]);
   const others = entries.filter(([path]) => expandHome(path) !== main);
-  others.splice(existing === -1 ? others.length : existing, 0, [key, { ...setting, ...kept }]);
+  others.splice(existing === -1 ? others.length : existing, 0, [key, changed]);
   const text = `${JSON.stringify({ ...settings, repos: Object.fromEntries(others) }, null, 2)}\n`;
   await writeTextFile(settingsPath(), text, previous);
   forgetLookups();
+}
+
+// Makes `setting`, a tracker with its team or repo and how work lands (merge, and complete for a pull request),
+// the choices of the repository whose main checkout is `main`. It replaces those keys in the repository's entry
+// but keeps that entry's other keys.
+export async function saveSetupChoices(main, setting) {
+  await changeEntry(main, (entry) => {
+    const kept = Object.fromEntries(Object.entries(entry ?? {}).filter(([name]) => !SETUP_KEYS.includes(name)));
+    return { ...setting, ...kept };
+  });
 }
