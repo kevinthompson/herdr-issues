@@ -28,7 +28,7 @@ import { listedScopeName, headerTitlePieces } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
 import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
-import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
+import { FieldMenu, ScopeMenu, LabelMenu, openMenu, openScopeMenu, openLabelMenu, openIssueLabelsMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
@@ -37,7 +37,7 @@ import { avatarImage } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
-import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
+import { fieldEdits, markEditFailed, forgetEdits, claimEdit, showFieldEdit, trackerFields } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { closeWorktreeSpace } from "./worktree-removal.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
@@ -150,7 +150,7 @@ const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? no
 
 export default class Issues extends View {
   init(_props, cx) {
-    if (props()?.menu) { this.menu = props().menu === "scope" ? new ScopeMenu() : new FieldMenu(); return; }
+    if (props()?.menu) { this.menu = new ({ scope: ScopeMenu, labels: LabelMenu }[props().menu] ?? FieldMenu)(); return; }
     if (props()?.action) { this.worktreeDialog = new WorktreeDialog(cx); return; }
     this.issues = []; this.unloaded = new Set(); this.generation = 0; this.expanded = {};
     this.listScroll = ScrollHandle.new(); this.revealing = null;
@@ -630,6 +630,23 @@ export default class Issues extends View {
     });
   }
 
+  // The tracker's labels, read once per tracker, which the panel makes anew each refresh, with the issue's own
+  // labels. A tracker without a list, Beads, offers only the issue's labels, to remove.
+  openLabelsMenu(issue, cx) {
+    const tracker = this.tracker;
+    if (this.labelChoices?.tracker !== tracker) this.labelChoices = { tracker, names: tracker.labels?.() ?? Promise.resolve([]) };
+    const { names } = this.labelChoices;
+    cx.spawn(async (cx) => {
+      try {
+        openIssueLabelsMenu(issue, this.project, await names);
+      } catch (e) {
+        if (this.labelChoices?.names === names) this.labelChoices = null;
+        this.detailError = `Could not list the labels: ${e.message ?? e}`;
+      }
+      cx.notify();
+    });
+  }
+
   // This project's field edits that haven't saved yet, or whose save failed: [[id, edit]].
   projectEdits() {
     const project = this.project;
@@ -641,9 +658,8 @@ export default class Issues extends View {
   applyFieldEdits(cx) {
     for (const [id, edit] of this.projectEdits()) {
       const issue = this.findIssue(edit.issueId);
-      if (edit.failed) { if (issue?.[edit.field] === edit.value) issue[edit.field] = edit.previous; continue; }
-      if (issue) issue[edit.field] = edit.value;
-      if (this.tracker && claimEdit(id)) this.saveFieldEdit(id, edit, cx);
+      if (issue) showFieldEdit(issue, edit);
+      if (!edit.failed && this.tracker && claimEdit(id)) this.saveFieldEdit(id, edit, cx);
     }
   }
 
@@ -653,7 +669,7 @@ export default class Issues extends View {
       try {
         const issue = this.issues.find((each) => each.id === edit.issueId) ?? await tracker.get(edit.issueId);
         if (!issue) throw new Error(`${edit.issueId} was not found`);
-        await tracker.update(issue, { [edit.field]: edit.value });
+        await tracker.update(issue, trackerFields(edit));
         forgetEdits([id]);
         this.fadeSyncIcon(cx);
         announceIssueChange();
@@ -1059,6 +1075,8 @@ export default class Issues extends View {
         onBack: (cx) => this.back(cx),
         onCollapse: () => this.toggleCollapsed(),
         onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),
+        labelsEditable: Boolean(this.tracker?.writable && (this.tracker.labels || issue.labels.length)),
+        onLabelsMenu: (cx) => this.openLabelsMenu(issue, cx),
         onEdit: (cx) => this.edit(issue, cx),
         onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),
         onLink: (url, cx) => this.openLink(issue, url, cx),

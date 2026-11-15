@@ -13,6 +13,7 @@ import { exec, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup } from "../lookups.js";
 import { bdMissing, bdFailed, beadsNotInitialized } from "./problems.js";
+import { refuseUnknownLabels } from "./labels.js";
 
 const RECENTLY_CLOSED = 20;
 const BRANCH_SLUG_LENGTH = 50;
@@ -103,6 +104,15 @@ export async function beadsTracker({ root: projectRoot, on }) {
     return detail ? toIssue(detail, openBlockers(detail.dependencies), { detailed: true }) : null;
   }
 
+  // Beads keeps no list of labels apart from its issues', and `bd label add` takes any name, so the labels on
+  // some issue are the ones it has.
+  async function changeLabels(issue, addLabels, removeLabels) {
+    const known = ((await bd(["label", "list-all"])) ?? []).map((entry) => entry.label);
+    refuseUnknownLabels([...addLabels, ...removeLabels], known, "Beads");
+    for (const label of addLabels) await bd(["label", "add", issue.id, label]);
+    for (const label of removeLabels) await bd(["label", "remove", issue.id, label]);
+  }
+
   return {
     kind: "beads",
     name: "Beads",
@@ -121,8 +131,9 @@ export async function beadsTracker({ root: projectRoot, on }) {
     get,
     // A new body only saves over the body `issue` was read with, so edits made with `bd` meanwhile are never
     // overwritten. Order has nowhere to go.
-    async update(issue, { status, priority, body }) {
+    async update(issue, { status, priority, body, addLabels = [], removeLabels = [] }) {
       if (status !== undefined && !STATUS_TO_BEADS[status]) throw new Error(`Beads issues can't be set to ${status}`);
+      if (addLabels.length || removeLabels.length) await changeLabels(issue, addLabels, removeLabels);
       if (body !== undefined) {
         const current = await get(issue.id);
         if (!current) throw new Error(`${issue.id} no longer exists`);

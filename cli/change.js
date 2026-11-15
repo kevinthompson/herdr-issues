@@ -1,7 +1,8 @@
-// Changes an issue through its tracker for `issues status`, `issues start` and `issues edit`, then tells every
-// panel, so a change made from a Claude session shows at once without the hook that watches gh, bd and Linear's
-// MCP calls. Each throws a ChangeRefusal, having changed nothing, for a read-only tracker, an unknown issue, a
-// status the tracker can't set or a body that changed since its caller read it.
+// Changes an issue through its tracker for `issues status`, `issues start`, `issues edit` and `issues label`, then
+// tells every panel, so a change made from a Claude session shows at once without the hook that watches gh, bd and
+// Linear's MCP calls. Each throws a ChangeRefusal, having changed nothing, for a read-only tracker, an unknown issue,
+// a status the tracker can't set or a body that changed since its caller read it; the tracker itself refuses an
+// unknown label.
 import { createHash } from "node:crypto";
 import { announceIssueChange } from "../mod/changes.js";
 
@@ -37,3 +38,6 @@ export function editIssueBody(tracker, id, { body, readBodyHash }) {
     await tracker.update(issue, { body });
   });
 }
+
+export const changeIssueLabels = (tracker, id, { addLabels, removeLabels }) =>
+  changeIssue(tracker, id, (issue) => tracker.update(issue, { addLabels, removeLabels }));

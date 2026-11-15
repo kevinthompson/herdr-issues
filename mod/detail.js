@@ -1,5 +1,5 @@
 // One issue, drawn inside the panel in place of the list: a way back, its status and priority
-// (each a dropdown), its other details and its Markdown body, which Edit swaps for an editor. Merge shows
+// (each a dropdown), its labels (with a dropdown that adds and removes them), its other details and its Markdown body, which Edit swaps for an editor. Merge shows
 // when the issue's finished branch can merge into main from here (merge.js).
 // Task-list items in the body are checkboxes that check off in place.
 import { div, svg, image } from "gpui-kit";
@@ -69,6 +69,15 @@ function labelChip(label, color, t) {
 
 export const labelChips = ({ labels, labelColors }, t) => labels.map((label) => labelChip(label, labelColors?.[label], t));
 
+// The issue's labels, then, where they can change, a button opening the dropdown that adds and removes them.
+function labelsRow({ issue, labelsEditable, onLabelsMenu }, t) {
+  return h_flex().pt(4).flex_wrap().gap(4).items_center().children(labelChips(issue, t))
+    .when(labelsEditable, (e) => e.child(h_flex().id("field-labels").flex_none().px(5).gap(4).items_center().rounded(4)
+      .border_1().border_color(t.border).text_color(t.dim).cursor_pointer().hover((s) => s.bg(t.hover).text_color(t.foreground))
+      .on_click((_e, cx) => onLabelsMenu(cx))
+      .child(issue.labels.length ? "Edit labels" : "Add label").child("▾")));
+}
+
 // `blocking`: the IDs of issues that list this one in their blocked_by.
 function facts(view, t) {
   const { issue: { blockedBy, branch, pullRequests: attached }, blocking, assignee } = view, due = dueStatus(view.issue);
@@ -79,7 +88,7 @@ function facts(view, t) {
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "circle-arrow-right", "Blocking", blocking, view, t)))
     .when(Boolean(branch), (e) => e.child(iconFact("git-branch", "Branch", div().min_w(0).truncate().child(branch), t)))
     .when(attached?.length > 0, (e) => e.child(iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t)))
-    .when(view.issue.labels.length > 0, (e) => e.child(h_flex().pt(4).flex_wrap().gap(4).items_center().children(labelChips(view.issue, t))));
+    .when(view.issue.labels.length > 0 || view.labelsEditable, (e) => e.child(labelsRow(view, t)));
 }
 
 const PULL_REQUEST_STATUSES = {

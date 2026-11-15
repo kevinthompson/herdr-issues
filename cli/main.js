@@ -11,7 +11,7 @@ import { issueSpaceName } from "../mod/space-name.js";
 import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
-import { bodyHash, ChangeRefusal, editIssueBody, setIssueStatus, startIssue } from "./change.js";
+import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import { clearCloseRequest, completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
@@ -27,8 +27,8 @@ Commands:
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
-                           credentials as auth does, its labels (GitHub's; null elsewhere) and up to 10 of its listed
-                           issues whose titles share the most words with <words>
+                           credentials as auth does, its labels (Linear's and GitHub's; null for Beads) and up to 10
+                           of its listed issues whose titles share the most words with <words>
   scopes [--json]          Print the issue lists the panel can show, default first: each one's ID, label and group,
                            a project's milestones grouped under it
   list [<scope>] [--json]  Print the open issues the panel lists in a scope, or the default one: ID, status and title
@@ -54,6 +54,10 @@ Commands:
   edit <id> --body-file <file> --body-hash <hash>
                            Save the file as the issue's body and refresh the panels; <hash> is the bodyHash show --json
                            printed, and the edit is refused, changing nothing, when the body changed since then
+  label <id> [--add <name>]... [--remove <name>]...
+                           Add and remove the issue's labels by name, keeping its others, and refresh the panels;
+                           refuse, changing nothing, a name the tracker has no label by. A Linear label in a group
+                           is named "group > name"
 
 Options:
   -h, --help               Print this help`;
@@ -366,7 +370,31 @@ async function edit(args) {
   console.log(`Saved the body of ${issue.id}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, close, worktree, merge, status, start, edit };
+function labelOptions(args) {
+  const options = { id: null, addLabels: [], removeLabels: [] };
+  const flags = { "--add": "addLabels", "--remove": "removeLabels" };
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (flags[arg]) {
+      if (index + 1 >= args.length) throw new UsageError(`label: ${arg} needs a label name`);
+      options[flags[arg]].push(args[++index]);
+    } else if (arg.startsWith("-") || options.id) throw new UsageError(`label: unexpected ${arg}`);
+    else options.id = arg;
+  }
+  if (!options.id || !(options.addLabels.length || options.removeLabels.length)) {
+    throw new UsageError("label needs an issue ID and at least one --add <name> or --remove <name>");
+  }
+  return options;
+}
+
+async function label(args) {
+  const { id, addLabels, removeLabels } = labelOptions(args);
+  const issue = await refusingChanges(async () => changeIssueLabels(await currentTracker(), id, { addLabels, removeLabels }));
+  const changes = [...addLabels.map((name) => `added ${name}`), ...removeLabels.map((name) => `removed ${name}`)];
+  console.log(`${issue.id}: ${changes.join(", ")}`);
+}
+
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, close, worktree, merge, status, start, edit, label };
 
 const HELP_FLAGS = ["-h", "--help"];
 

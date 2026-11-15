@@ -13,14 +13,18 @@
 //                                 it has only one
 //   tracker.list(scopeId)       → Issue[] in that scope, or the default one
 //   tracker.get(id)             → Issue, or null
-//   tracker.labels()            → the names of the labels new issues can take, for GitHub; Linear's come from
-//                                 its MCP server, and Beads has none to choose from
-//   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
-//                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
+//   tracker.labels()            → the names of the labels issues can take, as issue.labels names them, for
+//                                 Linear (its team's) and GitHub; Beads has none to choose from
+//   tracker.update(issue, f)    → saves any of { status, priority, order, body, addLabels, removeLabels }
+//                                 (status: one of STATUSES in issue.js; body: Markdown, refused if it changed
+//                                 since `issue` was read; addLabels and removeLabels: arrays of label names,
+//                                 changing only those labels, and refused, changing nothing, when the tracker
+//                                 has no label by one of the names)
 //   tracker.start(issue)        → marks the issue in progress
 //   tracker.viewerId()          → the person's Linear user ID, for Linear
 //
-// Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
+// Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null),
+//          labels (names; a Linear label in a group is "group > name"), blockedBy,
 //          branch, created, body (null until loaded: tracker.get loads it), updated (when the tracker
 //          can say), labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
 //          assigneeId (the assignee's user ID, or null, for Linear issues),

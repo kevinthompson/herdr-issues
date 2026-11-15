@@ -1,6 +1,7 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
 // this same mod with props { menu: field, root, on, id, current, statuses }; picking an option hands the
-// edit to the panel, which shows it at once and saves it.
+// edit to the panel, which shows it at once and saves it. The issue's labels dropdown is a popup too, with props
+// { menu: "labels", root, on, id, labels, current }, where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns are popups too, with props { menu: "scope", scopes, current, key, store }:
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
@@ -35,7 +36,7 @@ export function openMenu(field, issue, project, statuses) {
   });
 }
 
-function optionList(options, current, onPick) {
+function optionList(options, isChecked, onPick) {
   const t = theme();
   return v_flex().id("issue-field-menu").size_full().overflow_y_scroll().py(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
     .children(options.map((option, index) => option.heading
@@ -50,7 +51,7 @@ function optionList(options, current, onPick) {
       .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
       .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
       .child(div().flex_1().truncate().child(option.label))
-      .child(div().flex_none().ml(CHECK_GAP - ICON_GAP).text_color(t.muted).child(option.value === current ? "✓" : ""))));
+      .child(div().flex_none().ml(CHECK_GAP - ICON_GAP).text_color(t.muted).child(isChecked(option.value) ? "✓" : ""))));
 }
 
 // The scope each repository lists, and the label it narrows the list to, by its main checkout:
@@ -100,7 +101,7 @@ export function openLabelMenu(labels, current, key) {
 export class ScopeMenu {
   render() {
     const { scopes, current, key, store, overlay } = props();
-    return optionList(scopeOptions(scopes), current, (option) => {
+    return optionList(scopeOptions(scopes), (value) => value === current, (option) => {
       setShared(store, { ...selections(store), [key]: option.value });
       closeOverlay(overlay);
     });
@@ -116,6 +117,32 @@ export class FieldMenu {
 
   render() {
     const { menu: field, current, statuses } = props();
-    return optionList(optionsFor(field, statuses), current, (option) => this.pick(option));
+    return optionList(optionsFor(field, statuses), (value) => value === current, (option) => this.pick(option));
+  }
+}
+
+const LABELS_MENU_WIDTH = 240;
+const LABELS_MENU_MAX_HEIGHT = 360;
+
+// The tracker's labels `names`, then any of the issue's it didn't list, with the issue's checked.
+export function openIssueLabelsMenu(issue, project, names) {
+  const labels = [...new Set([...names, ...issue.labels])];
+  openOverlay({
+    mod: "issues", kind: "popup", at: "pointer", width: LABELS_MENU_WIDTH,
+    height: Math.min(labels.length * ROW + PADDING * 2, LABELS_MENU_MAX_HEIGHT),
+    props: { menu: "labels", ...project, id: issue.id, labels, current: issue.labels },
+  });
+}
+
+// Checking a label adds it and unchecking one removes it, at once, leaving the issue's other labels alone.
+export class LabelMenu {
+  render() {
+    const { labels, current, root, on, id, overlay } = props();
+    const options = labels.map((label) => ({ value: label, label }));
+    return optionList(options, (label) => current.includes(label), (option) => {
+      const checked = current.includes(option.value);
+      requestFieldEdit({ root, on: on ?? null, issueId: id, field: "labels", add: checked ? [] : [option.value], remove: checked ? [option.value] : [] });
+      closeOverlay(overlay);
+    });
   }
 }
