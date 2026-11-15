@@ -41,7 +41,7 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
 const FACT_ROW_PX = 18, FACT_ICON_PX = 12;
 
 // The bar of fields you can change, a shade lighter than the panel so it reads apart from the issue's details.
-const fieldBar = (t) => mixColors(t.background, t.raised, 0.35) ?? t.surface;
+const fieldBar = (t) => mixColors(t.surface, t.raised, 0.35) ?? t.surface;
 
 // One of the issue's facts on a line of its own: its name dimmed, then its value.
 function fact(label, value, t) {

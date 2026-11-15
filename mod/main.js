@@ -103,11 +103,11 @@ const ISSUES_WORKTREE_TIMEOUT_MS = 10 * 60 * 1000;
 // issues worktree works on this computer's checkouts and needs the issue's branch.
 const opensWithIssuesWorktree = (issue, project) => Boolean(issue.branch && project && !project.on);
 // A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
-// otherwise halfway back to the panel's background.
+// otherwise halfway back to the panel's surface.
 function rowHover(t) {
   const translucent = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(t.hover);
   if (translucent) return `#${translucent[1]}${Math.round(parseInt(translucent[2], 16) / 2).toString(16).padStart(2, "0")}`;
-  return mixColors(t.background, t.hover, 0.5) ?? t.hover;
+  return mixColors(t.surface, t.hover, 0.5) ?? t.hover;
 }
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
@@ -856,7 +856,7 @@ export default class Issues extends View {
   }
 
   frame(t) {
-    return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.background).border_1().border_color(t.border)
+    return v_flex().id("issues").size_full().min_h(0).rounded(10).overflow_hidden().bg(t.surface).border_1().border_color(t.border)
       .text_color(t.foreground).text_size(13)
       .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
   }

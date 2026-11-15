@@ -344,7 +344,7 @@ export class WorktreeDialog {
       .when(r === null, (el) => el.child(div().text_color(t.muted).child(`${this.folder ? tilde(this.folder, this.userHome ?? "") : "This folder"} is not in a git repository.`)))
       .when(Boolean(r && this.list), (el) =>
         el
-          .child(Input.new(this.input).h(32).px(10).items_center().rounded(6).border(1).border_color(this.inputFocused ? t.accent : t.input).bg(t.background).text_color(t.foreground))
+          .child(Input.new(this.input).h(32).px(10).items_center().rounded(6).border(1).border_color(this.inputFocused ? t.accent : t.input).bg(t.surface).text_color(t.foreground))
           .child(
             div()
               .relative()
@@ -415,7 +415,7 @@ export class WorktreeDialog {
             .rounded(6)
             .border(1)
             .border_color(this.inputFocused ? t.accent : t.input)
-            .bg(t.background)
+            .bg(t.surface)
             .text_color(t.foreground),
         ),
       )
