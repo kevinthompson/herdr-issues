@@ -11,6 +11,7 @@
 // masked field that saves a key Linear accepts.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
+import { settings } from "herdr";
 import { button, collapseButton } from "./detail.js";
 import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
 import { TrackerChoice, TRACKERS, markdown } from "./tracker-choice.js";
@@ -45,7 +46,18 @@ function blankState({ id, sentence, label, enabled = true, error = null, onClick
     .child(div().whitespace_normal().text_center().text_color(t.muted).child(sentence))
     .child(button(id, label, onClick, t, { primary: true, enabled }))
     .when(Boolean(error), (e) => e.child(div().whitespace_normal().text_center().text_size(12).text_color(t.ansi1).child(error ?? "")))
-    .child(div().whitespace_normal().text_center().text_size(12).text_color(t.dim).child("Press ⌘⇧I to collapse this panel."));
+    .child(collapseHint(t));
+}
+
+// The chord sits in a monospace chip because the UI font draws a capital I like a lowercase l, and ⌘⇧L changes
+// the Herdr layout instead.
+function collapseHint(t) {
+  const keyChip = div().flex_none().px(4).rounded(4).bg(t.raised).text_color(t.foreground)
+    .font_family(settings().font_family).child("⌘⇧I");
+  return h_flex().flex_wrap().justify_center().items_center().gap_x(4).text_size(12).text_color(t.dim)
+    .child(div().child("Press"))
+    .child(keyChip)
+    .child(div().whitespace_normal().text_center().child("to collapse this panel."));
 }
 
 // For a folder outside a git repository, with a button that makes it one.
