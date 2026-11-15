@@ -18,7 +18,7 @@ import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/set
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, stripBadges, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
@@ -91,6 +91,7 @@ function scopeDropdown(id, label, onClick, t) {
 const SCOPE_DROPDOWN_MAX_PX = 260;
 const SYNC_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
+const STATUS_ICON_PX = 12;
 const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
@@ -746,12 +747,14 @@ export default class Issues extends View {
   group(group, shown, idColumnWidth, t) {
     const expanded = this.isExpanded(group), hidden = group.issues.length - shown;
     const color = STATUS_COLORS[group.id];
+    const icon = statusIcon(group.id);
     const fill = color ? tinted(color) : t.raised;
     return v_flex().flex_none().gap(1)
       .child(h_flex().id(`group-${group.id}`).mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
         .bg(fill).text_color(t.foreground)
         .on_click((_e, cx) => this.toggle(group, cx))
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
+        .when(Boolean(icon), (e) => e.child(image(icon ?? "").flex_none().size(STATUS_ICON_PX)))
         .child(div().font_semibold().child(group.label))
         .when(!group.unloaded || expanded, (e) => e.child(div().opacity(0.7).child(group.unloaded ? "…" : String(group.issues.length)))))
       .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, idColumnWidth, t))))
@@ -875,7 +878,7 @@ export default class Issues extends View {
   stripBadge({ id, label, text }, t) {
     return v_flex().id(`strip-${id}`).flex_none().w(24).py(3).items_center().gap(2).rounded(6).tooltip(label)
       .cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.expandToGroup(id, cx))
-      .child(image(`mods/issues/icons/linear-${id}.png`).size(STRIP_ICON_PX))
+      .child(image(statusIcon(id)).size(STRIP_ICON_PX))
       .child(div().text_size(10).text_color(t.muted).child(text));
   }
 

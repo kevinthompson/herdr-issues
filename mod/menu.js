@@ -5,19 +5,19 @@
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick.
-import { div } from "gpui-kit";
+import { div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herdr";
 import { requestFieldEdit } from "./edits.js";
-import { STATUSES, STATUS_LABELS, PRIORITIES } from "./issue.js";
+import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
 
-const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4;
+const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 14;
 // The theme's text color at this opacity, so the band follows light and dark themes.
 const HEADING_TINT_ALPHA = "0a";
 const headingTint = (t) => (/^#[0-9a-f]{6}$/i.test(t.foreground) ? t.foreground + HEADING_TINT_ALPHA : "transparent");
 
 const OPTIONS = {
-  status: STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] })),
+  status: STATUSES.map((value) => ({ value, label: STATUS_LABELS[value], icon: statusIcon(value) })),
   priority: [1, 2, 3, 4, 0].map((value) => ({ value, label: PRIORITIES[value] })),
 };
 
@@ -48,6 +48,7 @@ function optionList(options, current, onPick) {
         .text_size(11).text_color(t.dim).child(option.subheading)
       : h_flex().id(`option-${option.value}`).h(ROW).mx(PADDING).px(TEXT_INSET).gap(9).flex_none().items_center()
       .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
+      .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
       .child(div().flex_1().truncate().child(option.label))
       .child(div().flex_none().text_color(t.muted).child(option.value === current ? "✓" : ""))));
 }
