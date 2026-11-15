@@ -28,7 +28,8 @@ import {
 const TEAM_PICKS = "issues.settingsTeams";
 
 const COMPLETE_CHOICES = [
-  { id: "pull-request-open", label: "Once the pull request is open", detail: "Once the branch is pushed with an open pull request, while it waits for review." },
+  { id: "pull-request-open", label: "Once the pull request is open", detail: "Once the branch is pushed with an open pull request, without waiting for its checks." },
+  { id: "pull-request-passing", label: "Once its checks pass", detail: "Once the pull request is open and its checks pass, while it waits for review." },
   { id: "merged", label: "Once it merges", detail: "Once the branch is in main." },
 ];
 const COMPLETE_SENTENCE = "When a session can finish and the issue's worktree is safe to close.";

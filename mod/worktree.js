@@ -2,7 +2,7 @@
 // is a linked worktree, and whether a branch has merged into main.
 
 import { exec, spaces, panes } from "herdr";
-import { mergeSettings } from "./trackers/setting.js";
+import { PULL_REQUEST_COMPLETES, mergeSettings } from "./trackers/setting.js";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -96,7 +96,7 @@ export async function isMergedInto(repo, base, on) {
 // complete, else null: also when the settings can't be read or gh can't answer, so the dialog asks for main.
 async function completingPullRequest(repo, branch, on) {
   const { complete } = await mergeSettings({ root: repo.main, on }).catch(() => ({ complete: "merged" }));
-  if (complete !== "pull-request-open") return null;
+  if (!PULL_REQUEST_COMPLETES.includes(complete)) return null;
   const view = await exec("gh", ["pr", "view", branch, "--json", "state,url"], { cwd: repo.top, on }).catch(() => null);
   if (view?.code !== 0) return null;
   try {

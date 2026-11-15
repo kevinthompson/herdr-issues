@@ -127,7 +127,7 @@ describe("branchState", () => {
 
     // A clone whose issues.json entry merges through pull requests, with gh answering that the branch has an
     // open one. Returns the repository and the commands run, as "git fetch …" or "gh pr …".
-    function reviewedClone(t) {
+    function reviewedClone(t, entry = {}) {
       const commands = [];
       stubHerdr(t, {
         exec: (command, args, options) => {
@@ -138,7 +138,7 @@ describe("branchState", () => {
       });
       const { clone: top } = createClonedRepository(temporaryFolder(t));
       mkdirSync(dirname(settingsPath()), { recursive: true });
-      writeFileSync(settingsPath(), JSON.stringify({ repos: { [top]: { tracker: "github", repo: "owner/name", merge: "pull-request" } } }));
+      writeFileSync(settingsPath(), JSON.stringify({ repos: { [top]: { tracker: "github", repo: "owner/name", merge: "pull-request", ...entry } } }));
       forgetLookups();
       t.after(() => { rmSync(settingsPath(), { force: true }); forgetLookups(); });
       git(top, "switch", "-q", "-c", "feature");
@@ -170,6 +170,12 @@ describe("branchState", () => {
       const { repo } = reviewedClone(t);
       const state = await branchState(repo, null);
       assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: null, unpushed: 1, pullRequest: PULL_REQUEST });
+    });
+
+    test("names the pull request when the work is complete only once its checks pass", async (t) => {
+      const { repo } = reviewedClone(t, { complete: "pull-request-passing" });
+      const state = await branchState(repo, null);
+      assert.equal(state.pullRequest, PULL_REQUEST);
     });
   });
 

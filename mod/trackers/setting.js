@@ -44,7 +44,8 @@ import { badMergeSetting, badSetting, settingsUnreadable } from "./problems.js";
 export const settingsPath = () => `${appHome()}/issues.json`;
 const TRACKERS = ["linear", "github", "beads"];
 const MERGES = ["auto", "review", "pull-request"];
-const COMPLETES = ["merged", "pull-request-open"];
+const COMPLETES = ["merged", "pull-request-open", "pull-request-passing"];
+export const PULL_REQUEST_COMPLETES =["pull-request-open", "pull-request-passing"];
 export const CLOSES = ["manual", "ask", "auto"];
 export const DEFAULT_CLOSE = "ask";
 export const DEFAULT_POLL_SECONDS = 60;
@@ -118,7 +119,7 @@ export async function trackerSetting({ root, on }) {
   checkChoice(setting.close, "close", CLOSES, `issues.json's ${key}`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
-  if (setting.complete === "pull-request-open" && setting.merge && setting.merge !== "pull-request") {
+  if (PULL_REQUEST_COMPLETES.includes(setting.complete) && setting.merge && setting.merge !== "pull-request") {
     throw badMergeSetting(`issues.json's ${key} merges with ${setting.merge}, so its complete can only be merged`);
   }
   return setting;
@@ -166,8 +167,9 @@ const hasGitHubOrigin =(main) => githubRepository(main, {}).then(() => true, () 
 // How the repository's issue branches get into main, and when an issue's work counts as complete: when a session
 // can stop and a worktree is safe to remove. merge is "auto" (merged locally at once), "review" (merged locally
 // once the person approves) or "pull-request"; without the setting, a pull request when origin is on GitHub,
-// else review. complete is "merged" (once the branch is in main) or "pull-request-open" (once it's pushed with
-// an open pull request), which only a pull request allows and is its default.
+// else review. complete is "merged" (once the branch is in main), "pull-request-open" (once it's pushed with an
+// open pull request) or "pull-request-passing" (once that pull request's checks pass); only a pull request allows
+// the last two, and "pull-request-open" is its default.
 export async function mergeSettings(project) {
   return resolveMergeSettings(await mainCheckout(project.root, project.on), await trackerSetting(project));
 }
@@ -249,7 +251,7 @@ export async function saveTrackerChoice(main, { tracker, team = null, repo = nul
 function checkMergeChoice(merge, complete) {
   if (!MERGES.includes(merge)) throw badMergeSetting(`merge must be one of ${MERGES.join(", ")}`);
   if (complete != null && !COMPLETES.includes(complete)) throw badMergeSetting(`complete must be one of ${COMPLETES.join(", ")}`);
-  if (complete === "pull-request-open" && merge !== "pull-request") {
+  if (PULL_REQUEST_COMPLETES.includes(complete) && merge !== "pull-request") {
     throw badMergeSetting(`Work that merges with ${merge} is complete only once merged`);
   }
 }

@@ -22,7 +22,8 @@ export const MERGE_CHOICES = [
   { id: "pull-request", label: "Open a pull request", detail: "The branch lands in main through a pull request." },
 ];
 const COMPLETE_CHOICES = [
-  { id: "pull-request-open", label: "Once the pull request is open", detail: "The session can finish and the worktree close while the pull request waits for review." },
+  { id: "pull-request-open", label: "Once the pull request is open", detail: "The session can finish and the worktree close as soon as the pull request is open." },
+  { id: "pull-request-passing", label: "Once its checks pass", detail: "The session waits for the pull request's checks to pass, then can finish while it waits for review." },
   { id: "merged", label: "Once it merges", detail: "The work stays open until the pull request merges into main." },
 ];
 

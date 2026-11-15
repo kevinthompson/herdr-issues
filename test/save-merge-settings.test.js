@@ -45,6 +45,16 @@ test("saving merge and complete keeps the entry's other keys and every other rep
   assert.equal(await setting(t, repository, "complete"), "merged");
 });
 
+test("a pull request can complete once its checks pass", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ repos: { [repository]: { tracker: "github", repo: "owner/name", merge: "pull-request" } } });
+
+  await saveMergeSettings(repository, { merge: "pull-request", complete: "pull-request-passing" });
+
+  assert.equal(readSettings().repos[repository].complete, "pull-request-passing");
+  assert.equal(await setting(t, repository, "complete"), "pull-request-passing");
+});
+
 test("merging without a pull request removes complete, so the work is complete once merged", async (t) => {
   const repository = createRepository(temporaryFolder(t));
   writeSettings({ repos: { [repository]: { tracker: "github", repo: "owner/name", merge: "pull-request", complete: "pull-request-open" } } });
@@ -62,6 +72,7 @@ test("an invalid combination is not written", async (t) => {
   const before = readFileSync(settingsPath(), "utf8");
 
   await assert.rejects(saveMergeSettings(repository, { merge: "auto", complete: "pull-request-open" }), /complete only once merged/);
+  await assert.rejects(saveMergeSettings(repository, { merge: "review", complete: "pull-request-passing" }), /complete only once merged/);
   await assert.rejects(saveMergeSettings(repository, { merge: "rebase" }), /merge must be one of/);
   await assert.rejects(saveMergeSettings(repository, { merge: "pull-request", complete: "soon" }), /complete must be one of/);
   assert.equal(readFileSync(settingsPath(), "utf8"), before);

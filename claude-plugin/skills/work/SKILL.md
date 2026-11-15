@@ -48,7 +48,8 @@ Then name the session's tab as step 3 says, and summarize as step 5 says. Read t
 11. **Confirm the worktree can close.** Never remove a Herdr worktree yourself. Run `issues setting complete`, which prints when the repository's work counts as complete. The work is complete when either:
    - nothing in the worktree is uncommitted (`git status --porcelain` is empty), and:
      - with `merged`, the branch is merged into main (`git merge-base --is-ancestor HEAD main`);
-     - with `pull-request-open`, the branch is merged into main, or is pushed with no unpushed commits and has an open pull request (`gh pr view --json state,url`) whose checks pass or whose failures are recorded in an issue comment as not caused by the branch; or
+     - with `pull-request-open`, the branch is merged into main, or is pushed with no unpushed commits and has an open pull request (`gh pr view --json state,url`);
+     - with `pull-request-passing`, the same, and the pull request's checks pass or their failures are recorded in an issue comment as not caused by the branch; or
    - the person explicitly canceled the work.
 
    If so, run `issues complete <issue ID>`, which labels the session's terminal and marks its Herdr tab with ✅ so Herdr's agents list shows the session is finished. Then run `issues setting close`, which prints what a finished session does about its worktree, and follow it:
@@ -65,7 +66,7 @@ Then name the session's tab as step 3 says, and summarize as step 5 says. Read t
 
    ## ✅ Session finished: <issue ID>
 
-   <one sentence: merged into main, or, with `pull-request-open`, PR open at <url>; nothing is uncommitted>
+   <one sentence: merged into main, or, with `pull-request-open` or `pull-request-passing`, PR open at <url>; nothing is uncommitted>
 
    **<closing line>**
    ```

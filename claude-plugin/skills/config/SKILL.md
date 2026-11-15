@@ -1,7 +1,7 @@
 ---
 name: config
 description: Choose where a repository's issues are tracked (a Linear team, GitHub Issues or a local Beads database), how its work lands in main (its merge and complete settings) and whether finished sessions close their worktrees (its close setting), by writing its entry in the Herdr app's issues.json, which the issues panel and the other issues skills read, and check the credentials that tracker needs, or set the command run in each new worktree, or the model and effort of the Claude sessions that work issues. Use when asked to configure, set up or change a repository's issue tracker or how its work is merged, for example "/issues:config", "track this repo's issues in Linear", "set up issues for this repo", "merge this repo's work without pull requests" or "show this repo's merge setting".
-argument-hint: [linear <team key> | github [owner/name] | beads | merge <auto|review|pull-request> | complete <merged|pull-request-open> | close <ask|auto|manual> | clear <merge|complete|close|name> | name <name> | workModel <model> [--all] | workEffort <effort> [--all] | clear <workModel|workEffort> [--all] | worktreeSetup [<command> | clear] | show]
+argument-hint: [linear <team key> | github [owner/name] | beads | merge <auto|review|pull-request> | complete <merged|pull-request-open|pull-request-passing> | close <ask|auto|manual> | clear <merge|complete|close|name> | name <name> | workModel <model> [--all] | workEffort <effort> [--all] | clear <workModel|workEffort> [--all] | worktreeSetup [<command> | clear] | show]
 ---
 
 Set where the current repository's issues live and how its work lands in main, from `$ARGUMENTS` or by asking, and make sure this machine can reach that tracker.
@@ -32,9 +32,10 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
   - `pull-request`: the branch lands in main through a pull request.
   - Without it, `pull-request` when origin is on GitHub, else `review`.
 - `complete`: when a session can finish and the issue's worktree is safe to remove.
-  - `pull-request-open`: once the branch is pushed with an open pull request, while it waits for review.
+  - `pull-request-open`: once the branch is pushed with an open pull request, without waiting for its checks.
+  - `pull-request-passing`: once the pull request is open and its checks pass, while it waits for review.
   - `merged`: once the branch is in main.
-  - It applies only with `merge: "pull-request"`, where `pull-request-open` is its default; with `auto` or `review`, the work is complete once merged. Refuse `complete: "pull-request-open"` with `auto` or `review`, saying why.
+  - It applies only with `merge: "pull-request"`, where `pull-request-open` is its default; with `auto` or `review`, the work is complete once merged. Refuse `complete: "pull-request-open"` or `"pull-request-passing"` with `auto` or `review`, saying why.
 
 `issues setting merge` and `issues setting complete`, run in the repository, print the settings with their defaults applied.
 
@@ -66,14 +67,14 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
      - **GitHub**: the repository's GitHub Issues. Offer origin's repository (`gh repo view --json nameWithOwner,hasIssuesEnabled`) and leave `repo` out when it's that one; if issues are disabled there, say so.
      - **Beads**: a local [Beads](https://github.com/steveyegge/beads) database in the main checkout's `.beads/` folder, shared by every worktree and kept out of git. Its entry is `{ "tracker": "beads" }`, with no `team` or `repo`.
 3. **Check the credentials** of the chosen tracker by following `auth.md` beside this skill. Never print a secret, and never ask for one in chat.
-4. **Choose how work lands.** When the repository had no entry, or the person asked to set up its tracker, ask how work gets into main with AskUserQuestion, offering `auto`, `review` and `pull-request` in plain labels with the explanations above, and the current value from step 1 first, marked Recommended. When they choose `pull-request`, ask when the work is complete the same way, with `pull-request-open` marked Recommended unless `complete` is already set to `merged`. When the repository already had an entry and the person only changed its tracker, keep its `merge` and `complete` without asking.
+4. **Choose how work lands.** When the repository had no entry, or the person asked to set up its tracker, ask how work gets into main with AskUserQuestion, offering `auto`, `review` and `pull-request` in plain labels with the explanations above, and the current value from step 1 first, marked Recommended. When they choose `pull-request`, ask when the work is complete the same way, with `pull-request-open` marked Recommended unless `complete` is already set to `merged` or `pull-request-passing`. When the repository already had an entry and the person only changed its tracker, keep its `merge` and `complete` without asking.
 5. **Write the settings.** Change the repository's entry in `~/.config/herdr-app/issues.json`, creating the file if needed, keeping every other entry and two-space indentation. Treat an entry for the same main checkout as the repository's even when its key is written differently (`~/…` or the full path), and write it under the `~/…` key.
    - A tracker change replaces the entry's `tracker`, `team` and `repo` (a Beads entry has neither `team` nor `repo`), and keeps its other keys, such as `views`, `spaceName` and `worktreeSetup`; `merge` and `complete` are the ones chosen in step 4, or kept.
-   - `merge <value>` sets `merge`. Setting `auto` or `review` also removes a `complete` of `pull-request-open`, saying so, since it no longer applies.
-   - `complete <value>` sets `complete`. Refuse `pull-request-open` unless `merge` is `pull-request` or, with no `merge` set, `issues setting merge` prints `pull-request`.
+   - `merge <value>` sets `merge`. Setting `auto` or `review` also removes a `complete` of `pull-request-open` or `pull-request-passing`, saying so, since it no longer applies.
+   - `complete <value>` sets `complete`. Refuse `pull-request-open` and `pull-request-passing` unless `merge` is `pull-request` or, with no `merge` set, `issues setting merge` prints `pull-request`.
    - `close <value>` sets `close`, then gives the note above about a personal instruction for `ask` and `auto`.
    - `name <name>` sets `name` to the rest of the arguments; a blank name clears it.
-   - `clear <key>` removes `merge`, `complete`, `close` or `name`, so its default applies. Clearing `merge` while `complete` is `pull-request-open` keeps `complete`, which then applies only if the default is `pull-request`; say so.
+   - `clear <key>` removes `merge`, `complete`, `close` or `name`, so its default applies. Clearing `merge` while `complete` is `pull-request-open` or `pull-request-passing` keeps `complete`, which then applies only if the default is `pull-request`; say so.
    - `workModel <value>` and `workEffort <value>` set that key; `clear` removes it, so the top level's value or the default applies. A repository's entry needs a `tracker`, so when the repository has none, set them at the top level or set up its tracker first.
    - Refuse a value not listed above, listing the valid ones.
 6. **Set the worktree setup command** when the person asks to set, show or clear it, with or without changing the tracker. Show the entry's `worktreeSetup`, or say it has none. To set it, write the command the person gives as the entry's `worktreeSetup` string; to clear it, remove the key. Keep every other key. Explain that the command runs once in each new worktree `issues worktree` creates, and that a failure keeps the worktree without opening its space.

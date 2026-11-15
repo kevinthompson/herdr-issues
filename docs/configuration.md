@@ -74,7 +74,7 @@ An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2
 These two settings say how an issue's branch gets into main and when its work counts as complete. An issue is done once its branch is in main, whichever you choose.
 
 - `merge`: `auto` merges the branch into main locally without waiting; `review` merges it locally once you approve; `pull-request` lands it through a pull request. Without the setting, it's `pull-request` when the repository's origin is on GitHub, else `review`.
-- `complete`: when the work counts as complete, so a Claude session can stop and the issue's worktree is safe to remove. `merged` means once the branch is in main; `pull-request-open` means once the branch is pushed with an open pull request. Only `merge: "pull-request"` allows `pull-request-open`, and it's that setting's default; with `auto` or `review`, the work is complete once merged.
+- `complete`: when the work counts as complete, so a Claude session can stop and the issue's worktree is safe to remove. `merged` means once the branch is in main; `pull-request-open` means once the branch is pushed with an open pull request, without waiting for its checks; `pull-request-passing` means once that pull request's checks also pass. Only `merge: "pull-request"` allows `pull-request-open` and `pull-request-passing`, and `pull-request-open` is that setting's default; with `auto` or `review`, the work is complete once merged.
 
 ```json
 "~/Code/herdr-issues": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
