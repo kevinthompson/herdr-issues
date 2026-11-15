@@ -81,6 +81,10 @@ function withLoadedBodies(issues, previous) {
   });
 }
 
+const pullRequestBadge = (count, t) => h_flex().flex_none().gap(3).items_center().text_color(t.dim)
+  .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(11))
+  .child(div().child(String(count)));
+
 function scopeDropdown(id, label, onClick, t) {
   return h_flex().id(id).min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
     .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
@@ -693,15 +697,15 @@ export default class Issues extends View {
           .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
           .when(Boolean(sla), (e) => e.child(div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))))
           .when(Boolean(due), (e) => e.child(div().whitespace_nowrap().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
-          .when(issue.priority > 0, (e) => e.child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
-            .child(svg(`mods/issues/icons/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))))
+          .when(issue.priority > 0, (e) => e.child(h_flex().gap(6).items_center()
+            .child(div().id(`priority-${issue.id}`).flex_none().tooltip(PRIORITIES[issue.priority])
+              .child(svg(`mods/issues/icons/${PRIORITY_ICONS[issue.priority]}.svg`).size(PRIORITY_ICON_PX).text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim)))
+            .when(pullRequestCount > 0, (e) => e.child(pullRequestBadge(pullRequestCount, t)))))
+          .when(issue.priority <= 0 && pullRequestCount > 0, (e) => e.child(pullRequestBadge(pullRequestCount, t))))
         .child(v_flex().flex_1().min_w(0).gap(3)
           .child(div().whitespace_normal().child(issue.title))
-          .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0 || pullRequestCount > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
+          .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0, (e) => e.child(h_flex().flex_wrap().gap_x(8).gap_y(2).items_center().text_size(11).text_color(t.dim).overflow_hidden()
             .children(labelChips(issue, t).slice(0, 3))
-            .when(pullRequestCount > 0, (e) => e.child(h_flex().flex_none().gap(3).items_center()
-              .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(11))
-              .child(div().child(String(pullRequestCount)))))
             .when(blockers.length > 0, (e) => e.child(h_flex().flex_none().gap(4).items_center().text_color(t.blocked)
               .child(div().flex_none().child("Blocked by"))
               .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked))))
