@@ -83,19 +83,25 @@ uninstall() {
     esac
   }
 
+  # Given the terminal as input, claude switches it to raw mode and leaves it there, so the confirm
+  # prompts that follow never see Enter; its plugin commands never read input.
+  claude_plugin() {
+    claude plugin "$@" </dev/null
+  }
+
   remove_plugin() {
     if ! command -v claude >/dev/null; then
       printf 'Skipped the Claude plugin: claude is not installed\n'
       return
     fi
-    if claude plugin list --json | node "$setup_json" plugin-installed "$plugin"; then
-      claude plugin uninstall "$plugin"
+    if claude_plugin list --json | node "$setup_json" plugin-installed "$plugin"; then
+      claude_plugin uninstall "$plugin"
       removed=1
     else
       printf 'Skipped the %s plugin: it is not installed\n' "$plugin"
     fi
-    if [[ -n $(claude plugin marketplace list --json | node "$setup_json" marketplace-path "$marketplace") ]]; then
-      claude plugin marketplace remove "$marketplace"
+    if [[ -n $(claude_plugin marketplace list --json | node "$setup_json" marketplace-path "$marketplace") ]]; then
+      claude_plugin marketplace remove "$marketplace"
       removed=1
     else
       printf 'Skipped the %s marketplace: it is not added\n' "$marketplace"
