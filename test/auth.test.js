@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { beforeEach, describe, test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
+import { clearKeychain, keychainPassword, saveKeychainPassword } from "./support/keychain.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { linearKeyPath } from "../mod/trackers/linear.js";
 import { main } from "../cli/main.js";
@@ -17,7 +18,9 @@ function writeLinearKey(text) {
 // Runs `issues auth …`, resolving with its exit code and everything it printed.
 async function auth(t, ...args) {
   const printed = [];
-  const capture = (...parts) => { printed.push(parts.join(" ")); };
+  const capture = (...parts) => {
+    printed.push(parts.join(" "));
+  };
   t.mock.method(console, "log", capture);
   t.mock.method(console, "error", capture);
   const code = await main(["auth", ...args]);
@@ -29,49 +32,62 @@ async function auth(t, ...args) {
 function stubGh(t, { installed = true, loggedIn = true } = {}) {
   stubHerdr(t, {
     exec: async (command, args) => {
-      if (command === "brew") return { code: 0, stdout: "Homebrew 4.4.0", stderr: "" };
-      if (command === "devbox") throw Object.assign(new Error("spawn devbox ENOENT"), { code: "ENOENT" });
+      if (command === "brew")
+        return { code: 0, stdout: "Homebrew 4.4.0", stderr: "" };
+      if (command === "devbox")
+        throw Object.assign(new Error("spawn devbox ENOENT"), {
+          code: "ENOENT",
+        });
       assert.equal(command, "gh");
-      if (!installed) throw Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" });
+      if (!installed)
+        throw Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" });
       const code = args[0] === "auth" && !loggedIn ? 1 : 0;
       return { code, stdout: "", stderr: "" };
     },
   });
 }
 
-beforeEach(() => forgetLookups());
+const keychainKey = () => keychainPassword("herdr-issues", "linear");
+
+beforeEach(() => {
+  rmSync(linearKeyPath(), { force: true });
+  clearKeychain();
+  forgetLookups();
+});
 
 describe("issues auth linear", () => {
-  test("passes silently when linear.json holds an API key", async (t) => {
+  test("passes silently when the Keychain holds an API key", async (t) => {
+    saveKeychainPassword("herdr-issues", "linear", API_KEY);
+    const { code, output } = await auth(t, "linear");
+    assert.equal(code, 0);
+    assert.ok(!output.includes(API_KEY));
+  });
+
+  test("moves a key in linear.json to the Keychain and passes silently", async (t) => {
     writeLinearKey(JSON.stringify({ apiKey: API_KEY }));
     const { code, output } = await auth(t, "linear");
     assert.equal(code, 0);
     assert.ok(!output.includes(API_KEY));
+    assert.equal(keychainKey(), API_KEY);
+    assert.equal(existsSync(linearKeyPath()), false);
   });
 
   for (const [situation, text] of [
     ["linear.json is missing", null],
     ["linear.json has no apiKey", "{}"],
     ["the apiKey is empty", JSON.stringify({ apiKey: "" })],
+    ["linear.json isn't valid JSON", `{ "apiKey": "${API_KEY}"`],
   ]) {
-    test(`reports the missing key and its fix when ${situation}`, async (t) => {
-      if (text === null) rmSync(linearKeyPath(), { force: true });
-      else writeLinearKey(text);
+    test(`reports the missing key in the Keychain and its fix when ${situation}`, async (t) => {
+      if (text !== null) writeLinearKey(text);
       const { code, output } = await auth(t, "linear");
       assert.equal(code, 1);
-      assert.match(output, /No Linear API key/);
+      assert.match(output, /No Linear API key in the macOS Keychain/);
       assert.match(output, /Settings → Account → Security & access/);
+      assert.match(output, /security add-generic-password -U -s herdr-issues -a linear -w/);
+      assert.ok(!output.includes(API_KEY));
     });
   }
-
-  test("reports an unreadable file when linear.json isn't valid JSON", async (t) => {
-    writeLinearKey(`{ "apiKey": "${API_KEY}"`);
-    const { code, output } = await auth(t, "linear");
-    assert.equal(code, 1);
-    assert.match(output, /isn't valid JSON/);
-    assert.match(output, /Settings → Account → Security & access/);
-    assert.ok(!output.includes(API_KEY));
-  });
 });
 
 describe("issues auth github", () => {

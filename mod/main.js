@@ -316,9 +316,9 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // issues.json picks each repository's tracker, linear.json holds Linear's API key, and the changed stamp says
-  // Claude just made or changed an issue, so a change to any of them refreshes the panel at once rather than at the next
-  // poll, without the lookups kept from those files. The app's folder holds more than these files, so other
+  // issues.json picks each repository's tracker, the key file holds Linear's API key on a system without the
+  // Keychain, and the changed stamp says Claude just made or changed an issue, so a change to any of them refreshes
+  // the panel at once rather than at the next poll, without the lookups kept from those files. The app's folder holds more than these files, so other
   // changes there are ignored.
   watchAppFiles(cx) {
     if (this.watchingAppFiles) return;

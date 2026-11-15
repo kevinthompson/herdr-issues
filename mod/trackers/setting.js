@@ -16,7 +16,7 @@
 // how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
 // each value means and resolves their defaults. worktreeSetup is a shell command `issues worktree` runs in each new
 // checkout (cli/worktree.js).
-// The file holds no secrets, so it can be shared between machines; Linear's API key stays in linear.json.
+// The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";

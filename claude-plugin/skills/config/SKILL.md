@@ -18,7 +18,7 @@ The settings are the repository's entry in `~/.config/herdr-app/issues.json`, un
 }
 ```
 
-The file holds no secrets. Linear's API key lives apart from it, in `~/.config/herdr-app/linear.json`.
+The file holds no secrets. Linear's API key lives apart from it, in the macOS Keychain.
 
 `views` is optional: saved Linear views the panel offers as lists beside the team's. `repo` is optional too: without it, GitHub issues come from origin's repository.
 
@@ -47,7 +47,7 @@ The file holds no secrets. Linear's API key lives apart from it, in `~/.config/h
      - **GitHub**: the repository's GitHub Issues. Offer origin's repository (`gh repo view --json nameWithOwner,hasIssuesEnabled`) and leave `repo` out when it's that one; if issues are disabled there, say so.
      - **Beads**: a local [Beads](https://github.com/steveyegge/beads) database in the main checkout's `.beads/` folder, shared by every worktree and kept out of git. Its entry is `{ "tracker": "beads" }`, with no `team` or `repo`.
 3. **Check the credentials.** Never print a secret, and never ask for one in chat: tell the person where to put it.
-   - **Linear**: the panel reads the API key from `apiKey` in `~/.config/herdr-app/linear.json`. Check the key is present with `issues auth linear`, which never prints it. If it fails, relay the problem and fix it prints, and tell the person to save the file with `chmod 600`. The skills reach Linear through its MCP server instead. When neither `mcp__linear__` nor `mcp__claude_ai_Linear__` tools are available, tell the person to add the server once for every project by running this command, suggesting the `! ` prefix so it runs in this session:
+   - **Linear**: the panel reads the API key from the macOS Keychain, where its setup view saves it. Check the key is present with `issues auth linear`, which never prints it. If it fails, relay the problem and fix it prints: the person pastes the key in the panel's setup view, or saves it in the Keychain themselves with `security add-generic-password -U -s herdr-issues -a linear -w`, which asks for it. Never ask for the key in chat. The skills reach Linear through its MCP server instead. When neither `mcp__linear__` nor `mcp__claude_ai_Linear__` tools are available, tell the person to add the server once for every project by running this command, suggesting the `! ` prefix so it runs in this session:
 
      ```sh
      claude mcp add --transport http --scope user linear https://mcp.linear.app/mcp
