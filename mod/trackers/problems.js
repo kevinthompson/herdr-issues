@@ -35,9 +35,10 @@ export const beadsNotInitialized = () => new SetupProblem("This repository has n
   "Run `bd init` in the repository's main checkout, then check again.", BEADS_NOT_INITIALIZED);
 export const bdFailed = (message) => new SetupProblem(message,
   "Check that `bd list` works in the repository's main checkout, then check again.");
-export const linearKeyMissing = () => new SetupProblem("No Linear API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);
-export const linearKeyUnreadable = () => new SetupProblem("~/.config/herdr-app/linear.json isn't valid JSON", LINEAR_KEY_FIX);
-export const linearKeyInvalid = () => new SetupProblem("Linear refused the API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX);
+export const LINEAR_KEY_PROBLEM = "linear-key";
+export const linearKeyMissing = () => new SetupProblem("No Linear API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+export const linearKeyUnreadable = () => new SetupProblem("~/.config/herdr-app/linear.json isn't valid JSON", LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+export const linearKeyInvalid = () => new SetupProblem("Linear refused the API key in ~/.config/herdr-app/linear.json", LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
 export const badSetting = (message) => new SetupProblem(message,
   "Fix the repository's entry in `~/.config/herdr-app/issues.json`, or choose a different tracker to replace it.");
 export const badMergeSetting = (message) => new SetupProblem(message,

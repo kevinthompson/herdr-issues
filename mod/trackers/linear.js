@@ -5,12 +5,12 @@
 // default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
 // open projects are scopes too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
 // completed or merged most recently.
-import { appHome, readTextFile } from "herdr";
+import { appHome, exec, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
-import { cachedLookup } from "../lookups.js";
+import { cachedLookup, forgetLookups } from "../lookups.js";
 import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
-import { linearKeyMissing, linearKeyUnreadable, linearKeyInvalid } from "./problems.js";
+import { linearKeyMissing, linearKeyUnreadable, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
 
 const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
@@ -60,6 +60,7 @@ const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) 
 // works the issues delegated to it.
 const CLOUD_AGENT = `query { users(filter: { app: { eq: true }, name: { eq: "Cloud Agent" } }) { nodes { id } }
   issueLabels(filter: { name: { eq: "one-shot" }, parent: { name: { eq: "cloud-agent" } } }) { nodes { id } } }`;
+const VIEWER = "query { viewer { id } }";
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
@@ -111,6 +112,27 @@ export async function linearClient() {
   const apiKey = await readApiKey();
   if (!apiKey) throw linearKeyMissing();
   return (query, variables = {}) => request(apiKey, query, variables);
+}
+
+// The fields linear.json already holds besides the key, or none when it's missing or isn't a JSON object.
+function otherKeyFileFields(text) {
+  try {
+    const fields = JSON.parse(text ?? "{}");
+    return fields && typeof fields === "object" && !Array.isArray(fields) ? fields : {};
+  } catch { return {}; }
+}
+
+// Saves the API key in linear.json once Linear accepts it, keeping the file's other fields, readable only by
+// the person. A key Linear refuses rejects and writes nothing.
+export async function saveLinearKey(apiKey) {
+  try { await request(apiKey, VIEWER, {}); }
+  catch (e) { throw e.code === LINEAR_KEY_PROBLEM ? new Error("Linear refused this API key, so it wasn't saved.") : e; }
+  const path = linearKeyPath(), previous = await readTextFile(path);
+  await exec("mkdir", ["-p", appHome()]);
+  await writeTextFile(path, `${JSON.stringify({ ...otherKeyFileFields(previous), apiKey }, null, 2)}\n`, previous);
+  const restricted = await exec("chmod", ["600", path]);
+  if (restricted.code !== 0) throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
+  forgetLookups();
 }
 
 // Projects in the scope menu, by status: in progress, then planned, paused and backlog. Within a status, by
