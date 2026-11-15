@@ -51,7 +51,14 @@ Then name the session's tab as step 3 says, and summarize as step 5 says. Read t
      - with `pull-request-open`, the branch is merged into main, or is pushed with no unpushed commits and has an open pull request (`gh pr view --json state,url`) whose checks pass or whose failures are recorded in an issue comment as not caused by the branch; or
    - the person explicitly canceled the work.
 
-   If so, run `issues complete <issue ID>`, which labels the session's terminal and marks its Herdr tab with ✅ so Herdr's agents list shows the session is finished; skip it without comment when `$HC_TERMINAL_ID` is empty or `herdr-app` isn't installed. Then end your final message with this block, set apart from everything above it, filling in the issue ID, the reason, and the merge or PR result, and write nothing after it:
+   If so, run `issues complete <issue ID>`, which labels the session's terminal and marks its Herdr tab with ✅ so Herdr's agents list shows the session is finished. Then run `issues setting close`, which prints what a finished session does about its worktree, and follow it:
+   - **`manual`**: end with the block below, closing with **This session is finished. Close this worktree with cmd+shift+w.**
+   - **`ask`**: ask with AskUserQuestion, saying how the work landed: "This issue is complete and the work has been merged. Would you like to close this worktree?", or "…and its pull request has been opened…" when it is complete with an open pull request. Offer **Close it** and **Keep it open**. On Close it, run `issues close <issue ID>` and end with the block, closing with **This session is finished. This worktree closes once this message is shown.** On Keep it open, end with the block, closing with **This session is finished. Close this worktree with cmd+shift+w when you're ready.**
+   - **`auto`**: run `issues close <issue ID>` without asking, and end with the block, closing with **This session is finished. This worktree closes once this message is shown.**
+   - `issues close` asks the Herdr issues panel to close the session's space once this session's turn has ended, so the final message is shown first. The panel removes the worktree without a dialog only when every removal check passes, and shows the removal dialog otherwise.
+   - Skip `issues complete` and `issues close` without comment when `$HC_TERMINAL_ID` is empty or `herdr-app` isn't installed, and follow `manual`.
+
+   End your final message with this block, set apart from everything above it, filling in the issue ID, the reason, the merge or PR result and the closing line above, and write nothing after it:
 
    ```
    ---
@@ -60,7 +67,7 @@ Then name the session's tab as step 3 says, and summarize as step 5 says. Read t
 
    <one sentence: merged into main, or, with `pull-request-open`, PR open at <url>; nothing is uncommitted>
 
-   **This session is finished. Close this worktree with cmd+shift+w.**
+   **<closing line>**
    ```
 
-   Do not ask follow-up questions or offer further work in that message, so it reads clearly as the end of the session. Otherwise, list what's outstanding and keep the worktree. With `merged` and a pull request that is still open, end by saying the worktree stays until the pull request merges, and leave the issue in review; continuing the issue once it has merged finishes it in step 10.
+   Apart from the `ask` question, do not ask follow-up questions or offer further work in that message, so it reads clearly as the end of the session. Otherwise, list what's outstanding and keep the worktree. With `merged` and a pull request that is still open, end by saying the worktree stays until the pull request merges, and leave the issue in review; continuing the issue once it has merged finishes it in step 10.
