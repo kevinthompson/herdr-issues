@@ -53,7 +53,7 @@ function blankState({ id, sentence, label, enabled = true, error = null, onClick
 // the Herdr layout instead.
 function collapseHint(t) {
   const keyChip = div().flex_none().px(4).rounded(4).bg(t.raised).text_color(t.foreground)
-    .font_family(settings().font_family).child("⌘⇧I");
+    .font_family(settings().font_family).child("CMD + Shift + I");
   return h_flex().flex_wrap().justify_center().items_center().gap_x(4).text_size(12).text_color(t.dim)
     .child(div().child("Press"))
     .child(keyChip)
