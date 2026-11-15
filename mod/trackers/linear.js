@@ -1,5 +1,5 @@
-// Issues in Linear, for repositories whose entry in issues.json names a team (setting.js) and Planning Center
-// repositories, whose team linear-team.js finds. The API key is the one secret, kept in the macOS Keychain, where
+// Issues in Linear, for repositories whose entry in issues.json names a team (setting.js). The API key is the
+// one secret, kept in the macOS Keychain, where
 // a dotfiles repository tracking the app's folder can't commit it.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
 // default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
@@ -8,7 +8,6 @@
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
-import { planningCenterRepoName, detectedTeam } from "./linear-team.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
 import { KEYCHAIN, linearKeyMissing, linearKeyUnreadable, linearKeyUnsaved, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
 
@@ -56,10 +55,6 @@ const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
-// The cloud-agent > one-shot label marks an issue as ready for Planning Center's Cloud Agent, which
-// works the issues delegated to it.
-const CLOUD_AGENT = `query { users(filter: { app: { eq: true }, name: { eq: "Cloud Agent" } }) { nodes { id } }
-  issueLabels(filter: { name: { eq: "one-shot" }, parent: { name: { eq: "cloud-agent" } } }) { nodes { id } } }`;
 const VIEWER = "query { viewer { id } }";
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
 
@@ -242,6 +237,18 @@ function workBranch(node, pullRequests, repoName) {
   return open?.branch ?? (node.branchName || null);
 }
 
+const cachedOriginRepoName = cachedLookup();
+
+// The name of the GitHub repository origin points to, without its owner, as Linear's pull request
+// attachments name it; null when origin isn't on GitHub.
+function originRepoName(root) {
+  return cachedOriginRepoName(root, async () => {
+    const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: root }).catch(() => null);
+    if (origin?.code !== 0) return null;
+    return /github\.com[:/][^/\s]+\/([^/\s]+?)(?:\.git)?\s*$/.exec(origin.stdout)?.[1] ?? null;
+  });
+}
+
 function toIssue(node, repoName) {
   const pullRequests = pullRequestsOf(node.attachments);
   return {
@@ -275,16 +282,6 @@ function toIssue(node, repoName) {
   };
 }
 
-// { agentId, labelId } once read, shared by every tracker since neither changes.
-let cloudAgent = null;
-async function cloudAgentIds(linear) {
-  if (cloudAgent) return cloudAgent;
-  const { users, issueLabels } = await linear(CLOUD_AGENT);
-  const agentId = users.nodes[0]?.id, labelId = issueLabels.nodes[0]?.id;
-  if (agentId && labelId) cloudAgent = { agentId, labelId };
-  return cloudAgent;
-}
-
 // view ID → { filter, at }, and team key → { team, at }. Outlive each tracker, since the panel
 // makes a new one every refresh.
 const viewFilters = new Map();
@@ -309,15 +306,11 @@ async function teamOf(teamKey, linear) {
 export async function linearTracker({ root: projectRoot, on }, setting = null) {
   if (on != null) return null;
   const root = await mainCheckout(projectRoot, on);
-  const configured = setting && repoConfig(root, setting);
-  const repoName = await planningCenterRepoName(root);
-  if (!configured && !repoName) return null;
+  const repo = setting && repoConfig(root, setting);
+  if (!repo) return null;
   const linear = await linearClient();
-  const teamKey = configured?.teamKey ?? (await detectedTeam(root, repoName, linear));
-  if (!teamKey) return null;
-  const repo = configured ?? { teamKey, path: root, views: [] };
   const scopes = scopesFor(repo, await teamOf(repo.teamKey, linear));
-  const agent = repoName ? await cloudAgentIds(linear) : null;
+  const repoName = await originRepoName(root);
 
   // Every page of the connection `connectionOf` picks out of each answer.
   async function allPages(query, variables, connectionOf) {
@@ -445,11 +438,6 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
       if (!current.assignee) input.assigneeId = viewer.id;
       await linear(UPDATE, { id: issue.linearId, input });
     },
-    isDelegated: agent && ((issue) => issue.delegateId === agent.agentId),
-    delegate: agent && (async (issue) => {
-      await linear(UPDATE, { id: issue.linearId, input: { delegateId: agent.agentId, addedLabelIds: [agent.labelId] } });
-      issue.delegateId = agent.agentId;
-    }),
   };
   return tracker;
 }

@@ -20,7 +20,6 @@ import { linearClient, saveLinearKey } from "./trackers/linear.js";
 import { checkGitHubLogin } from "./trackers/github.js";
 import { checkBeads, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
-import { planningCenterRepoName, detectedTeam } from "./trackers/linear-team.js";
 import { originNotOnGitHub, BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM, LINEAR_KEY_PAGE } from "./trackers/problems.js";
 
 const TEAM_PICKS = "issues.setupTeams";
@@ -48,14 +47,11 @@ async function checkGitHub(main) {
   if (origin?.code !== 0 || !/github\.com[:/]/.test(origin.stdout)) throw originNotOnGitHub();
 }
 
-// The teams the API key can see, by name, with the one the repository's pull requests point to first.
-async function linearTeams(main) {
+// The teams the API key can see, by name.
+async function linearTeams() {
   const linear = await linearClient();
   const { teams } = await linear(TEAMS);
-  const repoName = await planningCenterRepoName(main);
-  const detected = repoName ? await detectedTeam(main, repoName, linear) : null;
-  const byName = [...teams.nodes].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-  return [...byName.filter((team) => team.key === detected), ...byName.filter((team) => team.key !== detected)];
+  return [...teams.nodes].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
 const markdown = (id, text, color) => TextView.markdown(id, text).flex_none().text_size(12).text_color(color);

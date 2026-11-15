@@ -51,7 +51,7 @@ The panel also needs a personal Linear API key: create one on [Linear's Security
 
 ## Configuration
 
-The panel shows a setup view for a repository whose tracker it can't place: choose **GitHub Issues** or **Linear**, and how work gets into main. For options the panel doesn't offer, run `/issues:config` in a Claude Code session in the repository.
+The panel shows a setup view for a repository with no tracker configured: choose **GitHub Issues**, **Linear** or **Beads**, and how work gets into main. For options the panel doesn't offer, run `/issues:config` in a Claude Code session in the repository.
 
 Each tracker needs credentials:
 
