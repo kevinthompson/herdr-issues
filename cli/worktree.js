@@ -1,5 +1,5 @@
-// `issues worktree`: opens a branch in a worktree of the repository holding a folder and, in Herdr, shows it
-// in a space nested under the repository's space. The worktree is the branch's existing one, else a new
+// `issues worktree`: opens a branch in a worktree of the repository holding a folder and, in Herdr, opens it
+// behind what's shown in a space nested under the repository's space. The worktree is the branch's existing one, else a new
 // checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. With --claude, the space
 // opens a Claude session on the repository's workModel and workEffort settings.
 import { spawn } from "node:child_process";
@@ -10,6 +10,7 @@ import { exec, home, readLayout } from "./herdr.js";
 import { spaceShowing, worktreeFor } from "../mod/worktree.js";
 import { trackerSetting } from "../mod/trackers/setting.js";
 import { workSessionArgv } from "../mod/work-session.js";
+import { openBehindArgs } from "../mod/open-behind.js";
 
 const GIT_TIMEOUT_MS = 10 * 60 * 1000;
 const RECENT_FETCH_MS = 60 * 1000;
@@ -175,7 +176,13 @@ async function herdrDo(action, params) {
   if (result.code !== 0) throw new Error(`herdr-app do ${action}: ${lastLine(result.stderr || result.stdout)}`);
 }
 
-// Selects the space already showing the worktree, or opens one on it, after a space on the main checkout,
+// `herdr-app --version` prints "herdr-app <version>".
+async function herdrVersion() {
+  const result = await exec("herdr-app", ["--version"]);
+  return result.code === 0 ? result.stdout.trim().split(" ").pop() : null;
+}
+
+// Selects the space already showing the worktree, or opens one on it behind what's shown, after a space on the main checkout,
 // which the Herdr sidebar nests worktree spaces under. Concurrent runs would each see no space on the main
 // checkout and open one, so they take turns.
 async function showInSpace({ branch, path, main, common, name, claudeMessage }) {
@@ -187,12 +194,13 @@ async function showInSpace({ branch, path, main, common, name, claudeMessage }) 
       console.log(`switched to the space already open on ${branch}`);
       return;
     }
+    const behind = openBehindArgs(await herdrVersion());
     if (!spaceShowing(main, null)) {
-      await herdrDo("space.new", { folder: main });
+      await herdrDo("space.new", { folder: main, ...behind });
       console.log(`opened a space on ${main}`);
     }
     const claudeTab = claudeMessage ? { tab: "Claude", argv: await workSessionArgv({ root: main, on: null }), task: claudeMessage } : {};
-    await herdrDo("space.new", { folder: path, name, ...claudeTab });
+    await herdrDo("space.new", { folder: path, name, ...claudeTab, ...behind });
     console.log(`opened ${branch} in a Herdr space${claudeMessage ? " with Claude" : ""}`);
   });
 }
