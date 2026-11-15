@@ -41,7 +41,7 @@ Each tracker needs:
 ```json
 {
   "repos": {
-    "~/Code/calendar": { "tracker": "linear", "team": "CAL" },
+    "~/Code/web": { "tracker": "linear", "team": "WEB" },
     "~/Code/herdr-issues": { "tracker": "github" }
   }
 }
@@ -84,13 +84,13 @@ The panel's setup view asks for both when it sets up a repository's tracker, pro
 
 ### `worktreeSetup`
 
-`worktreeSetup` is a command to run in each new worktree, such as one that installs the branch's dependencies. `issues worktree` runs it once, in a worktree it has just created, before opening the worktree's space; it doesn't run again when it reuses a worktree. The command runs through your login shell (`$SHELL -lc`), so it finds the tools on your profile's `PATH` even when the Herdr app starts it, and its output is printed. When it fails, `issues worktree` says which command failed, keeps the worktree so you can finish setting it up by hand, and exits with an error without opening the space. For example, a Planning Center box app:
+`worktreeSetup` is a command to run in each new worktree, such as one that installs the branch's dependencies. `issues worktree` runs it once, in a worktree it has just created, before opening the worktree's space; it doesn't run again when it reuses a worktree. The command runs through your login shell (`$SHELL -lc`), so it finds the tools on your profile's `PATH` even when the Herdr app starts it, and its output is printed. When it fails, `issues worktree` says which command failed, keeps the worktree so you can finish setting it up by hand, and exits with an error without opening the space. For example, a Node app:
 
 ```json
-"~/Code/people": { "tracker": "linear", "team": "<team key>", "worktreeSetup": "box worktree-setup" }
+"~/Code/web": { "tracker": "linear", "team": "WEB", "worktreeSetup": "npm install" }
 ```
 
-A repository whose own git hook already sets up new worktrees, such as calendar, leaves `worktreeSetup` unset.
+A repository whose own git hook already sets up new worktrees leaves `worktreeSetup` unset.
 
 ### `pollSeconds`
 

@@ -86,7 +86,7 @@ function pullRequestsOf(attachments) {
 }
 
 // A view's URL ends in its name and its ID, which the API takes in place of the view's UUID:
-// …/view/calendar-core-a8875271fcf5 is a8875271fcf5.
+// …/view/checkout-bugs-a8875271fcf5 is a8875271fcf5.
 const viewId = (url) => url.replace(/[?#].*$/, "").replace(/\/+$/, "").split("/").pop().split("-").pop();
 
 function repoConfig(root, { team, views = {} }) {

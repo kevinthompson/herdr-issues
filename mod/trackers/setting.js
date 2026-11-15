@@ -2,12 +2,12 @@
 // are keyed by their main checkout's path, ~ for the home folder, so worktrees share their repository's choice:
 // { "pollSeconds": 120,                                             how often every panel polls its tracker
 //   "repos": {
-//     "~/Code/calendar": { "tracker": "linear", "team": "CAL",      a Linear team, with saved views as extra lists
+//     "~/Code/web":      { "tracker": "linear", "team": "WEB",      a Linear team, with saved views as extra lists
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
 //     "~/Code/app":      { "tracker": "github", "repo": "owner/name",   its GitHub issues; repo defaults to origin's
 //                          "spaceName": "<repo><issueId>",            names issue spaces (space-name.js), here app#41
 //                          "merge": "pull-request", "complete": "merged",
-//                          "worktreeSetup": "box worktree-setup", "pollSeconds": 30 },
+//                          "worktreeSetup": "npm install", "pollSeconds": 30 },
 //     "~/Code/notes":    { "tracker": "beads" } } }                   the Beads database in its .beads folder
 // pollSeconds, at the top level and in any entry, is how often the panel asks the tracker for its list, a whole number
 // of seconds of at least 10; an entry's overrides the top level's, and pollSettings resolves it, 60 without either.
