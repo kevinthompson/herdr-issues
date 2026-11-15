@@ -11,8 +11,10 @@ export class SetupProblem extends Error {
   }
 }
 
-const LINEAR_KEY_FIX = "Create a personal API key in Linear under **Settings → Account → Security & access**, and save it in "
-  + '`~/.config/herdr-app/linear.json` as `{ "apiKey": "lin_api_…" }`. Then check again.';
+export const LINEAR_KEY_PAGE = "https://linear.app/settings/account/security";
+const LINEAR_KEY_FIX = `Create a personal API key in Linear under **Settings → Account → Security & access** (${LINEAR_KEY_PAGE}), paste it in the Issues panel's API key field `
+  + "and choose **Save key**. Or save it yourself in `~/.config/herdr-app/linear.json` as `{ \"apiKey\": \"lin_api_…\" }`, "
+  + "readable only by you (`chmod 600`), then check again.";
 
 // Installing a missing tool with the person's package managers, or as `instructions` say when they have none.
 async function installFix(packageName, instructions) {
