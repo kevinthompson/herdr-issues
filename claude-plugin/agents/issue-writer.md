@@ -1,6 +1,13 @@
+---
+name: issue-writer
+description: Files the issues /issues:create has settled, from the brief that skill writes. Use only when /issues:create hands off to it.
+tools: Bash, Read, Grep, Glob, Write, ToolSearch, mcp__linear__*, mcp__claude_ai_Linear__*
+omitClaudeMd: true
+---
+
 # Writing issues in the background
 
-The `/issues:create` skill hands you this guide in a background agent, with a brief carrying the settled intent, the repository's main checkout and what `issues context` printed: the tracker, its labels and the issues whose titles resemble the request. Write one issue per distinct piece of work the brief describes. Each issue is a **hand-off**: an agent holding only that issue and the repository must be able to finish the work and know it is finished.
+The `/issues:create` skill starts you in the background with a brief carrying the settled intent, the repository's main checkout and what `issues context` printed: the tracker, its labels and the issues whose titles resemble the request. Write one issue per distinct piece of work the brief describes. Each issue is a **hand-off**: an agent holding only that issue and the repository must be able to finish the work and know it is finished.
 
 You can't ask the person anything. The brief settles what the work is and why; you supply everything findable. When a choice the brief doesn't settle would change an issue, make the likelier one, write the issue so it says so, and list it as an assumption in your report.
 
