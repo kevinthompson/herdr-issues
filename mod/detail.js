@@ -1,16 +1,19 @@
 // One issue, drawn inside the panel in place of the list: a way back, its status and priority
 // (each a dropdown), its other details and its Markdown body, which Edit swaps for an editor.
 // Task-list items in the body are checkboxes that check off in place.
-import { div, svg } from "gpui-kit";
+import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
-import { dueStatus } from "./issue.js";
+import { dueStatus, statusIcon } from "./issue.js";
 import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
+
+const STATUS_ICON_PX = 12;
 
 // The status dropdown takes the status's color, as the list's status headers do.
 function dropdown(field, label, { issue, writable, onMenu }, t) {
   const statusColor = field === "status" ? STATUS_COLORS[issue.status] : null;
+  const icon = field === "status" ? statusIcon(issue.status) : null;
   const [fill, border, hoverFill] = statusColor
     ? [tinted(statusColor), tinted(statusColor, "60"), tinted(statusColor, "48")]
     : [t.raised, t.border, t.hover];
@@ -19,6 +22,7 @@ function dropdown(field, label, { issue, writable, onMenu }, t) {
     .child(h_flex().id(`field-${field}`).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(border)
       .text_color(t.foreground).bg(fill)
       .when(writable, (e) => e.cursor_pointer().hover((s) => s.bg(hoverFill)).on_click((_e, cx) => onMenu(field, cx)))
+      .when(Boolean(icon), (e) => e.child(image(icon ?? "").flex_none().size(STATUS_ICON_PX)))
       .child(optionLabel(field, issue[field]))
       .when(writable, (e) => e.child(div().text_color(t.dim).child("▾"))));
 }
