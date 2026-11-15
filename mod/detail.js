@@ -105,13 +105,13 @@ function pullRequestLine(issueId, pullRequest, onLink, t) {
     .child(h_flex().id(`pull-request-${issueId}-${pullRequest.url}`).flex_1().min_w(0).gap(6).items_start().cursor_pointer()
       .on_click((_e, cx) => onLink(pullRequest.url, cx))
       .child(div().flex_none().text_color(t.accent).child(reference))
-      .child(div().flex_1().min_w(0).whitespace_normal().child(pullRequest.title)));
+      .child(div().flex_1().min_w(0).truncate().child(pullRequest.title)));
 }
 
 // The issue's one pull request, or a bulleted list of several.
 function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
   if (pullRequests.length === 1) return pullRequestLine(id, pullRequests[0], onLink, t);
-  return v_flex().flex_1().min_w(0).gap(2).children(pullRequests.map((pullRequest) => h_flex().min_h(FACT_ROW_PX).gap(6).items_start()
+  return v_flex().flex_1().min_w(0).gap(2).children(pullRequests.map((pullRequest) => h_flex().min_w(0).min_h(FACT_ROW_PX).gap(6).items_start()
     .child(div().flex_none().text_color(t.dim).child("•"))
     .child(pullRequestLine(id, pullRequest, onLink, t))));
 }
