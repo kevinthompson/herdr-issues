@@ -1,8 +1,9 @@
 // Worktree dialog, a dialog of this mod with props { space, action: "new" | "open" | "remove" } or
 // { folder, machine } for a repo without a space; optional { branch, name, tab, argv, task }, and { behind: true }
 // to open the new worktree's space behind what's shown.
-// Remove takes an optional { warning }: work outside the checkout that removing it would leave behind. It removes
-// the checkout without asking when removesWithoutAsking (removal.js) says so, and otherwise waits for Enter.
+// Remove takes an optional { warning }: work outside the checkout that removing it would leave behind, and { ask }
+// to wait for Enter whatever the checks find. It removes the checkout without asking when removesWithoutAsking
+// (removal.js) says so, and otherwise waits for Enter.
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
@@ -12,8 +13,8 @@ import { openBehindArgs } from "./open-behind.js";
 import { checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks, sessionComplete, PASS, LOSS } from "./removal.js";
 
 // Opens the dialog that removes the space's worktree and closes the space.
-export function openRemovalDialog(spaceId) {
-  openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: spaceId, action: "remove" } });
+export function openRemovalDialog(spaceId, { ask = false } = {}) {
+  openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: spaceId, action: "remove", ask } });
 }
 
 // Where a space is now: its first terminal's live folder, else where it was made.
@@ -195,7 +196,7 @@ export class WorktreeDialog {
         cx.notify();
         if (repo?.linked && props().action === "remove") {
           await this.check(repo, cx);
-          if (removesWithoutAsking({ ...this.checks, warning: props().warning }, this.nestedSpaces.length)) await this.work(cx);
+          if (removesWithoutAsking({ ...this.checks, warning: props().warning }, this.nestedSpaces.length, { ask: props().ask })) await this.work(cx);
         }
         if (props().branch) await this.work(cx);
       } catch (error) { this.repo = null; this.error = String(error); cx.notify(); }

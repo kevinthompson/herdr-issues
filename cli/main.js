@@ -12,7 +12,7 @@ import { mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, editIssueBody, setIssueStatus, startIssue } from "./change.js";
-import { completedTabName, isUnnamed, issueTabName, labelComplete, renameTab, sessionTab } from "./tab.js";
+import { completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameTab, sessionTab } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
 
@@ -39,6 +39,8 @@ Commands:
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   complete <id>            Mark the session finished: label $HC_TERMINAL_ID issues.complete=<id> and prefix its tab's
                            name with ✅, even a name the person chose, once
+  close <id>               Ask the issues panel to close the session's space once $HC_TERMINAL_ID is idle: label it
+                           issues.close=<id>; the panel removes the worktree without asking only when every check passes
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a Herdr space named after the issue
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
@@ -173,6 +175,13 @@ async function complete([issueId]) {
   const newName = completedTabName(tab.name);
   if (newName !== tab.name) await renameTab(tab, newName);
   console.log(`Marked ${issueId} complete in the tab ${newName}`);
+}
+
+async function close(args) {
+  if (args.length !== 1 || args[0].startsWith("-")) throw new UsageError("close needs one issue ID");
+  const tab = await sessionTab();
+  await labelCloseRequest(tab, args[0]);
+  console.log("Asked the issues panel to close the space once this session is idle; if it stays open, press cmd+shift+w");
 }
 
 // Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
@@ -347,7 +356,7 @@ async function edit(args) {
   console.log(`Saved the body of ${issue.id}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, worktree, merge, status, start, edit };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, close, worktree, merge, status, start, edit };
 
 const HELP_FLAGS = ["-h", "--help"];
 

@@ -5,7 +5,8 @@
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open the
 // issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge lands a
-// finished branch in main (merge.js) and removes its worktree. Clicking a task-list
+// finished branch in main (merge.js) and removes its worktree. A finished session's `issues close` closes its space
+// through the removal dialog once the session is idle (close-request.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list, and a folder outside a git repository
 // shows a button that initializes one there. The header's gear opens the repository's settings in place of the
@@ -15,7 +16,7 @@
 // checkout it runs from for an update, and its footer offers one with an Update button (update.js).
 import { View, div, image, svg } from "gpui-kit";
 import { v_flex, h_flex, EditorState, ScrollHandle } from "gpui-base";
-import { theme, props, settings, nextCommand, openOverlay, spaces, focused, notify, exec, run, watchFolder, appHome, updates } from "herdr";
+import { theme, props, settings, nextCommand, openOverlay, spaces, panes, terminals, focused, notify, exec, hc, run, watchFolder, appHome, updates } from "herdr";
 import { location, repositoryRoot, mainCheckout, initializeRepository } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
 import { settingsPath, pollSettings, updateSettings, DEFAULT_POLL_SECONDS, DEFAULT_UPDATE_CHECK_HOURS } from "./trackers/setting.js";
@@ -45,8 +46,11 @@ import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
+import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 
 const REFRESH_CHECK_MS = 10 * 1000;
+// Reading terminals' labels and statuses asks nothing of the machine, so close requests are checked often.
+const CLOSE_REQUEST_CHECK_MS = 1000;
 const HOUR_MS = 60 * 60 * 1000;
 const UPDATED_NOTE = "Updated. New Claude Code sessions pick up the plugin's update.";
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
@@ -80,6 +84,20 @@ async function closeFocusedSpace() {
     openRemovalDialog(space.id);
   } else {
     run("space.close", { id: space.id });
+  }
+}
+
+// Terminals whose close request is being acted on, until its label is removed, so the next check doesn't open a
+// second dialog.
+const closingTerminals = new Set();
+
+// Opens the removal dialog for each finished session that asked with `issues close` and is now idle.
+function closeFinishedSessions() {
+  for (const request of readyCloseRequests(terminals(), spaces(), panes())) {
+    if (closingTerminals.has(request.terminal)) continue;
+    closingTerminals.add(request.terminal);
+    hc(["label", request.terminal, `${CLOSE_LABEL}=`]).catch(() => {}).finally(() => closingTerminals.delete(request.terminal));
+    openRemovalDialog(request.space, { ask: request.ask });
   }
 }
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
@@ -141,6 +159,7 @@ export default class Issues extends View {
     this.update = null; this.updated = false; this.updateCheckedAt = null; this.updateCheckMs = DEFAULT_UPDATE_CHECK_HOURS * HOUR_MS;
     this.checkForUpdate(cx);
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
+    cx.timer.every(CLOSE_REQUEST_CHECK_MS, () => closeFinishedSessions());
     // Herdr delivers a mod's commands only to a shown copy, so the keys in keys.json, such as cmd-shift-w's
     // close-space, do nothing in a layout without the panel.
     cx.spawn(async (cx) => {

@@ -162,6 +162,27 @@ test("complete leaves a tab already marked with ✅ as it is", async (t) => {
   assert.deepEqual(calls, [["hc", "label", "t2", "issues.complete=#72"]]);
 });
 
+test("close labels the session's terminal so the panel closes its space, and changes nothing else", async (t) => {
+  const calls = stubApp(t, listing("✅ Review"));
+  const { code, out } = await run(t, ["close", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["hc", "label", "t2", "issues.close=#72"]]);
+  assert.match(out, /cmd\+shift\+w/);
+});
+
+test("close needs one issue ID", async (t) => {
+  const calls = stubApp(t, listing("Claude"));
+  const { code, err } = await run(t, ["close"]);
+  assert.equal(code, 2);
+  assert.match(err, /close needs one issue ID/);
+  assert.deepEqual(calls, []);
+});
+
+test("--help lists close", async (t) => {
+  const { out } = await run(t, ["--help"]);
+  assert.match(out, /^ {2}close <id> /m);
+});
+
 test("complete never renames the space", async (t) => {
   const calls = stubApp(t, listing("Claude"));
   await run(t, ["complete", "#72"]);
