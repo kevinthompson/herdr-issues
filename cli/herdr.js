@@ -5,7 +5,7 @@
 // file to export it too.
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, utimes, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -75,3 +75,14 @@ export async function readLayout() {
 export const spaces = () => layout.spaces;
 export const panes = () => layout.panes;
 export const focused = () => null;
+
+// The CLI can't reach the app's shared values, so none are set, and setting one touches the stamp every panel
+// watches (main.js's changedStampPath), whose only use from the CLI is telling the panels an issue changed.
+export const shared = () => undefined;
+export async function setShared() {
+  const stamp = join(appHome(), "data/issues/changed");
+  await mkdir(dirname(stamp), { recursive: true });
+  await writeFile(stamp, "", { flag: "a" });
+  const now = new Date();
+  await utimes(stamp, now, now);
+}
