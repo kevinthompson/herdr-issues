@@ -82,6 +82,22 @@ These two settings say how an issue's branch gets into main and when its work co
 
 The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
 
+### `close`
+
+What a finished `/issues:work` session does about its worktree:
+
+- `ask` (the default): the session asks whether to close the worktree, and closes it if you say yes.
+- `auto`: the session closes the worktree without asking.
+- `manual`: the session tells you to close the worktree with cmd+shift+w.
+
+The session closes its worktree with `issues close`, which asks the issues panel to close the session's space. The panel waits until the session's turn has ended, so its final message is shown, then removes the worktree without a dialog when every removal check passes, and shows the removal dialog otherwise, or when the space is on another machine.
+
+```json
+"~/Code/herdr-issues": { "tracker": "github", "close": "auto" }
+```
+
+A personal instruction that tells Claude to always ask you to close worktrees with cmd+shift+w, such as one in your global `~/.claude/CLAUDE.md`, overrides `ask` and `auto`; reword it for this setting to take effect. The panel's settings view and `/issues:config` change `close`, and `issues setting close` prints it.
+
 ### `worktreeSetup`
 
 `worktreeSetup` is a command to run in each new worktree, such as one that installs the branch's dependencies. `issues worktree` runs it once, in a worktree it has just created, before opening the worktree's space; it doesn't run again when it reuses a worktree. The command runs through your login shell (`$SHELL -lc`), so it finds the tools on your profile's `PATH` even when the Herdr app starts it, and its output is printed. When it fails, `issues worktree` says which command failed, keeps the worktree so you can finish setting it up by hand, and exits with an error without opening the space. For example, a Node app:

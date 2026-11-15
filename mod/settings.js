@@ -1,14 +1,14 @@
 // The focused repository's settings, which the gear in the panel's header opens in place of the list, with Back
 // at the top left as the setup view (setup.js) has: where its issues live, its tracker, which a different choice
 // checks as the setup view does (tracker-choice.js) before it can be saved, with Linear's team; how its work gets
-// into main, and, for a pull request, when the work is complete, its merge and complete in issues.json; then the
-// model and effort of the background agent
+// into main, and, for a pull request, when the work is complete, its merge and complete in issues.json; what a
+// finished session does about its worktree, its close; then the model and effort of the background agent
 // that writes issues and of the sessions that work them, its createModel, createEffort, workModel and workEffort.
 // It opens on the settings in effect, defaults applied, as `issues setting` prints them, and says where each model
 // and effort comes from when the repository's entry doesn't set it. Each model and effort offers its allowed values
 // and a choice that removes it from the entry, so issues.json's top level or the default applies; workModel also
 // takes another model alias or full name typed in. Save waits for a different tracker's check to pass and, for
-// Linear, a team, writes only the changed keys (saveTrackerChoice, saveMergeSettings and saveAgentSettings in
+// Linear, a team, writes only the changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting and saveAgentSettings in
 // setting.js) and goes back to the list; a failed save shows its error and stays. Back writes nothing.
 import { div } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
@@ -17,7 +17,7 @@ import { MERGE_CHOICES } from "./setup.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
   AGENT_DEFAULTS, CREATE_EFFORTS, CREATE_MODELS, SUGGESTED_WORK_MODELS,
-  agentSettings, mergeSettings, saveAgentSettings, saveMergeSettings, saveTrackerChoice,
+  agentSettings, closeSettings, mergeSettings, saveAgentSettings, saveCloseSetting, saveMergeSettings, saveTrackerChoice,
 } from "./trackers/setting.js";
 
 const TEAM_PICKS = "issues.settingsTeams";
@@ -29,6 +29,13 @@ const COMPLETE_CHOICES = [
 const COMPLETE_SENTENCE = "When a session can finish and the issue's worktree is safe to close.";
 const COMPLETE_WITHOUT_PULL_REQUEST = "Once it merges: without a pull request, the work is complete once its branch is in main.";
 const DEFAULT_COMPLETE = "pull-request-open";
+
+const CLOSE_CHOICES = [
+  { id: "ask", label: "Ask me", detail: "The session asks whether to close its worktree, and closes it if you say yes." },
+  { id: "auto", label: "Close it", detail: "The session closes its worktree without asking." },
+  { id: "manual", label: "I'll close it", detail: "The session tells you to close the worktree with cmd+shift+w." },
+];
+const CLOSE_SENTENCE = "What a finished session does about its worktree. A worktree that might lose work, or that has other spaces nested under it, always shows the removal dialog first.";
 
 const AGENT_QUESTIONS = [
   { key: "createModel", title: "Issue writer's model", sentence: "The model of the background agent that writes issues for /issues:create, /issues:plan and /issues:triage.", choices: CREATE_MODELS },
@@ -59,6 +66,7 @@ export class SettingsView {
       onTeam: (cx) => cx.notify(),
     });
     this.saved = null; this.merge = null; this.complete = null;
+    this.savedClose = null; this.close = null;
     this.savedAgent = null; this.agentEntry = {};
     this.loading = true; this.saving = false; this.error = null;
     this.workModelInput = InputState.new({ placeholder: "Another model alias or full name" });
@@ -69,8 +77,9 @@ export class SettingsView {
   load(cx) {
     cx.spawn(async (cx) => {
       try {
-        const [merge, agent] = await Promise.all([mergeSettings(this.project), agentSettings(this.project)]);
+        const [merge, { close }, agent] = await Promise.all([mergeSettings(this.project), closeSettings(this.project), agentSettings(this.project)]);
         this.saved = merge; Object.assign(this, merge);
+        this.savedClose = close; this.close = close;
         this.savedAgent = agent;
         this.agentEntry = Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry]));
         if (isTypedWorkModel(this.agentEntry.workModel)) this.workModelInput.set_value(this.agentEntry.workModel);
@@ -117,6 +126,11 @@ export class SettingsView {
     cx.notify();
   }
 
+  chooseClose(close, cx) {
+    Object.assign(this, { close, error: null });
+    cx.notify();
+  }
+
   // The entry's value for `key`, or null to remove it.
   chooseAgent(key, value, cx) {
     this.agentEntry = { ...this.agentEntry, [key]: value };
@@ -137,6 +151,10 @@ export class SettingsView {
     return Boolean(this.merge) && (this.merge !== this.saved?.merge || this.complete !== this.saved?.complete);
   }
 
+  closeChanged() {
+    return Boolean(this.close) && this.close !== this.savedClose;
+  }
+
   agentChanges() {
     return Object.fromEntries(Object.keys(AGENT_DEFAULTS)
       .filter((key) => this.savedAgent && (this.agentEntry[key] ?? null) !== this.savedAgent[key].entry)
@@ -144,7 +162,7 @@ export class SettingsView {
   }
 
   changed() {
-    return Boolean(this.trackerChange()) || this.mergeChanged() || Object.keys(this.agentChanges()).length > 0;
+    return Boolean(this.trackerChange()) || this.mergeChanged() || this.closeChanged() || Object.keys(this.agentChanges()).length > 0;
   }
 
   canSave() {
@@ -155,12 +173,14 @@ export class SettingsView {
     if (!this.canSave()) return;
     const trackerChoice = this.trackerChange();
     const mergeChoice = this.mergeChanged() ? { merge: this.merge, complete: this.merge === "pull-request" ? this.complete : null } : null;
+    const closeChoice = this.closeChanged() ? this.close : null;
     const agentChanges = this.agentChanges();
     Object.assign(this, { saving: true, error: null });
     cx.spawn(async (cx) => {
       try {
         if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
         if (mergeChoice) await saveMergeSettings(this.main, mergeChoice);
+        if (closeChoice) await saveCloseSetting(this.main, closeChoice);
         if (Object.keys(agentChanges).length > 0) await saveAgentSettings(this.main, agentChanges);
         this.onSaved(cx);
       } catch (e) { this.error = `Could not save: ${e.message ?? e}`; }
@@ -195,6 +215,8 @@ export class SettingsView {
       .child(this.question(v_flex().flex_none().gap(12).pt(4), "When is the work complete?", COMPLETE_SENTENCE, t)
         .when(pullRequest, (e) => e.child(this.options("complete", COMPLETE_CHOICES, this.complete, (id, cx) => this.chooseComplete(id, cx), t)))
         .when(!pullRequest && Boolean(this.merge), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.foreground).child(COMPLETE_WITHOUT_PULL_REQUEST))))
+      .child(this.question(v_flex().flex_none().gap(12).pt(4), "When the work is complete, close the worktree?", CLOSE_SENTENCE, t)
+        .child(this.options("close", CLOSE_CHOICES, this.close, (id, cx) => this.chooseClose(id, cx), t)))
       .when(Boolean(this.savedAgent), (e) => e.children(AGENT_QUESTIONS.map((question) => this.agentQuestion(question, t))))
       .when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")))
       .child(h_flex().gap(8).items_center()

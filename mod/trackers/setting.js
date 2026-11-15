@@ -7,7 +7,7 @@
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
 //     "~/Code/app":      { "tracker": "github", "repo": "owner/name",   its GitHub issues; repo defaults to origin's
 //                          "spaceName": "<repo><issueId>",            names issue spaces (space-name.js), here app#41
-//                          "merge": "pull-request", "complete": "merged",
+//                          "merge": "pull-request", "complete": "merged", "close": "auto",
 //                          "worktreeSetup": "npm install", "pollSeconds": 30 },
 //     "~/Code/notes":    { "tracker": "beads" } } }                   the Beads database in its .beads folder
 // pollSeconds, at the top level and in any entry, is how often the panel asks the tracker for its list, a whole number
@@ -18,7 +18,9 @@
 // and <repo> the repository's name without its owner; without it, an issue's space is named after its ID. merge is
 // how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
 // each value means and resolves their defaults. worktreeSetup is a shell command `issues worktree` runs in each new
-// checkout (cli/worktree.js).
+// checkout (cli/worktree.js). close, also optional in any entry, is what a finished /issues:work session does about
+// its worktree: manual tells the person to close it with cmd+shift+w, ask asks whether to close it now, and auto
+// closes it, the last two with `issues close`; closeSettings resolves it, ask without it.
 // createModel and createEffort, at the top level and in any entry, an entry's winning, are the model and effort
 // the issue-writer agent files issues on in the background for /issues:create, /issues:plan and /issues:triage:
 // createModel is inherit (the session's own model), sonnet, opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
@@ -30,8 +32,8 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, and its model and effort settings
-// with saveAgentSettings.
+// tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, and
+// its model and effort settings with saveAgentSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -42,6 +44,8 @@ export const settingsPath = () => `${appHome()}/issues.json`;
 const TRACKERS = ["linear", "github", "beads"];
 const MERGES = ["auto", "review", "pull-request"];
 const COMPLETES = ["merged", "pull-request-open"];
+export const CLOSES = ["manual", "ask", "auto"];
+export const DEFAULT_CLOSE = "ask";
 export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
 export const DEFAULT_UPDATE_CHECK_HOURS = 6;
@@ -119,6 +123,7 @@ export async function trackerSetting({ root, on }) {
   checkCreateSettings(setting, `issues.json's ${key}`);
   checkWorkSettings(setting, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
+  checkChoice(setting.close, "close", CLOSES, `issues.json's ${key}`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
   if (setting.complete === "pull-request-open" && setting.merge && setting.merge !== "pull-request") {
@@ -196,7 +201,12 @@ export async function resolveMergeSettings(main, setting) {
   return { merge, complete };
 }
 
-const SETUP_KEYS = ["tracker", "team", "repo", "merge", "complete"];
+// What a finished issue session does about its worktree: the entry's close, else ask.
+export async function closeSettings(project) {
+  return { close: (await trackerSetting(project))?.close ?? DEFAULT_CLOSE };
+}
+
+const SETUP_KEYS =["tracker", "team", "repo", "merge", "complete"];
 
 // Writes `change(entry)` as the entry of the repository whose main checkout is `main`, in the place of any entry
 // it has under either spelling of its path, and keeps every other repository's entry. `entry` is null without one.
@@ -256,6 +266,17 @@ export async function saveMergeSettings(main, { merge, complete = null }) {
     const changed = { ...entry, merge, complete };
     if (complete == null) delete changed.complete;
     return changed;
+  });
+}
+
+// Sets what a finished session of the repository whose main checkout is `main` does about its worktree. It changes
+// only close in the repository's existing entry, and writes nothing for a value trackerSetting would refuse or a
+// repository without an entry.
+export async function saveCloseSetting(main, close) {
+  if (!CLOSES.includes(close)) throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
+  await changeEntry(main, (entry) => {
+    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
+    return { ...entry, close };
   });
 }
 
