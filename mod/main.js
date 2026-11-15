@@ -789,7 +789,7 @@ export default class Issues extends View {
   // shows its project, and the filter bar below narrows it.
   trackerLabel(t) {
     const { scopes, name } = this.tracker;
-    if (!scopes) return div().flex_none().text_size(11).text_color(t.dim).child(name);
+    if (!scopes) return div().flex_none().text_color(t.dim).child(name);
     const { scope, project } = this.currentScope(), shown = project ?? scope;
     return scopeDropdown("issues-scope", shown.label, () => openScopeMenu(scopes, shown.id, this.scopeKey), t).flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX);
   }
@@ -824,7 +824,7 @@ export default class Issues extends View {
     const syncIndicator = this.syncIndicator(t);
     return h_flex().h(42).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
       .child(div().flex_none().font_semibold().child("Issues"))
-      .when(Boolean(this.tracker), (e) => e.child(this.trackerLabel(t)))
+      .when(Boolean(this.tracker), (e) => e.child(div().flex_none().text_color(t.dim).child(">")).child(this.trackerLabel(t)))
       .child(div().flex_1())
       .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
       .child(collapseButton(() => this.toggleCollapsed(), t));
