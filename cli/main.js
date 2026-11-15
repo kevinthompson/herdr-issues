@@ -26,6 +26,9 @@ Commands:
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
                            credentials as auth does, its labels (GitHub's; null elsewhere) and up to 10 of its listed
                            issues whose titles share the most words with <words>
+  scopes [--json]          Print the issue lists the panel can show, default first: each one's ID, label and group,
+                           a project's milestones grouped under it
+  list [<scope>] [--json]  Print the open issues the panel lists in a scope, or the default one: ID, status and title
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   worktree <id> [--name <space name>] [--claude <first message>]
@@ -187,6 +190,36 @@ async function context(searchWords) {
   console.log(JSON.stringify({ tracker: { kind, name, team, repo }, labels, similarIssues: similarIssues(issues, searchWords) }));
 }
 
+// A tracker with one list has no scopes; it stands in for that list.
+const trackerScopes = (tracker) => tracker.scopes ?? [{ id: "default", label: tracker.name }];
+
+const scopeRows = (scopes) => scopes.flatMap((scope) => [
+  scope,
+  ...(scope.milestones ?? []).map((milestone) => ({ ...milestone, group: scope.label })),
+]);
+
+async function scopes(args) {
+  const scopes = trackerScopes(await currentTracker());
+  if (args.includes("--json")) console.log(JSON.stringify(scopes));
+  else for (const { id, label, group } of scopeRows(scopes)) console.log([id, label, group].filter(Boolean).join("\t"));
+}
+
+// The panel's Backlog group, collapsed at first, still holds open issues, so they're listed too.
+const OPEN_GROUPS_TO_LOAD = new Set(["backlog"]);
+
+async function list(args) {
+  const [scopeId, ...extra] = args.filter((arg) => !arg.startsWith("--"));
+  if (extra.length) throw new UsageError("list takes at most one scope");
+  const tracker = await currentTracker();
+  const rows = scopeRows(trackerScopes(tracker));
+  if (scopeId && !rows.some((scope) => scope.id === scopeId)) {
+    throw new Refusal(`${scopeId}: no such scope; the scopes are ${rows.map((scope) => scope.id).join(", ")}`);
+  }
+  const issues = await tracker.list(tracker.scopes ? scopeId : undefined, OPEN_GROUPS_TO_LOAD);
+  if (args.includes("--json")) console.log(JSON.stringify(issues));
+  else for (const { id, status, title } of issues) console.log([id, status, title].join("\t"));
+}
+
 function worktreeOptions(args) {
   const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
   const valueAfter = (index) => {
@@ -228,7 +261,7 @@ async function merge(args) {
   }
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, tab, worktree, merge };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, tab, worktree, merge };
 
 const HELP_FLAGS = ["-h", "--help"];
 
