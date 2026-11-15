@@ -4,7 +4,8 @@
 // repository's name setting (trackers/setting.js).
 // Remove takes an optional { warning }: work outside the checkout that removing it would leave behind, and { ask }
 // to wait for Enter whatever the checks find. It removes the checkout without asking when removesWithoutAsking
-// (removal.js) says so, and otherwise waits for Enter. Its checks and the removal itself are worktree-removal.js's.
+// (removal.js) says so, and otherwise waits for Enter. It carries on with the checks of a removal closeWorktreeSpace
+// (worktree-removal.js) already started for the space, and starts them itself otherwise.
 
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
@@ -12,7 +13,7 @@ import { run, props, closeOverlay, theme, spaces, panes, exec, home, updates } f
 import { openBehindArgs } from "./open-behind.js";
 import { nameSettings } from "./trackers/setting.js";
 import { removalFindings, removalVerdict, PASS, LOSS } from "./removal.js";
-import { git, place, repoOf, WorktreeRemoval } from "./worktree-removal.js";
+import { git, place, repoOf, removalInFlight, startRemoval, forgetRemoval } from "./worktree-removal.js";
 
 // Checkouts go to <ROOT>/<repo>/<branch, slashes as dashes>.
 const ROOT = (home) => `${home}/.herdr/worktrees`;
@@ -109,7 +110,8 @@ export class WorktreeDialog {
           this.userHome = result.stdout.trim().replace(/\\/g, "/");
         }
         this.folder = props()?.folder || place(this.space()) || this.userHome;
-        const repo = await repoOf(this.folder, this.on);
+        const inFlight = props().action === "remove" ? removalInFlight(props().space) : undefined;
+        const repo = inFlight?.repo ?? await repoOf(this.folder, this.on);
         if (repo && this.opening) {
           [this.list, this.mainName] = await Promise.all([
             checkouts(repo, this.on),
@@ -119,7 +121,7 @@ export class WorktreeDialog {
         this.repo = repo;
         cx.notify();
         if (repo?.linked && props().action === "remove") {
-          this.removal = new WorktreeRemoval(this.space(), repo);
+          this.removal = inFlight ?? startRemoval(this.space(), repo);
           await this.followChecks(cx);
           if (this.removal.removesWithoutAsking({ ask: props().ask, warning: props().warning })) await this.work(cx);
         }
@@ -148,6 +150,7 @@ export class WorktreeDialog {
   }
 
   close() {
+    if (this.removal) forgetRemoval(props().space, this.removal);
     closeOverlay(props().overlay);
   }
 

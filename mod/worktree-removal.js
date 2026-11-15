@@ -1,9 +1,16 @@
-// Removing a linked worktree and closing the space showing it: WorktreeRemoval runs removal.js's checks and removes
-// the checkout, for the remove-worktree dialog (worktree-dialog.js) to show.
+// Removing a linked worktree and closing the space showing it. closeWorktreeSpace runs removal.js's checks without
+// showing anything and, when every check passes, removes the checkout and closes the space with no dialog. The
+// remove-worktree dialog (worktree-dialog.js) opens, carrying on with the checks already running rather than starting
+// them again, once they've run for DIALOG_DELAY_MS, or at once when a check fails, `ask` is set or other spaces nest
+// under this one. One removal runs per space until it finishes or its dialog closes.
 
 import { exec, run, spaces, panes, terminals, openOverlay } from "herdr";
 import { branchState, checkouts } from "./worktree.js";
 import { checksAnswered, removalFindings, removesWithoutAsking, runChecks, sessionComplete, PASS } from "./removal.js";
+
+export const DIALOG_DELAY_MS = 300;
+
+const removalsBySpace = new Map();
 
 // Opens the dialog that removes the space's worktree and closes the space.
 export function openRemovalDialog(spaceId, { ask = false } = {}) {
@@ -160,4 +167,60 @@ export class WorktreeRemoval {
     const result = await git(repo.main, ["worktree", "remove", ...(force ? ["--force"] : []), repo.top], on);
     return result.ok ? "" : result.err || "git worktree remove failed.";
   }
+}
+
+// The removal running for a space, which its dialog carries on with.
+export function removalInFlight(spaceId) {
+  const removal = removalsBySpace.get(spaceId);
+  return removal instanceof WorktreeRemoval ? removal : undefined;
+}
+
+// Starts a removal for a space with none running, for a dialog opened directly.
+export function startRemoval(space, repo) {
+  const removal = new WorktreeRemoval(space, repo);
+  removalsBySpace.set(space.id, removal);
+  return removal;
+}
+
+// Ends the space's removal, so the next close starts afresh.
+export function forgetRemoval(spaceId, removal) {
+  if (removalsBySpace.get(spaceId) === removal) removalsBySpace.delete(spaceId);
+}
+
+// Removes the worktree a space shows and closes the space, through the dialog only when the person needs to see it.
+// `sleep(ms)` waits on the caller's executor (cx.sleep). A space not on a linked worktree goes straight to the dialog,
+// which says so. Throws when the space closed but its checkout couldn't be removed.
+export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
+  if (removalsBySpace.has(spaceId)) return;
+  const space = spaces().find((candidate) => candidate.id === spaceId);
+  if (!space) return;
+  const lookingUp = {};
+  removalsBySpace.set(spaceId, lookingUp);
+  let repo = null;
+  try { repo = await repoOf(place(space), space.machine); } catch {}
+  forgetRemoval(spaceId, lookingUp);
+  if (!repo?.linked) return openRemovalDialog(spaceId, { ask });
+
+  const removal = startRemoval(space, repo);
+  let dialogOpen = false;
+  const openDialog = () => {
+    if (dialogOpen) return;
+    dialogOpen = true;
+    openRemovalDialog(spaceId, { ask });
+  };
+  if (ask) openDialog();
+  const stopWatching = removal.onChange(() => { if (removal.foundProblem()) openDialog(); });
+  await Promise.race([removal.finished, sleep(DIALOG_DELAY_MS)]);
+  if (!removal.answered()) openDialog();
+  await removal.finished;
+  stopWatching();
+  // From here the dialog removes the checkout or asks, and ends the removal when it closes.
+  if (dialogOpen) return;
+  if (!removal.removesWithoutAsking()) return openDialog();
+  let error;
+  try { error = await removal.remove(); }
+  catch (thrown) { error = String(thrown?.message ?? thrown); }
+  if (error && spaces().some((candidate) => candidate.id === spaceId)) return openDialog();
+  forgetRemoval(spaceId, removal);
+  if (error) throw new Error(error);
 }
