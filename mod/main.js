@@ -804,7 +804,7 @@ export default class Issues extends View {
     const hasMilestones = Boolean(project?.milestones.length);
     if (!hasMilestones && !labels.length) return null;
     const filterName = (name) => div().flex_none().text_size(11).text_color(t.dim).child(name);
-    return h_flex().h(38).flex_none().px(14).gap(8).items_center().justify_end().border_b(1).border_color(t.border)
+    return h_flex().h(38).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
       .when(hasMilestones, (e) => e.child(filterName("Milestone"))
         .child(scopeDropdown("issues-milestone", milestone?.label ?? "All milestones",
           () => openScopeMenu([{ id: project.id, label: "All milestones" }, ...project.milestones], milestone?.id ?? project.id, this.scopeKey), t).flex_shrink(1)))
