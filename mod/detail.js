@@ -77,7 +77,8 @@ function facts(view, t) {
     .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "Blocked by:", blockedBy, view, t)))
     .when(blocking.length > 0, (e) => e.child(linkedFact("detail-blocking", "Blocking:", blocking, view, t)))
     .when(Boolean(branch), (e) => e.child(iconFact("git-branch", "Branch", div().min_w(0).truncate().child(branch), t)))
-    .when(attached?.length > 0, (e) => e.child(iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t)));
+    .when(attached?.length > 0, (e) => e.child(iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t)))
+    .when(view.issue.labels.length > 0, (e) => e.child(h_flex().pt(4).flex_wrap().gap(4).items_center().children(labelChips(view.issue, t))));
 }
 
 const PULL_REQUEST_STATUSES = {
@@ -208,18 +209,14 @@ export function issueDetail(view, t) {
       .child(div().flex_1())
       .when(Boolean(view.syncIndicator), (e) => e.child(view.syncIndicator))
       .child(collapseButton(view.onCollapse, t)))
-    .child(h_flex().h(38).flex_none().px(10).gap(8).items_center().justify_end().border_b(1).border_color(t.border)
+    .child(h_flex().h(38).flex_none().px(10).gap(8).items_center().border_b(1).border_color(t.border)
+      .child(div().flex_1().min_w(0).pl(4).truncate().text_size(11).text_color(t.accent).child(issue.id))
       .child(editActions(view, t))
       .when(!view.editor && view.mergeable, (e) => e.child(mergeButton(view, t)))
       .when(!view.editor, (e) => e.child(workActions(view, t))))
     .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
     .child(v_flex().flex_none().px(14).py(10).gap(8).border_b(1).border_color(t.border)
-      .child(v_flex().gap(2)
-        .child(h_flex().gap(8).items_start()
-          .child(div().flex_1().text_size(11).text_color(t.accent).child(issue.id))
-          .when(issue.labels.length > 0, (e) => e.child(h_flex().flex_wrap().justify_end().gap(4).items_center().text_size(11)
-            .children(labelChips(issue, t)))))
-        .child(div().whitespace_normal().font_semibold().child(issue.title)))
+      .child(div().whitespace_normal().text_size(16).font_semibold().child(issue.title))
       .child(facts(view, t)))
     .child(h_flex().flex_none().flex_wrap().px(14).py(8).gap(14).items_center().border_b(1).border_color(t.border).bg(fieldBar(t))
       .child(dropdown("status", "Status", view, t))
