@@ -155,16 +155,6 @@ export function workButton(key, { finishable, startable, inSpace, inActiveSpace,
   return button(`${key}-start`, compact ? branchIcon : "Start", onStart, t, { ...style, enabled: startable && !opening, tooltip: compact ? "Start work" : null });
 }
 
-// Hands the issue to the Cloud Agent, disabled once it has the issue or while the handoff saves.
-function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
-  const enabled = !delegated && !delegating;
-  const tooltip = delegated ? "Delegated to Cloud Agent" : delegating ? "Delegating…" : "Delegate to Cloud Agent";
-  return outlinedInLightTheme(div().id("issue-delegate").flex_none().size(26).flex().items_center().justify_center().rounded(7).bg(t.raised), t)
-    .tooltip(tooltip)
-    .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onDelegate(cx)))
-    .child(svg("mods/issues/icons/cloud-upload.svg").size(14).text_color(enabled ? t.foreground : t.dim));
-}
-
 const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
 
 // Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
@@ -219,7 +209,6 @@ export function issueDetail(view, t) {
       .when(Boolean(view.syncIndicator), (e) => e.child(view.syncIndicator))
       .child(collapseButton(view.onCollapse, t)))
     .child(h_flex().h(38).flex_none().px(10).gap(8).items_center().justify_end().border_b(1).border_color(t.border)
-      .when(!view.editor && Boolean(view.onDelegate), (e) => e.child(cloudAgentButton(view, t)))
       .child(editActions(view, t))
       .when(!view.editor && view.mergeable, (e) => e.child(mergeButton(view, t)))
       .when(!view.editor, (e) => e.child(workActions(view, t))))

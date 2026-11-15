@@ -138,7 +138,5 @@ export async function beadsTracker({ root: projectRoot, on }) {
     async start(issue) {
       await bd(["update", issue.id, "--status", "in_progress"]);
     },
-    delegate: null,
-    isDelegated: null,
   };
 }

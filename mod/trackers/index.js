@@ -18,9 +18,6 @@
 //   tracker.update(issue, f)    → saves any of { status, priority, order, body } (status: one of STATUSES
 //                                 in issue.js; body: Markdown, refused if it changed since `issue` was read)
 //   tracker.start(issue)        → marks the issue in progress
-//   tracker.delegate(issue)     → hands the issue to Planning Center's Cloud Agent to work; null where
-//                                 the project can't
-//   tracker.isDelegated(issue)  → whether the Cloud Agent has the issue already; null with delegate
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null), labels, blockedBy,
 //          branch, created, body (null until loaded: tracker.get loads it), updated (when the tracker

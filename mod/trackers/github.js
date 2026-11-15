@@ -225,7 +225,5 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     async start(issue) {
       await setStatus(issue, "in-progress");
     },
-    delegate: null,
-    isDelegated: null,
   };
 }

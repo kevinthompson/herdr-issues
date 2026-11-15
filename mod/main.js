@@ -600,19 +600,6 @@ export default class Issues extends View {
       .text_size(11).text_color(t.dim).child(div().min_w(0).truncate().child(this.opening.status));
   }
 
-  delegateToCloudAgent(issue, cx) {
-    const tracker = this.tracker;
-    this.delegating = issue.id; this.detailError = null;
-    cx.spawn(async (cx) => {
-      try { await tracker.delegate(issue); }
-      catch (e) { this.detailError = `Could not delegate: ${e.message ?? e}`; }
-      this.delegating = null;
-      this.refresh(cx);
-      cx.notify();
-    });
-    cx.notify();
-  }
-
   // Whether the issue view offers Merge for the open issue, checked again for each list the panel reads. The last
   // answer for the same issue stands meanwhile, so the button doesn't flicker on every poll.
   mergeOffered(issue, cx) {
@@ -959,9 +946,6 @@ export default class Issues extends View {
         mergeable: this.mergeOffered(issue, cx),
         merging: Boolean(this.opening?.merging && this.opening.id === issue.id),
         onMerge: (cx) => this.mergeBranch(issue, cx),
-        onDelegate: this.tracker?.delegate && ((cx) => this.delegateToCloudAgent(issue, cx)),
-        delegated: Boolean(this.tracker?.isDelegated?.(issue)),
-        delegating: this.delegating === issue.id,
         onSave: (cx) => this.save(cx),
         onCancel: (cx) => { this.stopEditing(); cx.notify(); },
       }, t))

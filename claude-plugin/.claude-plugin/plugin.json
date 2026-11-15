@@ -1,8 +1,8 @@
 {
   "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
   "name": "issues",
-  "version": "1.20.1",
-  "description": "Plan, write, work and delegate issues tracked in Linear, in GitHub Issues or in a local Beads database.",
+  "version": "2.0.0",
+  "description": "Plan, write and work issues tracked in Linear, in GitHub Issues or in a local Beads database.",
   "author": {
     "name": "Kevin Thompson",
     "email": "email@kevinthompson.info"
