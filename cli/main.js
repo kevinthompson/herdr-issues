@@ -1,7 +1,7 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
-import { mergeSettings, pollSettings } from "../mod/trackers/setting.js";
+import { createSettings, mergeSettings, pollSettings } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
@@ -17,7 +17,8 @@ Commands:
   tracker [--json]         Print the tracker the repository's issues live in: its kind, name, Linear team or GitHub repository
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
-  setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
+  setting <key>            Print one of the repository's settings, with its default applied: merge, complete,
+                           pollSeconds, createModel or createEffort
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
@@ -82,7 +83,7 @@ async function spaceName([id]) {
   console.log(await issueSpaceName(await currentProject(), id));
 }
 
-const SETTINGS = { merge: mergeSettings, complete: mergeSettings, pollSeconds: pollSettings };
+const SETTINGS = { merge: mergeSettings, complete: mergeSettings, pollSeconds: pollSettings, createModel: createSettings, createEffort: createSettings };
 
 async function setting([key]) {
   const settings = SETTINGS[key];

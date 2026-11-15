@@ -16,6 +16,11 @@
 // how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
 // each value means and resolves their defaults. worktreeSetup is a shell command `issues worktree` runs in each new
 // checkout (cli/worktree.js).
+// createModel and createEffort, at the top level and in any entry, an entry's winning, are the model and effort
+// /issues:create writes issues on in the background: createModel is inherit (the session's own model), sonnet,
+// opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
+// max, default without either. createSettings resolves them. Any model or effort the mod or its skills choose is
+// a setting like these, with a default.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices.
@@ -31,6 +36,10 @@ const MERGES = ["auto", "review", "pull-request"];
 const COMPLETES = ["merged", "pull-request-open"];
 export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
+const CREATE_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
+const CREATE_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
+export const DEFAULT_CREATE_MODEL = "sonnet";
+export const DEFAULT_CREATE_EFFORT = "default";
 const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}` : path);
 const abbreviateHome = (path) => (path.startsWith(`${home()}/`) ? `~${path.slice(home().length)}` : path);
 
@@ -49,9 +58,19 @@ function checkPollSeconds(value, where) {
   throw badSetting(`${where} needs a pollSeconds that's a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
 }
 
+function checkChoice(value, name, choices, where) {
+  if (value != null && !choices.includes(value)) throw badSetting(`${where} needs a ${name} of ${choices.join(", ")}`);
+}
+
+function checkCreateSettings(settings, where) {
+  checkChoice(settings?.createModel, "createModel", CREATE_MODELS, where);
+  checkChoice(settings?.createEffort, "createEffort", CREATE_EFFORTS, where);
+}
+
 const readCheckedSettings = async () => {
   const settings = await readSettings();
   checkPollSeconds(settings?.pollSeconds, "issues.json");
+  checkCreateSettings(settings, "issues.json");
   return settings;
 };
 
@@ -67,6 +86,7 @@ export async function trackerSetting({ root, on }) {
   if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
   if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
   checkPollSeconds(setting.pollSeconds, `issues.json's ${key}`);
+  checkCreateSettings(setting, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
@@ -81,6 +101,16 @@ export async function trackerSetting({ root, on }) {
 export async function pollSettings(project) {
   const setting = await trackerSetting(project), settings = await readCheckedSettings();
   return { pollSeconds: setting?.pollSeconds ?? settings?.pollSeconds ?? DEFAULT_POLL_SECONDS };
+}
+
+// The model and effort /issues:create writes issues on: the entry's createModel and createEffort, else the top
+// level's, else sonnet and default.
+export async function createSettings(project) {
+  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  return {
+    createModel: setting?.createModel ?? settings?.createModel ?? DEFAULT_CREATE_MODEL,
+    createEffort: setting?.createEffort ?? settings?.createEffort ?? DEFAULT_CREATE_EFFORT,
+  };
 }
 
 const hasGitHubOrigin = (main) => githubRepository(main, {}).then(() => true, () => false);

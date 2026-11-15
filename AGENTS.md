@@ -43,4 +43,5 @@ This repository's own issues are tracked in GitHub Issues at `kevinthompson/herd
 
 - Commits follow Conventional Commits. Mod and skill changes have used the `issues` scope; recent commits name the narrower area instead, such as `skills`, `worktree`, `github` or `list`.
 - Each commit is one vertical slice: it does one thing end to end, and the subjects read in order explain the change.
+- Any model or effort the mod or its skills choose, such as `/issues:create`'s background agent's, is an `issues.json` setting with a default, checked in `mod/trackers/setting.js` and read with `issues setting <key>`; nothing hard-codes one.
 - The repository has one contributor, so a finished branch is merged into main locally, once the person approves it: its entry in `issues.json` sets `merge` to `review`.

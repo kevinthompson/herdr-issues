@@ -1,7 +1,7 @@
 ---
 name: config
-description: Choose where a repository's issues are tracked (a Linear team, GitHub Issues or a local Beads database) and how its work lands in main (its merge and complete settings), by writing its entry in the Herdr app's issues.json, which the issues panel and the other issues skills read, and check the credentials that tracker needs, or set the command run in each new worktree. Use when asked to configure, set up or change a repository's issue tracker or how its work is merged, for example "/issues:config", "track this repo's issues in Linear", "set up issues for this repo", "merge this repo's work without pull requests" or "show this repo's merge setting".
-argument-hint: [linear <team key> | github [owner/name] | beads | merge <auto|review|pull-request> | complete <merged|pull-request-open> | clear <merge|complete> | worktreeSetup [<command> | clear] | show]
+description: Choose where a repository's issues are tracked (a Linear team, GitHub Issues or a local Beads database) and how its work lands in main (its merge and complete settings), by writing its entry in the Herdr app's issues.json, which the issues panel and the other issues skills read, and check the credentials that tracker needs, or set the command run in each new worktree, or the model and effort /issues:create writes issues on. Use when asked to configure, set up or change a repository's issue tracker or how its work is merged, for example "/issues:config", "track this repo's issues in Linear", "set up issues for this repo", "merge this repo's work without pull requests" or "show this repo's merge setting".
+argument-hint: [linear <team key> | github [owner/name] | beads | merge <auto|review|pull-request> | complete <merged|pull-request-open> | clear <merge|complete> | createModel <model> [--all] | createEffort <effort> [--all] | clear <createModel|createEffort> [--all] | worktreeSetup [<command> | clear] | show]
 ---
 
 Set where the current repository's issues live and how its work lands in main, from `$ARGUMENTS` or by asking, and make sure this machine can reach that tracker.
@@ -38,9 +38,17 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
 
 `issues setting merge` and `issues setting complete`, run in the repository, print the settings with their defaults applied.
 
-1. **Read the current state.** Read the repository's entry in `issues.json`, if any; in the main checkout, read `git remote get-url origin`, `issues tracker --json`, `issues setting merge` and `issues setting complete`. Say what the repository uses today: its tracker, from `issues tracker`'s `kind` with its `team` or `repo` (or what it printed when it fails, such as that the repository has no tracker), and how work lands, saying which settings are set and which are defaults. For `show`, stop here.
+`createModel` and `createEffort` are optional, at the top level of `issues.json` for every repository or in the repository's entry, which wins. They choose the model and effort of the background agent `/issues:create` writes issues with:
+
+- `createModel`: `sonnet` (the default), `opus`, `haiku` or `fable`, or `inherit` for the session's own model.
+- `createEffort`: `low`, `medium`, `high`, `xhigh` or `max`, or `default` (the default) to leave the effort unset.
+
+`issues setting createModel` and `issues setting createEffort` print them with their defaults applied.
+
+1. **Read the current state.** Read the repository's entry and the top-level settings in `issues.json`, if any; in the main checkout, read `git remote get-url origin`, `issues tracker --json`, `issues setting merge`, `issues setting complete`, `issues setting createModel` and `issues setting createEffort`. Say what the repository uses today: its tracker, from `issues tracker`'s `kind` with its `team` or `repo` (or what it printed when it fails, such as that the repository has no tracker), and how work lands, and the model and effort `/issues:create` writes on, saying which settings are set, where, and which are defaults. For `show`, stop here.
 2. **Choose what to change.**
    - `merge <value>`, `complete <value>` or `clear <key>` change only that setting: go to step 5.
+   - `createModel <value>`, `createEffort <value>` or `clear <createModel|createEffort>`, or a request to change the model or effort `/issues:create` writes on, change only that setting: go to step 5. They go in the repository's entry, or at the top level of `issues.json` for every repository with `--all` or when the person says so.
    - When the person only asks about `worktreeSetup`, keep the current tracker and go to step 6.
    - Otherwise choose the tracker. Use the arguments when they name one. Otherwise ask with AskUserQuestion, offering the tracker the repository already uses first, marked Recommended:
      - **Linear**: a Linear team. Load `list_teams` with ToolSearch (prefixed `mcp__linear__` or `mcp__claude_ai_Linear__`) and offer the teams, with the `team` from step 1 first. Ask whether to add any saved views, and take their URLs from the person.
@@ -66,6 +74,7 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
    - `merge <value>` sets `merge`. Setting `auto` or `review` also removes a `complete` of `pull-request-open`, saying so, since it no longer applies.
    - `complete <value>` sets `complete`. Refuse `pull-request-open` unless `merge` is `pull-request` or, with no `merge` set, `issues setting merge` prints `pull-request`.
    - `clear <key>` removes `merge` or `complete`, so its default applies. Clearing `merge` while `complete` is `pull-request-open` keeps `complete`, which then applies only if the default is `pull-request`; say so.
+   - `createModel <value>` and `createEffort <value>` set that key; `clear` removes it, so the top level's value or the default applies. A repository's entry needs a `tracker`, so when the repository has none, set them at the top level or set up its tracker first.
    - Refuse a value not listed above, listing the valid ones.
 6. **Set the worktree setup command** when the person asks to set, show or clear it, with or without changing the tracker. Show the entry's `worktreeSetup`, or say it has none. To set it, write the command the person gives as the entry's `worktreeSetup` string; to clear it, remove the key. Keep every other key. Explain that the command runs once in each new worktree `issues worktree` creates, and that a failure keeps the worktree without opening its space.
-7. **Report** the tracker the repository now uses and how its work lands, with `issues setting merge` and `issues setting complete`, and anything the person still has to do, such as saving an API key. The issues panel picks the change up on its next refresh.
+7. **Report** the tracker the repository now uses and how its work lands, with `issues setting merge` and `issues setting complete`, the model and effort `/issues:create` writes on when either changed, with `issues setting createModel` and `issues setting createEffort`, and anything the person still has to do, such as saving an API key. The issues panel picks the change up on its next refresh.

@@ -59,6 +59,8 @@ Each tracker needs credentials:
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
 - **Beads**: none; it needs `bd` installed and a database in the repository's main checkout, which the setup view and `/issues:config` offer to make with `bd init`. The panel lists its issues and edits their status, priority and body, and none of it makes a git commit. Every `issues:*` skill but `/issues:delegate`, which is for Linear only, works its issues too.
 
+`/issues:create` writes issues in a background agent on the model and effort in `issues.json`'s `createModel` and `createEffort`: `sonnet` at its default effort unless you set them, at the top level or in a repository's entry.
+
 [Configuration](docs/configuration.md) covers creating the Linear key and every setting in `issues.json`.
 
 ## Removing
