@@ -119,7 +119,7 @@ describe("stripBadges", () => {
 describe("statusIcon", () => {
   test("names the Linear icon of each group and status that has one", () => {
     for (const id of ["triage", "in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"]) {
-      assert.equal(statusIcon(id), `mods/issues/icons/linear-${id}.png`);
+      assert.equal(statusIcon(id), `mods/issues/icons/${id}.png`);
     }
   });
 
