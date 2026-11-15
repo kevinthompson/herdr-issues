@@ -1,7 +1,8 @@
 // A dropdown for one field of an issue (status or priority). The issue view opens it as a popup of
 // this same mod with props { menu: field, root, on, id, current, statuses }; picking an option hands the
 // edit to the panel, which shows it at once and saves it. The issue's labels dropdown is a popup too, with props
-// { menu: "labels", root, on, id, labels, current }, where picking a label checks or unchecks it.
+// { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
+// where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns are popups too, with props { menu: "scope", scopes, current, key, store }:
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
@@ -10,6 +11,7 @@ import { div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herdr";
 import { requestFieldEdit } from "./edits.js";
+import { labelGroups } from "./label-order.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
 
 const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 16, ICON_GAP = 6, CHECK_GAP = 9;
@@ -39,7 +41,9 @@ export function openMenu(field, issue, project, statuses) {
 function optionList(options, isChecked, onPick) {
   const t = theme();
   return v_flex().id("issue-field-menu").size_full().overflow_y_scroll().py(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
-    .children(options.map((option, index) => option.heading
+    .children(options.map((option, index) => option.divider
+      ? div().id(`divider-${index}`).flex_none().my(DIVIDER_GAP).border_t(1).border_color(t.border)
+      : option.heading
       ? div().id(`heading-${option.heading}`).h(ROW).px(PADDING + TEXT_INSET).flex_none().flex().items_center()
         .mb(DIVIDER_GAP).bg(headingTint(t)).border_b(1).border_color(t.border)
         .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1))
@@ -79,8 +83,9 @@ function scopeOptions(scopes) {
   });
 }
 
+const DIVIDER_HEIGHT = DIVIDER_GAP * 2 + 1;
 const menuHeight = (options) => options.reduce((height, option, index) =>
-  height + ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0), PADDING * 2);
+  height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0)), PADDING * 2);
 
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
   const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
@@ -124,22 +129,27 @@ export class FieldMenu {
 const LABELS_MENU_WIDTH = 240;
 const LABELS_MENU_MAX_HEIGHT = 360;
 
-// The tracker's labels `names`, then any of the issue's it didn't list, with the issue's checked.
+// The issue's labels, checked, then a divider when both groups have labels, then the tracker's others.
+function issueLabelOptions({ applied, others }) {
+  const toOption = (label) => ({ value: label, label });
+  return [...applied.map(toOption), ...(applied.length && others.length ? [{ divider: true }] : []), ...others.map(toOption)];
+}
+
+// The tracker's labels are `names`.
 export function openIssueLabelsMenu(issue, project, names) {
-  const labels = [...new Set([...names, ...issue.labels])];
+  const groups = labelGroups(names, issue.labels);
   openOverlay({
     mod: "issues", kind: "popup", at: "pointer", width: LABELS_MENU_WIDTH,
-    height: Math.min(labels.length * ROW + PADDING * 2, LABELS_MENU_MAX_HEIGHT),
-    props: { menu: "labels", ...project, id: issue.id, labels, current: issue.labels },
+    height: Math.min(menuHeight(issueLabelOptions(groups)), LABELS_MENU_MAX_HEIGHT),
+    props: { menu: "labels", ...project, id: issue.id, groups, current: issue.labels },
   });
 }
 
 // Checking a label adds it and unchecking one removes it, at once, leaving the issue's other labels alone.
 export class LabelMenu {
   render() {
-    const { labels, current, root, on, id, overlay } = props();
-    const options = labels.map((label) => ({ value: label, label }));
-    return optionList(options, (label) => current.includes(label), (option) => {
+    const { groups, current, root, on, id, overlay } = props();
+    return optionList(issueLabelOptions(groups), (label) => current.includes(label), (option) => {
       const checked = current.includes(option.value);
       requestFieldEdit({ root, on: on ?? null, issueId: id, field: "labels", add: checked ? [] : [option.value], remove: checked ? [option.value] : [] });
       closeOverlay(overlay);
