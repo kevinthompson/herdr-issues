@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
-import { closeSettings, createSettings, mergeSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
+import { closeSettings, createSettings, mergeSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
@@ -22,7 +22,7 @@ Commands:
                            and body; --json: the whole issue, with the bodyHash edit needs. Comments aren't included
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
-  setting <key>            Print one of the repository's settings, with its default applied: merge, complete, close,
+  setting <key>            Print one of the repository's settings, with its default applied: merge, complete, close, name,
                            pollSeconds, updateCheckHours, createModel, createEffort, workModel or workEffort
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
@@ -137,7 +137,7 @@ async function spaceName([id]) {
 }
 
 const SETTINGS = {
-  merge: mergeSettings, complete: mergeSettings, close: closeSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
+  merge: mergeSettings, complete: mergeSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
   createModel: createSettings, createEffort: createSettings, workModel: workSettings, workEffort: workSettings,
 };
 
