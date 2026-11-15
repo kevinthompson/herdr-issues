@@ -9,6 +9,7 @@
 import { exec } from "herdr";
 import { mainCheckout } from "../location.js";
 import { ghMissing, ghLoggedOut, ghFailed } from "./problems.js";
+import { refuseUnknownLabels } from "./labels.js";
 
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
@@ -178,6 +179,16 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     return node ? toIssue(node, repo) : null;
   }
 
+  async function labels() {
+    return JSON.parse(await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)])).map((label) => label.name);
+  }
+
+  async function changeLabels(issue, addLabels, removeLabels) {
+    refuseUnknownLabels([...addLabels, ...removeLabels], await labels(), repo);
+    await gh(["issue", "edit", String(issue.number), "--repo", repo,
+      ...addLabels.flatMap((name) => ["--add-label", name]), ...removeLabels.flatMap((name) => ["--remove-label", name])]);
+  }
+
   async function setStatus(issue, status) {
     if (!SETTABLE_STATUSES.includes(status)) throw new Error(`GitHub issues can't be set to ${status}`);
     if (status === "done") return editIssue(issue, { state: "closed", state_reason: "completed" });
@@ -207,12 +218,11 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     },
     deferred: () => ["done", "canceled"],
     get,
-    async labels() {
-      return JSON.parse(await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)])).map((label) => label.name);
-    },
+    labels,
     // A new body only saves over the body `issue` was read with, so edits made on GitHub meanwhile are
     // never overwritten. Priority and order have nowhere to go.
-    async update(issue, { status, body }) {
+    async update(issue, { status, body, addLabels = [], removeLabels = [] }) {
+      if (addLabels.length || removeLabels.length) await changeLabels(issue, addLabels, removeLabels);
       if (body !== undefined) {
         const current = await get(issue.id);
         if (!current) throw new Error(`${issue.id} no longer exists`);

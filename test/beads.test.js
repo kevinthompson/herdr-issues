@@ -174,3 +174,39 @@ describe("Beads tracker", () => {
     await assert.rejects(trackerWith(t, [], { initialized: false }), (e) => /no Beads database/.test(e.message) && /bd init/.test(e.fix));
   });
 });
+
+describe("Beads tracker labels", () => {
+  // A tracker whose `bd label list-all` lists `known`.
+  async function labelTracker(t, known) {
+    const commands = [];
+    stubHerdr(t, {
+      exec: async (command, args) => {
+        if (command === "git") return { code: 1, stdout: "", stderr: "" };
+        commands.push(args.slice(0, -1));
+        if (args[0] === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
+        const output = args[1] === "list-all" ? known.map((label) => ({ label, count: 1 })) : [];
+        return { code: 0, stdout: JSON.stringify(output), stderr: "" };
+      },
+    });
+    const tracker = await beadsTracker({ root: checkout(), on: null }, { tracker: "beads" });
+    const labelCommands = () => commands.filter((args) => args[0] === "label" && args[1] !== "list-all");
+    return { tracker, labelCommands };
+  }
+
+  test("adds and removes labels with bd label add and remove", async (t) => {
+    const { tracker, labelCommands } = await labelTracker(t, ["ui", "bug"]);
+    await tracker.update({ id: "bd-1", labels: ["bug"] }, { addLabels: ["ui"], removeLabels: ["bug"] });
+    assert.deepEqual(labelCommands(), [["label", "add", "bd-1", "ui"], ["label", "remove", "bd-1", "bug"]]);
+  });
+
+  test("refuses a label no issue has, naming it and changing nothing", async (t) => {
+    const { tracker, labelCommands } = await labelTracker(t, ["ui"]);
+    await assert.rejects(tracker.update({ id: "bd-1", labels: [] }, { addLabels: ["ui", "urgent"] }), /Beads has no label named urgent/);
+    assert.deepEqual(labelCommands(), []);
+  });
+
+  test("has no list of labels to choose from", async (t) => {
+    const { tracker } = await labelTracker(t, []);
+    assert.equal(tracker.labels, undefined);
+  });
+});

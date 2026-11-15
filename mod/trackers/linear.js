@@ -9,6 +9,7 @@ import { appHome, exec, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
+import { refuseUnknownLabels } from "./labels.js";
 import { KEYCHAIN, linearKeyMissing, linearKeyUnreadable, linearKeyUnsaved, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
 
 const API_URL = "https://api.linear.app/graphql";
@@ -25,7 +26,7 @@ const TEAM_TTL_MS = 10 * 60 * 1000;
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt dueDate url
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { id name avatarUrl } delegate { id name avatarUrl }
   state { type name } team { id }
-  labels(first: 10) { nodes { name color } }
+  labels(first: 10) { nodes { name color parent { name } } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type name } } } }
   attachments(first: 10) { nodes { url title sourceType metadata } }`;
 
@@ -57,6 +58,14 @@ const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id n
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const VIEWER = "query { viewer { id } }";
 const UPDATE = `mutation($id: String!, $input: IssueUpdateInput!) { issueUpdate(id: $id, input: $input) { success } }`;
+// A team's labels include the workspace's and those it inherits from a parent team.
+const TEAM_LABELS = `query($team: String!, $first: Int!, $after: String) { team(id: $team) {
+  labels(first: $first, after: $after) { pageInfo { hasNextPage endCursor } nodes { id name isGroup parent { name } } } } }`;
+const ADD_LABEL = `mutation($id: String!, $labelId: String!) { issueAddLabel(id: $id, labelId: $labelId) { success } }`;
+const REMOVE_LABEL = `mutation($id: String!, $labelId: String!) { issueRemoveLabel(id: $id, labelId: $labelId) { success } }`;
+
+// A label in a label group is named after its group too, since names repeat across groups: "cloud-agent > one-shot".
+const labelName = (label) => (label.parent ? `${label.parent.name} > ${label.name}` : label.name);
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
 // review is In review, one named Merged is Done, and the rest are In progress.
@@ -259,8 +268,8 @@ function toIssue(node, repoName) {
     status: statusOf(node.state),
     priority: node.priority ?? 0,
     order: node.sortOrder ?? null,
-    labels: node.labels.nodes.map((label) => label.name),
-    labelColors: Object.fromEntries(node.labels.nodes.map((label) => [label.name, label.color])),
+    labels: node.labels.nodes.map(labelName),
+    labelColors: Object.fromEntries(node.labels.nodes.map((label) => [labelName(label), label.color])),
     // Linear keeps finished blockers as relations; only the unfinished ones still block.
     blockedBy: node.inverseRelations.nodes
       .filter((relation) => relation.type === "blocks" && !isFinished(relation.issue.state))
@@ -400,6 +409,27 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     return issue ? toIssue(issue, repoName) : null;
   }
 
+  // The labels an issue in the team, by its key or ID, can take: { id, name }. Label groups can't be applied.
+  const labelsByTeam = new Map();
+  function labelsOf(team) {
+    if (!labelsByTeam.has(team)) {
+      const labels = allPages(TEAM_LABELS, { team }, (data) => data.team.labels)
+        .then((nodes) => nodes.filter((label) => !label.isGroup).map((label) => ({ id: label.id, name: labelName(label) })));
+      labels.catch(() => labelsByTeam.delete(team));
+      labelsByTeam.set(team, labels);
+    }
+    return labelsByTeam.get(team);
+  }
+
+  // Adds and removes labels one at a time, which leaves the issue's other labels alone, once every name is known.
+  async function changeLabels(issue, addLabels, removeLabels) {
+    const labels = await labelsOf(issue.teamId);
+    refuseUnknownLabels([...addLabels, ...removeLabels], labels.map((label) => label.name), `${issue.id}'s team`);
+    const labelId = (name) => labels.find((label) => label.name === name).id;
+    for (const name of addLabels) await linear(ADD_LABEL, { id: issue.linearId, labelId: labelId(name) });
+    for (const name of removeLabels) await linear(REMOVE_LABEL, { id: issue.linearId, labelId: labelId(name) });
+  }
+
   const tracker = {
     kind: "linear",
     name: "Linear",
@@ -415,13 +445,17 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     },
     deferred: (scopeId) => deferredGroups((findScope(scopes, scopeId)?.scope ?? scopes[0]).id),
     get,
+    async labels() {
+      return (await labelsOf(repo.teamKey)).map((label) => label.name);
+    },
     async viewerId() {
       return (await linear(VIEWER, {})).viewer.id;
     },
     // A new body only saves over the description `issue` was read with, so edits made in Linear
     // meanwhile are never overwritten.
     async update(issue, fields) {
-      const { status, priority, order, body } = fields, input = {};
+      const { status, priority, order, body, addLabels = [], removeLabels = [] } = fields, input = {};
+      if (addLabels.length || removeLabels.length) await changeLabels(issue, addLabels, removeLabels);
       if (status !== undefined) input.stateId = await stateFor(issue, status);
       if (priority !== undefined) input.priority = priority;
       if (order !== undefined) input.sortOrder = order;
@@ -431,7 +465,7 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
         if (current.body !== issue.body) throw new Error(`${issue.id} changed in Linear while you were editing it`);
         input.description = body;
       }
-      await linear(UPDATE, { id: issue.linearId, input });
+      if (Object.keys(input).length) await linear(UPDATE, { id: issue.linearId, input });
     },
     // Claims an unassigned issue in the same save. The assignee is read fresh from Linear, since a list
     // shown from the cache may be out of date and someone else may have claimed it since.
