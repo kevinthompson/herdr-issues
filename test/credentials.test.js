@@ -24,10 +24,13 @@ async function credentials(t, ...args) {
   return { code, output: printed.join("\n") };
 }
 
-// A `gh` whose `--version` and `auth status` exit with these codes, or that isn't installed when `installed` is false.
+// A `gh` whose `--version` and `auth status` exit with these codes, or that isn't installed when `installed` is false,
+// on a computer with Homebrew and no devbox.
 function stubGh(t, { installed = true, loggedIn = true } = {}) {
   stubHerdr(t, {
     exec: async (command, args) => {
+      if (command === "brew") return { code: 0, stdout: "Homebrew 4.4.0", stderr: "" };
+      if (command === "devbox") throw Object.assign(new Error("spawn devbox ENOENT"), { code: "ENOENT" });
       assert.equal(command, "gh");
       if (!installed) throw Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" });
       const code = args[0] === "auth" && !loggedIn ? 1 : 0;
