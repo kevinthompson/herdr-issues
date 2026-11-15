@@ -34,7 +34,8 @@
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
 // tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, its
-// name with saveNameSetting, and its model and effort settings with saveAgentSettings.
+// name with saveNameSetting, its pollSeconds, spaceName and worktreeSetup with saveRepositorySettings, and its model
+// and effort settings with saveAgentSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -289,6 +290,55 @@ export async function saveNameSetting(main, name) {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
     const changed = { ...entry, name: trimmed };
     if (!trimmed) delete changed.name;
+    return changed;
+  });
+}
+
+export const REPOSITORY_KEYS = ["pollSeconds", "spaceName", "worktreeSetup"];
+
+// The entry's own pollSeconds, spaceName and worktreeSetup, null where unset or blank, and topLevelPollSeconds,
+// the top level's pollSeconds, which applies without the entry's, null where unset.
+export async function repositorySettings(project) {
+  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  return {
+    pollSeconds: setting?.pollSeconds ?? null,
+    spaceName: setting?.spaceName?.trim() || null,
+    worktreeSetup: setting?.worktreeSetup?.trim() || null,
+    topLevelPollSeconds: settings?.pollSeconds ?? null,
+  };
+}
+
+// The pollSeconds typed as `text`: null when it's blank, else the number. It throws for anything trackerSetting
+// would refuse.
+export function parsePollSeconds(text) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const seconds = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
+  if (!(seconds >= MIN_POLL_SECONDS)) throw badSetting(`The poll interval must be a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
+  return seconds;
+}
+
+function checkRepositoryChanges(changes) {
+  for (const [key, value] of Object.entries(changes)) {
+    if (!REPOSITORY_KEYS.includes(key)) throw badSetting(`${key} isn't a poll, space name or worktree setup setting`);
+    if (value == null) continue;
+    if (key === "pollSeconds") checkPollSeconds(value, "This repository");
+    else if (typeof value !== "string") throw badSetting(`${key} must be text`);
+  }
+}
+
+// Sets the settings in `changes`, { pollSeconds, spaceName, worktreeSetup } or any of them, in the existing entry of
+// the repository whose main checkout is `main`. A null or blank value removes the key, so the top level's
+// pollSeconds or the default applies. It changes no other key, and writes nothing for a value trackerSetting
+// would refuse or a repository without an entry.
+export async function saveRepositorySettings(main, changes) {
+  checkRepositoryChanges(changes);
+  const cleaned = Object.fromEntries(Object.entries(changes).map(([key, value]) =>
+    [key, typeof value === "string" ? value.trim() || null : value ?? null]));
+  await changeEntry(main, (entry) => {
+    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
+    const changed = { ...entry, ...cleaned };
+    for (const [key, value] of Object.entries(cleaned)) if (value == null) delete changed[key];
     return changed;
   });
 }
