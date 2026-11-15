@@ -5,7 +5,7 @@
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open the
 // issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge lands a
-// finished branch in main (merge.js). Clicking a task-list
+// finished branch in main (merge.js) and removes its worktree. Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list, and a folder outside a git repository
 // shows a button that initializes one there. The header's gear opens the repository's settings in place of the
@@ -36,7 +36,7 @@ import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
-import { WorktreeDialog } from "./worktree-dialog.js";
+import { WorktreeDialog, openRemovalDialog } from "./worktree-dialog.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
@@ -77,7 +77,7 @@ async function closeFocusedSpace() {
   const space = spaces().find((candidate) => candidate.id === focused()?.space);
   if (!space) return;
   if (await isLinkedWorktree(focused()?.cwd ?? space.folder, space.machine)) {
-    openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: space.id, action: "remove" } });
+    openRemovalDialog(space.id);
   } else {
     run("space.close", { id: space.id });
   }
@@ -710,15 +710,19 @@ export default class Issues extends View {
     return kept;
   }
 
-  // Merges the issue's branch into main and marks it done, through the same module as `issues merge`.
+  // Merges the issue's branch into main and marks it done, through the same module as `issues merge`, then removes
+  // its worktree and closes the space showing it through the removal dialog, which asks first only when a check fails.
   mergeBranch(issue, cx) {
     const tracker = this.tracker, project = this.project;
     this.detailError = null;
     this.showOpening(issue, `Merging ${issue.branch} into main…`, cx);
     this.opening.merging = true;
     cx.spawn(async (cx) => {
-      try { await mergeIssue(issue, tracker, project); }
-      catch (e) { this.detailError = e instanceof MergeRefusal ? e.message : `Could not merge: ${e.message ?? e}`; }
+      try {
+        await mergeIssue(issue, tracker, project);
+        const space = worktreeSpace(this.repository, issue.branch);
+        if (space) openRemovalDialog(space.id);
+      } catch (e) { this.detailError = e instanceof MergeRefusal ? e.message : `Could not merge: ${e.message ?? e}`; }
       this.opening = null;
       this.refresh(cx);
       cx.notify();
