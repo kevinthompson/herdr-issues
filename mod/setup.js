@@ -28,7 +28,7 @@ const TRACKERS = [{ id: "github", label: "GitHub Issues" }, { id: "linear", labe
 const TEAM_DROPDOWN_MAX_PX = 280;
 const ANSWER_LABEL_PX = 80;
 const CONFIG_HINT = "For saved Linear views, changing how work lands later, and other options the panel doesn't offer, run `/issues:config` in Claude instead.";
-const MERGE_CHOICES = [
+export const MERGE_CHOICES = [
   { id: "auto", label: "Merge automatically", detail: "The branch merges into main on this computer as soon as its work is done." },
   { id: "review", label: "Merge after I review", detail: "The branch merges into main on this computer once you approve it." },
   { id: "pull-request", label: "Open a pull request", detail: "The branch lands in main through a pull request." },

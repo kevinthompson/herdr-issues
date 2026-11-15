@@ -8,7 +8,8 @@
 // finished branch in main (merge.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
 // can't load, shows the setup view (setup.js) in place of the list, and a folder outside a git repository
-// shows a button that initializes one there. The issues.toggle key command and the
+// shows a button that initializes one there. The header's gear opens the repository's settings in place of the
+// list (settings.js). The issues.toggle key command and the
 // strip's button collapse the panel to a thin strip and expand it again (collapse.js). The list polls its
 // tracker, and the issues.refresh key command fetches it at once. Every updateCheckHours, the panel checks the
 // checkout it runs from for an update, and its footer offers one with an Update button (update.js).
@@ -40,6 +41,7 @@ import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
+import { MergeSettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
@@ -88,6 +90,13 @@ function withLoadedBodies(issues, previous) {
     if (!before) return issue;
     return { ...issue, body: before.body, bodyStale: before.bodyStale || before.updated !== issue.updated };
   });
+}
+
+function settingsButton(onClick, t) {
+  return div().id("issues-settings-open").flex_none().size(24).flex().items_center().justify_center().rounded(6)
+    .tooltip("Settings").cursor_pointer().hover((s) => s.bg(t.hover))
+    .on_click((_e, cx) => onClick(cx))
+    .child(svg("mods/issues/icons/settings.svg").size(15).text_color(t.foreground));
 }
 
 const pullRequestBadge = (count, t) => h_flex().flex_none().gap(3).items_center().text_color(t.dim)
@@ -214,7 +223,7 @@ export default class Issues extends View {
   showSetup(main, failure, cx) {
     if (this.setup?.main !== main) this.setup = new TrackerSetup(main, (cx) => this.refresh(cx));
     this.setup.showFailure(failure);
-    Object.assign(this, { tracker: null, issues: [], unloaded: new Set(), listKey: null, repository: null, error: null });
+    Object.assign(this, { tracker: null, issues: [], unloaded: new Set(), listKey: null, repository: null, error: null, settingsView: null });
     this.closeIssue();
     cx.notify();
   }
@@ -246,7 +255,23 @@ export default class Issues extends View {
   forgetList() {
     this.project = null; this.tracker = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
     this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.openingSpaceIssue = null;
-    this.setup = null;
+    this.setup = null; this.settingsView = null;
+  }
+
+  // Settings change issues.json, which only this computer's repositories have entries in.
+  canOpenSettings() {
+    return Boolean(this.tracker && this.project && !this.project.on && this.scopeKey);
+  }
+
+  // Saved settings refresh the list at once, so the panel acts on them without waiting for the next poll.
+  openSettings(cx) {
+    const view = new MergeSettingsView(this.project, this.scopeKey, {
+      onBack: (cx) => { if (this.settingsView === view) this.settingsView = null; cx.notify(); },
+      onSaved: (cx) => { if (this.settingsView === view) this.settingsView = null; this.refresh(cx); },
+    });
+    this.settingsView = view;
+    view.load(cx);
+    cx.notify();
   }
 
   // The open issue stays up after leaving the list, such as when it's done and the Done group isn't
@@ -916,6 +941,7 @@ export default class Issues extends View {
       .when(Boolean(this.tracker), (e) => e.child(div().flex_none().text_color(t.dim).child(">")).child(this.trackerLabel(t)))
       .child(div().flex_1())
       .when(Boolean(syncIndicator), (e) => e.child(syncIndicator))
+      .when(this.canOpenSettings(), (e) => e.child(settingsButton((cx) => this.openSettings(cx), t)))
       .child(collapseButton(() => this.toggleCollapsed(), t));
   }
 
@@ -937,6 +963,7 @@ export default class Issues extends View {
         onCollapse: () => this.toggleCollapsed(),
       });
     }
+    if (this.settingsView) return this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
