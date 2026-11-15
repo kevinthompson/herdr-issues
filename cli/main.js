@@ -18,7 +18,7 @@ Commands:
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
-                           or beads (bd installed and a database in the main checkout)
+                           or beads (bd installed and a database in the main checkout); print the fix when they aren't
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   worktree <id> [--name <space name>] [--claude <first message>]

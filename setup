@@ -2,14 +2,18 @@
 # Usage: ./setup
 #
 # Installs this repository's Herdr issues mod and, when Claude Code is installed, its Claude Code plugin:
-#   - links the mod folder (mod/) to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues)
+#   - links the mod folder (mod/) to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues),
+#     repointing a link an older install made to the checkout itself
 #   - adds the repository as the herdr-issues plugin marketplace and installs issues@herdr-issues,
 #     which brings the issues:* skills and the Claude hooks; without claude it skips the plugin with a warning
 #   - adds the mod's keys (mod/keys.json) to $HERDR_APP_HOME/keys.json, keeping any key already bound
-#     to something else
-#   - offers to add the Issues panel beside a personal layout's side panel, unless a layout already shows it,
-#     and moves the panel out of the side panel of a layout an earlier setup put it in
-#   - links the issues CLI (bin/issues) to ~/.local/bin/issues
+#     to something else, except a binding an earlier version of the mod made, such as cmd-shift-i to
+#     layout.toggle:panel
+#   - offers to add the Issues panel in a column of its own beside the side panel of a personal layout, or of a
+#     new copy of main, unless a layout already shows it, and moves the panel out of the side panel of a layout
+#     an earlier setup put it in; it never writes a shipped layout, and asks nothing without a terminal
+#   - links the issues CLI (bin/issues) to ~/.local/bin/issues, refusing to replace a file there that isn't a link
+# It refuses in a linked worktree, whose folder goes away when the worktree closes.
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version.
 #
 # Needs herdr-app, git and node 22.15 or later, which it offers to install with devbox or Homebrew. Claude Code

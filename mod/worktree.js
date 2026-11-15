@@ -1,3 +1,6 @@
+// A repository's checkouts: the worktree a branch is checked out in and the space showing it, whether a folder
+// is a linked worktree, and whether a branch has merged into main.
+
 import { exec, spaces, panes } from "herdr";
 import { mergeSettings } from "./trackers/setting.js";
 

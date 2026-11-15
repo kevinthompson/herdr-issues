@@ -121,6 +121,8 @@ export default class Issues extends View {
     this.noticeSpaceSwitch();
     this.refresh(cx, { reuse: true });
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
+    // Herdr delivers a mod's commands only to a shown copy, so the keys in keys.json, such as cmd-shift-w's
+    // close-space, do nothing in a layout without the panel.
     cx.spawn(async (cx) => {
       for (; ;) {
         const command = await nextCommand();
