@@ -5,7 +5,7 @@
 - Herdr (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
 - Claude Code (`claude`), only for the `issues:*` skills and the Claude hooks; without it, setup installs the panel and the `issues` command and skips the plugin with a warning, and running setup again after installing Claude Code adds it
 - `git`, with access to the GitHub repository
-- Node.js (`node`) 22.15 or later, for the `issues` command
+- Node.js (`node`) 22.15 or later, for the `issues` command; setup offers to install it with Homebrew or devbox (see below)
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
 - the Linear MCP server in Claude Code, for repositories tracked in Linear; [Configuration](configuration.md#credentials) explains adding it
 
@@ -26,6 +26,8 @@ d="$HOME/.local/share/herdr-issues"; [ -d "$d" ] || git clone https://github.com
 ```
 
 If the Issues panel is already linked to another clone, such as one you develop in, the command says so and asks before pointing everything at `~/.local/share/herdr-issues`; without a terminal to ask in, it changes nothing.
+
+When `node` is missing or older than 22.15, setup offers to install it before it changes anything: with devbox (`devbox global add nodejs`) when its global profile lists packages, and with Homebrew (`brew install node`) when `brew` is installed, asking which to use when both apply. It finds the new `node` and carries on. After a devbox install it warns when your shell profile doesn't evaluate `devbox global shellenv`, since Herdr and Claude Code won't find `node` until it does. Without a terminal, without either package manager, or when you decline, it installs nothing and stops.
 
 The setup script:
 
