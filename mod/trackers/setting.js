@@ -21,6 +21,9 @@
 // checkout (cli/worktree.js). close, also optional in any entry, is what a finished /issues:work session does about
 // its worktree: manual tells the person to close it with cmd+shift+w, ask asks whether to close it now, and auto
 // closes it, the last two with `issues close`; closeSettings resolves it, ask without it.
+// name, also optional in any entry, names the space `issues worktree` and the worktree dialog open on the main
+// checkout, which the sidebar nests worktree spaces under; nameSettings resolves it, the repository's name without
+// its owner without it or when it's blank.
 // createModel and createEffort, at the top level and in any entry, an entry's winning, are the model and effort
 // the issue-writer agent files issues on in the background for /issues:create, /issues:plan and /issues:triage:
 // createModel is inherit (the session's own model), sonnet, opus, haiku or fable, sonnet without either; createEffort is default (left unset), low, medium, high, xhigh or
@@ -32,8 +35,8 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, and
-// its model and effort settings with saveAgentSettings.
+// tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, its
+// name with saveNameSetting, and its model and effort settings with saveAgentSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -123,6 +126,7 @@ export async function trackerSetting({ root, on }) {
   checkCreateSettings(setting, `issues.json's ${key}`);
   checkWorkSettings(setting, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
+  if (setting.name != null && typeof setting.name !== "string") throw badSetting(`issues.json's ${key} has a name that isn't text`);
   checkChoice(setting.close, "close", CLOSES, `issues.json's ${key}`);
   if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
   if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
@@ -206,6 +210,26 @@ export async function closeSettings(project) {
   return { close: (await trackerSetting(project))?.close ?? DEFAULT_CLOSE };
 }
 
+// The repository's name without its owner: the GitHub repository's for GitHub, else the main checkout's folder's.
+export async function repositoryName(main, setting) {
+  if (setting?.tracker === "github") return (await githubRepository(main, setting)).split("/").pop();
+  return main.split("/").pop();
+}
+
+// What the space on the repository's main checkout is named: { name, entry, defaultName }, where entry is the
+// entry's own name, null when unset or blank, and defaultName the repository's name, which applies without it.
+export async function nameSettings(project) {
+  return resolveNameSettings(await mainCheckout(project.root, project.on), await trackerSetting(project));
+}
+
+// nameSettings for the repository whose main checkout is `main`, from `setting`, its entry or null. A GitHub
+// repository whose name can't be read, such as one without origin, falls back on the main checkout's folder's.
+export async function resolveNameSettings(main, setting) {
+  const entry = setting?.name?.trim() || null;
+  const defaultName = await repositoryName(main, setting).catch(() => repositoryName(main, null));
+  return { name: entry ?? defaultName, entry, defaultName };
+}
+
 const SETUP_KEYS =["tracker", "team", "repo", "merge", "complete"];
 
 // Writes `change(entry)` as the entry of the repository whose main checkout is `main`, in the place of any entry
@@ -277,6 +301,19 @@ export async function saveCloseSetting(main, close) {
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
     return { ...entry, close };
+  });
+}
+
+// Sets the name of the space on the main checkout `main`. A blank or null name removes the key, so the
+// repository's name applies. It changes only name in the repository's existing entry, and writes nothing for a
+// repository without an entry.
+export async function saveNameSetting(main, name) {
+  const trimmed = name?.trim() || null;
+  await changeEntry(main, (entry) => {
+    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
+    const changed = { ...entry, name: trimmed };
+    if (!trimmed) delete changed.name;
+    return changed;
   });
 }
 
