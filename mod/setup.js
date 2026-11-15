@@ -1,8 +1,9 @@
-// The panel's view for a repository whose issues it can't list. With no tracker, it walks through one question
-// per page, with Back at the top left and the step at the top right, as an open issue's view has its way back:
-// the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; how work gets
-// into main; for a pull request, when the work is complete; and a review of the choices. Only Save on the review
-// writes the repository's entry in issues.json (setting.js), and the panel lists the issues. How work lands
+// The panel's view for a repository whose issues it can't list. With no tracker, it shows a blank state whose
+// Set Up Issues button walks through one question per page, with Back at the top left and the step and Cancel,
+// which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
+// back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; how work
+// gets into main; for a pull request, when the work is complete; and a review of the choices. Only Save on the
+// review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. How work lands
 // proposes the repository's current or default settings. A configured tracker that fails to load with a
 // SetupProblem (trackers/problems.js) shows the problem and its fix, with Check again and a way to choose a
 // different tracker. A Linear API key that is missing, unreadable or refused, at either point, comes with a
@@ -59,7 +60,7 @@ export class TrackerSetup {
   // main: the repository's main checkout. onSaved(cx) runs once its entry is written.
   constructor(main, onSaved) {
     this.main = main; this.onSaved = onSaved;
-    this.failure = null; this.choosingAnother = false;
+    this.failure = null; this.choosingAnother = false; this.settingUp = false;
     this.step = "tracker"; this.saving = false; this.saveProblem = null;
     // The proposed merge and complete once the tracker is ready, and the answers to them.
     this.merge = null; this.complete = null; this.proposed = null;
@@ -82,6 +83,18 @@ export class TrackerSetup {
   steps() {
     const merge = this.merge ?? this.proposed?.merge ?? "pull-request";
     return ["tracker", ...(this.tracker.choice === "linear" ? ["team"] : []), "merge", ...(merge === "pull-request" ? ["complete"] : []), "review"];
+  }
+
+  // Drops every answer and returns to the blank state; a check still running is ignored once it finishes.
+  cancel(cx) {
+    this.forgetAnswers();
+    this.settingUp = false;
+    cx.notify();
+  }
+
+  forgetAnswers() {
+    Object.assign(this, { step: "tracker", choosingAnother: false, saveProblem: null, merge: null, complete: null, proposed: null });
+    this.tracker.reset();
   }
 
   goTo(step, cx) {
@@ -128,8 +141,7 @@ export class TrackerSetup {
     cx.spawn(async (cx) => {
       try {
         await saveSetupChoices(this.main, setting);
-        Object.assign(this, { step: "tracker", choosingAnother: false, merge: null, complete: null, proposed: null });
-        this.tracker.reset();
+        this.forgetAnswers();
         this.onSaved(cx);
       } catch (e) { this.saveProblem = e; }
       finally { this.saving = false; cx.notify(); }
@@ -148,6 +160,12 @@ export class TrackerSetup {
           button("setup-choose-another", "Choose a different tracker", (cx) => { this.choosingAnother = true; cx.notify(); }, t)))
         .child(markdown("setup-hint", CONFIG_HINT, t.dim)));
     }
+    if (!this.failure && !this.settingUp) {
+      return v_flex().size_full().min_h(0).child(header).child(blankState({
+        id: "setup-start", sentence: "Issues isn't set up for this repository.", label: "Set Up Issues",
+        onClick: (cx) => { this.settingUp = true; cx.notify(); },
+      }, t));
+    }
     const page = { tracker: this.trackerPage, team: this.teamPage, merge: this.mergePage, complete: this.completePage, review: this.reviewPage }[this.step];
     return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(page.call(this, content, t));
   }
@@ -164,6 +182,7 @@ export class TrackerSetup {
       .when(!canGoBack, (e) => e.child(div().px(8).font_semibold().child("Set up issues")))
       .child(div().flex_1())
       .child(div().px(4).text_size(12).text_color(t.dim).child(`Step ${index + 1} of ${steps.length}`))
+      .when(!this.failure, (e) => e.child(button("setup-cancel", "Cancel", (cx) => this.cancel(cx), t)))
       .child(collapseButton(this.onCollapse, t));
   }
 
