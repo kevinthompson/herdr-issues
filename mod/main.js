@@ -18,7 +18,7 @@ import { settingsPath, pollSettings, DEFAULT_POLL_SECONDS } from "./trackers/set
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { groupIssues, stripBadges, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
@@ -875,7 +875,7 @@ export default class Issues extends View {
   stripBadge({ id, label, text }, t) {
     return v_flex().id(`strip-${id}`).flex_none().w(24).py(3).items_center().gap(2).rounded(6).tooltip(label)
       .cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.expandToGroup(id, cx))
-      .child(image(`mods/issues/icons/linear-${id}.png`).size(STRIP_ICON_PX))
+      .child(image(statusIcon(id)).size(STRIP_ICON_PX))
       .child(div().text_size(10).text_color(t.muted).child(text));
   }
 

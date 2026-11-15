@@ -64,6 +64,10 @@ export function groupIssues(issues, unloaded = new Set(), label = null) {
     .filter((group) => group.unloaded || group.issues.length);
 }
 
+// The Linear icon drawn beside a group or status, or null for one without, such as Unknown status.
+const ICON_IDS = ["triage", "in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"];
+export const statusIcon = (id) => (ICON_IDS.includes(id) ? `mods/issues/icons/linear-${id}.png` : null);
+
 // The collapsed strip counts only the groups a tracker always lists, so their counts are never unknown.
 const STRIP_GROUP_IDS = ["triage", "in-review", "in-progress", "todo"];
 const MAX_STRIP_COUNT = 99;

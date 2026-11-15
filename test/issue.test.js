@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupIssues, holdingBlockers, stripBadges, waitingIssues } from "../mod/issue.js";
+import { canStartWork, groupIssues, holdingBlockers, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
 
 const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
   ({ id, status, priority, blockedBy, labels: [], order: null, sla: null });
@@ -113,5 +113,19 @@ describe("stripBadges", () => {
   test("counts only the issues carrying the label the list is narrowed to", () => {
     const labeled = { ...issue("#2", "todo"), labels: ["bug"] };
     assert.equal(stripBadges(groupIssues([issue("#1", "todo"), labeled], new Set(), "bug"))[0].count, 1);
+  });
+});
+
+describe("statusIcon", () => {
+  test("names the Linear icon of each group and status that has one", () => {
+    for (const id of ["triage", "in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"]) {
+      assert.equal(statusIcon(id), `mods/issues/icons/linear-${id}.png`);
+    }
+  });
+
+  test("returns null for Unknown status and any other id", () => {
+    assert.equal(statusIcon("unknown"), null);
+    assert.equal(statusIcon("started"), null);
+    assert.equal(statusIcon(undefined), null);
   });
 });
