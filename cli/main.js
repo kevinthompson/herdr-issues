@@ -15,6 +15,8 @@ const USAGE = `Usage: issues <command> [options]
 
 Commands:
   tracker [--json]         Print the tracker the repository's issues live in: its kind, name, Linear team or GitHub repository
+  show <id> [--json]       Print an issue as the tracker reads it: title, status, labels, blockers, branch, pull requests
+                           and body; --json: the whole issue. Comments aren't included
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete,
@@ -64,10 +66,39 @@ async function tracker(args) {
   else console.log([kind, name, team, repo].filter(Boolean).join("\t"));
 }
 
-// The trackers list only an issue's unfinished blockers, so any blocker left holds the work back.
-async function issueToWork(id) {
+async function foundIssue(id) {
   const issue = await (await currentTracker()).get(id);
   if (!issue) throw new Refusal(`${id}: not found`);
+  return issue;
+}
+
+function issueText(issue) {
+  const fields = [
+    ["Status", issue.status],
+    ["Labels", issue.labels.join(", ")],
+    ["Blocked by", issue.blockedBy.join(", ")],
+    ["Branch", issue.branch],
+    ["Assignee", issue.assignee],
+    ["Due", issue.due],
+    ["Pull requests", (issue.pullRequests ?? []).map((pullRequest) => `${pullRequest.url} (${pullRequest.status})`).join(", ")],
+    ["URL", issue.url],
+    ["Updated", issue.updated],
+  ];
+  const lines = fields.filter(([, value]) => value).map(([label, value]) => `${label}: ${value}`);
+  const text = [`${issue.id} ${issue.title}`, ...lines].join("\n");
+  return issue.body ? `${text}\n\n${issue.body}` : text;
+}
+
+async function show(args) {
+  const [id, ...rest] = args.filter((arg) => arg !== "--json");
+  if (!id || rest.length || id.startsWith("-")) throw new UsageError("show needs one issue ID");
+  const issue = await foundIssue(id);
+  console.log(args.includes("--json") ? JSON.stringify(issue) : issueText(issue));
+}
+
+// The trackers list only an issue's unfinished blockers, so any blocker left holds the work back.
+async function issueToWork(id) {
+  const issue = await foundIssue(id);
   if (issue.blockedBy.length) throw new Refusal(`blocked by ${issue.blockedBy.join(", ")}`);
   if (!issue.branch) throw new Refusal(`${issue.id}: has no branch`);
   return issue;
@@ -197,7 +228,7 @@ async function merge(args) {
   }
 }
 
-const COMMANDS = { tracker, branch, "space-name": spaceName, setting, auth, context, tab, worktree, merge };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, tab, worktree, merge };
 
 const HELP_FLAGS = ["-h", "--help"];
 
