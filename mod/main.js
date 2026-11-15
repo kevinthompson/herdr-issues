@@ -1,5 +1,6 @@
 // The issues of the project in the focused pane: its git repository's root, or its folder outside one.
-// Clicking an issue shows it in the panel in place of the list (detail.js). The list draws a limited
+// Each repository remembers which status sections the person opened or closed (open-sections.js), across
+// focus changes and restarts, and lists a remembered open section's issues when it is focused. Clicking an issue shows it in the panel in place of the list (detail.js). The list draws a limited
 // number of rows, and Show more draws more. Status and priority dropdowns are popups of this same mod
 // with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
@@ -43,6 +44,7 @@ import { closeWorktreeSpace } from "./worktree-removal.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
+import { isSectionOpen, setSectionOpen } from "./open-sections.js";
 import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
 import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
@@ -150,7 +152,7 @@ export default class Issues extends View {
   init(_props, cx) {
     if (props()?.menu) { this.menu = new ({ scope: ScopeMenu, labels: LabelMenu }[props().menu] ?? FieldMenu)(); return; }
     if (props()?.action) { this.worktreeDialog = new WorktreeDialog(cx); return; }
-    this.issues = []; this.unloaded = new Set(); this.generation = 0; this.expanded = {};
+    this.issues = []; this.unloaded = new Set(); this.generation = 0;
     this.listScroll = ScrollHandle.new(); this.revealing = null;
     this.rowLimit = ROW_LIMIT; this.shownByContext = new Map();
     this.editing = null; this.saving = false; this.detailError = null;
@@ -398,7 +400,7 @@ export default class Issues extends View {
   // A badge in the strip expands the panel to the list, with the badge's group open and scrolled to the top.
   expandToGroup(groupId, cx) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
-    else { this.closeIssue(); this.expanded[groupId] = true; this.revealing = { groupId, step: "end" }; }
+    else { this.closeIssue(); setSectionOpen(this.scopeKey, groupId, true); this.revealing = { groupId, step: "end" }; }
     this.toggleCollapsed();
     cx.notify();
   }
@@ -834,13 +836,13 @@ export default class Issues extends View {
   }
   // Expanding a group whose issues weren't listed lists them.
   toggle(group, cx) {
-    this.expanded[group.id] = !this.isExpanded(group);
+    setSectionOpen(this.scopeKey, group.id, !this.isExpanded(group));
     if (group.unloaded && this.isExpanded(group)) this.refresh(cx);
     cx.notify();
   }
 
   isExpanded(group) {
-    return this.expanded[group.id] ?? !group.collapsed;
+    return isSectionOpen(this.scopeKey, group);
   }
 
   // Room for SLA and priority under the ID when the tracker shows them, otherwise for the longest listed
