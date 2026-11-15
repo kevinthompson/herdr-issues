@@ -15,11 +15,16 @@ const listing = (tabName, spaceName = "#72") => ({
   ],
 });
 
-// Stubs `herdr-app ls` with the listing and records each `herdr-app do` call; other programs, such as git, run.
+// Stubs `herdr-app ls` with the listing and records each `herdr-app do` call, and each `hc` call with its command
+// first; other programs, such as git, run.
 function stubApp(t, layout) {
   const calls = [];
   stubHerdr(t, {
     exec: async (command, args, options) => {
+      if (command === "hc") {
+        calls.push([command, ...args]);
+        return { code: 0, stdout: "", stderr: "" };
+      }
       if (command !== "herdr-app") return defaults.exec(command, args, options);
       if (args[0] === "ls") return { code: 0, stdout: JSON.stringify(layout), stderr: "" };
       calls.push(args);
@@ -68,7 +73,7 @@ test("tab --json prints the session tab as an object", async (t) => {
   assert.deepEqual(JSON.parse(out), { id: "tab-session", name: "Claude", space: "#72" });
 });
 
-for (const args of [["tab"], ["tab", "--json"], ["tab", "rename", "#72", "Tab names"]]) {
+for (const args of [["tab"], ["tab", "--json"], ["tab", "rename", "#72", "Tab names"], ["complete", "#72"]]) {
   test(`${args.join(" ")} fails when HC_TERMINAL_ID is empty`, async (t) => {
     const calls = stubApp(t, listing("Claude"));
     const { code, err } = await run(t, args, { terminal: "" });
@@ -135,4 +140,44 @@ test("--help lists both tab commands", async (t) => {
   assert.equal(code, 0);
   assert.match(out, /^ {2}tab \[--json\] /m);
   assert.match(out, /^ {2}tab rename <id> <name> /m);
+});
+
+for (const tabName of ["Claude", "Review"]) {
+  test(`complete labels the session's terminal and marks a tab named ${tabName} with ✅`, async (t) => {
+    const calls = stubApp(t, listing(tabName));
+    const { code, out } = await run(t, ["complete", "#72"]);
+    assert.equal(code, 0);
+    assert.deepEqual(calls, [
+      ["hc", "label", "t2", "issues.complete=#72"],
+      ["do", "tab.rename", "--id", "tab-session", "--name", `✅ ${tabName}`],
+    ]);
+    assert.match(out, new RegExp(`✅ ${tabName}`));
+  });
+}
+
+test("complete leaves a tab already marked with ✅ as it is", async (t) => {
+  const calls = stubApp(t, listing("✅ Review"));
+  const { code } = await run(t, ["complete", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["hc", "label", "t2", "issues.complete=#72"]]);
+});
+
+test("complete never renames the space", async (t) => {
+  const calls = stubApp(t, listing("Claude"));
+  await run(t, ["complete", "#72"]);
+  assert.ok(calls.every((call) => !call.some((arg) => String(arg).startsWith("space."))));
+});
+
+test("complete needs an issue ID", async (t) => {
+  const calls = stubApp(t, listing("Claude"));
+  const { code, err } = await run(t, ["complete"]);
+  assert.equal(code, 2);
+  assert.match(err, /needs an issue ID/);
+  assert.deepEqual(calls, []);
+});
+
+test("--help lists complete", async (t) => {
+  const { code, out } = await run(t, ["--help"]);
+  assert.equal(code, 0);
+  assert.match(out, /^ {2}complete <id> /m);
 });
