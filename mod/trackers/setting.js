@@ -30,7 +30,7 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// merge and complete with saveMergeSettings.
+// merge and complete with saveMergeSettings and its model and effort settings with saveAgentSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -45,8 +45,9 @@ export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
 export const DEFAULT_UPDATE_CHECK_HOURS = 6;
 const MIN_UPDATE_CHECK_HOURS = 1;
-const CREATE_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
-const CREATE_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
+export const CREATE_MODELS = ["inherit", "sonnet", "opus", "haiku", "fable"];
+export const CREATE_EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
+export const SUGGESTED_WORK_MODELS = ["inherit", "sonnet", "opus", "haiku"];
 export const DEFAULT_CREATE_MODEL = "sonnet";
 export const DEFAULT_CREATE_EFFORT = "default";
 export const DEFAULT_WORK_MODEL = "inherit";
@@ -83,9 +84,11 @@ function checkCreateSettings(settings, where) {
   checkChoice(settings?.createEffort, "createEffort", CREATE_EFFORTS, where);
 }
 
+const isModelName = (model) => typeof model === "string" && /^\S+$/.test(model);
+
 function checkWorkSettings(settings, where) {
   const model = settings?.workModel;
-  if (model != null && !(typeof model === "string" && /^\S+$/.test(model))) {
+  if (model != null && !isModelName(model)) {
     throw badSetting(`${where} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`);
   }
   checkChoice(settings?.workEffort, "workEffort", CREATE_EFFORTS, where);
@@ -157,7 +160,24 @@ export async function workSettings(project) {
   };
 }
 
-const hasGitHubOrigin = (main) => githubRepository(main, {}).then(() => true, () => false);
+export const AGENT_DEFAULTS = {
+  createModel: DEFAULT_CREATE_MODEL, createEffort: DEFAULT_CREATE_EFFORT,
+  workModel: DEFAULT_WORK_MODEL, workEffort: DEFAULT_WORK_EFFORT,
+};
+
+// The four agent settings, each as { value, source, entry, topLevel }: the value createSettings or workSettings
+// resolves, where it comes from ("repository", "top level" or "default"), and the repository's entry's and the
+// top level's own values, null where unset.
+export async function agentSettings(project) {
+  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  return Object.fromEntries(Object.entries(AGENT_DEFAULTS).map(([key, fallback]) => {
+    const entry = setting?.[key] ?? null, topLevel = settings?.[key] ?? null;
+    const source = entry != null ? "repository" : topLevel != null ? "top level" : "default";
+    return [key, { value: entry ?? topLevel ?? fallback, source, entry, topLevel }];
+  }));
+}
+
+const hasGitHubOrigin =(main) => githubRepository(main, {}).then(() => true, () => false);
 
 // How the repository's issue branches get into main, and when an issue's work counts as complete: when a session
 // can stop and a worktree is safe to remove. merge is "auto" (merged locally at once), "review" (merged locally
@@ -219,6 +239,33 @@ export async function saveMergeSettings(main, { merge, complete = null }) {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
     const changed = { ...entry, merge, complete };
     if (complete == null) delete changed.complete;
+    return changed;
+  });
+}
+
+function checkAgentChanges(changes) {
+  for (const [key, value] of Object.entries(changes)) {
+    if (!(key in AGENT_DEFAULTS)) throw badSetting(`${key} isn't a model or effort setting`);
+    if (value == null) continue;
+    if (key === "workModel") {
+      if (!isModelName(value)) throw badSetting("workModel must be inherit, a model alias such as sonnet, or a model's full name");
+      continue;
+    }
+    const choices = key === "createModel" ? CREATE_MODELS : CREATE_EFFORTS;
+    if (!choices.includes(value)) throw badSetting(`${key} must be one of ${choices.join(", ")}`);
+  }
+}
+
+// Sets the model and effort settings in `changes`, { createModel, createEffort, workModel, workEffort } or any of
+// them, in the existing entry of the repository whose main checkout is `main`. A null value removes the key, so the
+// top level's value or the default applies. It changes no other key, and writes nothing for a value
+// trackerSetting would refuse or a repository without an entry.
+export async function saveAgentSettings(main, changes) {
+  checkAgentChanges(changes);
+  await changeEntry(main, (entry) => {
+    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
+    const changed = { ...entry, ...changes };
+    for (const [key, value] of Object.entries(changes)) if (value == null) delete changed[key];
     return changed;
   });
 }
