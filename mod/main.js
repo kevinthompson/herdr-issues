@@ -25,6 +25,7 @@ import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName, trackerTitle } from "./listed-scope.js";
+import { listFilters } from "./filters.js";
 import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, openMenu, openScopeMenu, openLabelMenu, selectedScope, selectedLabel } from "./menu.js";
@@ -942,19 +943,15 @@ export default class Issues extends View {
     return labels.includes(label) ? label : null;
   }
 
-  // Under a project with milestones, a dropdown that narrows the list to one of them; when the listed
-  // issues carry labels, a dropdown that narrows it to one label.
-  filterBar(labels, label, t) {
-    const { project, milestone } = this.tracker?.scopes ? this.currentScope() : {};
-    const hasMilestones = Boolean(project?.milestones.length);
-    if (!hasMilestones && !labels.length) return null;
-    const filterName = (name) => div().flex_none().text_size(11).text_color(t.dim).child(name);
-    return h_flex().h(38).flex_none().px(14).gap(8).items_center().border_b(1).border_color(t.border)
-      .when(hasMilestones, (e) => e.child(filterName("Milestone"))
-        .child(scopeDropdown("issues-milestone", milestone?.label ?? "All milestones",
-          () => openScopeMenu([{ id: project.id, label: "All milestones" }, ...project.milestones], milestone?.id ?? project.id, this.scopeKey), t).flex_shrink(1)))
-      .when(labels.length > 0, (e) => e.child(filterName("Label"))
-        .child(scopeDropdown("issues-label", label ?? "All labels", () => openLabelMenu(labels, label, this.scopeKey), t).flex_shrink(1)));
+  // Each filter that narrows the list (filters.js) as its own section: a sub-heading over its dropdown.
+  filterSections(labels, label, t) {
+    const scope = this.tracker?.scopes ? this.currentScope() : {};
+    const openMenu = { scope: openScopeMenu, label: openLabelMenu };
+    return listFilters(scope, labels, label).map((filter) =>
+      v_flex().flex_none().px(14).py(8).gap(4).border_b(1).border_color(t.border)
+        .child(div().text_size(11).font_semibold().text_color(t.dim).child(filter.heading))
+        .child(scopeDropdown(filter.id, filter.shown, () => openMenu[filter.menu](filter.options, filter.selected, this.scopeKey), t)
+          .self_start().max_w(SCOPE_DROPDOWN_MAX_PX)));
   }
 
   header(t) {
@@ -988,12 +985,12 @@ export default class Issues extends View {
     }
     if (this.settingsView) return this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
-    const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError, filterBar = this.filterBar(labels, label, t);
+    const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError;
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
     this.revealGroup(groups);
     return v_flex().size_full().min_h(0)
       .child(this.header(t))
-      .when(Boolean(filterBar), (e) => e.child(filterBar))
+      .children(this.filterSections(labels, label, t))
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").track_scroll(this.listScroll).on_size_change((_size, cx) => this.noticeListLaidOut(cx)).flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group, index) => this.group(group, shown[index], idColumnWidth, t)))
