@@ -67,12 +67,17 @@ const checkInstalled = (root) => cachedInstalls(root, async () => {
   if (!result || result.code === 127) throw await bdMissing();
 });
 
+// Throws bdMissing when the main checkout `root` can't run `bd`, and beadsNotInitialized when it has no database.
+export async function checkBeads(root) {
+  await checkInstalled(root);
+  const metadata = await readTextFile(`${root}/.beads/metadata.json`).catch(() => null);
+  if (metadata === null) throw beadsNotInitialized();
+}
+
 export async function beadsTracker({ root: projectRoot, on }) {
   if (on != null) return null;
   const root = await mainCheckout(projectRoot, on);
-  const metadata = await readTextFile(`${root}/.beads/metadata.json`).catch(() => null);
-  if (metadata === null) throw beadsNotInitialized();
-  await checkInstalled(root);
+  await checkBeads(root);
   const bd = bdIn(root);
 
   // Each record's open blockers, read with `bd show` only for the records that have dependencies.

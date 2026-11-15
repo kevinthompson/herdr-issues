@@ -1,9 +1,10 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
-import { repositoryRoot } from "../mod/location.js";
+import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
 import { mergeSettings, pollSettings } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
+import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
 import { openWorktree } from "./worktree.js";
@@ -16,7 +17,8 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: merge, complete or pollSeconds
-  credentials <tracker>    Check the credentials a tracker needs are present: linear (an API key) or github (gh logged in)
+  credentials <tracker>    Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
+                           or beads (bd installed and a database in the main checkout)
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
   worktree <id> [--name <space name>] [--claude <first message>]
@@ -107,11 +109,18 @@ async function renameSessionTab([issueId, ...words]) {
 }
 
 // Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
-const CREDENTIAL_CHECKS = { linear: linearClient, github: checkGitHubLogin };
+const CREDENTIAL_CHECKS = {
+  linear: linearClient,
+  github: checkGitHubLogin,
+  beads: async () => {
+    const { root, on } = await currentProject();
+    await checkBeads(await mainCheckout(root, on));
+  },
+};
 
 async function credentials([kind, ...rest]) {
   const check = CREDENTIAL_CHECKS[kind];
-  if (!check || rest.length) throw new UsageError(`credentials needs one tracker: ${Object.keys(CREDENTIAL_CHECKS).join(" or ")}`);
+  if (!check || rest.length) throw new UsageError(`credentials needs one tracker: ${Object.keys(CREDENTIAL_CHECKS).join(", ")}`);
   await check();
 }
 
