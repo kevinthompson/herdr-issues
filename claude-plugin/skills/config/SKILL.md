@@ -11,7 +11,7 @@ The settings are the repository's entry in `~/.config/herdr-app/issues.json`, un
 ```json
 {
   "repos": {
-    "~/Code/calendar": { "tracker": "linear", "team": "CAL", "views": { "Calendar core": "https://linear.app/…/view/…" } },
+    "~/Code/web": { "tracker": "linear", "team": "WEB", "views": { "Checkout bugs": "https://linear.app/…/view/…" } },
     "~/Code/app": { "tracker": "github", "repo": "owner/name", "merge": "pull-request", "complete": "merged" },
     "~/Code/notes": { "tracker": "beads", "merge": "auto" }
   }
@@ -22,7 +22,7 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
 
 `views` is optional: saved Linear views the panel offers as lists beside the team's. `repo` is optional too: without it, GitHub issues come from origin's repository.
 
-`worktreeSetup` is optional: a shell command that `issues worktree` runs once in each new worktree it creates, through the person's login shell, before opening its space, such as `box worktree-setup` for a Planning Center box app. When it fails, the worktree is kept and no space opens. A repository whose own git hook sets up new worktrees, such as calendar, leaves it unset.
+`worktreeSetup` is optional: a shell command that `issues worktree` runs once in each new worktree it creates, through the person's login shell, before opening its space, such as `npm install`. When it fails, the worktree is kept and no space opens. A repository whose own git hook sets up new worktrees leaves it unset.
 
 `merge` and `complete` are optional, and say how an issue's branch gets into main and when its work counts as complete. Explain them in these words when you ask about them or show them:
 
