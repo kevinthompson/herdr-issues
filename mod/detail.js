@@ -6,14 +6,12 @@ import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus } from "./issue.js";
-import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
+import { DUE_COLORS, statusTints, fieldBar, isLightTheme } from "./colors.js";
 
 // The status dropdown takes the status's color, as the list's status headers do.
 function dropdown(field, label, { issue, writable, onMenu }, t) {
-  const statusColor = field === "status" ? STATUS_COLORS[issue.status] : null;
-  const [fill, border, hoverFill] = statusColor
-    ? [tinted(statusColor), tinted(statusColor, "60"), tinted(statusColor, "48")]
-    : [t.raised, t.border, t.hover];
+  const tints = field === "status" ? statusTints(issue.status, t) : null;
+  const { fill, border, hover: hoverFill } = tints ?? { fill: t.raised, border: t.border, hover: t.hover };
   return h_flex().gap(6).items_center().text_size(11)
     .child(div().text_color(t.dim).child(label))
     .child(h_flex().id(`field-${field}`).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(border)
@@ -39,9 +37,6 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
 }
 
 const FACT_ROW_PX = 18, FACT_ICON_PX = 12;
-
-// The bar of fields you can change, a shade lighter than the panel so it reads apart from the issue's details.
-const fieldBar = (t) => mixColors(t.surface, t.raised, 0.35) ?? t.surface;
 
 // One of the issue's facts on a line of its own: its name dimmed, then its value.
 function fact(label, value, t) {
@@ -117,6 +112,9 @@ export function collapseButton(onCollapse, t) {
 // An icon has its own color, so a button whose label is an icon redraws it in the hover color.
 let hoveredButton = null;
 
+// A light theme's raised fill barely differs from the panel, so a button there is outlined too.
+const outlinedInLightTheme = (element, t) => element.when(isLightTheme(t), (e) => e.border_1().border_color(t.border));
+
 // Buttons stop the pointer events a list row would otherwise take as an open. A label may be a
 // function of the button's text color, for an icon.
 export function button(id, label, onClick, t, { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {}) {
@@ -129,6 +127,7 @@ export function button(id, label, onClick, t, { primary = false, enabled = true,
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
     .bg(enabled && primary ? t.solid : t.raised).text_color(textColor)
+    .when(!(enabled && primary), (e) => outlinedInLightTheme(e, t))
     .when(enabled, (e) => e.cursor_pointer().hover(hoverStyle).on_click((_e, cx) => onClick(cx)))
     .when(enabled && typeof label === "function", (e) => e.on_hover((hovered, cx) => {
       if (hovered) hoveredButton = id;
@@ -157,7 +156,7 @@ export function workButton(key, { finishable, startable, inSpace, inActiveSpace,
 function cloudAgentButton({ delegated, delegating, onDelegate }, t) {
   const enabled = !delegated && !delegating;
   const tooltip = delegated ? "Delegated to Cloud Agent" : delegating ? "Delegating…" : "Delegate to Cloud Agent";
-  return div().id("issue-delegate").flex_none().size(26).flex().items_center().justify_center().rounded(7).bg(t.raised)
+  return outlinedInLightTheme(div().id("issue-delegate").flex_none().size(26).flex().items_center().justify_center().rounded(7).bg(t.raised), t)
     .tooltip(tooltip)
     .when(enabled, (e) => e.cursor_pointer().hover((s) => s.opacity(0.85)).on_click((_e, cx) => onDelegate(cx)))
     .child(svg("mods/issues/icons/cloud-upload.svg").size(14).text_color(enabled ? t.foreground : t.dim));

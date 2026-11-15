@@ -28,7 +28,7 @@ import { isTextFile, openInEditor } from "./editor.js";
 import { avatarImage } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
-import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
+import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
@@ -102,13 +102,6 @@ const workIssueSession = (issue) => ({ tab: "Claude", argv: ["claude"], task: `/
 const ISSUES_WORKTREE_TIMEOUT_MS = 10 * 60 * 1000;
 // issues worktree works on this computer's checkouts and needs the issue's branch.
 const opensWithIssuesWorktree = (issue, project) => Boolean(issue.branch && project && !project.on);
-// A list row's hover, half as strong as the theme's: half as opaque when it's translucent,
-// otherwise halfway back to the panel's surface.
-function rowHover(t) {
-  const translucent = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(t.hover);
-  if (translucent) return `#${translucent[1]}${Math.round(parseInt(translucent[2], 16) / 2).toString(16).padStart(2, "0")}`;
-  return mixColors(t.surface, t.hover, 0.5) ?? t.hover;
-}
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
 export default class Issues extends View {
@@ -745,8 +738,7 @@ export default class Issues extends View {
   // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
   group(group, shown, idColumnWidth, t) {
     const expanded = this.isExpanded(group), hidden = group.issues.length - shown;
-    const color = STATUS_COLORS[group.id];
-    const fill = color ? tinted(color) : t.raised;
+    const fill = statusTints(group.id, t)?.fill ?? t.raised;
     return v_flex().flex_none().gap(1)
       .child(h_flex().id(`group-${group.id}`).mt(6).px(10).py(4).gap(6).items_center().rounded(6).cursor_pointer().text_size(11)
         .bg(fill).text_color(t.foreground)
