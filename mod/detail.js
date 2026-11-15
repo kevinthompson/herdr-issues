@@ -8,7 +8,7 @@ import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { mixColors, STATUS_COLORS, DUE_COLORS, tinted } from "./colors.js";
 
-const STATUS_ICON_PX = 12;
+const STATUS_ICON_PX = 14;
 
 // The status dropdown takes the status's color, as the list's status headers do.
 function dropdown(field, label, { issue, writable, onMenu }, t) {

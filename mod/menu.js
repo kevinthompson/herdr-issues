@@ -11,7 +11,7 @@ import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herd
 import { requestFieldEdit } from "./edits.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
 
-const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 14;
+const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 16;
 // The theme's text color at this opacity, so the band follows light and dark themes.
 const HEADING_TINT_ALPHA = "0a";
 const headingTint = (t) => (/^#[0-9a-f]{6}$/i.test(t.foreground) ? t.foreground + HEADING_TINT_ALPHA : "transparent");

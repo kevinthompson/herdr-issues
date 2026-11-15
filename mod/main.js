@@ -91,7 +91,7 @@ function scopeDropdown(id, label, onClick, t) {
 const SCOPE_DROPDOWN_MAX_PX = 260;
 const SYNC_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
-const STATUS_ICON_PX = 12;
+const STATUS_ICON_PX = 14;
 const SYNC_SPIN_MS = 1000;
 // A saved edit's sync icon fades out over this long, a step at a time.
 const SYNC_FADE_MS = 600, SYNC_FADE_STEP_MS = 30;
