@@ -8,16 +8,18 @@
 // work is complete, its merge and complete in issues.json; what a finished session does about its worktree, its
 // close; the command run in each new worktree, its worktreeSetup; the name of each issue's space, its spaceName;
 // how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10 seconds before
-// it can be saved; then the model and effort of the sessions that work its issues, its workModel and workEffort.
+// it can be saved; then the model and effort of the sessions that work its issues, its workModel and workEffort;
+// and last the text appended to those sessions' system prompt, its workPrompt, in a soft-wrapped textarea several
+// rows tall with the top level's prompt, if any, as placeholder, where emptying it removes it from the entry.
 // Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what applies without it as the
 // placeholder. It opens on the settings in effect, defaults applied, as `issues setting` prints them. Each model and effort offers its allowed values and a choice that removes
 // it from the entry, so issues.json's top level or the default applies; workModel's Other takes another model alias
 // or full name typed in. Save waits for a different tracker's check to pass and, for Linear, a team, writes only the
-// changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings and
-// saveAgentSettings in setting.js) and goes
+// changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
+// saveAgentSettings and saveWorkPrompt in setting.js) and goes
 // back to the list; a failed save shows its error and stays. Back writes nothing.
 import { div } from "gpui-kit";
-import { v_flex, h_flex, Input, InputState } from "gpui-base";
+import { v_flex, h_flex, Input, InputState, Textarea, TextareaState } from "gpui-base";
 import { button, collapseButton } from "./detail.js";
 import { MERGE_CHOICES } from "./setup.js";
 import { SelectMenu } from "./select.js";
@@ -27,6 +29,7 @@ import {
   AGENT_DEFAULTS, DEFAULT_POLL_SECONDS, EFFORTS, REPOSITORY_KEYS, SUGGESTED_WORK_MODELS,
   agentSettings, closeSettings, mergeSettings, nameSettings, parsePollSeconds, repositorySettings,
   saveAgentSettings, saveCloseSetting, saveMergeSettings, saveNameSetting, saveRepositorySettings, saveTrackerChoice,
+  saveWorkPrompt, workPromptSettings,
 } from "./trackers/setting.js";
 
 const TEAM_PICKS = "issues.settingsTeams";
@@ -58,7 +61,9 @@ const AGENT_QUESTIONS = [
   { key: "workModel", title: "Issue sessions' model", sentence: "The model of the Claude sessions Start and Continue open to work an issue. inherit uses your own Claude Code model.", choices: SUGGESTED_WORK_MODELS },
   { key: "workEffort", title: "Issue sessions' effort", sentence: null, choices: EFFORTS },
 ];
-const OTHER_WORK_MODEL_OPTION = { id: OTHER_WORK_MODEL, label: "Other…", detail: "Another model alias or full name, typed in." };
+const WORK_PROMPT_SENTENCE = "Instructions appended to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use the top level's prompt, if any.";
+const WORK_PROMPT_ROWS = 6;
+const OTHER_WORK_MODEL_OPTION ={ id: OTHER_WORK_MODEL, label: "Other…", detail: "Another model alias or full name, typed in." };
 
 // Where the listed issues come from now, such as "Linear team WEB".
 function currentTrackerLabel({ kind, team, repo }) {
@@ -83,6 +88,7 @@ export class SettingsView {
     this.savedName = null; this.nameInput = null;
     this.savedRepository = null; this.repositoryInputs = null;
     this.savedAgent = null; this.agentEntry = {}; this.otherWorkModelPicked = false;
+    this.savedWorkPrompt = null; this.workPromptInput = null;
     this.selects = null;
     this.loading = true; this.saving = false; this.error = null;
     this.workModelInput = InputState.new({ placeholder: "Another model alias or full name" });
@@ -100,9 +106,9 @@ export class SettingsView {
     };
     cx.spawn(async (cx) => {
       try {
-        const [merge, { close }, name, repository, agent] = await Promise.all([
+        const [merge, { close }, name, repository, agent, workPrompt] = await Promise.all([
           mergeSettings(this.project), closeSettings(this.project), nameSettings(this.project),
-          repositorySettings(this.project), agentSettings(this.project),
+          repositorySettings(this.project), agentSettings(this.project), workPromptSettings(this.project),
         ]);
         this.saved = merge; Object.assign(this, merge);
         this.savedClose = close; this.close = close;
@@ -115,6 +121,10 @@ export class SettingsView {
         this.savedAgent = agent;
         this.agentEntry = Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry]));
         if (isTypedWorkModel(this.agentEntry.workModel)) this.workModelInput.set_value(this.agentEntry.workModel);
+        this.savedWorkPrompt = workPrompt.entry;
+        this.workPromptInput = TextareaState.new({ placeholder: workPrompt.topLevel ?? "No prompt", value: workPrompt.entry ?? "", rows: WORK_PROMPT_ROWS });
+        this.workPromptInput.set_soft_wrap(true);
+        this.workPromptInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
       } catch (e) { this.error = String(e.message ?? e); }
       finally { this.loading = false; cx.notify(); }
     });
@@ -245,9 +255,19 @@ export class SettingsView {
       .map((key) => [key, this.agentEntry[key] ?? null]));
   }
 
+  // The typed prompt, trimmed, or null when the textarea is empty, so the top level's prompt applies.
+  typedWorkPrompt() {
+    return this.workPromptInput?.value().trim() || null;
+  }
+
+  workPromptChanged() {
+    return Boolean(this.workPromptInput) && this.typedWorkPrompt() !== this.savedWorkPrompt;
+  }
+
   changed() {
     return Boolean(this.trackerChange()) || this.mergeChanged() || this.closeChanged() || this.nameChanged()
-      || Object.keys(this.repositoryChanges()).length > 0 || Object.keys(this.agentChanges()).length > 0;
+      || Object.keys(this.repositoryChanges()).length > 0 || Object.keys(this.agentChanges()).length > 0
+      || this.workPromptChanged();
   }
 
   canSave() {
@@ -261,6 +281,7 @@ export class SettingsView {
     const closeChoice = this.closeChanged() ? this.close : null;
     const nameChanged = this.nameChanged(), name = this.typedName();
     const repositoryChanges = this.repositoryChanges(), agentChanges = this.agentChanges();
+    const workPromptChanged = this.workPromptChanged(), workPrompt = this.typedWorkPrompt();
     Object.assign(this, { saving: true, error: null });
     cx.spawn(async (cx) => {
       try {
@@ -270,6 +291,7 @@ export class SettingsView {
         if (nameChanged) await saveNameSetting(this.main, name);
         if (Object.keys(repositoryChanges).length > 0) await saveRepositorySettings(this.main, repositoryChanges);
         if (Object.keys(agentChanges).length > 0) await saveAgentSettings(this.main, agentChanges);
+        if (workPromptChanged) await saveWorkPrompt(this.main, workPrompt);
         this.onSaved(cx);
       } catch (e) { this.error = `Could not save: ${e.message ?? e}`; }
       finally { this.saving = false; cx.notify(); }
@@ -317,6 +339,8 @@ export class SettingsView {
         .child(this.selects.close.render(t, { options: CLOSE_CHOICES, value: this.close, onChoose: (id, cx) => this.chooseClose(id, cx), enabled: !this.saving }))))
       .when(Boolean(this.repositoryInputs), (e) => e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))))
       .when(Boolean(this.savedAgent), (e) => e.children(AGENT_QUESTIONS.map((question) => this.agentQuestion(question, fields, t))))
+      .when(Boolean(this.workPromptInput), (e) => e.child(this.question("Work prompt", WORK_PROMPT_SENTENCE, t,
+        (controls) => controls.child(this.textareaField(this.workPromptInput, t)))))
       .when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")))
       .child(h_flex().gap(8).items_center()
         .child(button("settings-save", this.saving ? "Saving…" : "Save", (cx) => this.save(cx), t, { primary: true, enabled: this.canSave() })));
@@ -365,6 +389,11 @@ export class SettingsView {
 
   textField(state, t) {
     return Input.new(state).min_w(0).max_w(280).h(26).px(8).items_center()
+      .rounded(7).border(1).border_color(t.input).bg(t.surface).text_size(12).text_color(t.foreground);
+  }
+
+  textareaField(state, t) {
+    return Textarea.new(state).w_full().min_w(0).px(8).py(6)
       .rounded(7).border(1).border_color(t.input).bg(t.surface).text_size(12).text_color(t.foreground);
   }
 }

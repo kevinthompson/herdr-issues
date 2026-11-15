@@ -65,3 +65,31 @@ test("a top-level workEffort that isn't an effort level is refused", async (t) =
   assert.equal(result.code, 1);
   assert.match(result.err, /issues\.json needs a workEffort of default, low, medium, high, xhigh, max/);
 });
+
+test("issues setting workPrompt prints nothing without a prompt", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ repos: { [repository]: githubEntry() } });
+  const result = await setting(t, repository, "workPrompt");
+  assert.equal(result.out, "");
+  assert.equal(result.err, "");
+});
+
+test("a repository's workPrompt overrides the top level's", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ workPrompt: "Top level", repos: { [repository]: githubEntry({ workPrompt: "Run the tests.\nCommit often." }) } });
+  assert.equal((await setting(t, repository, "workPrompt")).out, "Run the tests.\nCommit often.");
+});
+
+test("a top-level workPrompt applies without the repository's", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ workPrompt: "Top level", repos: { [repository]: githubEntry() } });
+  assert.equal((await setting(t, repository, "workPrompt")).out, "Top level");
+});
+
+test("a repository's workPrompt that isn't text is refused", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ repos: { [repository]: githubEntry({ workPrompt: ["Run the tests."] }) } });
+  const result = await setting(t, repository, "workPrompt");
+  assert.notEqual(result.code, 0);
+  assert.match(result.err, new RegExp(`issues.json's ${repository} has a workPrompt that isn't text`));
+});
