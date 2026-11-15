@@ -6,11 +6,15 @@
 // its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be saved,
 // with Linear's team once Linear is checked; how its work gets into main, and, only for a pull request, when the
 // work is complete, its merge and complete in issues.json; what a finished session does about its worktree, its
-// close; then the model and effort of the sessions that work its issues, its workModel and workEffort. It opens on the settings in effect, defaults applied,
-// as `issues setting` prints them. Each model and effort offers its allowed values and a choice that removes
+// close; the command run in each new worktree, its worktreeSetup; the name of each issue's space, its spaceName;
+// how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10 seconds before
+// it can be saved; then the model and effort of the sessions that work its issues, its workModel and workEffort.
+// Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what applies without it as the
+// placeholder. It opens on the settings in effect, defaults applied, as `issues setting` prints them. Each model and effort offers its allowed values and a choice that removes
 // it from the entry, so issues.json's top level or the default applies; workModel's Other takes another model alias
 // or full name typed in. Save waits for a different tracker's check to pass and, for Linear, a team, writes only the
-// changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting and saveAgentSettings in setting.js) and goes
+// changed keys (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings and
+// saveAgentSettings in setting.js) and goes
 // back to the list; a failed save shows its error and stays. Back writes nothing.
 import { div } from "gpui-kit";
 import { v_flex, h_flex, Input, InputState } from "gpui-base";
@@ -20,9 +24,9 @@ import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, settingsFields, workModelChoice } from "./settings-fields.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
-  AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS,
-  agentSettings, closeSettings, mergeSettings, nameSettings,
-  saveAgentSettings, saveCloseSetting, saveMergeSettings, saveNameSetting, saveTrackerChoice,
+  AGENT_DEFAULTS, DEFAULT_POLL_SECONDS, EFFORTS, REPOSITORY_KEYS, SUGGESTED_WORK_MODELS,
+  agentSettings, closeSettings, mergeSettings, nameSettings, parsePollSeconds, repositorySettings,
+  saveAgentSettings, saveCloseSetting, saveMergeSettings, saveNameSetting, saveRepositorySettings, saveTrackerChoice,
 } from "./trackers/setting.js";
 
 const TEAM_PICKS = "issues.settingsTeams";
@@ -43,6 +47,12 @@ const CLOSE_CHOICES = [
 ];
 const CLOSE_SENTENCE = "What a finished session does about its worktree. A worktree that might lose work, or that has other spaces nested under it, always shows the removal dialog first.";
 const NAME_SENTENCE = "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
+
+const REPOSITORY_QUESTIONS = [
+  { key: "worktreeSetup", title: "Worktree setup command", sentence: "A shell command run in each new issue worktree, such as npm install. Leave it empty to run nothing." },
+  { key: "spaceName", title: "Issue space name", sentence: "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to name spaces after the issue's ID." },
+  { key: "pollSeconds", title: "Poll interval", sentence: "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the top level's interval or the default." },
+];
 
 const AGENT_QUESTIONS = [
   { key: "workModel", title: "Issue sessions' model", sentence: "The model of the Claude sessions Start and Continue open to work an issue. inherit uses your own Claude Code model.", choices: SUGGESTED_WORK_MODELS },
@@ -71,6 +81,7 @@ export class SettingsView {
     this.saved = null; this.merge = null; this.complete = null;
     this.savedClose = null; this.close = null;
     this.savedName = null; this.nameInput = null;
+    this.savedRepository = null; this.repositoryInputs = null;
     this.savedAgent = null; this.agentEntry = {}; this.otherWorkModelPicked = false;
     this.selects = null;
     this.loading = true; this.saving = false; this.error = null;
@@ -89,8 +100,9 @@ export class SettingsView {
     };
     cx.spawn(async (cx) => {
       try {
-        const [merge, { close }, name, agent] = await Promise.all([
-          mergeSettings(this.project), closeSettings(this.project), nameSettings(this.project), agentSettings(this.project),
+        const [merge, { close }, name, repository, agent] = await Promise.all([
+          mergeSettings(this.project), closeSettings(this.project), nameSettings(this.project),
+          repositorySettings(this.project), agentSettings(this.project),
         ]);
         this.saved = merge; Object.assign(this, merge);
         this.savedClose = close; this.close = close;
@@ -98,12 +110,30 @@ export class SettingsView {
         this.nameInput = InputState.new({ placeholder: name.defaultName, value: name.entry ?? "" });
         this.nameInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
         this.nameInput.on("submit", (_e, cx) => this.save(cx));
+        this.savedRepository = repository;
+        this.repositoryInputs = this.newRepositoryInputs(repository);
         this.savedAgent = agent;
         this.agentEntry = Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry]));
         if (isTypedWorkModel(this.agentEntry.workModel)) this.workModelInput.set_value(this.agentEntry.workModel);
       } catch (e) { this.error = String(e.message ?? e); }
       finally { this.loading = false; cx.notify(); }
     });
+  }
+
+  // A field for each of pollSeconds, spaceName and worktreeSetup, opening on the entry's value, with what applies
+  // without it as the placeholder.
+  newRepositoryInputs(repository) {
+    const placeholders = {
+      pollSeconds: String(repository.topLevelPollSeconds ?? DEFAULT_POLL_SECONDS),
+      spaceName: "<issueId>",
+      worktreeSetup: "No command",
+    };
+    return Object.fromEntries(REPOSITORY_KEYS.map((key) => {
+      const input = InputState.new({ placeholder: placeholders[key], value: repository[key] == null ? "" : String(repository[key]) });
+      input.on("change", (_e, cx) => { this.error = null; cx.notify(); });
+      input.on("submit", (_e, cx) => this.save(cx));
+      return [key, input];
+    }));
   }
 
   // Choosing the current GitHub or Beads tracker again undoes a change; Linear's is checked again to change its team.
@@ -186,6 +216,29 @@ export class SettingsView {
     return Boolean(this.nameInput) && this.typedName() !== this.savedName;
   }
 
+  // The typed poll interval, or null when it's empty; undefined with the problem when it can't be saved.
+  typedPollSeconds() {
+    try { return { pollSeconds: parsePollSeconds(this.repositoryInputs.pollSeconds.value()) }; }
+    catch (e) { return { problem: String(e.message ?? e) }; }
+  }
+
+  // Each of pollSeconds, spaceName and worktreeSetup whose field differs from the entry, as its value or null.
+  repositoryChanges() {
+    if (!this.repositoryInputs) return {};
+    const typed = {
+      pollSeconds: this.typedPollSeconds().pollSeconds,
+      spaceName: this.repositoryInputs.spaceName.value().trim() || null,
+      worktreeSetup: this.repositoryInputs.worktreeSetup.value().trim() || null,
+    };
+    return Object.fromEntries(REPOSITORY_KEYS
+      .filter((key) => typed[key] !== undefined && typed[key] !== this.savedRepository[key])
+      .map((key) => [key, typed[key]]));
+  }
+
+  pollSecondsProblem() {
+    return this.repositoryInputs ? this.typedPollSeconds().problem ?? null : null;
+  }
+
   agentChanges() {
     return Object.fromEntries(Object.keys(AGENT_DEFAULTS)
       .filter((key) => this.savedAgent && (this.agentEntry[key] ?? null) !== this.savedAgent[key].entry)
@@ -193,11 +246,12 @@ export class SettingsView {
   }
 
   changed() {
-    return Boolean(this.trackerChange()) || this.mergeChanged() || this.closeChanged() || this.nameChanged() || Object.keys(this.agentChanges()).length > 0;
+    return Boolean(this.trackerChange()) || this.mergeChanged() || this.closeChanged() || this.nameChanged()
+      || Object.keys(this.repositoryChanges()).length > 0 || Object.keys(this.agentChanges()).length > 0;
   }
 
   canSave() {
-    return !this.saving && !this.trackerPending() && this.changed();
+    return !this.saving && !this.trackerPending() && !this.pollSecondsProblem() && this.changed();
   }
 
   save(cx) {
@@ -206,7 +260,7 @@ export class SettingsView {
     const mergeChoice = this.mergeChanged() ? { merge: this.merge, complete: this.merge === "pull-request" ? this.complete : null } : null;
     const closeChoice = this.closeChanged() ? this.close : null;
     const nameChanged = this.nameChanged(), name = this.typedName();
-    const agentChanges = this.agentChanges();
+    const repositoryChanges = this.repositoryChanges(), agentChanges = this.agentChanges();
     Object.assign(this, { saving: true, error: null });
     cx.spawn(async (cx) => {
       try {
@@ -214,6 +268,7 @@ export class SettingsView {
         if (mergeChoice) await saveMergeSettings(this.main, mergeChoice);
         if (closeChoice) await saveCloseSetting(this.main, closeChoice);
         if (nameChanged) await saveNameSetting(this.main, name);
+        if (Object.keys(repositoryChanges).length > 0) await saveRepositorySettings(this.main, repositoryChanges);
         if (Object.keys(agentChanges).length > 0) await saveAgentSettings(this.main, agentChanges);
         this.onSaved(cx);
       } catch (e) { this.error = `Could not save: ${e.message ?? e}`; }
@@ -260,6 +315,7 @@ export class SettingsView {
         .child(this.selects.complete.render(t, { options: COMPLETE_CHOICES, value: this.complete, onChoose: (id, cx) => this.chooseComplete(id, cx), enabled: !this.saving })))))
       .child(this.question("When the work is complete, close the worktree?", CLOSE_SENTENCE, t, (controls) => controls
         .child(this.selects.close.render(t, { options: CLOSE_CHOICES, value: this.close, onChoose: (id, cx) => this.chooseClose(id, cx), enabled: !this.saving }))))
+      .when(Boolean(this.repositoryInputs), (e) => e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))))
       .when(Boolean(this.savedAgent), (e) => e.children(AGENT_QUESTIONS.map((question) => this.agentQuestion(question, fields, t))))
       .when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")))
       .child(h_flex().gap(8).items_center()
@@ -283,6 +339,14 @@ export class SettingsView {
 
   note(text, t) {
     return div().whitespace_normal().text_size(12).text_color(t.dim).child(text);
+  }
+
+  // A typed setting; the poll interval says below its field why it can't be saved.
+  repositoryQuestion({ key, title, sentence }, t) {
+    const problem = key === "pollSeconds" ? this.pollSecondsProblem() : null;
+    return this.question(title, sentence, t, (controls) => controls
+      .child(this.textField(this.repositoryInputs[key], t))
+      .when(Boolean(problem), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(problem ?? ""))));
   }
 
   // A select of the setting's values led by the one that removes it from the entry, labeled with what then applies;
