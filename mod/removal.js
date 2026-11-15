@@ -45,6 +45,13 @@ function branchFindings({ bases, mergedInto, unpushed, pullRequest }) {
   ];
 }
 
+// Whether the dialog removes the checkout without asking: every check answered and passed, and no other space nests
+// under this one, since closing a space closes the spaces nested under it.
+export function removesWithoutAsking(checks, nestedSpaceCount) {
+  if (!checksAnswered(checks) || nestedSpaceCount > 0) return false;
+  return removalFindings(checks).every((finding) => finding.result === PASS);
+}
+
 // { mark, text }: ❌ when a finding loses work only this checkout holds, ⚠️ for any other failure, ✅ otherwise.
 export function removalVerdict(findings) {
   if (findings.some((finding) => finding.result === LOSS)) return { mark: "❌", text: "Removing it loses work that exists only in this checkout." };
