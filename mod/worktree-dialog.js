@@ -1,6 +1,7 @@
 // Worktree dialog, a dialog of this mod with props { space, action: "new" | "open" | "remove" } or
 // { folder, machine } for a repo without a space; optional { branch, name, tab, argv, task }, and { behind: true }
-// to open the new worktree's space behind what's shown.
+// to open the new worktree's space behind what's shown. Open names a new space on the main checkout with the
+// repository's name setting (trackers/setting.js).
 // Remove takes an optional { warning }: work outside the checkout that removing it would leave behind, and { ask }
 // to wait for Enter whatever the checks find. It removes the checkout without asking when removesWithoutAsking
 // (removal.js) says so, and otherwise waits for Enter.
@@ -10,6 +11,7 @@ import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { run, props, closeOverlay, theme, spaces, panes, terminals, exec, home, updates, openOverlay } from "herdr";
 import { branchState, checkouts as repositoryCheckouts } from "./worktree.js";
 import { openBehindArgs } from "./open-behind.js";
+import { nameSettings } from "./trackers/setting.js";
 import { checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks, sessionComplete, PASS, LOSS } from "./removal.js";
 
 // Opens the dialog that removes the space's worktree and closes the space.
@@ -191,7 +193,12 @@ export class WorktreeDialog {
         }
         this.folder = props()?.folder || place(this.space()) || this.userHome;
         const repo = await repoOf(this.folder, this.on);
-        if (repo && this.opening) this.list = await checkouts(repo, this.on);
+        if (repo && this.opening) {
+          [this.list, this.mainName] = await Promise.all([
+            checkouts(repo, this.on),
+            nameSettings({ root: repo.main, on: this.on }).then(({ name }) => name, () => null),
+          ]);
+        }
         this.repo = repo;
         cx.notify();
         if (repo?.linked && props().action === "remove") {
@@ -278,7 +285,7 @@ export class WorktreeDialog {
     this.close();
     const s = spaceOf(c.path, this.list, this.on, spaces(), panes());
     if (s) run("space.select", { id: s.id });
-    else run("space.new", { folder: c.path, machine: this.on });
+    else run("space.new", { folder: c.path, machine: this.on, ...(c.main && this.mainName && { name: this.mainName }) });
   }
 
   async remove() {

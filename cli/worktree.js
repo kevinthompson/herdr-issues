@@ -1,5 +1,6 @@
 // `issues worktree`: opens a branch in a worktree of the repository holding a folder and, in Herdr, opens it
-// behind what's shown in a space nested under the repository's space. The worktree is the branch's existing one, else a new
+// behind what's shown in a space nested under the repository's space, which it opens first, named with the
+// repository's name setting, when no space shows the main checkout. The worktree is the branch's existing one, else a new
 // checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. With --claude, the space
 // opens a Claude session on the repository's workModel and workEffort settings. A new worktree gets a copy of the main
 // checkout's .claude/settings.local.json before the repository's worktreeSetup command runs.
@@ -9,7 +10,7 @@ import { rmdirSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { exec, home, readLayout } from "./herdr.js";
 import { spaceShowing, worktreeFor } from "../mod/worktree.js";
-import { trackerSetting } from "../mod/trackers/setting.js";
+import { nameSettings, trackerSetting } from "../mod/trackers/setting.js";
 import { workSessionArgv } from "../mod/work-session.js";
 import { openBehindArgs } from "../mod/open-behind.js";
 
@@ -206,7 +207,8 @@ async function showInSpace({ branch, path, main, common, name, claudeMessage }) 
     }
     const behind = openBehindArgs(await herdrVersion());
     if (!spaceShowing(main, null)) {
-      await herdrDo("space.new", { folder: main, ...behind });
+      const { name: mainName } = await nameSettings({ root: main, on: null });
+      await herdrDo("space.new", { folder: main, name: mainName, ...behind });
       console.log(`opened a space on ${main}`);
     }
     const claudeTab = claudeMessage ? { tab: "Claude", argv: await workSessionArgv({ root: main, on: null }), task: claudeMessage } : {};
