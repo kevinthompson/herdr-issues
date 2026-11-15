@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -73,3 +73,49 @@ test("setup adds the marketplace and installs the plugin when claude is installe
   assert.match(readFileSync(log, "utf8"), new RegExp(`plugin marketplace add ${checkout}\\n(.*\\n)*plugin install issues@herdr-issues\\n`));
   assert.doesNotMatch(result.stderr, /Claude plugin .* was skipped/);
 });
+
+// Runs setup with a stub node that reports `nodeVersion`, and herdr-app and claude stubs that log each command.
+function runSetupWithNode(folder, nodeVersion, { inWorktree = false } = {}) {
+  const checkout = createCheckout(join(folder, "clone"));
+  const worktree = join(folder, "worktree");
+  if (inWorktree) git(checkout, "worktree", "add", "-q", "-b", "feature", worktree);
+  const home = join(folder, "home");
+  const bin = join(folder, "bin");
+  const log = join(folder, "commands.log");
+  mkdirSync(bin, { recursive: true });
+  symlinkSync(execFileSync("which", ["git"], { encoding: "utf8" }).trim(), join(bin, "git"));
+  for (const command of ["herdr-app", "claude"]) {
+    writeFileSync(join(bin, command), `#!/bin/sh\necho "${command} $*" >>"${log}"\n`, { mode: 0o755 });
+  }
+  writeFileSync(join(bin, "node"), `#!/bin/sh\necho ${nodeVersion}\n`, { mode: 0o755 });
+  const result = spawnSync(join(inWorktree ? worktree : checkout, "setup"), {
+    encoding: "utf8",
+    input: "",
+    env: { HOME: home, HERDR_APP_HOME: join(home, ".config/herdr-app"), PATH: [bin, "/usr/bin", "/bin"].join(":") },
+  });
+  return { result, home, log };
+}
+
+for (const nodeVersion of ["v22.14.0", "v20.19.1", "v18.20.4"]) {
+  test(`setup refuses node ${nodeVersion} before installing anything`, (t) => {
+    const { result, home, log } = runSetupWithNode(temporaryFolder(t), nodeVersion);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, new RegExp(`node ${nodeVersion.slice(1).replaceAll(".", "\\.")} is too old`));
+    assert.match(result.stderr, /needs Node 22\.15 or later/);
+    assert.equal(existsSync(join(home, ".config/herdr-app/mods/issues")), false);
+    assert.equal(existsSync(join(home, ".local/bin/issues")), false);
+    assert.equal(existsSync(log) ? readFileSync(log, "utf8") : "", "");
+  });
+}
+
+// A linked worktree stops setup right after the Node check, before it installs anything.
+for (const nodeVersion of ["v22.15.0", "v23.0.0", "v24.1.0"]) {
+  test(`setup accepts node ${nodeVersion}`, (t) => {
+    const { result } = runSetupWithNode(temporaryFolder(t), nodeVersion, { inWorktree: true });
+
+    assert.equal(result.status, 1);
+    assert.doesNotMatch(result.stderr, /too old/);
+    assert.match(result.stderr, /is a linked worktree/);
+  });
+}
