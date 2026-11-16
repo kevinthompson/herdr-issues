@@ -1,0 +1,11 @@
+#!/bin/bash
+# Git's pre-commit hook, installed by simple-git-hooks through `npm install`'s prepare script.
+#
+# Runs lint-staged, which formats, lints and type-checks what the commit stages (see lint-staged.config.js).
+# Herdr worktrees start without node_modules/, so it installs the locked dependencies first.
+
+set -euo pipefail
+
+[[ -d node_modules ]] || npm ci
+
+npx --no-install lint-staged

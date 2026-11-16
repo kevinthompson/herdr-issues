@@ -45,7 +45,7 @@ install() {
   git -C "$repo_root" merge --quiet --ff-only origin/main
   printf 'Updated %s to %s\n' "$repo_root" "$(git -C "$repo_root" log -1 --format='%h %s')"
 
-  exec "$repo_root/setup"
+  SKIP_DEV_DEPENDENCIES=1 exec "$repo_root/setup"
 }
 
 install "$@"

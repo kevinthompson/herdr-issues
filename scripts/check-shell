@@ -1,0 +1,20 @@
+#!/bin/bash
+# Usage: scripts/check-shell [file...]
+#
+# Checks the repository's shell scripts with `bash -n`, and with shellcheck when it is installed. Without
+# arguments it checks every script the repository ships; the pre-commit hook passes the staged ones.
+
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+if [[ $# -eq 0 ]]; then
+  set -- bootstrap install setup uninstall scripts/demo-setup scripts/check-shell scripts/pre-commit \
+    .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
+fi
+
+bash -n "$@"
+
+if command -v shellcheck >/dev/null; then
+  shellcheck "$@"
+fi

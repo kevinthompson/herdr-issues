@@ -1,3 +1,4 @@
 node_modules/
 package-lock.json
 mod/gpui-kit.d.ts
+.claude/settings.local.json
