@@ -327,7 +327,7 @@ show_layout() {
   local window_layout
   window_layout=$(herdr-app status 2>/dev/null </dev/null | node "$setup_json" window-layout)
   if [[ -n $window_layout ]]; then
-    herdr-app do layout.switch "{\"name\":\"$1\"}" >/dev/null
+    herdr-app 'do' layout.switch "{\"name\":\"$1\"}" >/dev/null
   else
     node "$setup_json" show-layout "$herdr_home/shared.json" "$1"
   fi
