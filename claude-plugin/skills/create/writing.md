@@ -12,6 +12,7 @@ The person settles what the work is and why; you supply everything findable. Don
 3. **Write each issue.** Whatever the destination, an issue is finished when:
    - every acceptance criterion and Verification step is a check an agent may run or observe under the repository's guide, read in step 2: a test, a command's output, or named behavior in the running program when the guide lets an agent try it;
    - checks only the person can make, such as trying a change in the running app when the guide forbids the agent from doing so, go in a **Checks for the person** section as a plain list without checkboxes, never among the criteria or Verification, and the section is left out when there are none;
+   - acceptance criteria describe only what this issue's work must achieve: the working session follows the repository's guide, so they don't restate its standing rules (tests passing, linting, comment conventions, version bumps and the like) or repeat Verification's commands, though a criterion may still name such a rule when the issue needs something the guide doesn't already require, such as a specific version bump the guide leaves to judgment;
    - for a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after;
    - Out of scope names the nearby work a reader might wander into;
    - Context holds what the code doesn't say: the reason for the work and any constraint behind it;
