@@ -8,7 +8,7 @@ import { actionButtonState, DISABLED_OPACITY } from "./action-button-state.js";
 
 export const ACTION_GAP_PX = 4;
 const ICON_PX = 14;
-const BUTTON_HEIGHT_PX = 26;
+export const BUTTON_HEIGHT_PX = 26;
 const BUTTON_WIDTH_PX = 34;
 const PRIMARY_HOVER_OPACITY = 0.85;
 
