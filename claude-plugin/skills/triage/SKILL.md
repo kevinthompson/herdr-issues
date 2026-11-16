@@ -44,9 +44,9 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 8. **Save.**
    - **Status**: for Linear and Beads, set the status the person chose with `issues status <issue ID> <todo or backlog>`, which saves it through the tracker and refreshes the Herdr issues panel; skip it when the status doesn't change.
-   - **Body**: on every tracker, write the full rewritten body to a file in the scratchpad and save it with `issues edit <issue ID> --body-file <file> --body-hash <bodyHash>`, passing the `bodyHash` printed by the `issues show <id> --json` the rewrite was based on. It refuses, changing nothing, when the body changed since that read; then read it again, carry what changed into the rewrite, show the person the difference, and save once they approve.
+   - **Body**: on every tracker, save the full rewritten body with `issues edit <issue ID> --body-hash <bodyHash> --body-file - <<'EOF'`, the body on standard input in the quoted heredoc rather than in a scratchpad file, passing the `bodyHash` printed by the `issues show <id> --json` the rewrite was based on. It refuses, changing nothing, when the body changed since that read; then read it again, carry what changed into the rewrite, show the person the difference, and save once they approve.
    - **Linear**: set the priority the person chose and the blocking relations with `save_issue`, without a description. Post comments with the comment tool.
-   - **GitHub**: leave the issue open and unassigned. Post comments with `gh issue comment`.
+   - **GitHub**: leave the issue open and unassigned. Post comments with `gh issue comment <number> --body-file - <<'EOF'`, the comment on standard input in the quoted heredoc.
    - **Beads**: save priority, blockers and comments as `beads.md` says.
    - **Canceling** (already implemented, duplicate, or the person decides against it): run `issues status <issue ID> canceled` for Linear or GitHub, which closes a GitHub issue as not planned, or close a Beads issue as `beads.md` says, and record why in a comment, with a link to where it lives or the issue it duplicates.
 
