@@ -12,6 +12,10 @@
 //                                 first, a project's milestones under it as { milestones }; absent when
 //                                 it has only one
 //   tracker.list(scopeId)       → Issue[] in that scope, or the default one
+//   tracker.deferred(scopeId)   → the groups (issue.js) whose issues list only once they are expanded
+//   tracker.sections(scopeId)   → the groups the list always shows in that scope, even when empty
+//   tracker.recentlyClosed      how many closed issues list at most, for GitHub and Beads, whose Done
+//                                 and Canceled can't count every closed issue
 //   tracker.get(id)             → Issue, or null
 //   tracker.labels()            → the names of the labels issues can take, as issue.labels names them, for
 //                                 Linear (its team's) and GitHub; Beads has none to choose from

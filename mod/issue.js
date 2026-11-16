@@ -56,15 +56,25 @@ export function loadsFor(isExpanded) {
   return new Set(GROUPS.filter((group) => group.loads && isExpanded(group)).map((group) => group.loads));
 }
 
-// The groups holding issues, each with its sorted issues. A group whose issues weren't listed (its `loads`
-// is in `unloaded`) shows as unloaded, with no issues, whether or not it holds any. With a `label`, groups
-// hold only the issues carrying it, while blockers are still read from every issue.
-export function groupIssues(issues, unloaded = new Set(), label = null) {
+// The groups to show, each with its sorted issues: those in `sections` even when empty, and any other group
+// holding issues. A group whose issues weren't listed (its `loads` is in `unloaded`) shows as unloaded, with
+// no issues, whether or not it holds any. With a `label`, groups hold only the issues carrying it, while
+// blockers are still read from every issue. When the tracker lists at most `recentlyClosed` finished issues
+// and listed that many, Done and Canceled carry that number as their `cap`, since they may hold more.
+export function groupIssues(issues, unloaded = new Set(), label = null, { sections = [], recentlyClosed = null } = {}) {
   const done = new Set(issues.filter((issue) => issue.status === "done").map((issue) => issue.id));
   const shown = label ? issues.filter((issue) => issue.labels.includes(label)) : issues;
+  const closedCapReached = recentlyClosed !== null && issues.filter((issue) => FINISHED.includes(issue.status)).length >= recentlyClosed;
+  const capOf = (group) => (closedCapReached && FINISHED.includes(group.loads) ? recentlyClosed : null);
   return GROUPS.map((group) => unloaded.has(group.loads) ? { ...group, unloaded: true, issues: [] }
-    : { ...group, issues: shown.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) })
-    .filter((group) => group.unloaded || group.issues.length);
+    : { ...group, cap: capOf(group), issues: shown.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) })
+    .filter((group) => group.unloaded || group.issues.length || sections.includes(group.id));
+}
+
+// The count beside a group's title: "20+" for a group capped at 20, or null when its issues weren't listed.
+export function groupCountText(group) {
+  if (group.unloaded) return null;
+  return group.cap ? `${group.cap}+` : String(group.issues.length);
 }
 
 // The Linear icon drawn beside a group or status, or null for one without, such as Unknown status.

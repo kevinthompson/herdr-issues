@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupIssues, holdingBlockers, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
+import { canStartWork, groupCountText, groupIssues, holdingBlockers, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
+import { linearSections } from "../mod/trackers/linear.js";
 
 const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
   ({ id, status, priority, blockedBy, labels: [], order: null, sla: null });
@@ -31,6 +32,45 @@ describe("groupIssues", () => {
     assert.deepEqual(done.issues, []);
     assert.equal(groups.find((group) => group.id === "canceled").unloaded, true);
     assert.equal(groups.find((group) => group.id === "todo").unloaded, undefined);
+  });
+
+  test("keeps the tracker's sections when empty and drops other empty groups", () => {
+    const groups = groupIssues([issue("#1", "todo")], new Set(), null, { sections: ["in-progress", "todo", "done"] });
+    assert.deepEqual(groupIds(groups), { "in-progress": [], todo: ["#1"], done: [] });
+  });
+
+  test("shows Unknown status only when it holds issues", () => {
+    const sections = ["todo"];
+    assert.deepEqual(groupIds(groupIssues([], new Set(), null, { sections })), { todo: [] });
+    assert.deepEqual(groupIds(groupIssues([issue("#1", "started")], new Set(), null, { sections })), { todo: [], unknown: ["#1"] });
+  });
+
+  test("counts a group's issues, including none, and none while its issues weren't listed", () => {
+    const groups = groupIssues([issue("#1", "todo")], new Set(["done"]), null, { sections: ["in-progress", "todo", "done"] });
+    assert.deepEqual(groups.map(groupCountText), ["0", "1", null]);
+  });
+
+  test("counts Done and Canceled as the cap and + once the tracker listed as many closed issues as it lists at most", () => {
+    const closed = [issue("#1", "done"), issue("#2", "done"), issue("#3", "canceled")];
+    const capped = groupIssues(closed, new Set(), null, { sections: ["todo", "done", "canceled"], recentlyClosed: 3 });
+    assert.deepEqual(capped.map(groupCountText), ["0", "3+", "3+"]);
+    const below = groupIssues(closed, new Set(), null, { sections: ["done", "canceled"], recentlyClosed: 4 });
+    assert.deepEqual(below.map(groupCountText), ["2", "1"]);
+  });
+
+  test("counts only the issues carrying the label the list is narrowed to", () => {
+    const labeled = { ...issue("#2", "todo"), labels: ["bug"] };
+    const groups = groupIssues([issue("#1", "todo"), labeled], new Set(), "bug", { sections: ["in-progress", "todo"] });
+    assert.deepEqual(groups.map(groupCountText), ["0", "1"]);
+  });
+});
+
+describe("linearSections", () => {
+  test("shows Triage only in the scopes that list triage issues", () => {
+    assert.equal(linearSections("team")[0], "triage");
+    assert.equal(linearSections("triage")[0], "triage");
+    assert.equal(linearSections("mine").includes("triage"), false);
+    assert.deepEqual(linearSections("mine"), ["in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"]);
   });
 });
 
