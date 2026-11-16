@@ -21,17 +21,17 @@ test("My issues is named by its label alone", () => {
 });
 
 test("a team's lists and saved views are named after the team", () => {
-  assert.equal(listedScopeName(linear, "triage"), "Web > Triage");
-  assert.equal(listedScopeName(linear, "team"), "Web > Issues");
-  assert.equal(listedScopeName(linear, "view:v1"), "Web > Bugs");
+  assert.equal(listedScopeName(linear, "triage"), "Web › Triage");
+  assert.equal(listedScopeName(linear, "team"), "Web › Issues");
+  assert.equal(listedScopeName(linear, "view:v1"), "Web › Bugs");
 });
 
 test("a project is named after the team, not its projects group", () => {
-  assert.equal(listedScopeName(linear, "project:p1"), "Web > Checkout redesign");
+  assert.equal(listedScopeName(linear, "project:p1"), "Web › Checkout redesign");
 });
 
 test("a selected milestone follows its project", () => {
-  assert.equal(listedScopeName(linear, "project:p1:m1"), "Web > Checkout redesign > Milestone 1");
+  assert.equal(listedScopeName(linear, "project:p1:m1"), "Web › Checkout redesign › Milestone 1");
 });
 
 test("a scope that no longer exists names the default scope", () => {
@@ -52,10 +52,10 @@ test("before a tracker is known, the name falls back to plain text", () => {
 test("the header titles each tracker by the repository's name, then the tracker's name, without the owner", () => {
   assert.equal(
     headerTitleText({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, "herdr-issues"),
-    "herdr-issues > GitHub",
+    "herdr-issues › GitHub",
   );
-  assert.equal(headerTitleText({ name: "Linear", scopes: [] }, "calendar"), "calendar > Linear");
-  assert.equal(headerTitleText({ name: "Beads" }, "notes"), "notes > Beads");
+  assert.equal(headerTitleText({ name: "Linear", scopes: [] }, "calendar"), "calendar › Linear");
+  assert.equal(headerTitleText({ name: "Beads" }, "notes"), "notes › Beads");
 });
 
 test("before the name setting loads, the header shows only the tracker's name", () => {
