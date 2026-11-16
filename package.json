@@ -3,10 +3,12 @@
   "type": "module",
   "scripts": {
     "test": "node --test --import ./test/support/register.js \"test/**/*.test.js\"",
+    "typecheck": "[ -f mod/gpui-kit.d.ts ] || herdr-app check \"$PWD/mod\"; tsc -p mod/jsconfig.json",
     "format": "prettier --write . bin/issues",
     "format:check": "prettier --check . bin/issues"
   },
   "devDependencies": {
-    "prettier": "3.9.10"
+    "prettier": "3.9.10",
+    "typescript": "7.0.2"
   }
 }

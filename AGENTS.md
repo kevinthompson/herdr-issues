@@ -6,7 +6,7 @@ This repository holds two things that ship together: the Herdr app's issues pane
 
 Each file opens with a comment saying what it does; read that before changing it. A change that adds a file or a command describes it in that file's opening comment (or `USAGE` in `cli/main.js`), not here, unless it adds a top-level folder.
 
-- `mod/`: the Herdr mod, loaded as `issues`. `mod.json` declares it, `main.js` is the panel, and `keys.json` holds the key bindings `setup` merges into Herdr's. Herdr generates the git-ignored `gpui-kit.d.ts` and `jsconfig.json` here.
+- `mod/`: the Herdr mod, loaded as `issues`. `mod.json` declares it, `main.js` is the panel, and `keys.json` holds the key bindings `setup` merges into Herdr's. `jsconfig.json` is the committed type-check configuration; Herdr generates the git-ignored `gpui-kit.d.ts` here, and `npm run typecheck` runs the check.
 - `mod/trackers/`: the backends for Linear, GitHub Issues and Beads, all returning the shapes `index.js` documents; `setting.js` reads each repository's entry in `~/.config/herdr-app/issues.json`.
 - `bin/issues` and `cli/`: the `issues` CLI, which runs the mod's own modules in Node with `cli/herdr.js` standing in for the app's `herdr` module. `issues --help` lists its commands.
 - `test/`: `npm test`'s tests; `test/support/` isolates them from the person's home folder, git configuration and Keychain.
