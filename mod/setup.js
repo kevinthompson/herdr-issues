@@ -180,6 +180,12 @@ export function notARepositoryView({ initializing, error, onInitialize }, t) {
   );
 }
 
+// For a loaded scope with no issues, pointing at the skills that write them.
+/** @param {Theme} t */
+export function emptyListView(t) {
+  return blankState({ sentence: "Run /issues:plan or /issues:create in Claude Code to begin making issues." }, t);
+}
+
 /**
  * @param {SelectOption[]} choices
  * @param {string | null | undefined} id
