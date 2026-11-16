@@ -52,6 +52,7 @@ import {
  * @property {{ id: string, name: string, avatarUrl: string | null } | null} delegate
  * @property {LinearState} state
  * @property {{ id: string }} team
+ * @property {{ id: string, name: string, color: string } | null} [project]
  * @property {{ nodes: (LinearLabel & { color: string })[] }} labels
  * @property {{ nodes: { type: string, issue: { identifier: string, state: LinearState } }[] }} inverseRelations
  * @property {LinearAttachments} attachments
@@ -106,6 +107,7 @@ const TEAM_TTL_MS = 10 * 60 * 1000;
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt dueDate url
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { id name avatarUrl } delegate { id name avatarUrl }
   state { type name } team { id }
+  project { id name color }
   labels(first: 10) { nodes { name color parent { name } } }
   inverseRelations(first: 20) { nodes { type issue { identifier state { type name } } } }
   attachments(first: 10) { nodes { url title sourceType metadata } }`;
@@ -460,6 +462,7 @@ function toIssue(node, repoName) {
         .filter((label) => label.parent)
         .map((label) => [labelName(label), { group: label.parent.name, value: label.name }]),
     ),
+    project: node.project ? { id: node.project.id, name: node.project.name, color: node.project.color } : null,
     // Linear keeps finished blockers as relations; only the unfinished ones still block.
     blockedBy: node.inverseRelations.nodes
       .filter((relation) => relation.type === "blocks" && !isFinished(relation.issue.state))
