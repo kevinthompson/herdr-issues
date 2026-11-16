@@ -3,6 +3,7 @@
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 
+/** @import { NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
 
 const DROPDOWN_MAX_PX = 260;
@@ -32,6 +33,29 @@ function dropdown(id, label, onClick, t) {
     .on_click(() => onClick())
     .child(div().min_w(0).truncate().child(label))
     .child(div().flex_none().text_color(t.dim).child("▾"));
+}
+
+/**
+ * A row with `leading` on the left and the dropdown aligned to the right, as the settings view's Back and scope
+ * picker are shown.
+ * @param {string} id
+ * @param {NativeElement} leading
+ * @param {string} shown
+ * @param {() => void} onClick
+ * @param {Theme} t
+ */
+export function leadingFilterRow(id, leading, shown, onClick, t) {
+  return h_flex()
+    .flex_none()
+    .px(14)
+    .py(8)
+    .gap(8)
+    .items_center()
+    .border_b(1)
+    .border_color(t.border)
+    .child(leading)
+    .child(div().flex_1())
+    .child(dropdown(id, shown, onClick, t).flex_shrink(1).max_w(DROPDOWN_MAX_PX));
 }
 
 /**
