@@ -41,7 +41,8 @@
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
 // tracker with saveTrackerChoice, its merge and complete with saveMergeSettings, its close with saveCloseSetting, its
 // name with saveNameSetting, its pollSeconds, spaceName and worktreeSetup with saveRepositorySettings, its model
-// and effort settings with saveAgentSettings, and its workPrompt with saveWorkPrompt.
+// and effort settings with saveAgentSettings, and its workPrompt with saveWorkPrompt; it changes the top level
+// with saveTopLevelSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -422,4 +423,26 @@ export async function saveWorkPrompt(main, prompt) {
     if (!trimmed) delete changed.workPrompt;
     return changed;
   });
+}
+
+export const TOP_LEVEL_KEYS = ["merge", "complete", "close", "spaceName", "pollSeconds", "updateCheckHours", "workModel", "workEffort", "workPrompt"];
+
+// Sets the settings in `changes`, any of TOP_LEVEL_KEYS, at the top level of issues.json, creating the file if
+// needed. Text is trimmed, and a null or blank value removes the key, so each repository's own value or the
+// default applies. It keeps repos and every other top-level key, and writes nothing for a key it doesn't take or a
+// top level readCheckedSettings would refuse once changed.
+export async function saveTopLevelSettings(changes) {
+  const unknown = Object.keys(changes).find((key) => !TOP_LEVEL_KEYS.includes(key));
+  if (unknown) throw badSetting(`${unknown} isn't a setting for every repository`);
+  const cleaned = Object.entries(changes).map(([key, value]) => [key, typeof value === "string" ? value.trim() || null : value ?? null]);
+  const previous = await readTextFile(settingsPath()).catch(() => null);
+  const { repos, ...settings } = previous === null ? {} : parseSettings(previous);
+  for (const [key, value] of cleaned) {
+    if (value == null) delete settings[key];
+    else settings[key] = value;
+  }
+  checkTopLevel(settings);
+  const text = `${JSON.stringify({ ...settings, ...(repos !== undefined && { repos }) }, null, 2)}\n`;
+  await writeTextFile(settingsPath(), text, previous);
+  forgetLookups();
 }
