@@ -43,7 +43,8 @@ Commands:
                            Print the n highest-ranked issues ready to start, nothing blocking them, in a scope or the
                            default one: ID and title; fewer when fewer qualify
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
-  tab rename <id> <name>   Rename that tab after the issue, unless the person named it
+  tab rename <id> <name>   Rename that tab after the issue, unless the person named it (it isn't Claude or a number),
+                           prefixed with the issue's ID when its space isn't named after the issue
   mark <working|waiting|done> <id>
                            Start the name of the space holding $HC_TERMINAL_ID with the state's mark, replacing a mark
                            already there; leave a space not named after the issue as it is
@@ -76,7 +77,8 @@ Commands:
   merge --check <id>       Make every check merge makes, including a trial merge that changes no checkout, and change
                            nothing: exit 0 when merge would go through, else print merge's refusal and exit 1
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
-                           The statuses: ${STATUSES.join(", ")}
+                           The statuses: ${STATUSES.join(", ")}. On GitHub, done closes the issue as completed,
+                           canceled closes it as not planned, and any other status reopens it
   start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
   edit <id> --body-file <file> --body-hash <hash>
                            Save the file, or standard input when <file> is -, as the issue's body and refresh the
