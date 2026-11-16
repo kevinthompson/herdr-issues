@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 if [[ $# -eq 0 ]]; then
-  set -- bootstrap install setup uninstall scripts/demo-setup scripts/check-shell scripts/pre-commit \
+  set -- bootstrap install setup uninstall scripts/check-shell scripts/pre-commit \
     .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
 fi
 
