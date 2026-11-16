@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import { forgetLookups } from "../mod/lookups.js";
-import { saveTopLevelSettings, settingsPath, topLevelSettings } from "../mod/trackers/setting.js";
+import { parseUpdateCheckHours, saveTopLevelSettings, settingsPath, topLevelSettings } from "../mod/trackers/setting.js";
 
 function writeSettings(settings) {
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
@@ -70,4 +70,13 @@ test("changing merge with complete together is checked as a pair", async () => {
   await saveTopLevelSettings({ merge: "auto", complete: null });
 
   assert.deepEqual(readSettings(), { merge: "auto", repos });
+});
+
+test("a typed update check interval is a whole number of hours, 1 or more, or blank", () => {
+  assert.equal(parseUpdateCheckHours(" 12 "), 12);
+  assert.equal(parseUpdateCheckHours("1"), 1);
+  assert.equal(parseUpdateCheckHours("  "), null);
+  for (const text of ["0", "1.5", "-2", "six"]) {
+    assert.throws(() => parseUpdateCheckHours(text), /whole number of hours, 1 or more/);
+  }
 });

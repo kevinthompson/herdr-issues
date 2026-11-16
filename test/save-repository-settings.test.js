@@ -22,7 +22,7 @@ test("a repository's settings open on its entry's values and the top level's pol
   const repository = createRepository(temporaryFolder(t));
   writeSettings({ pollSeconds: 120, repos: { [repository]: { tracker: "beads", spaceName: "<issueId>!", worktreeSetup: "npm install" } } });
   assert.deepEqual(await repositorySettings({ root: repository, on: null }), {
-    pollSeconds: null, spaceName: "<issueId>!", worktreeSetup: "npm install", topLevelPollSeconds: 120,
+    pollSeconds: null, spaceName: "<issueId>!", worktreeSetup: "npm install", topLevelPollSeconds: 120, topLevelSpaceName: null,
   });
 });
 

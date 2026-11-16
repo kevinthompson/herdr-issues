@@ -339,8 +339,8 @@ export async function saveNameSetting(main, name) {
 
 export const REPOSITORY_KEYS = ["pollSeconds", "spaceName", "worktreeSetup"];
 
-// The entry's own pollSeconds, spaceName and worktreeSetup, null where unset or blank, and topLevelPollSeconds,
-// the top level's pollSeconds, which applies without the entry's, null where unset.
+// The entry's own pollSeconds, spaceName and worktreeSetup, null where unset or blank, and topLevelPollSeconds and
+// topLevelSpaceName, the top level's, which apply without the entry's, null where unset or blank.
 export async function repositorySettings(project) {
   const setting = await trackerSetting(project), settings = await readCheckedSettings();
   return {
@@ -348,17 +348,30 @@ export async function repositorySettings(project) {
     spaceName: setting?.spaceName?.trim() || null,
     worktreeSetup: setting?.worktreeSetup?.trim() || null,
     topLevelPollSeconds: settings?.pollSeconds ?? null,
+    topLevelSpaceName: settings?.spaceName?.trim() || null,
   };
+}
+
+// A whole number typed as `text`, of at least `minimum`: null when it's blank, else the number. It throws
+// `problem` for anything else.
+function parseWholeNumber(text, minimum, problem) {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const number = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
+  if (!(number >= minimum)) throw badSetting(problem);
+  return number;
 }
 
 // The pollSeconds typed as `text`: null when it's blank, else the number. It throws for anything trackerSetting
 // would refuse.
 export function parsePollSeconds(text) {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const seconds = /^\d+$/.test(trimmed) ? Number(trimmed) : NaN;
-  if (!(seconds >= MIN_POLL_SECONDS)) throw badSetting(`The poll interval must be a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
-  return seconds;
+  return parseWholeNumber(text, MIN_POLL_SECONDS, `The poll interval must be a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
+}
+
+// The updateCheckHours typed as `text`: null when it's blank, else the number. It throws for anything the top
+// level would refuse.
+export function parseUpdateCheckHours(text) {
+  return parseWholeNumber(text, MIN_UPDATE_CHECK_HOURS, `The update check interval must be a whole number of hours, ${MIN_UPDATE_CHECK_HOURS} or more`);
 }
 
 function checkRepositoryChanges(changes) {

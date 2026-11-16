@@ -7,11 +7,12 @@
 // worktree, its close; the command run in each new worktree, its worktreeSetup; the name of each issue's space, its
 // spaceName; how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10
 // seconds before it can be saved; then the model and effort of the sessions that work its issues, its workModel
-// and workEffort, whose choice that removes them from the entry is labeled with the top level's value or the
-// default; and last the text appended to those sessions' system prompt, its workPrompt, in a soft-wrapped textarea
-// several rows tall with the top level's prompt, if any, as placeholder, where emptying it removes it from the
+// and workEffort, whose choice that removes them from the entry is labeled with the global value, such as
+// "Global (opus)", or the default; and last the text appended to those sessions' system prompt after the global
+// prompt, its workPrompt, in a soft-wrapped textarea several rows tall, where emptying it removes it from the
 // entry. Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what applies without it as
-// the placeholder. It opens on the settings in effect, defaults applied, as `issues setting` prints them. Save
+// the placeholder, naming the global value where one is set. It opens on the settings in effect, the global
+// values and defaults applied, as `issues setting` prints them. Save
 // waits for a different tracker's check to pass and, for Linear, a team, and writes only the changed keys
 // (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
 // saveAgentSettings and saveWorkPrompt in setting.js).
@@ -38,11 +39,11 @@ const NAME_SENTENCE = "The name of the space opened on the main checkout, which 
 
 const REPOSITORY_QUESTIONS = [
   { key: "worktreeSetup", title: "Worktree setup command", sentence: "A shell command run in each new issue worktree, such as npm install. Leave it empty to run nothing." },
-  { key: "spaceName", title: "Issue space name", sentence: "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to name spaces after the issue's ID." },
-  { key: "pollSeconds", title: "Poll interval", sentence: "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the top level's interval or the default." },
+  { key: "spaceName", title: "Issue space name", sentence: "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to use the global name, or the issue's ID without one." },
+  { key: "pollSeconds", title: "Poll interval", sentence: "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the global interval or the default." },
 ];
 
-const WORK_PROMPT_SENTENCE = "Instructions appended to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use the top level's prompt, if any.";
+const WORK_PROMPT_SENTENCE = "Instructions appended after the global prompt, if any, to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use only the global prompt.";
 
 // Where the listed issues come from now, such as "Linear team WEB".
 function currentTrackerLabel({ kind, team, repo }) {
@@ -97,7 +98,7 @@ export class RepositorySettings extends SettingsForm {
         this.agentSources = agent;
         this.openAgent(Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry])));
         this.savedWorkPrompt = workPrompt.entry;
-        this.workPromptInput = TextareaState.new({ placeholder: workPrompt.topLevel ?? "No prompt", value: workPrompt.entry ?? "", rows: WORK_PROMPT_ROWS });
+        this.workPromptInput = TextareaState.new({ placeholder: "No prompt for this repository", value: workPrompt.entry ?? "", rows: WORK_PROMPT_ROWS });
         this.workPromptInput.set_soft_wrap(true);
         this.workPromptInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
       } catch (e) { this.error = String(e.message ?? e); }
@@ -109,8 +110,8 @@ export class RepositorySettings extends SettingsForm {
   // without it as the placeholder.
   newRepositoryInputs(repository) {
     const placeholders = {
-      pollSeconds: String(repository.topLevelPollSeconds ?? DEFAULT_POLL_SECONDS),
-      spaceName: "<issueId>",
+      pollSeconds: repository.topLevelPollSeconds != null ? `Global (${repository.topLevelPollSeconds})` : String(DEFAULT_POLL_SECONDS),
+      spaceName: repository.topLevelSpaceName != null ? `Global (${repository.topLevelSpaceName})` : "<issueId>",
       worktreeSetup: "No command",
     };
     return Object.fromEntries(REPOSITORY_KEYS.map((key) => {
@@ -204,7 +205,7 @@ export class RepositorySettings extends SettingsForm {
     return this.repositoryInputs ? this.typedPollSeconds().problem ?? null : null;
   }
 
-  // The typed prompt, trimmed, or null when the textarea is empty, so the top level's prompt applies.
+  // The typed prompt, trimmed, or null when the textarea is empty, so only the global prompt applies.
   typedWorkPrompt() {
     return this.workPromptInput?.value().trim() || null;
   }
@@ -272,7 +273,7 @@ export class RepositorySettings extends SettingsForm {
   // What applies without the entry's model or effort.
   agentClearLabel(key) {
     const { topLevel } = this.agentSources[key];
-    return topLevel != null ? `Top level (${topLevel})` : `Default (${AGENT_DEFAULTS[key]})`;
+    return topLevel != null ? `Global (${topLevel})` : `Default (${AGENT_DEFAULTS[key]})`;
   }
 
   // The tracker in use, the chosen one's check, and Linear's team once Linear is checked.
