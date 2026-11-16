@@ -40,8 +40,9 @@ Commands:
                            default one: ID and title; fewer when fewer qualify
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
-  complete <id>            Mark the session finished: label $HC_TERMINAL_ID issues.complete=<id> and prefix its tab's
-                           name with ✅, even a name the person chose, once
+  complete <id>            Mark the session done working, handed off to the person: label $HC_TERMINAL_ID
+                           issues.complete=<id> and prefix its tab's name with ✅, even a name the person chose, once;
+                           it says nothing about the branch, which removing the worktree checks for itself
   complete --cancel <id>   Withdraw that when the work continues: remove the issues.complete label from $HC_TERMINAL_ID
                            and the ✅ from its tab's name
   close <id>               Ask the issues panel to close the session's space once $HC_TERMINAL_ID is idle: label it

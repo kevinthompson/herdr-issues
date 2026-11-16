@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks, sessionComplete } from "../mod/removal.js";
+import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks } from "../mod/removal.js";
 
 const mergedBranch = { branch: "feature", bases: ["main", "origin/main"], mergedInto: "main", unpushed: 0, pullRequest: null };
 const cleanChecks = { dirty: false, submodules: [], branch: mergedBranch };
@@ -47,11 +47,11 @@ describe("removesWithoutAsking", () => {
     assert.equal(removesWithoutAsking(cleanChecks, 0), true);
   });
 
-  test("is true for a complete session without a branch check", () => {
-    assert.equal(removesWithoutAsking({ dirty: false, submodules: [], complete: true }, 0), true);
+  test("is true for a pushed branch with an open pull request", () => {
+    assert.equal(removesWithoutAsking({ ...cleanChecks, branch: { ...mergedBranch, mergedInto: null, pullRequest: "#7" } }, 0), true);
   });
 
-  test("is false while a check runs", () => {
+  test("is false while a check runs, the branch check included", () => {
     assert.equal(removesWithoutAsking({ dirty: false, submodules: [] }, 0), false);
   });
 
@@ -122,70 +122,24 @@ describe("removalVerdict", () => {
   });
 });
 
-describe("sessionComplete", () => {
-  const space = { id: "s1", tabs: [{ id: "tab1" }] };
-  const panes = [{ tab: "tab1", terminal: "t1" }, { tab: "tab2", terminal: "t2" }, { tab: "tab1", terminal: null, mod: "issues" }];
-
-  test("is true when a terminal in the space carries the complete label", () => {
-    assert.equal(sessionComplete(space, panes, [{ address: "t1", labels: { "issues.complete": "#7" } }]), true);
-  });
-
-  test("is false without the label, or when only another space's terminal has it", () => {
-    assert.equal(sessionComplete(space, panes, [{ address: "t1", labels: { where: "x" } }, { address: "t3" }]), false);
-    assert.equal(sessionComplete(space, panes, [{ address: "t2", labels: { "issues.complete": "#7" } }]), false);
-  });
-});
-
 describe("runChecks", () => {
-  const run = async (complete, lookups = {}) => {
+  const run = async (lookups = {}) => {
     const answers = {};
     const looked = [];
     const lookup = (name, result) => async () => { looked.push(name); return result; };
     await runChecks({ dirty: lookup("dirty", false), submodules: lookup("submodules", []), branch: lookup("branch", mergedBranch), ...lookups },
-      { complete }, (name, result) => { answers[name] = result; });
+      (name, result) => { answers[name] = result; });
     return { answers, looked };
   };
 
-  test("checks the branch when the session isn't complete", async () => {
-    const { looked, answers } = await run(false);
+  test("runs every check, the branch included", async () => {
+    const { looked, answers } = await run();
     assert.deepEqual(looked.sort(), ["branch", "dirty", "submodules"]);
     assert.equal(checksAnswered(answers), true);
   });
 
-  test("skips the branch check for a complete session and still answers", async () => {
-    const { looked, answers } = await run(true);
-    assert.deepEqual(looked.sort(), ["dirty", "submodules"]);
-    assert.equal(checksAnswered({ ...answers, complete: true }), true);
-    assert.equal(checksAnswered(answers), false);
-  });
-
   test("answers a lookup that fails with its error", async () => {
-    const { answers } = await run(true, { dirty: () => { throw new Error("no git"); } });
+    const { answers } = await run({ dirty: () => { throw new Error("no git"); } });
     assert.deepEqual(answers.dirty, { error: "no git" });
-  });
-});
-
-describe("a complete session", () => {
-  const complete = { dirty: false, submodules: [], complete: true };
-
-  test("shows no branch findings, only that the session checked the branch", () => {
-    assert.deepEqual(removalFindings({ ...complete, branch: { ...mergedBranch, mergedInto: null, unpushed: 3 } }).map((finding) => finding.text), [
-      "It has no uncommitted changes.",
-      "Its submodules have no commits that aren't pushed.",
-      "Its session finished with issues complete, which checked the branch.",
-    ]);
-    assert.equal(verdictOf(complete), "✅");
-  });
-
-  test("is still ❌ with uncommitted changes", () => {
-    assert.equal(verdictOf({ ...complete, dirty: true }), "❌");
-  });
-
-  test("is still ❌ with unpushed submodule commits", () => {
-    assert.equal(verdictOf({ ...complete, submodules: ["vendor/lib"] }), "❌");
-  });
-
-  test("is still ⚠️ when its submodules couldn't be checked", () => {
-    assert.equal(verdictOf({ ...complete, submodules: { error: "no git" } }), "⚠️");
   });
 });

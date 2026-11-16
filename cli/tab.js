@@ -1,7 +1,8 @@
 // `issues tab`: the Herdr tab holding this session's terminal ($HC_TERMINAL_ID), and renaming it after the
 // issue the session works, as /issues:work does. A tab the person named keeps its name. `issues complete` labels
-// the terminal and marks the tab, whatever its name, with ✅ once the session's work is finished, which
-// `issues complete --cancel` withdraws when the person asks for more changes, and `issues close`
+// the terminal and marks the tab, whatever its name, with ✅ once the session is done working and has handed off to
+// the person, whether or not its branch has landed, which `issues complete --cancel` withdraws when the person asks
+// for more changes, and `issues close`
 // labels it to ask the panel to close the session's space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
 
