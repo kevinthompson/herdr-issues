@@ -609,7 +609,8 @@ export default class Issues extends View {
   }
 
   // A fresh Claude session, or a shell without Claude Code, in a new worktree space on the issue's branch, working the issue with /issues:work.
-  // Without a branch, the worktree dialog asks for one. The tracker saves the start while the worktree opens.
+  // Without a branch, the worktree dialog asks for one. The tracker saves the start while the worktree opens, and the
+  // list shows it as soon as it's saved, since opening can take many seconds.
   startWork(issue, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable) { this.detailError = "Can't mark this issue in progress here"; cx.notify(); return; }
@@ -620,7 +621,7 @@ export default class Issues extends View {
         const opening = opensWithIssuesWorktree(issue, this.project)
           ? this.openWithIssuesWorktree(issue)
           : this.spaceName(issue).then((spaceName) => this.openWorktreeDialog(issue, spaceName)).then(() => null);
-        const starting = tracker.start(issue).then(() => null, (e) => `Could not start: ${e.message ?? e}`);
+        const starting = tracker.start(issue).then(() => { this.refresh(cx); return null; }, (e) => `Could not start: ${e.message ?? e}`);
         const [openError, startError] = await Promise.all([opening, starting]);
         this.detailError = startError ?? openError;
         this.refresh(cx);

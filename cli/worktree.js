@@ -5,7 +5,8 @@
 // keeps its name. The worktree is the branch's existing one, else a new
 // checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. With --claude, the space
 // opens a Claude session on the repository's workModel and workEffort settings. A new worktree gets a copy of the main
-// checkout's .claude/settings.local.json before the repository's worktreeSetup command runs.
+// checkout's .claude/settings.local.json before the repository's worktreeSetup command runs. Given an issue rather
+// than a branch, `issues worktree` first marks it in progress when it's in triage, backlog or todo (main.js).
 import { spawn } from "node:child_process";
 import { access, copyFile, mkdir, readFile, rename, rmdir, stat, writeFile } from "node:fs/promises";
 import { rmdirSync } from "node:fs";
