@@ -443,7 +443,7 @@ export class WorktreeDialog {
       );
   }
 
-  render(cx) {
+  render() {
     const t = theme();
     if (this.opening) return this.renderOpen(t);
     const remove = props()?.action === "remove";

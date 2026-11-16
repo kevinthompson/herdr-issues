@@ -58,7 +58,12 @@ async function trackerWith(t, records, { installed = true, initialized = true } 
         return ok(
           records
             .filter((each) => statuses.includes(each.status))
-            .map(({ description, dependencies, ...listed }) => listed),
+            .map((each) => {
+              const listed = { ...each };
+              delete listed.description;
+              delete listed.dependencies;
+              return listed;
+            }),
         );
       }
       if (subcommand === "show") {

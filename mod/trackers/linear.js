@@ -54,8 +54,6 @@ const MY_ISSUES = `query($state: WorkflowStateFilter, $first: Int!, $after: Stri
 const TEAM_ISSUES = `query($team: String!, $state: WorkflowStateFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, state: $state }) { ${PAGE} } }`;
 const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData } }`;
-const FILTERED_ISSUES = `query($filter: IssueFilter, $first: Int!, $after: String) {
-  issues(first: $first, after: $after, filter: $filter) { ${PAGE} } }`;
 const FILTERED_ISSUES_IN_STATE = `query($filter: IssueFilter!, $state: WorkflowStateFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { and: [$filter, { state: $state }] }) { ${PAGE} } }`;
 const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
