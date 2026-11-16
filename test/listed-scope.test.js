@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { listedScopeName, headerTitlePieces } from "../mod/listed-scope.js";
+import { listedScopeName, headerTitleText } from "../mod/listed-scope.js";
 import { scopesFor } from "../mod/trackers/linear.js";
 
 const project = {
@@ -50,14 +50,14 @@ test("before a tracker is known, the name falls back to plain text", () => {
 });
 
 test("the header titles each tracker by the repository's name, then the tracker's name, without the owner", () => {
-  assert.deepEqual(headerTitlePieces({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, "herdr-issues"), [
-    "herdr-issues",
-    "GitHub",
-  ]);
-  assert.deepEqual(headerTitlePieces({ name: "Linear", scopes: [] }, "calendar"), ["calendar", "Linear"]);
-  assert.deepEqual(headerTitlePieces({ name: "Beads" }, "notes"), ["notes", "Beads"]);
+  assert.equal(
+    headerTitleText({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, "herdr-issues"),
+    "herdr-issues / GitHub",
+  );
+  assert.equal(headerTitleText({ name: "Linear", scopes: [] }, "calendar"), "calendar / Linear");
+  assert.equal(headerTitleText({ name: "Beads" }, "notes"), "notes / Beads");
 });
 
 test("before the name setting loads, the header shows only the tracker's name", () => {
-  assert.deepEqual(headerTitlePieces({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, null), ["GitHub"]);
+  assert.equal(headerTitleText({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, null), "GitHub");
 });

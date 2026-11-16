@@ -49,7 +49,7 @@ import { offeredUpdate, dismissUpdate, installTab, finishedUpdate } from "./upda
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { listedScopeName, headerTitlePieces } from "./listed-scope.js";
+import { listedScopeName, headerTitleText } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
 import { filterRow } from "./filter-row.js";
 import {
@@ -69,7 +69,8 @@ import {
   dueStatus,
   PRIORITIES,
 } from "./issue.js";
-import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
+import { issueDetail, issueLinks, workButton, labelChips, button } from "./detail.js";
+import { collapseButton, headerBar, iconButton, HEADER_HEIGHT_PX, ICON_BUTTON_PX } from "./header.js";
 import {
   FieldMenu,
   ScopeMenu,
@@ -206,21 +207,8 @@ function withLoadedBodies(issues, previous) {
  * @param {(cx: Context) => void} onClick
  * @param {Theme} t
  */
-function settingsButton(onClick, t) {
-  return div()
-    .id("issues-settings-open")
-    .flex_none()
-    .size(24)
-    .flex()
-    .items_center()
-    .justify_center()
-    .rounded(6)
-    .tooltip("Settings")
-    .cursor_pointer()
-    .hover((s) => s.bg(t.hover))
-    .on_click((_e, cx) => onClick(cx))
-    .child(svg("mods/issues/icons/settings.svg").size(15).text_color(t.foreground));
-}
+const settingsButton = (onClick, t) =>
+  iconButton({ id: "issues-settings-open", icon: "settings", tooltip: "Settings", onClick }, t);
 
 /**
  * @param {number} count
@@ -235,8 +223,6 @@ const pullRequestBadge = (count, t) =>
     .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(11))
     .child(div().child(String(count)));
 
-const REFRESH_ICON_PX = 15,
-  ALERT_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
 const GROUP_REFRESH_ICON_PX = 11,
@@ -1164,27 +1150,22 @@ export default class Issues extends View {
 
   /** @param {Theme} t */
   refreshButton(t) {
-    const busy = this.busy(),
-      icon = svg("mods/issues/icons/rotate-cw.svg").size(REFRESH_ICON_PX);
-    return div()
-      .id("issues-refresh")
-      .flex_none()
-      .size(24)
-      .flex()
-      .items_center()
-      .justify_center()
-      .rounded(6)
-      .tooltip("Refresh")
-      .when(!busy, (e) =>
-        e
-          .cursor_pointer()
-          .hover((s) => s.bg(t.hover))
-          .on_click((_e, cx) => {
-            this.refreshView(cx);
-            cx.notify();
-          }),
-      )
-      .child(busy ? icon.text_color(t.dim).spin(SYNC_SPIN_MS) : icon.text_color(t.foreground));
+    const busy = this.busy();
+    return iconButton(
+      {
+        id: "issues-refresh",
+        icon: "rotate-cw",
+        tooltip: "Refresh",
+        spin: busy ? SYNC_SPIN_MS : undefined,
+        onClick: busy
+          ? null
+          : (cx) => {
+              this.refreshView(cx);
+              cx.notify();
+            },
+      },
+      t,
+    );
   }
 
   // An alert while any edit failed to save, which a click dismisses.
@@ -1192,20 +1173,19 @@ export default class Issues extends View {
   failedEditAlert(t) {
     const failed = this.projectEdits().filter(([, edit]) => edit.failed);
     if (!failed.length) return null;
-    return div()
-      .id("issues-edit-failed")
-      .flex_none()
-      .size(24)
-      .flex()
-      .items_center()
-      .justify_center()
-      .cursor_pointer()
-      .tooltip(`${failed.map(([, edit]) => edit.failed).join("\n")}\nClick to dismiss.`)
-      .on_click((_e, cx) => {
-        forgetEdits(failed.map(([id]) => id));
-        cx.notify();
-      })
-      .child(svg("mods/issues/icons/circle-alert.svg").size(ALERT_ICON_PX).text_color(t.ansi1));
+    return iconButton(
+      {
+        id: "issues-edit-failed",
+        icon: "circle-alert",
+        color: t.ansi1,
+        tooltip: `${failed.map(([, edit]) => edit.failed).join("\n")}\nClick to dismiss.`,
+        onClick: (cx) => {
+          forgetEdits(failed.map(([id]) => id));
+          cx.notify();
+        },
+      },
+      t,
+    );
   }
 
   // Starting and continuing work wait on the tracker and issues worktree, so the footer says what they're doing meanwhile.
@@ -1771,26 +1751,6 @@ export default class Issues extends View {
     return findScope(scopes, this.listedScope) ?? { scope: scopes[0], project: null, milestone: null };
   }
 
-  // Each title piece after its ">": every piece but the source truncates, so a long name shrinks before it.
-  /**
-   * @param {import("gpui-kit").Element} header
-   * @param {Theme} t
-   */
-  headerTitle(header, t) {
-    const pieces = headerTitlePieces(this.tracker, this.repositoryName);
-    return pieces.reduce(
-      (row, piece, index) =>
-        row
-          .child(div().flex_none().text_color(t.dim).child(">"))
-          .child(
-            index === pieces.length - 1
-              ? div().flex_none().text_color(t.dim).child(piece)
-              : div().min_w(0).truncate().text_color(t.dim).child(piece),
-          ),
-      header,
-    );
-  }
-
   // Every label on the listed issues, by name.
   listedLabels() {
     return [...new Set(this.issues.flatMap((issue) => issue.labels))].sort((a, b) => a.localeCompare(b));
@@ -1827,22 +1787,20 @@ export default class Issues extends View {
 
   /** @param {Theme} t */
   header(t) {
-    const failedEditAlert = this.failedEditAlert(t);
-    return h_flex()
-      .h(42)
-      .flex_none()
-      .px(14)
-      .gap(8)
-      .items_center()
-      .border_b(1)
-      .border_color(t.border)
-      .child(div().flex_none().font_semibold().child("Issues"))
-      .when(Boolean(this.tracker), (e) => this.headerTitle(e, t))
-      .child(div().flex_1())
-      .when(Boolean(failedEditAlert), (e) => e.child(failedEditAlert))
-      .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)))
-      .when(this.canOpenSettings(), (e) => e.child(settingsButton((cx) => this.openSettings(cx), t)))
-      .child(collapseButton((cx) => this.toggleCollapsed(cx), t));
+    return headerBar(
+      {
+        icon: "issues",
+        title: "Issues",
+        secondary: this.tracker ? headerTitleText(this.tracker, this.repositoryName) : null,
+        trailing: [
+          this.failedEditAlert(t),
+          this.tracker ? this.refreshButton(t) : null,
+          this.canOpenSettings() ? settingsButton((cx) => this.openSettings(cx), t) : null,
+          collapseButton((cx) => this.toggleCollapsed(cx), t),
+        ],
+      },
+      t,
+    );
   }
 
   // The panel's header over `content`, which stands in for the list.
@@ -1947,29 +1905,25 @@ export default class Issues extends View {
       .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
   }
 
-  // The expand button, centered on the expanded panel's header, which is 42px tall, over a badge for each
+  // The expand button, centered on the expanded panel's header, which is 30px tall, over a badge for each
   // group the list shows, with the count its header shows.
   /** @param {Theme} t */
   strip(t) {
     const label = this.shownLabel(this.listedLabels());
     return this.frame(t)
       .items_center()
-      .pt(8)
+      .pt((HEADER_HEIGHT_PX - ICON_BUTTON_PX) / 2)
       .gap(10)
       .child(
-        div()
-          .id("issues-expand")
-          .flex_none()
-          .size(24)
-          .flex()
-          .items_center()
-          .justify_center()
-          .rounded(6)
-          .tooltip(listedScopeName(this.tracker, this.listedScope))
-          .cursor_pointer()
-          .hover((s) => s.bg(t.hover))
-          .on_click((_e, cx) => this.toggleCollapsed(cx))
-          .child(svg("mods/issues/icons/issues.svg").size(STRIP_ICON_PX).text_color(t.foreground)),
+        iconButton(
+          {
+            id: "issues-expand",
+            icon: "issues",
+            tooltip: listedScopeName(this.tracker, this.listedScope),
+            onClick: (cx) => this.toggleCollapsed(cx),
+          },
+          t,
+        ),
       )
       .children(stripBadges(this.groups(label)).map((badge) => this.stripBadge(badge, t)));
   }
