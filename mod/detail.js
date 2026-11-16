@@ -45,6 +45,7 @@ import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.j
  * @property {NativeElement | null} [settingsButton]
  * @property {(id: string) => boolean} hasIssue
  * @property {(id: string, cx: Context) => void} onOpen
+ * @property {string} [trackerName]
  * @property {(url: string, cx: Context) => void} onLink
  * @property {(text: string) => string} linkFiles
  * @property {(field: "status" | "priority", cx: Context) => void} onMenu
@@ -636,6 +637,24 @@ function body(view, t) {
 }
 
 /**
+ * The issue's ID, which opens its page in the browser when the tracker gives it one.
+ * @param {Pick<DetailView, "issue" | "trackerName" | "onLink">} view
+ * @param {Theme} t
+ */
+function issueIdLine({ issue, trackerName, onLink }, t) {
+  const line = div().truncate().text_size(11).text_color(t.accent).child(issue.id);
+  if (!issue.url) return line;
+  const { url } = issue;
+  return h_flex().child(
+    line
+      .id(`issue-link-${issue.id}`)
+      .cursor_pointer()
+      .tooltip(`Open in ${trackerName}`)
+      .on_click((_e, cx) => onLink(url, cx)),
+  );
+}
+
+/**
  * @param {DetailView} view
  * @param {Theme} t
  */
@@ -693,7 +712,7 @@ export function issueDetail(view, t) {
         .child(
           v_flex()
             .gap(2)
-            .child(div().truncate().text_size(11).text_color(t.accent).child(issue.id))
+            .child(issueIdLine(view, t))
             .child(div().whitespace_normal().text_size(16).font_semibold().child(issue.title)),
         )
         .child(facts(view, t)),
