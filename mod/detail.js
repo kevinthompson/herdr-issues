@@ -7,14 +7,14 @@ import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
-import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
+import { DUE_COLORS, fieldBar, isLightTheme, labelTint } from "./colors.js";
 import { collapseButton, headerBar, HEADER_HEIGHT_PX } from "./header.js";
 import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
 /** @import { Theme } from "./menu.js" */
-/** @import { Issue, PullRequest } from "./trackers/index.js" */
+/** @import { Issue, LabelParts, PullRequest } from "./trackers/index.js" */
 
 /** @typedef {{ line: number, indent: number, checked: boolean, text: string, markdown?: undefined }} TaskSegment */
 /** @typedef {{ markdown: string }} MarkdownSegment */
@@ -226,11 +226,39 @@ function labelChip(label, color, t) {
 }
 
 /**
- * @param {Pick<Issue, "labels" | "labelColors">} issue
+ * A label in a label group as one chip in two parts: its group on a tint of the label's color, then its value.
+ * @param {LabelParts} parts
+ * @param {string | undefined} color
  * @param {Theme} t
  */
-export const labelChips = ({ labels, labelColors }, t) =>
-  labels.map((label) => labelChip(label, labelColors?.[label], t));
+function groupedLabelChip({ group, value }, color, t) {
+  return h_flex()
+    .flex_none()
+    .items_center()
+    .rounded(4)
+    .border_1()
+    .border_color(t.border)
+    .overflow_hidden()
+    .text_color(t.muted)
+    .child(
+      div()
+        .px(5)
+        .bg(/** @type {Color} */ (labelTint(color, t)))
+        .child(group),
+    )
+    .child(div().px(5).child(value));
+}
+
+/**
+ * @param {Pick<Issue, "labels" | "labelColors" | "labelParts">} issue
+ * @param {Theme} t
+ */
+export const labelChips = ({ labels, labelColors, labelParts }, t) =>
+  labels.map((label) =>
+    labelParts?.[label]
+      ? groupedLabelChip(labelParts[label], labelColors?.[label], t)
+      : labelChip(label, labelColors?.[label], t),
+  );
 
 /**
  * The issue's labels, then, where they can change, a button opening the dropdown that adds and removes them.

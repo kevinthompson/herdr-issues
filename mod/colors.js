@@ -57,7 +57,16 @@ const LIGHT_STATUS_DARKENING = 0.4;
 /** @param {string} status @param {Theme} t */
 export function statusTints(status, t) {
   const color = STATUS_COLORS[status];
-  if (!color) return null;
+  return color ? colorTints(color, t) : null;
+}
+
+// A label's color laid thinly over the theme `t`, as the background of a grouped label's group; the theme's
+// neutral hover shade for a label without a color.
+/** @param {string | undefined} color @param {Theme} t */
+export const labelTint = (color, t) => (color ? colorTints(color, t).fill : t.hover);
+
+/** @param {string} color @param {Theme} t */
+function colorTints(color, t) {
   const light = isLightTheme(t);
   const base = light ? (mixColors(color, t.foreground, LIGHT_STATUS_DARKENING) ?? color) : color;
   const alphas = light ? LIGHT_STATUS_ALPHAS : DARK_STATUS_ALPHAS;
