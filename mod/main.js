@@ -86,7 +86,7 @@ import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLi
 import { toggleTask } from "./tasks.js";
 import { linkTarget, codeSpanPaths, linkCodeSpanFiles } from "./links.js";
 import { isTextFile, openInEditor, prefetchEditor } from "./editor.js";
-import { avatarImage } from "./avatars.js";
+import { avatarImage, AVATAR_PX } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
@@ -145,7 +145,6 @@ const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 /** @type {Record<number, string>} */
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
 const PRIORITY_ICON_PX = 18;
-const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 /** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };

@@ -4,6 +4,7 @@
 import { appHome, exec } from "herdr";
 import { fileKey } from "./file-key.js";
 
+export const AVATAR_PX = 14;
 const FOLDER = "data/issues/avatars";
 /** @type {Record<string, string>} */
 const EXTENSIONS = {
