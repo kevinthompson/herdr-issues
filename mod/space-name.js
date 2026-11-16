@@ -2,7 +2,8 @@
 // issues.json (trackers/setting.js) with its placeholders filled in. The panel and `issues space-name`,
 // which /issues:work runs, both name spaces here, and the panel reads the issue ID back out of a space's
 // name here to open that space's issue. A space's name matches an issue's space name when it ends with it, after
-// the start of the name or whitespace, so a mark before the name, such as `󰄱 #123`, still matches.
+// the start of the name or whitespace, so a mark before the name, such as `󰄱 #123`, still matches. The marks for
+// whether a space's session is working, waiting on the person or done are here too, for `issues mark`.
 import { mainCheckout } from "./location.js";
 import { repositoryName, spaceNameTemplate, trackerSetting } from "./trackers/setting.js";
 
@@ -12,6 +13,20 @@ const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const atEndOfName = (pattern) => new RegExp(String.raw`(?:^|\s)${pattern}$`);
 
 export const spaceNameEndsWith = (name, issueSpace) => atEndOfName(escapeRegExp(issueSpace)).test(name);
+
+// Nerd Font Material Design glyphs, which Herdr's interface font renders: md-checkbox_blank_outline, md-timer_sand and
+// md-checkbox_marked.
+export const WORKING_MARK = "\u{F0131}";
+export const WAITING_MARK = "\u{F051F}";
+export const DONE_MARK = "\u{F0132}";
+export const SPACE_MARKS = { working: WORKING_MARK, waiting: WAITING_MARK, done: DONE_MARK };
+
+export const unmarkedSpaceName = (name) => {
+  const mark = Object.values(SPACE_MARKS).find((mark) => name.startsWith(`${mark} `));
+  return mark ? name.slice(mark.length + 1) : name;
+};
+
+export const markedSpaceName = (name, state) => `${SPACE_MARKS[state]} ${unmarkedSpaceName(name)}`;
 
 // The repository's `spaceName` template, its entry's or else the top level's, and the repository name its `<repo>`
 // stands for.

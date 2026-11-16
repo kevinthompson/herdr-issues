@@ -7,14 +7,14 @@ import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch, STATUSES } from "../mod/issue.js";
-import { issueSpaceName, spaceNameEndsWith } from "../mod/space-name.js";
+import { issueSpaceName, markedSpaceName, SPACE_MARKS, spaceNameEndsWith, unmarkedSpaceName } from "../mod/space-name.js";
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, markedSpaceName, renameSpace,
-  renameTab, sessionTab, SPACE_MARKS, uncompletedTabName, unmarkedSpaceName,
+  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameSpace, renameTab, sessionTab,
+  uncompletedTabName,
 } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
