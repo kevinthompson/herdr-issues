@@ -11,6 +11,7 @@ Use it to choose where a repository's issues are tracked, or to show and change 
 Run without arguments, it asks which tracker to use: a Linear team, GitHub Issues or a local Beads database. It then checks the credentials that tracker needs and asks how finished work is approved and reaches main. With arguments, it changes one setting:
 
 - the tracker: `linear <team key>`, `github [owner/name]` or `beads`;
+- a Linear repository's [saved views](configuration.md#views): `view [<name>] <url>` adds one, naming it from Linear when the name is left out, `view clear <name>` removes one, and `views` lists them;
 - how work is approved and reaches main: `approval <ask|auto>`, `onApproval <merge|pull-request>` and `waitForChecks <true|false>`;
 - whether finished sessions close their worktrees: `close <ask|auto>`;
 - the repository's space name: `name <name>`;
@@ -23,6 +24,7 @@ Run without arguments, it asks which tracker to use: a Linear team, GitHub Issue
 /issues:config github
 /issues:config linear ENG
 /issues:config approval auto
+/issues:config view "Checkout bugs" https://linear.app/acme/view/checkout-bugs-a8875271fcf5
 /issues:config show
 ```
 
