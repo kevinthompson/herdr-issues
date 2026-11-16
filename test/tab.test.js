@@ -10,8 +10,8 @@ import { main } from "../cli/main.js";
 
 const listing = (tabName, spaceName = "#72") => ({
   spaces: [
-    { name: "elsewhere", tabs: [{ id: "tab-other", name: "1", terminals: [{ terminal: "t9" }] }] },
-    { name: spaceName, tabs: [{ id: "tab-session", name: tabName, terminals: [{ terminal: "t1" }, { terminal: "t2" }] }] },
+    { id: "space-other", name: "elsewhere", tabs: [{ id: "tab-other", name: "1", terminals: [{ terminal: "t9" }] }] },
+    { id: "space-session", name: spaceName, tabs: [{ id: "tab-session", name: tabName, terminals: [{ terminal: "t1" }, { terminal: "t2" }] }] },
   ],
 });
 
@@ -158,6 +158,60 @@ test("--help lists both tab commands", async (t) => {
   assert.equal(code, 0);
   assert.match(out, /^ {2}tab \[--json\] /m);
   assert.match(out, /^ {2}tab rename <id> <name> /m);
+});
+
+const MARKS = { working: "\u{F0131}", waiting: "\u{F051F}", done: "\u{F0132}" };
+
+for (const [state, mark] of Object.entries(MARKS)) {
+  test(`mark ${state} starts the issue's space name with its mark`, async (t) => {
+    inRepository(t);
+    const calls = stubApp(t, listing("Claude", "#72"));
+    const { code, out } = await run(t, ["mark", state, "#72"]);
+    assert.equal(code, 0);
+    assert.deepEqual(calls, [["do", "space.rename", "--id", "space-session", "--name", `${mark} #72`]]);
+    assert.equal(out, `Marked the space ${state}: ${mark} #72`);
+  });
+}
+
+test("mark replaces a mark already on the space's name", async (t) => {
+  inRepository(t, "<repo> <issueId>");
+  const calls = stubApp(t, listing("Claude", `${MARKS.waiting} name #72`));
+  const { code } = await run(t, ["mark", "done", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["do", "space.rename", "--id", "space-session", "--name", `${MARKS.done} name #72`]]);
+});
+
+test("mark leaves a space not named after the issue as it is", async (t) => {
+  inRepository(t);
+  const calls = stubApp(t, listing("Claude", "herdr-issues"));
+  const { code, out } = await run(t, ["mark", "working", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, []);
+  assert.equal(out, "The space keeps its name, since it isn't named after #72: herdr-issues");
+});
+
+test("mark changes nothing when the space already has the state's mark", async (t) => {
+  inRepository(t);
+  const calls = stubApp(t, listing("Claude", `${MARKS.done} #72`));
+  const { code, out } = await run(t, ["mark", "done", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, []);
+  assert.equal(out, `The space is already marked done: ${MARKS.done} #72`);
+});
+
+for (const args of [["mark"], ["mark", "finished", "#72"], ["mark", "done"], ["mark", "done", "#72", "#73"]]) {
+  test(`${args.join(" ")} fails with a usage error`, async (t) => {
+    const calls = stubApp(t, listing("Claude"));
+    const { code, err } = await run(t, args);
+    assert.equal(code, 2);
+    assert.match(err, /mark needs a state \(working, waiting, done\) and one issue ID/);
+    assert.deepEqual(calls, []);
+  });
+}
+
+test("--help lists mark", async (t) => {
+  const { out } = await run(t, ["--help"]);
+  assert.match(out, /^ {2}mark <working\|waiting\|done> <id>/m);
 });
 
 for (const tabName of ["Claude", "Review"]) {

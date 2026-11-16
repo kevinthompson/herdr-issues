@@ -7,14 +7,14 @@ import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch, STATUSES } from "../mod/issue.js";
-import { issueSpaceName } from "../mod/space-name.js";
+import { issueSpaceName, spaceNameEndsWith } from "../mod/space-name.js";
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameTab, sessionTab,
-  uncompletedTabName,
+  clearCloseRequest, clearComplete, completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, markedSpaceName, renameSpace,
+  renameTab, sessionTab, SPACE_MARKS, uncompletedTabName, unmarkedSpaceName,
 } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
@@ -40,6 +40,9 @@ Commands:
                            default one: ID and title; fewer when fewer qualify
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
+  mark <working|waiting|done> <id>
+                           Start the name of the space holding $HC_TERMINAL_ID with the state's mark, replacing a mark
+                           already there; leave a space not named after the issue as it is
   complete <id>            Mark the session done working, handed off to the person: label $HC_TERMINAL_ID
                            issues.complete=<id> and prefix its tab's name with ✅, even a name the person chose, once;
                            it says nothing about the branch, which removing the worktree checks for itself
@@ -180,6 +183,23 @@ async function renameSessionTab([issueId, ...words]) {
   const newName = issueTabName({ tab, issueId, issueSpace, name });
   await renameTab(tab, newName);
   console.log(`Renamed the tab to ${newName}`);
+}
+
+async function mark([state, issueId, ...rest]) {
+  if (!SPACE_MARKS[state] || !issueId || rest.length) throw new UsageError(`mark needs a state (${Object.keys(SPACE_MARKS).join(", ")}) and one issue ID`);
+  const tab = await sessionTab();
+  const issueSpace = await issueSpaceName(await currentProject(), issueId);
+  if (!spaceNameEndsWith(unmarkedSpaceName(tab.space), issueSpace)) {
+    console.log(`The space keeps its name, since it isn't named after ${issueId}: ${tab.space}`);
+    return;
+  }
+  const newName = markedSpaceName(tab.space, state);
+  if (newName === tab.space) {
+    console.log(`The space is already marked ${state}: ${newName}`);
+    return;
+  }
+  await renameSpace(tab, newName);
+  console.log(`Marked the space ${state}: ${newName}`);
 }
 
 async function complete(args) {
@@ -421,7 +441,7 @@ async function label(args) {
   console.log(`${issue.id}: ${changes.join(", ")}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, close, worktree, merge, status, start, edit, label };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, worktree, merge, status, start, edit, label };
 
 const HELP_FLAGS = ["-h", "--help"];
 

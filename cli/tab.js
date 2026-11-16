@@ -1,6 +1,8 @@
 // `issues tab`: the Herdr tab holding this session's terminal ($HC_TERMINAL_ID), and renaming it after the
 // issue the session works, as /issues:work does, prefixed with the issue's ID unless the space's name ends with the
-// issue's space name (space-name.js). A tab the person named keeps its name. `issues complete` labels
+// issue's space name (space-name.js). A tab the person named keeps its name. `issues mark` starts the name of the
+// session's space with a mark for whether the session is working, waiting on the person or done, replacing any mark
+// already there, but only in a space whose unmarked name ends with the issue's space name. `issues complete` labels
 // the terminal and marks the tab, whatever its name, with ✅ once the session is done working and has handed off to
 // the person, whether or not its branch has landed, which `issues complete --cancel` withdraws when the person asks
 // for more changes, and `issues close`
@@ -19,7 +21,7 @@ export async function sessionTab(terminal = process.env.HC_TERMINAL_ID) {
   const { spaces } = JSON.parse(await herdrApp(["ls"]));
   for (const space of spaces) {
     const tab = space.tabs.find((tab) => tab.terminals.some((held) => held.terminal === terminal));
-    if (tab) return { id: tab.id, name: tab.name, space: space.name, terminal };
+    if (tab) return { id: tab.id, name: tab.name, space: space.name, spaceId: space.id, terminal };
   }
   throw new Error(`no Herdr tab holds terminal ${terminal}`);
 }
@@ -33,6 +35,24 @@ export const issueTabName = ({ tab, issueId, issueSpace, name }) =>
 
 export async function renameTab(tab, name) {
   await herdrApp(["do", "tab.rename", "--id", tab.id, "--name", name]);
+}
+
+// Nerd Font Material Design glyphs, which Herdr's interface font renders: md-checkbox_blank_outline, md-timer_sand and
+// md-checkbox_marked.
+export const WORKING_MARK = "\u{F0131}";
+export const WAITING_MARK = "\u{F051F}";
+export const DONE_MARK = "\u{F0132}";
+export const SPACE_MARKS = { working: WORKING_MARK, waiting: WAITING_MARK, done: DONE_MARK };
+
+export const unmarkedSpaceName = (name) => {
+  const mark = Object.values(SPACE_MARKS).find((mark) => name.startsWith(`${mark} `));
+  return mark ? name.slice(mark.length + 1) : name;
+};
+
+export const markedSpaceName = (name, state) => `${SPACE_MARKS[state]} ${unmarkedSpaceName(name)}`;
+
+export async function renameSpace(tab, name) {
+  await herdrApp(["do", "space.rename", "--id", tab.spaceId, "--name", name]);
 }
 
 export const COMPLETE_MARK = "✅ ";
