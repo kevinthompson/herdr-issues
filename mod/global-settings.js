@@ -23,7 +23,7 @@ import {
 } from "./trackers/setting.js";
 
 const DEFAULT_ON_APPROVAL_CHOICE = {
-  id: CLEAR_CHOICE, label: "Default",
+  id: CLEAR_CHOICE, label: "Default (Pull request or merge)",
   detail: "A pull request when the repository's origin is on GitHub, and a merge into main otherwise.",
 };
 const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
