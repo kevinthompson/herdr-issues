@@ -10,9 +10,9 @@
 // show its error. Each setting is a select menu (select.js) whose open list says what each option means, or a typed
 // field, with its description below its controls.
 import { div } from "gpui-kit";
-import { v_flex, h_flex } from "gpui-base";
+import { v_flex } from "gpui-base";
 import { shared, setShared } from "herdr";
-import { collapseButton } from "./detail.js";
+import { collapseButton, headerBar, iconButton } from "./header.js";
 import { filterRow } from "./filter-row.js";
 import { GlobalSettings } from "./global-settings.js";
 import { openScopeMenu } from "./menu.js";
@@ -145,40 +145,24 @@ export class SettingsView {
    * @param {Parameters<typeof collapseButton>[0]} onCollapse
    */
   bar(t, onCollapse) {
-    return h_flex()
-      .h(42)
-      .flex_none()
-      .px(10)
-      .gap(8)
-      .items_center()
-      .border_b(1)
-      .border_color(t.border)
-      .child(
-        div()
-          .id("settings-back")
-          .flex_none()
-          .h(26)
-          .px(8)
-          .flex()
-          .items_center()
-          .rounded(7)
-          .text_color(this.leaving ? t.dim : t.muted)
-          .when(!this.leaving, (b) =>
-            b
-              .cursor_pointer()
-              .hover((s) => s.bg(t.hover).text_color(t.foreground))
-              .on_click((_e, cx) => this.back(cx)),
-          )
-          .child("‹ Back"),
-      )
-      .child(div().flex_1())
-      .child(
-        div()
-          .px(4)
-          .text_size(12)
-          .text_color(t.dim)
-          .child(this.saving() ? "Saving…" : "Settings"),
-      )
-      .child(collapseButton(onCollapse, t));
+    return headerBar(
+      {
+        leading: iconButton(
+          {
+            id: "settings-back",
+            icon: "chevron-left",
+            tooltip: "Back",
+            onClick: this.leaving ? null : (cx) => this.back(cx),
+          },
+          t,
+        ),
+        title: "Settings",
+        trailing: [
+          this.saving() ? div().flex_none().text_color(t.dim).child("Saving…") : null,
+          collapseButton(onCollapse, t),
+        ],
+      },
+      t,
+    );
   }
 }

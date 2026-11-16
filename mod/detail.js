@@ -8,6 +8,7 @@ import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
+import { collapseButton, headerBar, iconButton } from "./header.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -359,29 +360,6 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
     );
 }
 
-/**
- * @param {DetailView["onCollapse"]} onCollapse
- * @param {Theme} t
- */
-export function collapseButton(onCollapse, t) {
-  return div()
-    .id("issues-collapse")
-    .flex_none()
-    .size(24)
-    .flex()
-    .items_center()
-    .justify_center()
-    .rounded(6)
-    .border_1()
-    .border_color(t.border)
-    .bg(t.raised)
-    .tooltip("Collapse panel")
-    .cursor_pointer()
-    .hover((s) => s.bg(t.hover))
-    .on_click((_e, cx) => onCollapse(cx))
-    .child(svg("mods/issues/icons/panel-right-close.svg").size(15).text_color(t.foreground));
-}
-
 // An icon has its own color, so a button whose label is an icon redraws it in the hover color.
 /** @type {string | null} */
 let hoveredButton = null;
@@ -608,34 +586,17 @@ export function issueDetail(view, t) {
     .size_full()
     .min_h(0)
     .child(
-      h_flex()
-        .h(42)
-        .flex_none()
-        .px(10)
-        .gap(8)
-        .items_center()
-        .border_b(1)
-        .border_color(t.border)
-        .child(
-          div()
-            .id("issue-back")
-            .flex_none()
-            .h(26)
-            .px(8)
-            .flex()
-            .items_center()
-            .rounded(7)
-            .cursor_pointer()
-            .text_color(t.muted)
-            .hover((s) => s.bg(t.hover).text_color(t.foreground))
-            .on_click((_e, cx) => onBack(cx))
-            .child("‹ Issues"),
-        )
-        .child(div().flex_1())
-        .when(Boolean(view.failedEditAlert), (e) => e.child(view.failedEditAlert))
-        .child(view.refreshButton)
-        .when(Boolean(view.settingsButton), (e) => e.child(view.settingsButton))
-        .child(collapseButton(view.onCollapse, t)),
+      headerBar(
+        {
+          leading: iconButton(
+            { id: "issue-back", icon: "chevron-left", tooltip: "Back to issues", onClick: onBack },
+            t,
+          ),
+          title: "Issues",
+          trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
+        },
+        t,
+      ),
     )
     .child(
       h_flex()

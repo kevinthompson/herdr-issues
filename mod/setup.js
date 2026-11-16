@@ -13,7 +13,8 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
-import { button, collapseButton } from "./detail.js";
+import { button } from "./detail.js";
+import { collapseButton, headerBar, iconButton } from "./header.js";
 import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
@@ -412,45 +413,24 @@ export class TrackerSetup {
       index = steps.indexOf(this.step);
     const canGoBack = index > 0 || Boolean(this.failure),
       busy = this.tracker.checking || this.saving;
-    return h_flex()
-      .h(42)
-      .flex_none()
-      .px(10)
-      .gap(8)
-      .items_center()
-      .border_b(1)
-      .border_color(t.border)
-      .when(canGoBack, (e) =>
-        e.child(
-          div()
-            .id("setup-back")
-            .flex_none()
-            .h(26)
-            .px(8)
-            .flex()
-            .items_center()
-            .rounded(7)
-            .text_color(busy ? t.dim : t.muted)
-            .when(!busy, (b) =>
-              b
-                .cursor_pointer()
-                .hover((s) => s.bg(t.hover).text_color(t.foreground))
-                .on_click((_e, cx) => this.back(cx)),
+    return headerBar(
+      {
+        leading: canGoBack
+          ? iconButton(
+              { id: "setup-back", icon: "chevron-left", tooltip: "Back", onClick: busy ? null : (cx) => this.back(cx) },
+              t,
             )
-            .child("‹ Back"),
-        ),
-      )
-      .when(!canGoBack, (e) => e.child(div().px(8).font_semibold().child("Set up issues")))
-      .child(div().flex_1())
-      .child(
-        div()
-          .px(4)
-          .text_size(12)
-          .text_color(t.dim)
-          .child(`Step ${index + 1} of ${steps.length}`),
-      )
-      .when(!this.failure, (e) => e.child(button("setup-cancel", "Cancel", (cx) => this.cancel(cx), t)))
-      .child(collapseButton(this.onCollapse, t));
+          : null,
+        icon: "issues",
+        title: "Set up issues",
+        secondary: `Step ${index + 1} of ${steps.length}`,
+        trailing: [
+          this.failure ? null : button("setup-cancel", "Cancel", (cx) => this.cancel(cx), t),
+          collapseButton(this.onCollapse, t),
+        ],
+      },
+      t,
+    );
   }
 
   // A page's question, a sentence under it, and its options, each with what it means. The current answer is
