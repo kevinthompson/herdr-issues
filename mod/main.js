@@ -27,7 +27,7 @@ import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName, headerTitlePieces } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
-import { groupIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, groupCountText, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, LabelMenu, openMenu, openScopeMenu, openLabelMenu, openIssueLabelsMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
@@ -138,6 +138,7 @@ const SCOPE_DROPDOWN_MAX_PX = 260;
 const REFRESH_ICON_PX = 15, ALERT_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
+const GROUP_REFRESH_ICON_PX = 11;
 const SYNC_SPIN_MS = 1000;
 const NOT_A_REPOSITORY = "not-a-repository";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
@@ -914,6 +915,20 @@ export default class Issues extends View {
         .child(div().min_w(0).truncate().child(issue.delegate ?? "")));
   }
 
+  groups(label) {
+    const { tracker, listedScope } = this;
+    return groupIssues(this.issues, this.unloaded, label,
+      { sections: tracker?.sections?.(listedScope) ?? [], recentlyClosed: tracker?.recentlyClosed ?? null });
+  }
+
+  // Its issue count, or while its issues aren't listed, … when expanded and so being listed, else a refresh icon.
+  groupCount(group, expanded, t) {
+    const count = groupCountText(group);
+    if (count !== null) return div().text_color(t.dim).child(count);
+    if (expanded) return div().text_color(t.dim).child("…");
+    return svg("mods/issues/icons/rotate-cw.svg").flex_none().size(GROUP_REFRESH_ICON_PX).text_color(t.dim);
+  }
+
   // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
   group(group, shown, idColumnWidth, t) {
     const expanded = this.isExpanded(group), hidden = group.issues.length - shown;
@@ -926,7 +941,7 @@ export default class Issues extends View {
         .child(div().opacity(0.7).child(expanded ? "▾" : "▸"))
         .when(Boolean(icon), (e) => e.child(image(icon ?? "").flex_none().size(STATUS_ICON_PX)))
         .child(div().font_semibold().child(group.label))
-        .when(!group.unloaded || expanded, (e) => e.child(div().opacity(0.7).child(group.unloaded ? "…" : String(group.issues.length)))))
+        .child(this.groupCount(group, expanded, t)))
       .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, idColumnWidth, t))))
       .when(expanded && hidden > 0, (e) => e.child(div().id(`show-more-${group.id}`).flex_none().px(10).py(6).rounded(7)
         .cursor_pointer().text_size(12).text_color(t.accent).hover((s) => s.bg(t.hover))
@@ -1020,7 +1035,7 @@ export default class Issues extends View {
     }
     if (this.settingsView) return this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
-    const groups = groupIssues(this.issues, this.unloaded, label), error = this.error ?? this.detailError;
+    const groups = this.groups(label), error = this.error ?? this.detailError;
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
     this.revealGroup(groups);
     return v_flex().size_full().min_h(0)
@@ -1046,7 +1061,7 @@ export default class Issues extends View {
       .child(div().id("issues-expand").flex_none().size(24).flex().items_center().justify_center().rounded(6)
         .tooltip(listedScopeName(this.tracker, this.listedScope)).cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => this.toggleCollapsed())
         .child(svg("mods/issues/icons/issues.svg").size(STRIP_ICON_PX).text_color(t.foreground)))
-      .children(stripBadges(groupIssues(this.issues, this.unloaded, label)).map((badge) => this.stripBadge(badge, t)));
+      .children(stripBadges(this.groups(label)).map((badge) => this.stripBadge(badge, t)));
   }
 
   stripBadge({ id, label, text }, t) {

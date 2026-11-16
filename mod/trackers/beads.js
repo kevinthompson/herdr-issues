@@ -128,6 +128,8 @@ export async function beadsTracker({ root: projectRoot, on }) {
       return withBlockers(lists.flatMap((list) => list ?? []));
     },
     deferred: () => ["done"],
+    sections: () => ["in-progress", "todo", "blocked", "backlog", "done"],
+    recentlyClosed: RECENTLY_CLOSED,
     get,
     // A new body only saves over the body `issue` was read with, so edits made with `bd` meanwhile are never
     // overwritten. Order has nowhere to go.
