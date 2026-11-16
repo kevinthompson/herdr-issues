@@ -7,12 +7,15 @@ import { fileURLToPath } from "node:url";
 import { commitFile, git, temporaryFolder } from "./support/repository.js";
 
 const installScript = fileURLToPath(new URL("../install", import.meta.url));
+const terminalOutputScript = fileURLToPath(new URL("../scripts/terminal-output.sh", import.meta.url));
 
 // A clone of an origin whose main holds the install script and a setup that records it ran.
 function installedCheckout(folder) {
   const seed = join(folder, "seed");
   git(folder, "init", "-q", "-b", "main", seed);
   copyFileSync(installScript, join(seed, "install"));
+  mkdirSync(join(seed, "scripts"));
+  copyFileSync(terminalOutputScript, join(seed, "scripts/terminal-output.sh"));
   writeFileSync(join(seed, "setup"), '#!/bin/sh\necho setup ran >"$(dirname "$0")/../setup-ran"\n', { mode: 0o755 });
   git(seed, "add", ".");
   git(seed, "commit", "-q", "-m", "first");
@@ -43,6 +46,7 @@ test("install fast-forwards the checkout to origin/main and runs setup", (t) => 
   const result = runInstall(checkout, join(folder, "herdr-app"));
 
   assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /^== Update\n {2}\[done\] Updated .*checkout to [0-9a-f]+ /m);
   assert.equal(git(checkout, "rev-parse", "HEAD"), git(seed, "rev-parse", "HEAD"));
   assert.equal(readFileSync(join(folder, "setup-ran"), "utf8"), "setup ran\n");
 });
@@ -91,5 +95,5 @@ test("install refuses without a terminal when the mod is linked to another check
     result.stdout,
     /Repointing makes Herdr load the mod, the issues command run, and Claude Code install the plugin from/,
   );
-  assert.match(result.stderr, /standard input is not a terminal/);
+  assert.match(result.stderr, /Standard input is not a terminal/);
 });
