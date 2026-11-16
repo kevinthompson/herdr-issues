@@ -3,7 +3,8 @@
 // which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
 // back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; whether
 // a session asks for approval of its work; how the branch then gets into main; for a pull request,
-// whether the session waits for its checks; and a review of the choices, which points to the
+// whether the session waits for its checks, each asked with the settings view's dropdown (select.js) and a Next
+// button; and a review of the choices, which points to the
 // gear's settings (settings.js) for the rest. Only Save on the
 // review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. Approval
 // proposes the repository's current or default settings. A configured tracker that fails to load with a
@@ -17,6 +18,7 @@ import { button, icon } from "./detail.js";
 import { collapseButton, headerBar } from "./header.js";
 import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
+import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 
 /** @import { Context, NativeElement } from "gpui-kit" */
@@ -215,13 +217,12 @@ export class TrackerSetup {
     this.answers = {};
     /** @type {ProposedApproval | null} */
     this.proposed = null;
+    /** @type {Record<ApprovalKey, SelectMenu> | null} */
+    this.selects = null;
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
       alongside: () => this.proposeApproval(),
-      onReady: (proposed, cx) => {
-        this.proposed = proposed;
-        this.goTo(this.tracker.choice === "linear" ? "team" : "approval", cx);
-      },
+      onReady: (proposed, cx) => this.ready(proposed, cx),
       onTeam: (cx) => {
         if (this.step === "team") this.goTo("approval", cx);
       },
@@ -311,7 +312,31 @@ export class TrackerSetup {
     this.tracker.takePickedTeam(cx);
   }
 
-  // Answers approval, onApproval or waitForChecks, and goes on to the next step.
+  // The chosen tracker checked out: the approval questions' selects, made once since they need a cx, and the step
+  // after the tracker.
+  /**
+   * @param {ProposedApproval} proposed
+   * @param {Context} cx
+   */
+  ready(proposed, cx) {
+    this.proposed = proposed;
+    this.selects ??= /** @type {Record<ApprovalKey, SelectMenu>} */ (
+      Object.fromEntries(
+        Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`setup-${key}`, title, cx)]),
+      )
+    );
+    this.goTo(this.tracker.choice === "linear" ? "team" : "approval", cx);
+  }
+
+  // The select's value for approval, onApproval or waitForChecks: the earlier answer, or else the proposed one.
+  /**
+   * @param {ApprovalKey} key
+   */
+  approvalValue(key) {
+    return this.answers[key] ?? this.proposed?.[key] ?? APPROVAL_QUESTIONS[key].choices[0].id;
+  }
+
+  // Answers approval, onApproval or waitForChecks without leaving the step, so the step count follows onApproval.
   /**
    * @param {ApprovalKey} key
    * @param {string} id
@@ -319,6 +344,16 @@ export class TrackerSetup {
    */
   chooseApproval(key, id, cx) {
     this.answers = { ...this.answers, [key]: id };
+    cx.notify();
+  }
+
+  // Records the select's value for approval, onApproval or waitForChecks, and goes on to the next step.
+  /**
+   * @param {ApprovalKey} key
+   * @param {Context} cx
+   */
+  nextApproval(key, cx) {
+    this.answers = { ...this.answers, [key]: this.approvalValue(key) };
     const steps = this.steps();
     this.goTo(steps[steps.indexOf(key) + 1], cx);
   }
@@ -470,8 +505,7 @@ export class TrackerSetup {
     };
   }
 
-  // A page's question, a sentence under it, and its options, each with what it means. The current answer is
-  // solid, and the proposed one says so.
+  // A page's question and a sentence under it.
   /**
    * @param {NativeElement} content
    * @param {string} title
@@ -486,13 +520,14 @@ export class TrackerSetup {
       );
   }
 
+  // The tracker's options, each a button with what it means under it; the current answer is solid.
   /**
    * @param {string} kind
    * @param {SelectOption[]} choices
-   * @param {{ chosen: string | null | undefined, proposed?: string | null, onChoose: (id: string, cx: Context) => void, enabled?: boolean }} props
+   * @param {{ chosen: string | null | undefined, onChoose: (id: string, cx: Context) => void, enabled?: boolean }} props
    * @param {Theme} t
    */
-  options(kind, choices, { chosen, proposed = null, onChoose, enabled = true }, t) {
+  options(kind, choices, { chosen, onChoose, enabled = true }, t) {
     return v_flex()
       .flex_none()
       .gap(12)
@@ -502,16 +537,12 @@ export class TrackerSetup {
             .flex_none()
             .gap(4)
             .child(
-              h_flex()
-                .gap(8)
-                .items_center()
-                .child(
-                  button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, {
-                    primary: id === chosen,
-                    enabled,
-                  }),
-                )
-                .when(id === proposed, (e) => e.child(div().text_size(11).text_color(t.dim).child("Proposed"))),
+              h_flex().child(
+                button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, {
+                  primary: id === chosen,
+                  enabled,
+                }),
+              ),
             )
             .when(Boolean(detail), (e) =>
               e.child(
@@ -564,7 +595,7 @@ export class TrackerSetup {
       );
   }
 
-  // The page for approval, onApproval or waitForChecks.
+  // The page for approval, onApproval or waitForChecks: its select, the chosen option's detail, and Next.
   /**
    * @param {ApprovalKey} key
    * @param {NativeElement} content
@@ -572,18 +603,15 @@ export class TrackerSetup {
    */
   approvalPage(key, content, t) {
     const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
-    return this.question(content, title, sentence, t).child(
-      this.options(
-        key,
-        choices,
-        {
-          chosen: this.answers[key],
-          proposed: this.proposed?.[key],
-          onChoose: (id, cx) => this.chooseApproval(key, id, cx),
-        },
-        t,
-      ),
-    );
+    const select = /** @type {Record<ApprovalKey, SelectMenu>} */ (this.selects)[key];
+    const value = this.approvalValue(key);
+    const detail = choices.find(({ id }) => id === value)?.detail ?? "";
+    return this.question(content, title, sentence, t)
+      .child(select.render(t, { options: choices, value, onChoose: (id, cx) => this.chooseApproval(key, id, cx) }))
+      .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))
+      .child(
+        h_flex().child(button(`setup-${key}-next`, "Next", (cx) => this.nextApproval(key, cx), t, { primary: true })),
+      );
   }
 
   /**
