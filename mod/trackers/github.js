@@ -45,7 +45,7 @@ import { refuseUnknownLabels } from "./labels.js";
  * @property {{ nodes: { number: number, state: string, repository: { nameWithOwner: string } }[] }} blockedBy
  * @property {{ nodes: GitHubPullRequestNode[] }} closedByPullRequestsReferences
  * @property {string | null} [body]
- * @property {{ nodes: { author: { login: string } | null, createdAt: string, body: string }[] }} [comments]
+ * @property {{ nodes: { author: { login: string, avatarUrl: string } | null, createdAt: string, body: string }[] }} [comments]
  */
 
 /** @typedef {(args: string[]) => Promise<string>} Gh */
@@ -77,7 +77,7 @@ const ISSUES = (state, orderBy) => `query($owner: String!, $name: String!, $firs
     pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} } } } }`;
 const ISSUE = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) { issue(number: $number) { ${ISSUE_FIELDS} body
-    comments(first: ${COMMENTS}) { nodes { author { login } createdAt body } } } } }`;
+    comments(first: ${COMMENTS}) { nodes { author { login avatarUrl } createdAt body } } } } }`;
 
 // The statuses a person can pick. In review follows from a linked pull request, so it can't be set.
 const SETTABLE_STATUSES = ["todo", "in-progress", "done", "canceled"];
@@ -169,6 +169,7 @@ function toIssue(node, repo) {
     comments:
       node.comments?.nodes.map((comment) => ({
         author: comment.author?.login ?? "ghost",
+        avatar: comment.author?.avatarUrl ?? null,
         created: comment.createdAt,
         body: comment.body.trim(),
       })) ?? null,

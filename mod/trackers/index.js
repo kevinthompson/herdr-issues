@@ -29,7 +29,7 @@
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null),
 //          labels (names; a Linear label in a group is "group > name"), blockedBy,
 //          branch, url (the issue's web page, for Linear and GitHub issues), created, body (null until loaded: tracker.get loads it),
-//          comments ([{ author, created, body }] oldest first, the first 100, for Linear and GitHub issues;
+//          comments ([{ author, avatar (URL or null), created, body }] oldest first, the first 100, for Linear and GitHub issues;
 //          null until tracker.get loads them, like body), updated (when the tracker
 //          can say), labelColors ({ label: "#rrggbb" }, for Linear issues),
 //          labelParts ({ label: { group, value } } for each Linear label in a group),
@@ -59,7 +59,7 @@
  * @property {string} [fullRepo]
  */
 
-/** @typedef {{ author: string, created: string, body: string }} IssueComment */
+/** @typedef {{ author: string, avatar: string | null, created: string, body: string }} IssueComment */
 
 /**
  * @typedef {object} LabelParts
