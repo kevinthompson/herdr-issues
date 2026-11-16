@@ -455,6 +455,11 @@ function toIssue(node, repoName) {
     order: node.sortOrder ?? null,
     labels: node.labels.nodes.map(labelName),
     labelColors: Object.fromEntries(node.labels.nodes.map((label) => [labelName(label), label.color])),
+    labelParts: Object.fromEntries(
+      node.labels.nodes
+        .filter((label) => label.parent)
+        .map((label) => [labelName(label), { group: label.parent.name, value: label.name }]),
+    ),
     // Linear keeps finished blockers as relations; only the unfinished ones still block.
     blockedBy: node.inverseRelations.nodes
       .filter((relation) => relation.type === "blocks" && !isFinished(relation.issue.state))

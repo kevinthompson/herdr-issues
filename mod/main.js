@@ -2057,6 +2057,7 @@ export default class Issues extends View {
                 onLabelsMenu: (cx) => this.openLabelsMenu(issue, cx),
                 onEdit: (cx) => this.edit(issue, cx),
                 onToggleTask: (line, cx) => this.toggleTask(issue, line, cx),
+                trackerName: this.tracker?.name,
                 onLink: (url, cx) => this.openLink(issue, url, cx),
                 linkFiles: (markdown) => linkCodeSpanFiles(markdown, this.project.root, this.filesInBody(issue, cx)),
                 startable: canStartWork(issue, this.issues),

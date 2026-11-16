@@ -12,7 +12,8 @@
 import { div } from "gpui-kit";
 import { v_flex } from "gpui-base";
 import { shared, setShared } from "herdr";
-import { collapseButton, headerBar, iconButton } from "./header.js";
+import { actionButton } from "./action-button.js";
+import { collapseButton, headerBar } from "./header.js";
 import { leadingFilterRow } from "./filter-row.js";
 import { GlobalSettings } from "./global-settings.js";
 import { openScopeMenu } from "./menu.js";
@@ -142,12 +143,13 @@ export class SettingsView {
 
   /** @param {Theme} t */
   backButton(t) {
-    return iconButton(
+    return actionButton(
       {
         id: "settings-back",
         icon: "chevron-left",
         tooltip: "Back",
-        onClick: this.leaving ? null : (cx) => this.back(cx),
+        onClick: (cx) => this.back(cx),
+        enabled: !this.leaving,
       },
       t,
     );

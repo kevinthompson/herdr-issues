@@ -28,10 +28,11 @@
 //
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null),
 //          labels (names; a Linear label in a group is "group > name"), blockedBy,
-//          branch, created, body (null until loaded: tracker.get loads it),
+//          branch, url (the issue's web page, for Linear and GitHub issues), created, body (null until loaded: tracker.get loads it),
 //          comments ([{ author, created, body }] oldest first, the first 100, for Linear and GitHub issues;
 //          null until tracker.get loads them, like body), updated (when the tracker
-//          can say), labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
+//          can say), labelColors ({ label: "#rrggbb" }, for Linear issues),
+//          labelParts ({ label: { group, value } } for each Linear label in a group), assignee (a name, for Linear issues),
 //          assigneeId (the assignee's user ID, or null, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
@@ -59,6 +60,12 @@
 /** @typedef {{ author: string, created: string, body: string }} IssueComment */
 
 /**
+ * @typedef {object} LabelParts
+ * @property {string} group
+ * @property {string} value
+ */
+
+/**
  * @typedef {object} Issue
  * @property {string} id
  * @property {string} title
@@ -79,6 +86,7 @@
  * @property {IssueComment[] | null} [comments] Null until tracker.get loads them; absent for Beads.
  * @property {string} [updated]
  * @property {Record<string, string>} [labelColors]
+ * @property {Record<string, LabelParts>} [labelParts]
  * @property {string} [assignee]
  * @property {string | null} [assigneeId]
  * @property {string | null} [assigneeAvatar]
