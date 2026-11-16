@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupCountText, groupIssues, holdingBlockers, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
+import { canStartWork, groupCountText, groupIssues, holdingBlockers, sectionsForMerge, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
 import { linearSections } from "../mod/trackers/linear.js";
 
 const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
@@ -62,6 +62,19 @@ describe("groupIssues", () => {
     const labeled = { ...issue("#2", "todo"), labels: ["bug"] };
     const groups = groupIssues([issue("#1", "todo"), labeled], new Set(), "bug", { sections: ["in-progress", "todo"] });
     assert.deepEqual(groups.map(groupCountText), ["0", "1"]);
+  });
+});
+
+describe("sectionsForMerge", () => {
+  const sections = ["in-review", "in-progress", "todo"];
+
+  test("drops In review when work merges without review", () => {
+    assert.deepEqual(sectionsForMerge(sections, "auto"), ["in-progress", "todo"]);
+  });
+
+  test("keeps In review when work is reviewed before it merges", () => {
+    assert.deepEqual(sectionsForMerge(sections, "review"), sections);
+    assert.deepEqual(sectionsForMerge(sections, "pull-request"), sections);
   });
 });
 

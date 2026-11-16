@@ -71,6 +71,10 @@ export function groupIssues(issues, unloaded = new Set(), label = null, { sectio
     .filter((group) => group.unloaded || group.issues.length || sections.includes(group.id));
 }
 
+// The tracker's `sections` a repository shows even when empty: no In review when its `merge` setting lands
+// work in main without review, so issues only reach In review in it by hand.
+export const sectionsForMerge = (sections, merge) => (merge === "auto" ? sections.filter((id) => id !== "in-review") : sections);
+
 // The count beside a group's title: "20+" for a group capped at 20, or null when its issues weren't listed.
 export function groupCountText(group) {
   if (group.unloaded) return null;
