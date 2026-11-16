@@ -16,6 +16,10 @@ export const defaults = {
   terminals: () => [],
   hc: async () => ({ code: 1, stdout: "", stderr: "" }),
   openOverlay: () => null,
+  closeOverlay: () => null,
+  props: () => ({}),
+  theme: () => ({}),
+  settings: () => ({}),
 };
 let current = { ...defaults };
 
@@ -29,8 +33,12 @@ export const setShared = (...args) => current.setShared(...args);
 export const terminals = () => current.terminals();
 export const hc = (...args) => current.hc(...args);
 export const openOverlay = (...args) => current.openOverlay(...args);
+export const closeOverlay = (...args) => current.closeOverlay(...args);
+export const props = (...args) => current.props(...args);
+export const theme = (...args) => current.theme(...args);
+export const settings = (...args) => current.settings(...args);
 
-// Replaces any of exec, spaces, panes, layout, run, shared, setShared, terminals, hc and openOverlay until the test `t` ends.
+// Replaces any of exec, spaces, panes, layout, run, shared, setShared, terminals, hc, openOverlay, closeOverlay, props, theme and settings until the test `t` ends.
 export function stubHerdr(t, replacements) {
   current = { ...defaults, ...replacements };
   t.after(() => {

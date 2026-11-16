@@ -469,7 +469,7 @@ export function workButton(
  * @param {string} name
  * @returns {(color: Color) => NativeElement}
  */
-const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
+export const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
 
 /**
  * Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
