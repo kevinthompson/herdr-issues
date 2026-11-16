@@ -69,7 +69,7 @@ import {
   dueStatus,
   PRIORITIES,
 } from "./issue.js";
-import { issueDetail, issueLinks, workButton, labelChips, button } from "./detail.js";
+import { issueDetail, issueLinks, workButton, labelChips, button, COMPACT_BUTTON_WIDTH_PX } from "./detail.js";
 import { collapseButton, headerBar, iconButton, HEADER_HEIGHT_PX, ICON_BUTTON_PX } from "./header.js";
 import {
   FieldMenu,
@@ -154,7 +154,7 @@ const ID_COLUMN_PX = 68;
 // Generous for any character of an ID at the list's 11px, so a short ID column never cuts an ID off.
 const ID_CHARACTER_PX = 7;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
-const ACTION_COLUMN_PX = 32;
+const ACTION_COLUMN_PX = COMPACT_BUTTON_WIDTH_PX;
 /** @returns {string} */
 const contextKey = () => JSON.stringify(location());
 
