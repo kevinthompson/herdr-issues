@@ -4,12 +4,32 @@
 
 ## What it is
 
-An Issues panel for the Herdr desktop app, and a Claude Code plugin that works the same issues from Claude sessions.
+An Issues panel for the Herdr desktop app and a Claude Code plugin that work as one: the plugin's skills write and refine issues, the panel lists them beside your terminals, and Claude works each one in its own worktree until its branch is merged. [How they work together](#how-they-work-together) walks through the loop.
 
 - **Your issues beside your terminals.** The Herdr mod's Issues panel lists the issues of the repository in the focused pane, from Linear, GitHub Issues or a local Beads database, and lets you read and edit them in place.
-- **One click to start.** **Start** opens an issue's branch in its own worktree and Herdr space, with Claude already working the issue.
-- **Claude knows what you're looking at.** Claude sessions in Herdr know which issues the panel lists and which one is open, so "the issues" and "this issue" mean what you see.
-- **Skills for the whole loop.** The Claude Code plugin's `issues:*` skills create, plan, triage and work issues in whichever tracker the repository uses.
+- **Skills for the whole loop.** The Claude Code plugin's `issues:*` skills create, plan, triage and work the same issues in whichever tracker the repository uses.
+
+## How they work together
+
+1. **Write the issues.** `/issues:plan` turns an idea, a brief or a full spec into a series of issues by interviewing you, and `/issues:create` writes issues for work that is already settled. `/issues:triage` rewrites existing issues until each is a self-contained hand-off.
+2. **See them in the panel.** The panel lists the new issues, grouped by status, where you can read them, edit them and change their status and priority.
+3. **Start one.** **Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue. `/issues:start` does the same from a Claude session, for one issue, several, or the next few that are ready.
+4. **Claude works it.** `/issues:work` catches up on any work already on the branch, marks the issue in progress, does the work and verifies it.
+5. **Merge it or open its pull request.** As the repository's [approval settings](docs/configuration.md#approval-onapproval-and-waitforchecks) say, the session asks you to approve the work or goes straight on, then merges the branch into main or opens its pull request.
+
+Claude sessions in Herdr know which issues the panel lists and which one is open, so "the issues" and "this issue" mean what you see.
+
+A few examples:
+
+```
+/issues:plan make the collapsed panel show something useful
+/issues:create show a tooltip when hovering the panel toggle button
+/issues:triage #42
+/issues:start next 2
+/issues:work #42
+```
+
+[Claude skills](docs/skills.md) covers every skill and its arguments.
 
 ## Quickstart
 
