@@ -31,6 +31,7 @@ import { collapseButton, headerBar } from "./header.js";
  * @property {boolean} mergeable
  * @property {boolean} merging
  * @property {boolean} opening
+ * @property {boolean} loading
  * @property {boolean} saving
  * @property {boolean} finishable
  * @property {boolean} startable
@@ -430,15 +431,15 @@ export function button(
  * Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
  * whose worktree a space already shows switches to that space instead, and the button stands out to say so,
  * unless that space is the active one. The list's compact button shows the issue's branch for both, so it
- * fits beside a title. Each is disabled while the issue's worktree is opening.
+ * fits beside a title. Each is disabled while the issue's worktree is opening, and says so while loading.
  * @param {string} key
- * @param {Pick<DetailView, "finishable" | "startable" | "inSpace" | "inActiveSpace" | "opening" | "onStart" | "onContinue">} state
+ * @param {Pick<DetailView, "finishable" | "startable" | "inSpace" | "inActiveSpace" | "opening" | "loading" | "onStart" | "onContinue">} state
  * @param {Theme} t
  * @param {{ primary?: boolean, compact?: boolean }} [options]
  */
 export function workButton(
   key,
-  { finishable, startable, inSpace, inActiveSpace, opening, onStart, onContinue },
+  { finishable, startable, inSpace, inActiveSpace, opening, loading, onStart, onContinue },
   t,
   { primary = true, compact = false } = {},
 ) {
@@ -453,15 +454,18 @@ export function workButton(
   const style = { primary, primaryOnHover: compact, enabled: !opening };
   /** @param {Color} color */
   const branchIcon = (color) => svg("mods/issues/icons/git-branch-plus.svg").size(14).text_color(color);
-  if (finishable)
-    return button(`${key}-continue`, compact ? branchIcon : "Continue", onContinue, t, {
+  if (finishable) {
+    const label = loading ? (compact ? "…" : "Opening…") : compact ? branchIcon : "Continue";
+    return button(`${key}-continue`, label, onContinue, t, {
       ...style,
-      tooltip: compact ? "Continue work" : null,
+      tooltip: compact ? (loading ? "Opening this issue's worktree…" : "Continue work") : null,
     });
-  return button(`${key}-start`, compact ? branchIcon : "Start", onStart, t, {
+  }
+  const label = loading ? (compact ? "…" : "Starting…") : compact ? branchIcon : "Start";
+  return button(`${key}-start`, label, onStart, t, {
     ...style,
     enabled: startable && !opening,
-    tooltip: compact ? "Start work" : null,
+    tooltip: compact ? (loading ? "Starting work…" : "Start work") : null,
   });
 }
 
