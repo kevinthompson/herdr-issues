@@ -44,7 +44,7 @@ import { WorktreeDialog } from "./worktree-dialog.js";
 import { closeWorktreeSpace } from "./worktree-removal.js";
 import { issueIdOfSpace, panelIssueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
-import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
+import { collapseState } from "./collapse.js";
 import { isSectionOpen, setSectionOpen } from "./open-sections.js";
 import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
 import { SettingsView } from "./settings.js";
@@ -152,6 +152,7 @@ export default class Issues extends View {
     this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
     this.noticeSpaceSwitch();
     this.refresh(cx, { reuse: true });
+    this.collapse = collapseState();
     this.update = null; this.updated = false; this.updateCheckedAt = null; this.updateCheckMs = DEFAULT_UPDATE_CHECK_HOURS * HOUR_MS;
     this.checkForUpdate(cx);
     cx.timer.every(REFRESH_CHECK_MS, (cx) => this.poll(cx));
@@ -162,7 +163,7 @@ export default class Issues extends View {
       for (; ;) {
         const command = await nextCommand();
         if (command === "save") this.save(cx);
-        else if (command === "toggle") this.toggleCollapsed();
+        else if (command === "toggle") this.toggleCollapsed(cx);
         else if (command === "refresh" && !this.busy()) this.refreshView(cx);
         else if (command === "close-space") closeFocusedSpace(cx).catch((error) => notify({ title: "Could not close the space", body: String(error) }));
         cx.notify();
@@ -380,15 +381,14 @@ export default class Issues extends View {
 
   // Crossing the collapse threshold, by a toggle or a drag, redraws the panel as the strip or the list.
   noticeWidth(width, cx) {
-    const wasCollapsed = this.collapsed;
-    this.width = width;
-    this.collapsed = isCollapsed(width);
-    rememberWidth(width);
-    if (this.collapsed !== wasCollapsed) cx.notify();
+    const wasCollapsed = this.collapse.collapsed;
+    this.collapse.noticeWidth(width);
+    if (this.collapse.collapsed !== wasCollapsed) cx.notify();
   }
 
-  toggleCollapsed() {
-    toggleCollapsed(this.width);
+  toggleCollapsed(cx) {
+    this.collapse.toggle();
+    cx.notify();
   }
 
   // A badge in the strip expands the panel to the list, with the badge's group open and scrolled to the top,
@@ -399,7 +399,7 @@ export default class Issues extends View {
       this.closeIssue(); setSectionOpen(this.scopeKey, groupId, true); this.revealing = { groupId, step: "end" };
       if (unloaded) this.refresh(cx);
     }
-    this.toggleCollapsed();
+    this.toggleCollapsed(cx);
     cx.notify();
   }
 
@@ -1007,7 +1007,7 @@ export default class Issues extends View {
       .when(Boolean(failedEditAlert), (e) => e.child(failedEditAlert))
       .when(Boolean(this.tracker), (e) => e.child(this.refreshButton(t)))
       .when(this.canOpenSettings(), (e) => e.child(settingsButton((cx) => this.openSettings(cx), t)))
-      .child(collapseButton(() => this.toggleCollapsed(), t));
+      .child(collapseButton((cx) => this.toggleCollapsed(cx), t));
   }
 
   // The panel's header over `content`, which stands in for the list.
@@ -1025,10 +1025,10 @@ export default class Issues extends View {
       return this.setup.render(t, {
         onRetry: (cx) => { forgetLookups(); this.refresh(cx); cx.notify(); },
         header: this.header(t),
-        onCollapse: () => this.toggleCollapsed(),
+        onCollapse: (cx) => this.toggleCollapsed(cx),
       });
     }
-    if (this.settingsView) return this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() });
+    if (this.settingsView) return this.settingsView.render(t, { onCollapse: (cx) => this.toggleCollapsed(cx) });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
     const groups = this.groups(label), error = this.error ?? this.detailError, emptyText = this.emptyText(groups);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
@@ -1054,7 +1054,7 @@ export default class Issues extends View {
     const label = this.shownLabel(this.listedLabels());
     return this.frame(t).items_center().pt(8).gap(10)
       .child(div().id("issues-expand").flex_none().size(24).flex().items_center().justify_center().rounded(6)
-        .tooltip(listedScopeName(this.tracker, this.listedScope)).cursor_pointer().hover((s) => s.bg(t.hover)).on_click(() => this.toggleCollapsed())
+        .tooltip(listedScopeName(this.tracker, this.listedScope)).cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.toggleCollapsed(cx))
         .child(svg("mods/issues/icons/issues.svg").size(STRIP_ICON_PX).text_color(t.foreground)))
       .children(stripBadges(this.groups(label)).map((badge) => this.stripBadge(badge, t)));
   }
@@ -1081,7 +1081,7 @@ export default class Issues extends View {
     if (this.worktreeDialog) return this.worktreeDialog.render(cx);
     this.keepListCurrent(cx);
     this.noticeSpaceSwitch();
-    if (this.collapsed) return this.strip(theme());
+    if (this.collapse.collapsed) return this.strip(theme());
     this.openSpaceIssue(cx);
     this.applyFieldEdits(cx);
     this.setup?.takePickedTeam(cx);
@@ -1090,7 +1090,7 @@ export default class Issues extends View {
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];
     const content = issue && this.settingsView
-      ? this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() })
+      ? this.settingsView.render(t, { onCollapse: (cx) => this.toggleCollapsed(cx) })
       : issue
       ? (this.loadBody(issue, cx), issueDetail({
         issue, writable: this.tracker?.writable, prioritized: this.prioritized(),
@@ -1101,7 +1101,7 @@ export default class Issues extends View {
         assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),
-        onCollapse: () => this.toggleCollapsed(),
+        onCollapse: (cx) => this.toggleCollapsed(cx),
         onMenu: (field) => openMenu(field, issue, this.project, this.tracker?.statuses),
         labelsEditable: Boolean(this.tracker?.writable && (this.tracker.labels || issue.labels.length)),
         onLabelsMenu: (cx) => this.openLabelsMenu(issue, cx),
