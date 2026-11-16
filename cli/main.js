@@ -7,14 +7,14 @@ import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch, STATUSES } from "../mod/issue.js";
-import { issueSpaceName, spaceNameEndsWith } from "../mod/space-name.js";
+import { issueSpaceName, markedSpaceName, newIssueSpaceName, SPACE_MARKS, spaceNameEndsWith, unmarkedSpaceName } from "../mod/space-name.js";
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, markedSpaceName, renameSpace,
-  renameTab, sessionTab, SPACE_MARKS, uncompletedTabName, unmarkedSpaceName,
+  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameSpace, renameTab, sessionTab,
+  uncompletedTabName,
 } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
@@ -52,7 +52,8 @@ Commands:
                            issues.close=<id>; the panel removes the worktree without asking only when every check passes
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
   worktree <id> [--name <space name>] [--claude <first message>]
-                           Open the issue's branch in a worktree, in a Herdr space named after the issue
+                           Open the issue's branch in a worktree, in a new Herdr space named after the issue and
+                           marked working, as mark working does: 󰄱 <space name>
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
@@ -344,7 +345,7 @@ async function worktree(args) {
   if (!id) return openWorktree({ cwd, branch, isNew, name: name ?? branch, claudeMessage });
   const issue = await issueToWork(id);
   console.log(`${issue.id} is on ${issue.branch}`);
-  const spaceName = name ?? await issueSpaceName(await currentProject(), issue.id);
+  const spaceName = newIssueSpaceName(name ?? await issueSpaceName(await currentProject(), issue.id));
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
