@@ -12,6 +12,7 @@ import { issueSpaceName, markedSpaceName, newIssueSpaceName, SPACE_MARKS, spaceN
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
+import { finishedWork, finishInstructions } from "./finish.js";
 import {
   bodyHash, ChangeRefusal, changeIssueLabels, checkIssueItems, editIssueBody, MissingItemRefusal, setIssueStatus, startIssue,
 } from "./change.js";
@@ -56,6 +57,14 @@ Commands:
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
                            Outside a Herdr terminal, with $HC_TERMINAL_ID empty or herdr-app not installed, tab rename,
                            mark, complete and close, with or without --cancel, do nothing and print nothing
+  finish <id> [--canceled] [--checks-recorded]
+                           End a finished issue session: check its worktree is safe to remove (nothing uncommitted, and
+                           the branch merged into main or, with onApproval pull-request, pushed with an open pull
+                           request whose checks pass when waitForChecks is true), else list what's outstanding, change
+                           nothing and exit 1; then run complete, mark done and, with close ask or auto, close, and
+                           print the final block the session ends with and, with close ask, the question to ask.
+                           --canceled: the person canceled the work, so skip the checks; --checks-recorded: failing
+                           checks are recorded in an issue comment as not caused by the branch
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a new Herdr space named after the issue and
                            marked working, as mark working does: 󰄱 <space name>. An issue in triage, backlog or todo
@@ -251,6 +260,37 @@ async function close(args) {
   }
   await labelCloseRequest(tab, issueId);
   console.log("Asked the issues panel to close the space once this session is idle; if it stays open, press cmd+shift+w");
+}
+
+function finishOptions(args) {
+  const options = { id: null, canceled: false, checksRecorded: false };
+  for (const arg of args) {
+    if (arg === "--canceled") options.canceled = true;
+    else if (arg === "--checks-recorded") options.checksRecorded = true;
+    else if (arg.startsWith("-") || options.id) throw new UsageError(`finish: unexpected ${arg}`);
+    else options.id = arg;
+  }
+  if (!options.id) throw new UsageError("finish needs an issue ID");
+  return options;
+}
+
+async function finish(args) {
+  const { id, canceled, checksRecorded } = finishOptions(args);
+  const project = await currentProject();
+  const { approval, onApproval, waitForChecks } = await approvalSettings(project);
+  const work = await finishedWork({ id, cwd: process.cwd(), onApproval, waitForChecks, canceled, checksRecorded });
+  if (work.outstanding.length) {
+    throw new Refusal([`${id} isn't finished, so nothing was changed. Outstanding:`, ...work.outstanding.map((item) => `  - ${item}`)].join("\n"));
+  }
+  const inHerdr = Boolean(await herdrSessionTab());
+  const closeSetting = inHerdr ? (await closeSettings(project)).close : null;
+  if (inHerdr) {
+    await complete([id]);
+    await mark(["done", id]);
+    await close([id]);
+  }
+  const onlyBlock = approval === "auto" && closeSetting === "auto";
+  console.log(`\n${finishInstructions({ id, result: work.result, close: closeSetting, onlyBlock, canceled, pullRequestOpen: work.pullRequestOpen })}`);
 }
 
 // Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
@@ -500,7 +540,7 @@ async function label(args) {
   console.log(`${issue.id}: ${changes.join(", ")}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, worktree, merge, status, start, edit, check, label };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, finish, worktree, merge, status, start, edit, check, label };
 
 const HELP_FLAGS = ["-h", "--help"];
 
