@@ -145,10 +145,12 @@ async function freshStart(repo, on) {
 export class WorktreeDialog {
   /** @param {Context} cx */
   constructor(cx) {
+    // props() answers only while the dialog is being built; later, after awaits, it can be null.
+    this.props = props() ?? {};
     this.on = this.space()?.machine;
     this.userHome = this.on ? null : home();
-    this.opening = props()?.action === "open";
-    this.text = props()?.branch ?? "";
+    this.opening = this.props?.action === "open";
+    this.text = this.props?.branch ?? "";
     /** @type {ListedCheckout[] | undefined} */
     this.list = undefined; // open: the checkouts, once read
     /** @type {string | null} */
@@ -171,18 +173,19 @@ export class WorktreeDialog {
       this.inputFocused = false;
       cx.notify();
     });
-    if (props()?.action !== "remove") {
+    if (this.props?.action !== "remove") {
       this.input.focus();
       cx.timer.after(600, () => this.input.focus());
     }
     this.busy = false;
     this.error = "";
+    this.failed = false; // preparing the dialog threw: the error is shown, whatever the repo is
     /** @type {Repo | null | undefined} */
     this.repo = undefined; // undefined: looking, null: not in git
     /** @type {WorktreeRemoval | null} */
     this.removal = null; // remove: the space's WorktreeRemoval, once its repo is known
     this.handle = cx.focus_handle();
-    if (props()?.action === "remove") this.handle.focus();
+    if (this.props?.action === "remove") this.handle.focus();
     cx.spawn(async (cx) => {
       try {
         if (this.on) {
@@ -199,8 +202,8 @@ export class WorktreeDialog {
           if (result.code !== 0 || !result.stdout.trim()) throw new Error("Could not find the remote home folder.");
           this.userHome = result.stdout.trim().replace(/\\/g, "/");
         }
-        this.folder = props()?.folder || place(this.space()) || this.userHome;
-        const inFlight = props().action === "remove" ? removalInFlight(props().space) : undefined;
+        this.folder = this.props?.folder || place(this.space()) || this.userHome;
+        const inFlight = this.props.action === "remove" ? removalInFlight(this.props.space) : undefined;
         const repo = inFlight?.repo ?? (await repoOf(this.folder, this.on));
         if (repo && this.opening) {
           [this.list, this.mainName] = await Promise.all([
@@ -213,14 +216,15 @@ export class WorktreeDialog {
         }
         this.repo = repo;
         cx.notify();
-        if (repo?.linked && props().action === "remove") {
+        if (repo?.linked && this.props.action === "remove") {
           this.removal = inFlight ?? startRemoval(/** @type {SpaceInfo} */ (this.space()), repo);
           await this.followChecks(cx);
-          if (this.removal.removesWithoutAsking({ ask: props().ask, warning: props().warning })) await this.work(cx);
+          if (this.removal.removesWithoutAsking({ ask: this.props.ask, warning: this.props.warning }))
+            await this.work(cx);
         }
-        if (props().branch) await this.work(cx);
+        if (this.props.branch) await this.work(cx);
       } catch (error) {
-        this.repo = null;
+        this.failed = true;
         this.error = String(error);
         cx.notify();
       }
@@ -239,11 +243,11 @@ export class WorktreeDialog {
 
   // Enter removes only once every check has answered, so nobody confirms before seeing the verdict.
   checking() {
-    return props()?.action === "remove" && Boolean(this.repo?.linked) && !this.removal?.answered();
+    return this.props?.action === "remove" && Boolean(this.repo?.linked) && !this.removal?.answered();
   }
 
   space() {
-    const p = props() ?? {};
+    const p = this.props ?? {};
     return (
       spaces().find((s) => s.id === p.space) ??
       (p.folder ? { folder: p.folder, machine: p.machine ?? null, name: "" } : undefined)
@@ -251,8 +255,8 @@ export class WorktreeDialog {
   }
 
   close() {
-    if (this.removal) forgetRemoval(props().space, this.removal);
-    closeOverlay(props().overlay);
+    if (this.removal) forgetRemoval(this.props.space, this.removal);
+    closeOverlay(this.props.overlay);
   }
 
   /** @param {Context} cx */
@@ -268,7 +272,7 @@ export class WorktreeDialog {
     this.error = "";
     cx.notify();
     try {
-      this.error = props().action === "remove" ? await this.remove() : await this.create();
+      this.error = this.props.action === "remove" ? await this.remove() : await this.create();
     } catch (error) {
       this.error = String(error);
     }
@@ -293,7 +297,7 @@ export class WorktreeDialog {
         : ["worktree", "add", "--no-track", "-b", branch, path, fresh.start];
     const r = await git(this.repo.top, add, this.on);
     if (!r.ok) return r.err || "git worktree add failed.";
-    const p = props();
+    const p = this.props;
     // Unnamed spaces follow the checkout folder; nesting under the repo comes from the checkout either way.
     const behind = p.behind ? openBehindArgs(updates().app.version) : {};
     run("space.new", {
@@ -341,7 +345,7 @@ export class WorktreeDialog {
       cx.stop_propagation();
       return cx.notify();
     }
-    if (e.key === "enter" && props()?.action === "remove") return this.go(cx);
+    if (e.key === "enter" && this.props?.action === "remove") return this.go(cx);
   }
 
   /** @param {Theme} t */
@@ -424,7 +428,8 @@ export class WorktreeDialog {
       .when(r === undefined || (r && this.list === undefined), (el) =>
         el.child(div().text_color(t.muted).child("\u2026")),
       )
-      .when(r === null, (el) =>
+      .when(this.failed, (el) => el.child(div().text_color(t.blocked).child(this.error)))
+      .when(r === null && !this.failed, (el) =>
         el.child(
           div()
             .text_color(t.muted)
@@ -476,7 +481,7 @@ export class WorktreeDialog {
   // Each check's finding as it arrives, then, once all have answered, the verdict on removing the checkout.
   /** @param {Theme} t */
   renderChecks(t) {
-    const findings = removalFindings({ ...this.removal?.checks, warning: props()?.warning });
+    const findings = removalFindings({ ...this.removal?.checks, warning: this.props?.warning });
     /** @param {{ result: string, text: string }} finding */
     const row = ({ result, text }) =>
       h_flex()
@@ -510,11 +515,12 @@ export class WorktreeDialog {
   render() {
     const t = /** @type {Record<string, `#${string}`>} */ (theme());
     if (this.opening) return this.renderOpen(t);
-    const remove = props()?.action === "remove";
+    const remove = this.props?.action === "remove";
     const r = this.repo;
     const title = remove ? "Remove this worktree?" : `New worktree${r ? ` of ${r.name}` : ""}`;
-    const detail =
-      r === undefined
+    const detail = this.failed
+      ? "Couldn't prepare this worktree."
+      : r === undefined
         ? "…"
         : r === null
           ? `${this.folder ? tilde(this.folder, this.userHome) : "This folder"} is not in a git repository.`
@@ -523,7 +529,7 @@ export class WorktreeDialog {
               ? "This is the repository's main checkout, not a worktree."
               : "Closes the space and deletes this worktree. The branch stays."
             : `A new space on a checkout in ${tilde(ROOT(this.userHome), this.userHome)}/${r.name}/. A branch that exists here or on origin is checked out; a new one starts from origin's default branch, fetched first.`;
-    const blocked = !r || (remove && !r.linked);
+    const blocked = this.failed || !r || (remove && !r.linked);
     return v_flex()
       .id("worktree")
       .track_focus(this.handle)
