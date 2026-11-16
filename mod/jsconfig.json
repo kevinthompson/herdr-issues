@@ -17,11 +17,7 @@
     "a preference. A view assigns its state in `init`, which TypeScript cannot",
     "see as definite assignment the way it sees a constructor, so every field",
     "would read as possibly-undefined and every use would want a `?.` that",
-    "means nothing at run time. Turning it on would buy noise, not safety.",
-    "",
-    "`noImplicitAny` is off for now. Most of the mod's parameters and bindings",
-    "have no JSDoc types yet, and reporting each of them would bury the real",
-    "type errors this check exists to block. It comes back on once they are typed."
+    "means nothing at run time. Turning it on would buy noise, not safety."
   ],
   "compilerOptions": {
     "target": "ES2022",
@@ -31,7 +27,6 @@
     "checkJs": true,
     "strict": true,
     "strictNullChecks": false,
-    "noImplicitAny": false,
     "noEmit": true
   }
 }
