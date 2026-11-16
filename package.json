@@ -6,13 +6,20 @@
     "typecheck": "[ -f mod/gpui-kit.d.ts ] || herdr-app check \"$PWD/mod\"; tsc -p mod/jsconfig.json",
     "format": "prettier --write . bin/issues",
     "format:check": "prettier --check . bin/issues",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "prepare": "simple-git-hooks",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && scripts/check-shell"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
     "eslint": "10.14.0",
     "globals": "17.14.0",
+    "lint-staged": "17.6.0",
     "prettier": "3.9.10",
+    "simple-git-hooks": "2.14.0",
     "typescript": "7.0.2"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "scripts/pre-commit"
   }
 }

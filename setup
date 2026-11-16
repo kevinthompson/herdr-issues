@@ -2,6 +2,8 @@
 # Usage: ./setup
 #
 # Installs this repository's Herdr issues mod and, when Claude Code is installed, its Claude Code plugin:
+#   - runs `npm ci` for the development dependencies, which also installs the pre-commit hook, unless
+#     SKIP_DEV_DEPENDENCIES is set, as the README's install sets it
 #   - links the mod folder (mod/) to $HERDR_APP_HOME/mods/issues (default ~/.config/herdr-app/mods/issues),
 #     repointing a link an older install made to the checkout itself
 #   - adds the repository as the herdr-issues plugin marketplace and installs issues@herdr-issues,
@@ -327,7 +329,7 @@ show_layout() {
   local window_layout
   window_layout=$(herdr-app status 2>/dev/null </dev/null | node "$setup_json" window-layout)
   if [[ -n $window_layout ]]; then
-    herdr-app do layout.switch "{\"name\":\"$1\"}" >/dev/null
+    herdr-app 'do' layout.switch "{\"name\":\"$1\"}" >/dev/null
   else
     node "$setup_json" show-layout "$herdr_home/shared.json" "$1"
   fi
@@ -438,6 +440,15 @@ add_panel_to_layout() {
   [[ -z $layout_with_panel || $layout_with_panel == "$shown" ]] || offer_to_show_layout "$shown" "$layout_with_panel"
 }
 
+# The README's install needs none of this: install sets SKIP_DEV_DEPENDENCIES, since the dependencies only
+# run the checks and the pre-commit hook that `npm ci`'s prepare script installs.
+install_dev_dependencies() {
+  [[ -z ${SKIP_DEV_DEPENDENCIES:-} && -f $repo_root/package-lock.json ]] || return 0
+  (cd "$repo_root" && npm ci --silent)
+  success "Installed the development dependencies and the pre-commit hook"
+}
+
+install_dev_dependencies
 link_mod
 link_cli
 merge_keys

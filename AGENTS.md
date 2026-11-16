@@ -26,10 +26,9 @@ Running it again is safe, and is how plugin changes are installed. A person who 
 
 ## Checks before committing
 
-- `npm test` runs the tests.
-- `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what's wrong. In a worktree, check the worktree's mod folder: `herdr-app check "$PWD/mod"`.
-- `bash -n bootstrap install setup uninstall scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh` checks the shell scripts' syntax.
-- `shellcheck` with the same files, if it is installed.
+- A commit runs `scripts/pre-commit`, which `npm install` and `./setup` install as the git hook through simple-git-hooks. It runs lint-staged (`lint-staged.config.js`) on the staged files: ESLint and Prettier on JavaScript, Prettier on JSON and Markdown, the type check once when any `mod/` JavaScript is staged, and `scripts/check-shell` (`bash -n`, plus `shellcheck` when installed) on the shell scripts. A failing check refuses the commit. Herdr worktrees start without `node_modules/`, so the hook runs `npm ci` first.
+- `npm run check` runs the format check, lint, type check, tests and shell checks over the whole repository.
+- `herdr-app check ~/.config/herdr-app/mods/issues` loads the installed mod once and reports what is wrong. In a worktree, check the worktree's mod folder: `herdr-app check "$PWD/mod"`.
 
 ## Verifying a UI change
 
