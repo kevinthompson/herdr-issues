@@ -10,7 +10,11 @@ export class AutosaveQueue {
   // when there's nothing that can be saved. onStart(cx) runs as a write starts, onSaved(cx) after it succeeds,
   // onFailed(error, cx) when it throws, and onSettled(cx) once no write is running or queued.
   constructor({ request, onStart, onSaved, onFailed, onSettled }) {
-    Object.assign(this, { request, onStart, onSaved, onFailed, onSettled });
+    this.request = request;
+    this.onStart = onStart;
+    this.onSaved = onSaved;
+    this.onFailed = onFailed;
+    this.onSettled = onSettled;
     this.timer = null;
     this.saving = false;
     this.again = false;

@@ -164,6 +164,7 @@ export class WorktreeRemoval {
     return this.nestedSpaces?.length > 0 || removalFindings(this.checks).some((finding) => finding.result !== PASS);
   }
 
+  /** @param {{ ask?: boolean, warning?: any }} [options] */
   removesWithoutAsking({ ask = false, warning } = {}) {
     return this.answered() && removesWithoutAsking({ ...this.checks, warning }, this.nestedSpaces.length, { ask });
   }
@@ -260,7 +261,7 @@ export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
   let error;
   try {
     error = await removal.remove();
-  } catch (thrown) {
+  } catch (/** @type {any} */ thrown) {
     error = String(thrown?.message ?? thrown);
   }
   if (error && spaces().some((candidate) => candidate.id === spaceId)) return openDialog();

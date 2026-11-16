@@ -51,6 +51,6 @@ import { trackerSetting } from "./setting.js";
 export async function trackerFor(project) {
   const setting = await trackerSetting(project);
   if (setting?.tracker === "github") return githubTracker(project, setting);
-  if (setting?.tracker === "beads") return beadsTracker(project, setting);
+  if (setting?.tracker === "beads") return beadsTracker(project);
   return linearTracker(project, setting);
 }

@@ -4,7 +4,7 @@
 // "scope" opens openScopeMenu with options as scopes, and menu "label" opens openLabelMenu with options as
 // label names (menu.js).
 
-export function listFilters({ scopes, scope, project, milestone } = {}, labels, label) {
+export function listFilters({ scopes, scope, project, milestone } = /** @type {any} */ ({}), labels, label) {
   const filters = [];
   if (scopes) {
     const listed = project ?? scope;

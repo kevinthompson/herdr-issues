@@ -82,7 +82,7 @@ const abbreviateHome = (path) => (path.startsWith(`${home()}/`) ? `~${path.slice
 function parseSettings(text) {
   try {
     return JSON.parse(text);
-  } catch (e) {
+  } catch (/** @type {any} */ e) {
     throw settingsUnreadable(`issues.json isn't valid JSON: ${e.message ?? e}`);
   }
 }
@@ -122,7 +122,10 @@ function checkWorkSettings(settings, where) {
     throw badSetting(`${where} has a workPrompt that isn't text`);
 }
 
-function checkApproval({ approval, onApproval, waitForChecks, merge, complete } = {}, where) {
+function checkApproval(
+  { approval, onApproval, waitForChecks, merge, complete } = /** @type {Record<string, any>} */ ({}),
+  where,
+) {
   if (approval != null && !APPROVALS.includes(approval))
     throw badApprovalSetting(`${where} needs an approval of ${APPROVALS.join(", ")}`);
   if (onApproval != null && !ON_APPROVALS.includes(onApproval))

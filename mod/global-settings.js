@@ -71,6 +71,7 @@ const WORK_PROMPT_SENTENCE =
 export class GlobalSettings extends SettingsForm {
   constructor({ onSaved }) {
     super({ onSaved });
+    /** @type {Record<string, any>} */
     this.saved = null;
     this.chosen = {};
     this.typedInputs = null;
@@ -121,7 +122,7 @@ export class GlobalSettings extends SettingsForm {
         });
         this.workPromptInput.set_soft_wrap(true);
         this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.error = String(e.message ?? e);
       } finally {
         this.loading = false;
@@ -152,7 +153,7 @@ export class GlobalSettings extends SettingsForm {
     for (const { key, parse } of TYPED_QUESTIONS) {
       try {
         values[key] = parse(this.typedInputs[key].value());
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         problems[key] = String(e.message ?? e);
       }
     }
