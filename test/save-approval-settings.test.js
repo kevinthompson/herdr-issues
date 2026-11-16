@@ -98,7 +98,24 @@ test("a value trackerSetting would refuse is not written", async (t) => {
     saveApprovalSettings(repository, { waitForChecks: "yes" }),
     /needs a waitForChecks of true or false/,
   );
+  await assert.rejects(
+    saveApprovalSettings(repository, { pushAfterMerge: "yes" }),
+    /needs a pushAfterMerge of true or false/,
+  );
   assert.equal(readFileSync(settingsPath(), "utf8"), before);
+});
+
+test("saving pushAfterMerge writes it, and null removes it so the default applies", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ repos: { [repository]: { tracker: "beads" } } });
+
+  await saveApprovalSettings(repository, { onApproval: "merge", pushAfterMerge: true });
+  assert.deepEqual(readSettings().repos[repository], { tracker: "beads", onApproval: "merge", pushAfterMerge: true });
+  assert.equal(await setting(t, repository, "pushAfterMerge"), "true");
+
+  await saveApprovalSettings(repository, { onApproval: "merge", pushAfterMerge: null });
+  assert.deepEqual(readSettings().repos[repository], { tracker: "beads", onApproval: "merge" });
+  assert.equal(await setting(t, repository, "pushAfterMerge"), "false");
 });
 
 test("a repository without an entry gets none from saving approval settings", async (t) => {
@@ -114,7 +131,14 @@ test("the setup choices replace the approval settings and the retired merge and 
   const repository = createRepository(temporaryFolder(t));
   writeSettings({
     repos: {
-      [repository]: { tracker: "beads", merge: "pull-request", complete: "merged", waitForChecks: true, close: "auto" },
+      [repository]: {
+        tracker: "beads",
+        merge: "pull-request",
+        complete: "merged",
+        waitForChecks: true,
+        pushAfterMerge: true,
+        close: "auto",
+      },
     },
   });
 
@@ -137,8 +161,8 @@ test("approval sources give the entry's and top level's own values, the retired 
   });
 
   assert.deepEqual(await approvalSources({ root: repository, on: null }), {
-    entry: { approval: "auto", onApproval: "merge", waitForChecks: null, close: null },
-    topLevel: { approval: null, onApproval: null, waitForChecks: true, close: "auto" },
+    entry: { approval: "auto", onApproval: "merge", waitForChecks: null, pushAfterMerge: null, close: null },
+    topLevel: { approval: null, onApproval: null, waitForChecks: true, pushAfterMerge: null, close: "auto" },
     defaultOnApproval: "merge",
   });
 });

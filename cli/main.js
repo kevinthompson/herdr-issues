@@ -61,7 +61,8 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: approval, onApproval,
-                           waitForChecks, close, name, pollSeconds, updateCheckHours, workModel, workEffort or workPrompt
+                           waitForChecks, pushAfterMerge, close, name, pollSeconds, updateCheckHours, workModel,
+                           workEffort or workPrompt
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
@@ -221,6 +222,7 @@ const SETTINGS = {
   approval: approvalSettings,
   onApproval: approvalSettings,
   waitForChecks: approvalSettings,
+  pushAfterMerge: approvalSettings,
   close: closeSettings,
   name: nameSettings,
   pollSeconds: pollSettings,

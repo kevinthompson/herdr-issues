@@ -189,6 +189,30 @@ describe("approval, onApproval and waitForChecks", () => {
   });
 });
 
+describe("pushAfterMerge", () => {
+  test("false applies without either", async (t) => {
+    const repository = repositoryWith(t, {});
+    assert.equal((await setting(t, repository, "pushAfterMerge")).out, "false");
+  });
+
+  test("the entry's wins over the top level's", async (t) => {
+    const repository = repositoryWith(t, { entry: { pushAfterMerge: false }, topLevel: { pushAfterMerge: true } });
+    assert.equal((await setting(t, repository, "pushAfterMerge")).out, "false");
+  });
+
+  test("the top level's applies without the entry's", async (t) => {
+    const repository = repositoryWith(t, { topLevel: { pushAfterMerge: true } });
+    assert.equal((await setting(t, repository, "pushAfterMerge")).out, "true");
+  });
+
+  test("an entry's that isn't true or false is refused", async (t) => {
+    const repository = repositoryWith(t, { entry: { pushAfterMerge: "yes" } });
+    const result = await setting(t, repository, "pushAfterMerge");
+    assert.equal(result.code, 1);
+    assert.match(result.err, /needs a pushAfterMerge of true or false/);
+  });
+});
+
 describe("spaceName", () => {
   const spaceName = (repository) => issueSpaceName({ root: repository, on: null }, "#41");
 
@@ -224,6 +248,11 @@ describe("a top level that an entry couldn't hold is refused", () => {
       key: "waitForChecks",
       topLevel: { waitForChecks: "yes" },
       message: /issues\.json needs a waitForChecks of true or false/,
+    },
+    {
+      key: "pushAfterMerge",
+      topLevel: { pushAfterMerge: "yes" },
+      message: /issues\.json needs a pushAfterMerge of true or false/,
     },
     {
       key: "onApproval",

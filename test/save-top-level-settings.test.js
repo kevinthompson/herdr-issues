@@ -73,6 +73,7 @@ test("a value or pair the top level couldn't hold, or a repository-only key, wri
     [{ close: "manual" }, /close must be one of ask, auto/],
     [{ approval: "sometimes" }, /issues\.json needs an approval of ask, auto/],
     [{ waitForChecks: "yes" }, /issues\.json needs a waitForChecks of true or false/],
+    [{ pushAfterMerge: "yes" }, /issues\.json needs a pushAfterMerge of true or false/],
     [{ merge: "auto" }, /merge isn't a setting for every repository/],
     [{ pollSeconds: 5 }, /pollSeconds that's a whole number of seconds, 10 or more/],
     [{ updateCheckHours: 0.5 }, /updateCheckHours that's a whole number of hours/],
@@ -92,6 +93,16 @@ test("saving a approval setting removes the retired merge and complete, and othe
 
   await saveTopLevelSettings({ close: "auto" });
   assert.deepEqual(readSettings(), { merge: "pull-request", complete: "pull-request-passing", close: "auto", repos });
+
+  await saveTopLevelSettings({ pushAfterMerge: true });
+  assert.deepEqual(readSettings(), {
+    merge: "pull-request",
+    complete: "pull-request-passing",
+    close: "auto",
+    pushAfterMerge: true,
+    repos,
+  });
+  await saveTopLevelSettings({ pushAfterMerge: null });
 
   await saveTopLevelSettings({ approval: "ask", onApproval: "pull-request", waitForChecks: false });
   assert.deepEqual(readSettings(), {
