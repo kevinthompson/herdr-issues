@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { Readable } from "node:stream";
 import { afterEach, beforeEach, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { createRepository, temporaryFolder } from "./support/repository.js";
@@ -76,6 +77,31 @@ test("edit saves the body read with show and refreshes the panels", async (t) =>
   assert.equal(counts.announcements, 1);
 });
 
+function pipeToStandardInput(t, text) {
+  const standardInput = Object.getOwnPropertyDescriptor(process, "stdin");
+  Object.defineProperty(process, "stdin", { value: Readable.from([text]), configurable: true });
+  t.after(() => Object.defineProperty(process, "stdin", standardInput));
+}
+
+test("edit reads the body from standard input when the body file is -", async (t) => {
+  const { record, updates } = beadsRepository(t);
+  const hash = await readBodyHash(t, record.id);
+  pipeToStandardInput(t, "- [x] A criterion\n");
+  const result = await run(t, ["edit", record.id, "--body-file", "-", "--body-hash", hash]);
+  assert.equal(result.code, 0, result.err);
+  assert.deepEqual(updates, [[record.id, "--description=- [x] A criterion\n"]]);
+});
+
+test("edit exits 1 for empty standard input, changing nothing", async (t) => {
+  const { record, updates } = beadsRepository(t);
+  const hash = await readBodyHash(t, record.id);
+  pipeToStandardInput(t, " \n");
+  const result = await run(t, ["edit", record.id, "--body-file", "-", "--body-hash", hash]);
+  assert.equal(result.code, 1);
+  assert.match(result.err, /standard input: is empty/);
+  assert.deepEqual(updates, []);
+});
+
 test("edit refuses, changing nothing, when the body changed after show read it", async (t) => {
   const { record, updates, counts, bodyFile } = beadsRepository(t);
   const hash = await readBodyHash(t, record.id);
@@ -125,4 +151,5 @@ test("editing a body refuses a tracker that can't save", async () => {
 test("--help lists edit", async (t) => {
   const result = await run(t, ["--help"]);
   assert.match(result.out, /^ {2}edit <id> --body-file <file> --body-hash <hash>$/m);
+  assert.match(result.out, /standard input when <file> is -/);
 });

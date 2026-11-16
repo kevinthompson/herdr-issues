@@ -1,5 +1,6 @@
 // The issues CLI's commands. Each answers for the git repository holding the current folder, on this computer.
 import { readFile } from "node:fs/promises";
+import { text } from "node:stream/consumers";
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
 import { closeSettings, landingSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
@@ -67,7 +68,8 @@ Commands:
                            The statuses: ${STATUSES.join(", ")}
   start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
   edit <id> --body-file <file> --body-hash <hash>
-                           Save the file as the issue's body and refresh the panels; <hash> is the bodyHash show --json
+                           Save the file, or standard input when <file> is -, as the issue's body and refresh the
+                           panels; <hash> is the bodyHash show --json
                            printed, and the edit is refused, changing nothing, when the body changed since then
   check <id> [--except <n>]...
                            Check every unchecked task-list item (- [ ]) in the issue's body, save it as edit does and
@@ -426,9 +428,11 @@ function editOptions(args) {
 
 async function edit(args) {
   const { id, bodyFile, readBodyHash } = editOptions(args);
-  const body = await readFile(bodyFile, "utf8").catch(() => null);
-  if (body === null) throw new Refusal(`${bodyFile}: can't be read`);
-  if (!body.trim()) throw new Refusal(`${bodyFile}: is empty`);
+  const readsStandardInput = bodyFile === "-";
+  const source = readsStandardInput ? "standard input" : bodyFile;
+  const body = await (readsStandardInput ? text(process.stdin) : readFile(bodyFile, "utf8")).catch(() => null);
+  if (body === null) throw new Refusal(`${source}: can't be read`);
+  if (!body.trim()) throw new Refusal(`${source}: is empty`);
   const issue = await refusingChanges(async () => editIssueBody(await currentTracker(), id, { body, readBodyHash }));
   console.log(`Saved the body of ${issue.id}`);
 }
