@@ -8,7 +8,8 @@ import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
-import { collapseButton, headerBar } from "./header.js";
+import { collapseButton, headerBar, HEADER_HEIGHT_PX } from "./header.js";
+import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -466,17 +467,57 @@ export function workButton(
 }
 
 /**
+ * A button's label that is an icon, redrawn in the button's text color.
  * @param {string} name
  * @returns {(color: Color) => NativeElement}
  */
 export const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
 
 /**
- * Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
+ * Continue for an issue in progress, otherwise Start, or Go to space when a space already shows the
+ * worktree: the issue view's filled primary action.
  * @param {DetailView} view
  * @param {Theme} t
  */
-const workActions = (view, t) => workButton("issue", view, t, { compact: true });
+function workActions({ finishable, startable, inSpace, inActiveSpace, opening, onStart, onContinue }, t) {
+  if (inSpace)
+    return actionButton(
+      {
+        id: "issue-space",
+        icon: "circle-arrow-right",
+        tooltip: inActiveSpace ? "Already in this issue's space" : "Switch to this issue's worktree space",
+        onClick: onContinue,
+        primary: true,
+        enabled: !inActiveSpace,
+        busy: opening,
+      },
+      t,
+    );
+  if (finishable)
+    return actionButton(
+      {
+        id: "issue-continue",
+        icon: "git-branch-plus",
+        tooltip: "Continue work",
+        onClick: onContinue,
+        primary: true,
+        busy: opening,
+      },
+      t,
+    );
+  return actionButton(
+    {
+      id: "issue-start",
+      icon: "git-branch-plus",
+      tooltip: "Start work",
+      onClick: onStart,
+      primary: true,
+      enabled: startable,
+      busy: opening,
+    },
+    t,
+  );
+}
 
 /**
  * Merges the issue's finished branch into main, for a repository that merges locally.
@@ -484,10 +525,17 @@ const workActions = (view, t) => workButton("issue", view, t, { compact: true })
  * @param {Theme} t
  */
 function mergeButton({ issue, merging, opening, onMerge }, t) {
-  return button("issue-merge", merging ? "Merging…" : "Merge", onMerge, t, {
-    enabled: !opening,
-    tooltip: `Merge ${issue.branch} into main, mark ${issue.id} done and remove its worktree`,
-  });
+  return actionButton(
+    {
+      id: "issue-merge",
+      icon: "git-merge",
+      tooltip: `Merge ${issue.branch} into main, mark ${issue.id} done and remove its worktree`,
+      onClick: onMerge,
+      enabled: !opening,
+      busy: merging,
+    },
+    t,
+  );
 }
 
 /**
@@ -497,12 +545,20 @@ function mergeButton({ issue, merging, opening, onMerge }, t) {
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
   if (!writable) return div();
   if (!editor)
-    return button("issue-edit", icon("pencil"), onEdit, t, { enabled: issue.body !== null, tooltip: "Edit" });
+    return actionButton(
+      { id: "issue-edit", icon: "pencil", tooltip: "Edit", onClick: onEdit, enabled: issue.body !== null },
+      t,
+    );
   return h_flex()
     .flex_none()
-    .gap(6)
-    .child(button("issue-cancel", "Cancel", onCancel, t, { enabled: !saving }))
-    .child(button("issue-save", saving ? "Saving…" : "Save", onSave, t, { primary: true, enabled: !saving }));
+    .gap(ACTION_GAP_PX)
+    .child(textActionButton({ id: "issue-cancel", label: "Cancel", onClick: onCancel, enabled: !saving }, t))
+    .child(
+      textActionButton(
+        { id: "issue-save", label: saving ? "Saving…" : "Save", onClick: onSave, primary: true, enabled: !saving },
+        t,
+      ),
+    );
 }
 
 const TASK_INDENT_PX = 9;
@@ -597,14 +653,14 @@ export function issueDetail(view, t) {
     )
     .child(
       h_flex()
-        .h(38)
+        .h(HEADER_HEIGHT_PX)
         .flex_none()
         .px(10)
-        .gap(8)
+        .gap(ACTION_GAP_PX)
         .items_center()
         .border_b(1)
         .border_color(t.border)
-        .child(button("issue-back", icon("chevron-left"), onBack, t, { tooltip: "Back to issues" }))
+        .child(actionButton({ id: "issue-back", icon: "chevron-left", tooltip: "Back to issues", onClick: onBack }, t))
         .child(div().flex_1().min_w(0))
         .child(editActions(view, t))
         .when(!view.editor && view.mergeable, (e) => e.child(mergeButton(view, t)))
