@@ -123,26 +123,37 @@ describe("waitingIssues", () => {
 describe("stripBadges", () => {
   const issues = (status, count) => Array.from({ length: count }, (_, index) => issue(`#${status}-${index}`, status));
 
-  test("counts the active groups holding issues, in the list's order", () => {
+  test("counts each group the list shows, in the list's order", () => {
     const groups = groupIssues([...issues("todo", 2), ...issues("triage", 1), ...issues("in-review", 3)]);
     assert.deepEqual(stripBadges(groups), [
-      { id: "triage", label: "Triage", count: 1, text: "1" },
-      { id: "in-review", label: "In review", count: 3, text: "3" },
-      { id: "todo", label: "Todo", count: 2, text: "2" },
+      { id: "triage", label: "Triage", count: 1, text: "1", unloaded: false },
+      { id: "in-review", label: "In review", count: 3, text: "3", unloaded: false },
+      { id: "todo", label: "Todo", count: 2, text: "2", unloaded: false },
     ]);
   });
 
-  test("leaves out Blocked, Backlog, Unknown status, Done and Canceled", () => {
+  test("keeps the tracker's empty sections with 0", () => {
+    const groups = groupIssues([issue("#1", "todo")], new Set(), null, { sections: ["in-progress", "todo", "backlog"] });
+    assert.deepEqual(stripBadges(groups).map(({ id, text }) => [id, text]), [["in-progress", "0"], ["todo", "1"], ["backlog", "0"]]);
+  });
+
+  test("includes Blocked, Backlog, Unknown status, Done and Canceled", () => {
     const groups = groupIssues([
       issue("#1", "in-progress"), issue("#2", "todo", { blockedBy: ["#1"] }), issue("#3", "backlog"),
       issue("#4", "started"), issue("#5", "done"), issue("#6", "canceled"),
     ]);
-    assert.deepEqual(stripBadges(groups).map((badge) => badge.id), ["in-progress"]);
+    assert.deepEqual(stripBadges(groups).map((badge) => badge.id),
+      ["in-progress", "blocked", "backlog", "unknown", "done", "canceled"]);
   });
 
-  test("returns no badges without issues in the active groups", () => {
-    assert.deepEqual(stripBadges(groupIssues([issue("#1", "backlog")])), []);
-    assert.deepEqual(stripBadges(groupIssues([])), []);
+  test("marks a section whose issues weren't listed so the strip draws the refresh icon", () => {
+    const groups = groupIssues([issue("#1", "todo")], new Set(["done"]), null, { sections: ["todo", "done"] });
+    assert.deepEqual(stripBadges(groups).at(-1), { id: "done", label: "Done", count: 0, text: null, unloaded: true });
+  });
+
+  test("shows a capped Done or Canceled as the cap and +", () => {
+    const groups = groupIssues([...issues("done", 3)], new Set(), null, { sections: ["done", "canceled"], recentlyClosed: 3 });
+    assert.deepEqual(stripBadges(groups).map((badge) => badge.text), ["3+", "3+"]);
   });
 
   test("shows 99 issues as 99 and 100 or more as 99+", () => {

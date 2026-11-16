@@ -130,7 +130,7 @@ const pullRequestBadge = (count, t) => h_flex().flex_none().gap(3).items_center(
 const REFRESH_ICON_PX = 15, ALERT_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
-const GROUP_REFRESH_ICON_PX = 11;
+const GROUP_REFRESH_ICON_PX = 11, STRIP_REFRESH_ICON_PX = 10;
 const SYNC_SPIN_MS = 1000;
 const NOT_A_REPOSITORY = "not-a-repository";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
@@ -390,10 +390,14 @@ export default class Issues extends View {
     toggleCollapsed(this.width);
   }
 
-  // A badge in the strip expands the panel to the list, with the badge's group open and scrolled to the top.
-  expandToGroup(groupId, cx) {
+  // A badge in the strip expands the panel to the list, with the badge's group open and scrolled to the top,
+  // listing the group's issues when they weren't, as opening it in the list does.
+  expandToGroup(groupId, cx, { unloaded = false } = {}) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
-    else { this.closeIssue(); setSectionOpen(this.scopeKey, groupId, true); this.revealing = { groupId, step: "end" }; }
+    else {
+      this.closeIssue(); setSectionOpen(this.scopeKey, groupId, true); this.revealing = { groupId, step: "end" };
+      if (unloaded) this.refresh(cx);
+    }
     this.toggleCollapsed();
     cx.notify();
   }
@@ -1042,8 +1046,8 @@ export default class Issues extends View {
       .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
   }
 
-  // The expand button, centered on the expanded panel's header, which is 42px tall, over a count of each
-  // active group's issues that matches its header in the list.
+  // The expand button, centered on the expanded panel's header, which is 42px tall, over a badge for each
+  // group the list shows, with the count its header shows.
   strip(t) {
     const label = this.shownLabel(this.listedLabels());
     return this.frame(t).items_center().pt(8).gap(10)
@@ -1053,11 +1057,13 @@ export default class Issues extends View {
       .children(stripBadges(this.groups(label)).map((badge) => this.stripBadge(badge, t)));
   }
 
-  stripBadge({ id, label, text }, t) {
+  stripBadge({ id, label, text, unloaded }, t) {
+    const icon = statusIcon(id);
     return v_flex().id(`strip-${id}`).flex_none().w(24).py(3).items_center().gap(2).rounded(6).tooltip(label)
-      .cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.expandToGroup(id, cx))
-      .child(image(statusIcon(id)).size(STRIP_ICON_PX))
-      .child(div().text_size(10).text_color(t.muted).child(text));
+      .cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => this.expandToGroup(id, cx, { unloaded }))
+      .when(Boolean(icon), (e) => e.child(image(icon ?? "").size(STRIP_ICON_PX)))
+      .child(unloaded ? svg("mods/issues/icons/rotate-cw.svg").size(STRIP_REFRESH_ICON_PX).text_color(t.muted)
+        : div().text_size(10).text_color(t.muted).child(text));
   }
 
   // Moving to another repository, an issue change and a newly selected scope each refresh the list.
