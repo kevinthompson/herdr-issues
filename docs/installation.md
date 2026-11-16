@@ -35,7 +35,8 @@ The setup script:
 - adds the panel's keys to `~/.config/herdr-app/keys.json`, keeping any key you already bound to something else;
 - adds the checkout as the `herdr-issues` plugin marketplace and installs the `issues@herdr-issues` plugin;
 - offers to add the Issues panel beside the side panel of one of your layouts, or of a new copy of Herdr's `main` layout. Herdr's shipped layouts can't be changed, so it never edits them;
-- links the `issues` command to `~/.local/bin/issues`, warning if that folder isn't on your `PATH`.
+- when the layout with the Issues panel isn't the one Herdr shows, offers to switch to it, or says how to;
+- links the `issues` command to `~/.local/bin/issues`, refusing to replace a file there that isn't a link, and warning if that folder isn't on your `PATH`.
 
 If you skipped the layout step or ran setup without a terminal, run `./setup` again, or follow the steps it printed.
 
@@ -47,7 +48,7 @@ With Claude Code installed, start a new Claude Code session afterwards to load t
 
 ## Updating
 
-Run the install command again. It fast-forwards `~/.local/share/herdr-issues` to `origin/main` and runs setup again. When that checkout has local changes, isn't on `main` or has commits `origin/main` doesn't, it stops and says so, changing nothing.
+Run the install command again, or choose **Update** when the panel's footer offers one; the panel checks for an update every few hours, as [`updateCheckHours`](configuration.md#updatecheckhours) sets. The install command fast-forwards `~/.local/share/herdr-issues` to `origin/main` and runs setup again. When that checkout has local changes, isn't on `main` or has commits `origin/main` doesn't, it stops and says so, changing nothing.
 
 If you develop in your own clone, run `./setup` in it instead, after pulling; running it again is safe.
 

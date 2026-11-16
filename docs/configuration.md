@@ -73,6 +73,14 @@ An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2
 
 A `spaceName` at the top level of `issues.json` names the issue spaces of every repository without its own.
 
+### `name`
+
+The name of the space `issues worktree` and the worktree dialog open on the repository's main checkout, which Herdr's sidebar nests the issue spaces under. Without it, or when it's blank, the space is named after the repository without its owner. Set it in a repository's entry, from the panel's settings view or with `/issues:config name <name>`; `issues setting name` prints it.
+
+```json
+"~/Code/web": { "tracker": "linear", "team": "WEB", "name": "Web app" }
+```
+
 ### `approval`, `onApproval` and `waitForChecks`
 
 These settings say how an issue's branch is approved and reaches main. An issue is done once its branch is in main, whichever you choose.
@@ -99,7 +107,8 @@ What a finished `/issues:work` session does about its worktree:
 
 - `ask` (the default): the session asks whether to close the worktree, and closes it if you say yes.
 - `auto`: the session closes the worktree without asking.
-- `manual`: the session tells you to close the worktree with cmd+shift+w.
+
+The retired `manual` value, which only told you to close the worktree with cmd+shift+w, still loads and works as `ask`.
 
 The session closes its worktree with `issues close`, which asks the issues panel to close the session's space. The panel waits until the session's turn has ended, so its final message is shown, then removes the worktree without a dialog when every removal check passes, and shows the removal dialog otherwise, or when the space is on another machine.
 
@@ -134,6 +143,14 @@ How often the panel asks the tracker for its list of issues, in whole seconds, 1
     "~/Code/herdr-issues": { "tracker": "github", "pollSeconds": 30 }
   }
 }
+```
+
+### `updateCheckHours`
+
+How often the panel checks the checkout it runs from for an update, in whole hours, 1 or more; without it, every 6 hours. When `origin/main` has commits the checkout lacks and the checkout's `./install` would succeed, the panel's footer offers an **Update** button that runs it. It goes at the top level of `issues.json` only:
+
+```json
+{ "updateCheckHours": 24 }
 ```
 
 ### `workModel` and `workEffort`
