@@ -1,11 +1,13 @@
 // What the settings view's forms (settings.js) share: each question's title, controls and description, typed
-// fields, the error line and Save, a save that writes, then hands back to the view, or shows its error and stays,
-// and the issue sessions' model and effort. Those two are select menus (select.js) of their allowed values led by a
-// choice that removes the setting, labeled with what then applies; workModel's Other takes another model alias or
-// full name typed in.
+// fields, the line saying why its last save failed, saving as the form changes
+// (autosave.js), where a picked choice or Enter in a field saves at once and typing saves once it pauses, and the
+// issue sessions' model and effort. Those two are select menus (select.js) of their allowed values led by a choice
+// that removes the setting, labeled with what then applies; workModel's Other takes another model alias or full
+// name typed in. Each form gives saveRequest(), what to write and how its saved values change once written, or null
+// when nothing can be saved yet.
 import { div } from "gpui-kit";
-import { v_flex, h_flex, Input, InputState, Textarea } from "gpui-base";
-import { button } from "./detail.js";
+import { v_flex, Input, InputState, Textarea } from "gpui-base";
+import { AutosaveQueue } from "./autosave.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, workModelChoice } from "./settings-fields.js";
 import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
@@ -24,14 +26,44 @@ const OTHER_WORK_MODEL_OPTION = { id: OTHER_WORK_MODEL, label: "Other…", detai
 export const WORK_PROMPT_ROWS = 6;
 
 export class SettingsForm {
-  // onSaved(cx) runs once the changes are written.
+  // onSaved(cx) runs after each save is written; onSettled(cx), which the view sets, once none is running.
   constructor({ onSaved }) {
-    this.onSaved = onSaved;
+    this.onSaved = onSaved; this.onSettled = () => {};
     this.savedAgent = null; this.agentValues = {}; this.otherWorkModelPicked = false;
-    this.loading = true; this.saving = false; this.error = null;
+    this.loading = true; this.error = null; this.saveFailed = false;
+    this.autosave = new AutosaveQueue({
+      request: () => this.saveRequest(),
+      onStart: (cx) => { Object.assign(this, { error: null, saveFailed: false }); cx.notify(); },
+      onSaved: (cx) => this.onSaved(cx),
+      onFailed: (e, _cx) => Object.assign(this, { error: `Could not save: ${e.message ?? e}`, saveFailed: true }),
+      onSettled: (cx) => { this.onSettled(cx); cx.notify(); },
+    });
     this.workModelInput = InputState.new({ placeholder: "Another model alias or full name" });
     this.workModelInput.on("change", (_e, cx) => this.typeWorkModel(this.workModelInput.value().trim(), cx));
-    this.workModelInput.on("submit", (_e, cx) => this.save(cx));
+    this.workModelInput.on("submit", (_e, cx) => this.saveNow(cx));
+  }
+
+  get saving() {
+    return this.autosave.saving;
+  }
+
+  // A field changed: saves once typing pauses.
+  edited(cx) {
+    this.error = null;
+    this.autosave.schedule(cx);
+    cx.notify();
+  }
+
+  // A choice was picked or Enter pressed: saves at once, with any typing still waiting.
+  saveNow(cx) {
+    this.error = null;
+    this.autosave.now(cx);
+    cx.notify();
+  }
+
+  // Saves typing still waiting for its pause at once, as the view is left.
+  flush(cx) {
+    this.autosave.flush(cx);
   }
 
   // A select for each of workModel and workEffort, with ids led by `prefix`.
@@ -54,35 +86,20 @@ export class SettingsForm {
       if (!this.otherWorkModelPicked && isTypedWorkModel(this.workModelInput.value().trim())) this.workModelInput.set_value("");
     }
     if (value !== OTHER_WORK_MODEL) this.agentValues = { ...this.agentValues, [key]: value };
-    this.error = null;
-    cx.notify();
+    this.saveNow(cx);
   }
 
   // Emptying the field of a typed model removes workModel.
   typeWorkModel(text, cx) {
     if (text) this.agentValues = { ...this.agentValues, workModel: text };
     else if (isTypedWorkModel(this.agentValues.workModel)) this.agentValues = { ...this.agentValues, workModel: null };
-    this.error = null;
-    cx.notify();
+    this.edited(cx);
   }
 
   agentChanges() {
     return Object.fromEntries(Object.keys(AGENT_DEFAULTS)
       .filter((key) => this.savedAgent && (this.agentValues[key] ?? null) !== this.savedAgent[key])
       .map((key) => [key, this.agentValues[key] ?? null]));
-  }
-
-  // Marks the form saving, runs `write`, then hands back to the view, or shows why it failed.
-  runSave(cx, write) {
-    Object.assign(this, { saving: true, error: null });
-    cx.spawn(async (cx) => {
-      try {
-        await write();
-        this.onSaved(cx);
-      } catch (e) { this.error = `Could not save: ${e.message ?? e}`; }
-      finally { this.saving = false; cx.notify(); }
-    });
-    cx.notify();
   }
 
   // A select of the setting's values led by the one that removes it, labeled `clearLabel`; workModel's ends with
@@ -92,17 +109,14 @@ export class SettingsForm {
     const options = [{ id: CLEAR_CHOICE, label: clearLabel }, ...choices.map((id) => ({ id, label: id })), ...(isWorkModel ? [OTHER_WORK_MODEL_OPTION] : [])];
     const chosen = isWorkModel ? workModelChoice(this.agentValues.workModel, this.otherWorkModelPicked) : this.agentValues[key] ?? CLEAR_CHOICE;
     return this.question(title, sentence, t, (controls) => controls
-      .child(this.selects[key].render(t, { options, value: chosen, enabled: !this.saving,
+      .child(this.selects[key].render(t, { options, value: chosen,
         onChoose: (id, cx) => this.chooseAgent(key, id === CLEAR_CHOICE ? null : id, cx) }))
       .when(isWorkModel && showTypedModel, (e) => e.child(this.textField(this.workModelInput, t))));
   }
 
-  // The error, if any, and Save, which is enabled only when the form can save.
-  saveRow(content, id, t) {
-    return content
-      .when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")))
-      .child(h_flex().gap(8).items_center()
-        .child(button(id, this.saving ? "Saving…" : "Save", (cx) => this.save(cx), t, { primary: true, enabled: this.canSave() })));
+  // Why the last save failed, leading the form.
+  errorLine(content, t) {
+    return content.when(Boolean(this.error), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(this.error ?? "")));
   }
 
   question(title, sentence, t, addControls) {

@@ -280,12 +280,12 @@ export default class Issues extends View {
     return Boolean(this.tracker && this.project && !this.project.on && this.scopeKey);
   }
 
-  // Saved settings refresh the list at once, so the panel acts on them without waiting for the next poll.
+  // Each saved setting refreshes the list at once, so the panel acts on it without waiting for the next poll.
   openSettings(cx) {
     if (this.hasUnsavedEdits()) { this.detailError = "Save or cancel your edits first"; cx.notify(); return; }
     const view = new SettingsView(this.project, this.scopeKey, this.tracker, {
       onBack: (cx) => { if (this.settingsView === view) this.settingsView = null; cx.notify(); },
-      onSaved: (cx) => { if (this.settingsView === view) this.settingsView = null; this.refresh(cx); },
+      onSaved: (cx) => this.refresh(cx),
     });
     this.settingsView = view;
     view.load(cx);
