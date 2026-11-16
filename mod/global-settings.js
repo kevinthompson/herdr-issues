@@ -1,6 +1,6 @@
 // The settings at issues.json's top level, which apply to every repository without its own: the settings view's
 // Global form (settings.js). It shows only the settings that have a top-level version: whether a session asks for
-// approval before its work lands, approval; how the branch then gets into main, onApproval; whether a session waits
+// approval of its work, approval; how the branch then gets into main, onApproval; whether a session waits
 // for its pull request's checks, waitForChecks, shown for a pull request or the default onApproval, which is a
 // pull request for a repository on GitHub (settings-fields.js), where a retired merge and complete open as the
 // values they mean and any change to the three saves all three; what a finished session does about its worktree,
@@ -13,13 +13,13 @@
 // value that can't be saved writes nothing until it's fixed.
 import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
-import { LANDING_QUESTIONS } from "./setup.js";
+import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, checksChoiceId, globalSettingsFields, waitForChecksOf } from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import {
   AGENT_DEFAULTS, DEFAULT_APPROVAL, DEFAULT_CLOSE, DEFAULT_POLL_SECONDS, DEFAULT_UPDATE_CHECK_HOURS, DEFAULT_WAIT_FOR_CHECKS,
-  LANDING_KEYS, closeChoice, ownLanding, parsePollSeconds, parseUpdateCheckHours, saveTopLevelSettings, topLevelSettings,
+  APPROVAL_KEYS, closeChoice, ownApproval, parsePollSeconds, parseUpdateCheckHours, saveTopLevelSettings, topLevelSettings,
 } from "./trackers/setting.js";
 
 const DEFAULT_ON_APPROVAL_CHOICE = {
@@ -36,7 +36,7 @@ const TYPED_QUESTIONS = [
   { key: "updateCheckHours", title: "Update check interval", placeholder: String(DEFAULT_UPDATE_CHECK_HOURS), parse: parseUpdateCheckHours,
     sentence: `How often, in whole hours of 1 or more, the panel checks for an update to itself. Leave it empty to check every ${DEFAULT_UPDATE_CHECK_HOURS} hours.` },
 ];
-const SELECT_KEYS = [...LANDING_KEYS, "close"];
+const SELECT_KEYS = [...APPROVAL_KEYS, "close"];
 const WORK_PROMPT_SENTENCE = "Instructions appended to the system prompt of every Claude session that works an issue. A repository's own prompt is added after this one.";
 
 export class GlobalSettings extends SettingsForm {
@@ -49,7 +49,7 @@ export class GlobalSettings extends SettingsForm {
 
   load(cx) {
     this.selects = {
-      ...Object.fromEntries(Object.entries(LANDING_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`global-${key}`, title, cx)])),
+      ...Object.fromEntries(Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`global-${key}`, title, cx)])),
       close: new SelectMenu("global-close", "How are worktrees closed?", cx),
       ...this.agentSelects("global", cx),
     };
@@ -60,7 +60,7 @@ export class GlobalSettings extends SettingsForm {
         this.saved = {
           ...Object.fromEntries([...TYPED_QUESTIONS.map(({ key }) => key), "workPrompt"].map((key) => [key, value(key)])),
           close: closeChoice(value("close")),
-          ...ownLanding(settings),
+          ...ownApproval(settings),
         };
         this.chosen = { ...Object.fromEntries(SELECT_KEYS.map((key) => [key, this.saved[key]])), waitForChecks: checksChoiceId(this.saved.waitForChecks) };
         this.typedInputs = Object.fromEntries(TYPED_QUESTIONS.map(({ key, placeholder }) => {
@@ -100,7 +100,7 @@ export class GlobalSettings extends SettingsForm {
   }
 
   // The approval, onApproval and waitForChecks to save; waitForChecks only under a pull request or the default.
-  landingValues() {
+  approvalValues() {
     const { approval, onApproval, waitForChecks } = this.chosen;
     return { approval, onApproval, waitForChecks: this.fields().waitForChecksSelect ? waitForChecksOf(waitForChecks) : null };
   }
@@ -110,8 +110,8 @@ export class GlobalSettings extends SettingsForm {
   // complete; a hidden waitForChecks isn't a change by itself.
   changes() {
     if (!this.saved) return {};
-    const landing = this.landingValues();
-    const landingChanged = LANDING_KEYS.some((key) => (key !== "waitForChecks" || this.fields().waitForChecksSelect) && landing[key] !== this.saved[key]);
+    const approvalSettings = this.approvalValues();
+    const approvalChanged = APPROVAL_KEYS.some((key) => (key !== "waitForChecks" || this.fields().waitForChecksSelect) && approvalSettings[key] !== this.saved[key]);
     const current = {
       close: this.chosen.close, ...this.typed().values, ...this.agentValues,
       workPrompt: this.workPromptInput?.value().trim() || null,
@@ -120,7 +120,7 @@ export class GlobalSettings extends SettingsForm {
     const changed = Object.fromEntries(Object.entries(current)
       .filter(([key, value]) => (value ?? null) !== savedFor(key))
       .map(([key, value]) => [key, value ?? null]));
-    return landingChanged ? { ...changed, ...landing } : changed;
+    return approvalChanged ? { ...changed, ...approvalSettings } : changed;
   }
 
   // The changed keys, written together, after which they're the saved values, or null when nothing changed. A typed
@@ -143,10 +143,10 @@ export class GlobalSettings extends SettingsForm {
     const fields = this.fields();
     const { problems } = this.typed();
     return this.errorLine(content, t)
-      .child(this.landingQuestion("approval", { id: CLEAR_CHOICE, label: `Default (${choiceLabel(LANDING_QUESTIONS.approval.choices, DEFAULT_APPROVAL)})` }, t))
-      .child(this.landingQuestion("onApproval", DEFAULT_ON_APPROVAL_CHOICE, t))
-      .when(fields.waitForChecksSelect, (e) => e.child(this.landingQuestion("waitForChecks",
-        { id: CLEAR_CHOICE, label: `Default (${choiceLabel(LANDING_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})` }, t)))
+      .child(this.approvalQuestion("approval", { id: CLEAR_CHOICE, label: `Default (${choiceLabel(APPROVAL_QUESTIONS.approval.choices, DEFAULT_APPROVAL)})` }, t))
+      .child(this.approvalQuestion("onApproval", DEFAULT_ON_APPROVAL_CHOICE, t))
+      .when(fields.waitForChecksSelect, (e) => e.child(this.approvalQuestion("waitForChecks",
+        { id: CLEAR_CHOICE, label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})` }, t)))
       .child(this.selectQuestion("close", "How are worktrees closed?", CLOSE_SENTENCE,
         [{ id: CLEAR_CHOICE, label: `Default (${choiceLabel(CLOSE_CHOICES, DEFAULT_CLOSE)})` }, ...CLOSE_CHOICES], t))
       .when(Boolean(this.typedInputs), (e) => e.children(TYPED_QUESTIONS.map(({ key, title, sentence }) => this.question(title, sentence, t, (controls) => controls
@@ -159,8 +159,8 @@ export class GlobalSettings extends SettingsForm {
   }
 
   // The select of approval, onApproval or waitForChecks, led by `defaultChoice`.
-  landingQuestion(key, defaultChoice, t) {
-    const { title, sentence, choices } = LANDING_QUESTIONS[key];
+  approvalQuestion(key, defaultChoice, t) {
+    const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
     return this.selectQuestion(key, title, sentence, [defaultChoice, ...choices], t);
   }
 

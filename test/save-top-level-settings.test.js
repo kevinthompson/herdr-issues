@@ -67,7 +67,7 @@ test("a value or pair the top level couldn't hold, or a repository-only key, wri
   assert.ok(existsSync(settingsPath()));
 });
 
-test("saving a landing setting removes the retired merge and complete, and other saves keep them", async () => {
+test("saving a approval setting removes the retired merge and complete, and other saves keep them", async () => {
   writeSettings({ merge: "pull-request", complete: "pull-request-passing", repos });
 
   await saveTopLevelSettings({ close: "auto" });

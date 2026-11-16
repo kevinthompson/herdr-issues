@@ -18,13 +18,13 @@
 // spaceName, approval, onApproval, waitForChecks and close are optional at the top level and in any entry, an
 // entry's winning, and are checked the same way in either; worktreeSetup is optional in any entry. In spaceName,
 // <issueId> is the issue's ID and <repo> the repository's name without its owner; without it, an issue's space is
-// named after its ID. approval is whether a session asks the person before its work lands, ask or auto, ask
+// named after its ID. approval is whether a session asks the person to approve its work, ask or auto, ask
 // without it; onApproval is how the branch then reaches main, merge (locally) or pull-request, a pull request
 // without it when origin is on GitHub, else merge; waitForChecks, true or false, false without it, is whether a
 // session with a pull request stays until its checks pass. The retired merge and complete still apply where a
 // place sets none of these: merge auto means approval auto and onApproval merge, review means ask and merge, and
 // pull-request means onApproval pull-request; complete pull-request-passing means waitForChecks true, and its other
-// values false. Saving any of the three removes merge and complete there; landingSettings resolves them all.
+// values false. Saving any of the three removes merge and complete there; approvalSettings resolves them all.
 // worktreeSetup is a shell command `issues
 // worktree` runs in each new checkout (cli/worktree.js). close is what a finished /issues:work session does about
 // its worktree: ask asks whether to close it now, mentioning cmd+shift+w, and auto closes it, both with `issues
@@ -46,7 +46,7 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// tracker with saveTrackerChoice, its approval, onApproval and waitForChecks with saveLandingSettings, its close with saveCloseSetting, its
+// tracker with saveTrackerChoice, its approval, onApproval and waitForChecks with saveApprovalSettings, its close with saveCloseSetting, its
 // name with saveNameSetting, its pollSeconds, spaceName and worktreeSetup with saveRepositorySettings, its model
 // and effort settings with saveAgentSettings, and its workPrompt with saveWorkPrompt; it changes the top level
 // with saveTopLevelSettings.
@@ -54,7 +54,7 @@ import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
 import { githubRepository } from "./github.js";
-import { badLandingSetting, badSetting, settingsUnreadable } from "./problems.js";
+import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.js";
 
 export const settingsPath = () => `${appHome()}/issues.json`;
 const TRACKERS = ["linear", "github", "beads"];
@@ -114,12 +114,12 @@ function checkWorkSettings(settings, where) {
   if (settings?.workPrompt != null && typeof settings.workPrompt !== "string") throw badSetting(`${where} has a workPrompt that isn't text`);
 }
 
-function checkLanding({ approval, onApproval, waitForChecks, merge, complete } = {}, where) {
-  if (approval != null && !APPROVALS.includes(approval)) throw badLandingSetting(`${where} needs an approval of ${APPROVALS.join(", ")}`);
-  if (onApproval != null && !ON_APPROVALS.includes(onApproval)) throw badLandingSetting(`${where} needs an onApproval of ${ON_APPROVALS.join(", ")}`);
-  if (waitForChecks != null && typeof waitForChecks !== "boolean") throw badLandingSetting(`${where} needs a waitForChecks of true or false`);
-  if (merge != null && !RETIRED_MERGES.includes(merge)) throw badLandingSetting(`${where} needs a merge of ${RETIRED_MERGES.join(", ")}`);
-  if (complete != null && !RETIRED_COMPLETES.includes(complete)) throw badLandingSetting(`${where} needs a complete of ${RETIRED_COMPLETES.join(", ")}`);
+function checkApproval({ approval, onApproval, waitForChecks, merge, complete } = {}, where) {
+  if (approval != null && !APPROVALS.includes(approval)) throw badApprovalSetting(`${where} needs an approval of ${APPROVALS.join(", ")}`);
+  if (onApproval != null && !ON_APPROVALS.includes(onApproval)) throw badApprovalSetting(`${where} needs an onApproval of ${ON_APPROVALS.join(", ")}`);
+  if (waitForChecks != null && typeof waitForChecks !== "boolean") throw badApprovalSetting(`${where} needs a waitForChecks of true or false`);
+  if (merge != null && !RETIRED_MERGES.includes(merge)) throw badApprovalSetting(`${where} needs a merge of ${RETIRED_MERGES.join(", ")}`);
+  if (complete != null && !RETIRED_COMPLETES.includes(complete)) throw badApprovalSetting(`${where} needs a complete of ${RETIRED_COMPLETES.join(", ")}`);
 }
 
 // The settings both the top level and an entry take, checked the same way in either.
@@ -128,7 +128,7 @@ function checkSharedSettings(settings, where) {
   checkWorkSettings(settings, where);
   if (settings?.spaceName != null && typeof settings.spaceName !== "string") throw badSetting(`${where} has a spaceName that isn't text`);
   checkChoice(closeChoice(settings?.close), "close", CLOSES, where);
-  checkLanding(settings ?? {}, where);
+  checkApproval(settings ?? {}, where);
 }
 
 function checkTopLevel(settings) {
@@ -216,7 +216,7 @@ const RETIRED_MERGE_MEANINGS = {
 
 // The approval, onApproval and waitForChecks that `source`, an entry or the top level, sets itself, each null
 // where unset: its own key, else what its retired merge or complete means.
-export function ownLanding(source) {
+export function ownApproval(source) {
   const retired = RETIRED_MERGE_MEANINGS[source?.merge] ?? {};
   const retiredWait = source?.complete != null ? source.complete === "pull-request-passing" : null;
   return {
@@ -226,20 +226,20 @@ export function ownLanding(source) {
   };
 }
 
-// How the repository's issue branches land in main: approval, whether a session asks the person first ("ask")
+// The repository's approval settings: approval, whether a session asks the person first ("ask")
 // or goes straight on ("auto"); onApproval, how the branch reaches main once approved ("merge" locally or
 // "pull-request"); and waitForChecks, whether a session with a pull request stays until its checks pass. Each is
 // the entry's, else the top level's, else its default, where each place's retired merge and complete stand in for
 // keys it doesn't set.
-export async function landingSettings(project) {
+export async function approvalSettings(project) {
   const setting = await trackerSetting(project);
-  return resolveLandingSettings(await mainCheckout(project.root, project.on), setting, await topLevelSettings());
+  return resolveApprovalSettings(await mainCheckout(project.root, project.on), setting, await topLevelSettings());
 }
 
-// landingSettings for the repository whose main checkout is `main`, from `setting`, its entry or null, and
+// approvalSettings for the repository whose main checkout is `main`, from `setting`, its entry or null, and
 // `topLevel`, issues.json's top level or null.
-export async function resolveLandingSettings(main, setting, topLevel = null) {
-  const entry = ownLanding(setting), top = ownLanding(topLevel);
+export async function resolveApprovalSettings(main, setting, topLevel = null) {
+  const entry = ownApproval(setting), top = ownApproval(topLevel);
   return {
     approval: entry.approval ?? top.approval ?? DEFAULT_APPROVAL,
     onApproval: entry.onApproval ?? top.onApproval ?? await defaultOnApproval(main),
@@ -255,15 +255,15 @@ export async function closeSettings(project) {
   return { close: closeChoice(setting?.close) ?? closeChoice(settings.close) ?? DEFAULT_CLOSE };
 }
 
-export const LANDING_KEYS = ["approval", "onApproval", "waitForChecks"];
-const RETIRED_LANDING_KEYS = ["merge", "complete"];
+export const APPROVAL_KEYS = ["approval", "onApproval", "waitForChecks"];
+const RETIRED_APPROVAL_KEYS = ["merge", "complete"];
 
 // Where the repository's approval, onApproval, waitForChecks and close come from: { entry, topLevel,
-// defaultOnApproval }, the entry's and the top level's own values (ownLanding), null where unset, and the
+// defaultOnApproval }, the entry's and the top level's own values (ownApproval), null where unset, and the
 // onApproval that applies without either.
-export async function landingSources(project) {
+export async function approvalSources(project) {
   const setting = await trackerSetting(project), settings = await topLevelSettings();
-  const own = (source) => ({ ...ownLanding(source), close: closeChoice(source?.close) });
+  const own = (source) => ({ ...ownApproval(source), close: closeChoice(source?.close) });
   const main = await mainCheckout(project.root, project.on);
   return { entry: own(setting), topLevel: own(settings), defaultOnApproval: await defaultOnApproval(main) };
 }
@@ -295,7 +295,7 @@ export async function resolveNameSettings(main, setting) {
   return { name: entry ?? defaultName, entry, defaultName };
 }
 
-const SETUP_KEYS = ["tracker", "team", "repo", ...LANDING_KEYS, ...RETIRED_LANDING_KEYS];
+const SETUP_KEYS = ["tracker", "team", "repo", ...APPROVAL_KEYS, ...RETIRED_APPROVAL_KEYS];
 
 // Writes `change(entry)` as the entry of the repository whose main checkout is `main`, in the place of any entry
 // it has under either spelling of its path, and keeps every other repository's entry. `entry` is null without one.
@@ -312,11 +312,11 @@ async function changeEntry(main, change) {
   forgetLookups();
 }
 
-// Makes `setting`, a tracker with its team or repo and how work lands (approval, onApproval, and waitForChecks
+// Makes `setting`, a tracker with its team or repo and its approval settings (approval, onApproval, and waitForChecks
 // for a pull request), the choices of the repository whose main checkout is `main`. It replaces those keys and the
 // retired merge and complete in the repository's entry but keeps that entry's other keys.
 export async function saveSetupChoices(main, setting) {
-  checkLanding(setting, "This repository");
+  checkApproval(setting, "This repository");
   await changeEntry(main, (entry) => {
     const kept = Object.fromEntries(Object.entries(entry ?? {}).filter(([name]) => !SETUP_KEYS.includes(name)));
     return { ...setting, ...kept };
@@ -345,14 +345,14 @@ function withValues(entry, values) {
   return changed;
 }
 
-// Sets how the repository whose main checkout is `main` lands its work: `approval`, `onApproval` and
+// Sets the approval settings of the repository whose main checkout is `main`: `approval`, `onApproval` and
 // `waitForChecks`, each of which null removes so the global value or its default applies. It also removes the
 // retired merge and complete, which those three replace, so pass all three. It changes only those keys of the
 // repository's existing entry, and writes nothing for a value trackerSetting would refuse or a repository without
 // an entry.
-export async function saveLandingSettings(main, { approval = null, onApproval = null, waitForChecks = null }) {
+export async function saveApprovalSettings(main, { approval = null, onApproval = null, waitForChecks = null }) {
   const values = { approval, onApproval, waitForChecks };
-  checkLanding(values, "This repository");
+  checkApproval(values, "This repository");
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
     return withValues(entry, { ...values, merge: null, complete: null });
@@ -484,7 +484,7 @@ export async function saveWorkPrompt(main, prompt) {
   });
 }
 
-export const TOP_LEVEL_KEYS = [...LANDING_KEYS, "close", "spaceName", "pollSeconds", "updateCheckHours", "workModel", "workEffort", "workPrompt"];
+export const TOP_LEVEL_KEYS = [...APPROVAL_KEYS, "close", "spaceName", "pollSeconds", "updateCheckHours", "workModel", "workEffort", "workPrompt"];
 
 // Sets the settings in `changes`, any of TOP_LEVEL_KEYS, at the top level of issues.json, creating the file if
 // needed. Text is trimmed, and a null or blank value removes the key, so each repository's own value or the
@@ -496,7 +496,7 @@ export async function saveTopLevelSettings(changes) {
   if (unknown) throw badSetting(`${unknown} isn't a setting for every repository`);
   if (changes.close != null && !CLOSES.includes(changes.close)) throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
   const cleaned = Object.entries(changes).map(([key, value]) => [key, typeof value === "string" ? value.trim() || null : value ?? null]);
-  if (Object.keys(changes).some((key) => LANDING_KEYS.includes(key))) cleaned.push(...RETIRED_LANDING_KEYS.map((key) => [key, null]));
+  if (Object.keys(changes).some((key) => APPROVAL_KEYS.includes(key))) cleaned.push(...RETIRED_APPROVAL_KEYS.map((key) => [key, null]));
   const previous = await readTextFile(settingsPath()).catch(() => null);
   const { repos, ...settings } = previous === null ? {} : parseSettings(previous);
   for (const [key, value] of cleaned) {

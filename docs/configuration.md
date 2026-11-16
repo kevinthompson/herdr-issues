@@ -2,7 +2,7 @@
 
 ## Choosing a tracker
 
-A repository with no entry in `issues.json` shows a setup view in the panel: choose **GitHub Issues**, **Linear** (then a team) or **Beads**, and the panel checks what that tracker needs, asks how work lands (see [`approval`, `onApproval` and `waitForChecks`](#approval-onapproval-and-waitforchecks)), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
+A repository with no entry in `issues.json` shows a setup view in the panel: choose **GitHub Issues**, **Linear** (then a team) or **Beads**, and the panel checks what that tracker needs, asks about approval (see [`approval`, `onApproval` and `waitForChecks`](#approval-onapproval-and-waitforchecks)), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
 
 Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `approval`, `onApproval`, `waitForChecks`, `close`, `spaceName`, `pollSeconds`, `updateCheckHours`, `workModel`, `workEffort` and `workPrompt`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
 
@@ -75,7 +75,7 @@ A `spaceName` at the top level of `issues.json` names the issue spaces of every 
 
 ### `approval`, `onApproval` and `waitForChecks`
 
-These settings say how an issue's branch lands in main. An issue is done once its branch is in main, whichever you choose.
+These settings say how an issue's branch is approved and reaches main. An issue is done once its branch is in main, whichever you choose.
 
 - `approval`: `ask` (the default) has the session summarize its commits and changed files and wait for your approval before it merges or opens a pull request; `auto` goes straight on once the work is verified.
 - `onApproval`: how the branch reaches main once approved. `merge` merges it into main on this computer; `pull-request` pushes it and opens a pull request. Without the setting, it's `pull-request` when the repository's origin is on GitHub, else `merge`.

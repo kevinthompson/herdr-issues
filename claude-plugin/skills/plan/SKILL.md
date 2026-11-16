@@ -17,7 +17,7 @@ Turn the work described in `$ARGUMENTS` or the conversation into a series of iss
    - the outcome and who it's for, and what done looks like;
    - scope: what's in, what's deliberately out, and what's later;
    - approach, where the code allows more than one and the choice matters;
-   - sequencing: what must land first, and what can run in parallel;
+   - sequencing: what must be merged first, and what can run in parallel;
    - risks the code reveals, such as migrations, feature flags, data backfills or other teams' code.
 
    Never invent product or creative content (copy, names, designs, features the person hasn't asked for): ask for it, or record in the issue that the person provides it. Stop asking once every issue could meet the bar in step 3 of `../create/writing.md`.

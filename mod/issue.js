@@ -57,7 +57,7 @@ export function loadsFor(isExpanded) {
 }
 
 // The groups to show, each with its sorted issues: Todo even when empty, so the list always says where new
-// issues land, and any other group holding issues. A group whose issues weren't listed (its `loads` is in `unloaded`) shows as unloaded, with
+// issues go, and any other group holding issues. A group whose issues weren't listed (its `loads` is in `unloaded`) shows as unloaded, with
 // no issues, whether or not it holds any. With a `label`, groups hold only the issues carrying it, while
 // blockers are still read from every issue. When the tracker lists at most `recentlyClosed` finished issues
 // and listed that many, Done and Canceled carry that number as their `cap`, since they may hold more.

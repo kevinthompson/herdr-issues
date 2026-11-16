@@ -58,8 +58,8 @@ describe("close", () => {
 });
 
 describe("approval, onApproval and waitForChecks", () => {
-  // Every landing setting `issues setting` prints for the repository, as { approval, onApproval, waitForChecks }.
-  async function landing(t, repository) {
+  // Every approval setting `issues setting` prints for the repository, as { approval, onApproval, waitForChecks }.
+  async function approvalSettings(t, repository) {
     const printed = {};
     for (const key of ["approval", "onApproval", "waitForChecks"]) printed[key] = (await setting(t, repository, key)).out;
     return printed;
@@ -67,7 +67,7 @@ describe("approval, onApproval and waitForChecks", () => {
 
   test("the defaults apply without either, merging for a repository without a GitHub origin", async (t) => {
     const repository = repositoryWith(t, {});
-    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "merge", waitForChecks: "false" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "ask", onApproval: "merge", waitForChecks: "false" });
   });
 
   test("the default onApproval is a pull request for a repository with a GitHub origin", async (t) => {
@@ -75,7 +75,7 @@ describe("approval, onApproval and waitForChecks", () => {
       exec: (command, args, options) => (command === "gh" ? Promise.resolve({ code: 0, stdout: "owner/name\n", stderr: "" }) : defaults.exec(command, args, options)),
     });
     const repository = repositoryWith(t, {});
-    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "pull-request", waitForChecks: "false" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "ask", onApproval: "pull-request", waitForChecks: "false" });
   });
 
   test("the entry's win over the top level's", async (t) => {
@@ -83,12 +83,12 @@ describe("approval, onApproval and waitForChecks", () => {
       entry: { approval: "auto", onApproval: "merge", waitForChecks: false },
       topLevel: { approval: "ask", onApproval: "pull-request", waitForChecks: true },
     });
-    assert.deepEqual(await landing(t, repository), { approval: "auto", onApproval: "merge", waitForChecks: "false" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "auto", onApproval: "merge", waitForChecks: "false" });
   });
 
   test("the top level's apply without the entry's", async (t) => {
     const repository = repositoryWith(t, { topLevel: { approval: "auto", onApproval: "pull-request", waitForChecks: true } });
-    assert.deepEqual(await landing(t, repository), { approval: "auto", onApproval: "pull-request", waitForChecks: "true" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "auto", onApproval: "pull-request", waitForChecks: "true" });
   });
 
   const retiredMeanings = [
@@ -101,27 +101,27 @@ describe("approval, onApproval and waitForChecks", () => {
   ];
   for (const [retired, meaning] of retiredMeanings) {
     test(`an entry's retired ${JSON.stringify(retired)} means ${JSON.stringify(meaning)}`, async (t) => {
-      assert.deepEqual(await landing(t, repositoryWith(t, { entry: retired })), meaning);
+      assert.deepEqual(await approvalSettings(t, repositoryWith(t, { entry: retired })), meaning);
     });
 
     test(`a top level's retired ${JSON.stringify(retired)} means the same`, async (t) => {
-      assert.deepEqual(await landing(t, repositoryWith(t, { topLevel: retired })), meaning);
+      assert.deepEqual(await approvalSettings(t, repositoryWith(t, { topLevel: retired })), meaning);
     });
   }
 
   test("a place's new keys win over its own retired ones", async (t) => {
     const repository = repositoryWith(t, { entry: { merge: "auto", complete: "pull-request-passing", approval: "ask", onApproval: "pull-request", waitForChecks: false } });
-    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "pull-request", waitForChecks: "false" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "ask", onApproval: "pull-request", waitForChecks: "false" });
   });
 
   test("an entry's retired keys win over the top level's new ones", async (t) => {
     const repository = repositoryWith(t, { entry: { merge: "review" }, topLevel: { approval: "auto", onApproval: "pull-request", waitForChecks: true } });
-    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "merge", waitForChecks: "true" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "ask", onApproval: "merge", waitForChecks: "true" });
   });
 
   test("an entry's retired pull-request merge leaves approval to the top level", async (t) => {
     const repository = repositoryWith(t, { entry: { merge: "pull-request" }, topLevel: { approval: "auto" } });
-    assert.deepEqual(await landing(t, repository), { approval: "auto", onApproval: "pull-request", waitForChecks: "false" });
+    assert.deepEqual(await approvalSettings(t, repository), { approval: "auto", onApproval: "pull-request", waitForChecks: "false" });
   });
 
   test("merge and complete are no longer settings the CLI prints", async (t) => {

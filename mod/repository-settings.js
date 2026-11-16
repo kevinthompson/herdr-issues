@@ -2,7 +2,7 @@
 // apply to the choices above them (settings-fields.js): the name of the space on its main checkout, its name,
 // typed in with the default as placeholder, where emptying the field removes it from the entry; where its issues
 // live, its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be
-// saved, with Linear's team once Linear is checked; whether a session asks for approval before its work lands,
+// saved, with Linear's team once Linear is checked; whether a session asks for approval of its work,
 // its approval; how the branch then gets into main, its onApproval; only when the onApproval that applies is a
 // pull request, whether the session waits for its checks, its waitForChecks; what a finished session does about
 // its worktree, its close, each of these leading with a choice that removes it from the entry, labeled with what
@@ -18,20 +18,20 @@
 // the placeholder, naming the global value where one is set. It opens on the entry's own settings, with each
 // select the entry doesn't set on its choice that removes it; an entry's retired merge and complete show as the
 // approval, onApproval and waitForChecks they mean. Each change saves as it's made (settings-form.js), writing only
-// the changed keys (saveTrackerChoice, saveLandingSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
+// the changed keys (saveTrackerChoice, saveApprovalSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
 // saveAgentSettings and saveWorkPrompt in setting.js); a different tracker saves once its check passes and, for
 // Linear, once a team is picked, and a poll interval that can't be saved is written once it's fixed.
 import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
-import { LANDING_QUESTIONS } from "./setup.js";
+import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, checksChoiceId, settingsFields, waitForChecksOf } from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
   AGENT_DEFAULTS, DEFAULT_APPROVAL, DEFAULT_CLOSE, DEFAULT_POLL_SECONDS, DEFAULT_WAIT_FOR_CHECKS, REPOSITORY_KEYS,
-  agentSettings, landingSources, nameSettings, parsePollSeconds, repositorySettings,
-  saveAgentSettings, saveCloseSetting, saveLandingSettings, saveNameSetting, saveRepositorySettings, saveTrackerChoice,
+  agentSettings, approvalSources, nameSettings, parsePollSeconds, repositorySettings,
+  saveAgentSettings, saveCloseSetting, saveApprovalSettings, saveNameSetting, saveRepositorySettings, saveTrackerChoice,
   saveWorkPrompt, workPromptSettings,
 } from "./trackers/setting.js";
 
@@ -70,7 +70,7 @@ export class RepositorySettings extends SettingsForm {
       onTeam: (cx) => this.autosave.schedule(cx, 0),
     });
     // The entry's own approval, onApproval, waitForChecks and close, as their selects' ids, and the chosen ones.
-    this.landing = null; this.savedLanding = null; this.chosenLanding = {};
+    this.approvalSettings = null; this.savedApproval = null; this.chosenApproval = {};
     this.savedName = null; this.nameInput = null;
     this.savedRepository = null; this.repositoryInputs = null;
     this.agentSources = null;
@@ -81,19 +81,19 @@ export class RepositorySettings extends SettingsForm {
   load(cx) {
     this.selects = {
       tracker: new SelectMenu("settings-tracker", "Issue tracker", cx),
-      ...Object.fromEntries(Object.entries(LANDING_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`settings-${key}`, title, cx)])),
+      ...Object.fromEntries(Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`settings-${key}`, title, cx)])),
       close: new SelectMenu("settings-close", "How are worktrees closed?", cx),
       ...this.agentSelects("settings", cx),
     };
     cx.spawn(async (cx) => {
       try {
-        const [landing, name, repository, agent, workPrompt] = await Promise.all([
-          landingSources(this.project), nameSettings(this.project),
+        const [approvalSettings, name, repository, agent, workPrompt] = await Promise.all([
+          approvalSources(this.project), nameSettings(this.project),
           repositorySettings(this.project), agentSettings(this.project), workPromptSettings(this.project),
         ]);
-        this.landing = landing;
-        this.savedLanding = { ...landing.entry, waitForChecks: checksChoiceId(landing.entry.waitForChecks) };
-        this.chosenLanding = { ...this.savedLanding };
+        this.approvalSettings = approvalSettings;
+        this.savedApproval = { ...approvalSettings.entry, waitForChecks: checksChoiceId(approvalSettings.entry.waitForChecks) };
+        this.chosenApproval = { ...this.savedApproval };
         this.savedName = name.entry;
         this.nameInput = InputState.new({ placeholder: name.defaultName, value: name.entry ?? "" });
         this.nameInput.on("change", (_e, cx) => this.edited(cx));
@@ -148,43 +148,43 @@ export class RepositorySettings extends SettingsForm {
   }
 
   // `value` for approval, onApproval, waitForChecks or close, or null to remove it from the entry.
-  chooseLanding(key, value, cx) {
-    this.chosenLanding = { ...this.chosenLanding, [key]: value };
+  chooseApproval(key, value, cx) {
+    this.chosenApproval = { ...this.chosenApproval, [key]: value };
     this.saveNow(cx);
   }
 
   // The approval, onApproval, waitForChecks and close that apply without the entry's own, each { value, label },
   // where label names whether that's the global value or the default.
-  landingFallbacks() {
-    const { topLevel, defaultOnApproval } = this.landing;
+  approvalFallbacks() {
+    const { topLevel, defaultOnApproval } = this.approvalSettings;
     const fallback = (key, choices, defaultValue) => {
       const own = key === "waitForChecks" ? checksChoiceId(topLevel[key]) : topLevel[key];
       const value = own ?? defaultValue;
       return { value, label: `${own != null ? "Global" : "Default"} (${choiceLabel(choices, value)})` };
     };
     return {
-      approval: fallback("approval", LANDING_QUESTIONS.approval.choices, DEFAULT_APPROVAL),
-      onApproval: fallback("onApproval", LANDING_QUESTIONS.onApproval.choices, defaultOnApproval),
-      waitForChecks: fallback("waitForChecks", LANDING_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS)),
+      approval: fallback("approval", APPROVAL_QUESTIONS.approval.choices, DEFAULT_APPROVAL),
+      onApproval: fallback("onApproval", APPROVAL_QUESTIONS.onApproval.choices, defaultOnApproval),
+      waitForChecks: fallback("waitForChecks", APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS)),
       close: fallback("close", CLOSE_CHOICES, DEFAULT_CLOSE),
     };
   }
 
   // The approval, onApproval and waitForChecks to save; only a pull request keeps waitForChecks.
-  landingToSave() {
-    const { approval, onApproval, waitForChecks } = this.chosenLanding;
+  approvalToSave() {
+    const { approval, onApproval, waitForChecks } = this.chosenApproval;
     return { approval, onApproval, waitForChecks: this.fields().waitForChecksSelect ? waitForChecks : null };
   }
 
   // A hidden waitForChecks doesn't count as a change, though saving another change removes it.
-  landingChanged() {
-    if (!this.landing) return false;
+  approvalChanged() {
+    if (!this.approvalSettings) return false;
     const keys = ["approval", "onApproval", ...(this.fields().waitForChecksSelect ? ["waitForChecks"] : [])];
-    return keys.some((key) => this.chosenLanding[key] !== this.savedLanding[key]);
+    return keys.some((key) => this.chosenApproval[key] !== this.savedApproval[key]);
   }
 
   closeChanged() {
-    return Boolean(this.landing) && this.chosenLanding.close !== this.savedLanding.close;
+    return Boolean(this.approvalSettings) && this.chosenApproval.close !== this.savedApproval.close;
   }
 
   // The typed name, or null when the field is empty, so the repository's name applies.
@@ -231,19 +231,19 @@ export class RepositorySettings extends SettingsForm {
   // The changed keys, after which they're the saved values, or null when nothing changed. A tracker not yet checked
   // or without its team, and a poll interval that can't be saved, aren't changes yet.
   saveRequest() {
-    if (!this.landing) return null;
+    if (!this.approvalSettings) return null;
     const trackerChoice = this.trackerChange();
-    const landing = this.landingToSave(), landingChanged = this.landingChanged();
-    const closeChanged = this.closeChanged(), close = this.chosenLanding.close;
+    const approvalSettings = this.approvalToSave(), approvalChanged = this.approvalChanged();
+    const closeChanged = this.closeChanged(), close = this.chosenApproval.close;
     const nameChanged = this.nameChanged(), name = this.typedName();
     const repositoryChanges = this.repositoryChanges(), agentChanges = this.agentChanges();
     const workPromptChanged = this.workPromptChanged(), workPrompt = this.typedWorkPrompt();
     const hasRepositoryChanges = Object.keys(repositoryChanges).length > 0, hasAgentChanges = Object.keys(agentChanges).length > 0;
-    if (!trackerChoice && !landingChanged && !closeChanged && !nameChanged && !hasRepositoryChanges && !hasAgentChanges && !workPromptChanged) return null;
+    if (!trackerChoice && !approvalChanged && !closeChanged && !nameChanged && !hasRepositoryChanges && !hasAgentChanges && !workPromptChanged) return null;
     return {
       write: async () => {
         if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
-        if (landingChanged) await saveLandingSettings(this.main, { ...landing, waitForChecks: waitForChecksOf(landing.waitForChecks) });
+        if (approvalChanged) await saveApprovalSettings(this.main, { ...approvalSettings, waitForChecks: waitForChecksOf(approvalSettings.waitForChecks) });
         if (closeChanged) await saveCloseSetting(this.main, close);
         if (nameChanged) await saveNameSetting(this.main, name);
         if (hasRepositoryChanges) await saveRepositorySettings(this.main, repositoryChanges);
@@ -252,8 +252,8 @@ export class RepositorySettings extends SettingsForm {
       },
       written: () => {
         if (trackerChoice) this.current = { kind: trackerChoice.tracker, team: trackerChoice.team, repo: trackerChoice.tracker === this.current.kind ? this.current.repo : undefined };
-        if (landingChanged) this.savedLanding = { ...this.savedLanding, ...landing };
-        if (closeChanged) this.savedLanding = { ...this.savedLanding, close };
+        if (approvalChanged) this.savedApproval = { ...this.savedApproval, ...approvalSettings };
+        if (closeChanged) this.savedApproval = { ...this.savedApproval, close };
         if (nameChanged) this.savedName = name;
         this.savedRepository = { ...this.savedRepository, ...repositoryChanges };
         this.savedAgent = { ...this.savedAgent, ...agentChanges };
@@ -264,8 +264,8 @@ export class RepositorySettings extends SettingsForm {
 
   fields() {
     return settingsFields({
-      trackerChoice: this.tracker.choice, trackerReady: this.trackerReady, onApproval: this.chosenLanding.onApproval,
-      fallbackOnApproval: this.landing ? this.landingFallbacks().onApproval.value : null, workModel: this.agentValues.workModel, otherWorkModelPicked: this.otherWorkModelPicked,
+      trackerChoice: this.tracker.choice, trackerReady: this.trackerReady, onApproval: this.chosenApproval.onApproval,
+      fallbackOnApproval: this.approvalSettings ? this.approvalFallbacks().onApproval.value : null, workModel: this.agentValues.workModel, otherWorkModelPicked: this.otherWorkModelPicked,
     });
   }
 
@@ -275,7 +275,7 @@ export class RepositorySettings extends SettingsForm {
       .when(Boolean(this.nameInput), (e) => e.child(this.question("Repository name", NAME_SENTENCE, t,
         (controls) => controls.child(this.textField(this.nameInput, t)))))
       .child(this.trackerSection(fields, t))
-      .when(Boolean(this.landing), (e) => this.landingQuestions(e, fields, t))
+      .when(Boolean(this.approvalSettings), (e) => this.approvalQuestions(e, fields, t))
       .when(Boolean(this.repositoryInputs), (e) => e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))))
       .when(Boolean(this.agentSources), (e) => e.children(AGENT_QUESTIONS.map((question) =>
         this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t))))
@@ -285,26 +285,26 @@ export class RepositorySettings extends SettingsForm {
 
   // The approval, onApproval, waitForChecks and close selects, waitForChecks only when the onApproval that applies
   // is a pull request.
-  landingQuestions(content, fields, t) {
-    const fallbacks = this.landingFallbacks();
-    const landingQuestion = (key) => {
-      const { title, sentence, choices } = LANDING_QUESTIONS[key];
-      return this.landingSelect(key, title, sentence, choices, fallbacks, t);
+  approvalQuestions(content, fields, t) {
+    const fallbacks = this.approvalFallbacks();
+    const approvalQuestion = (key) => {
+      const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
+      return this.approvalSelect(key, title, sentence, choices, fallbacks, t);
     };
     return content
-      .child(landingQuestion("approval"))
-      .child(landingQuestion("onApproval"))
-      .when(fields.waitForChecksSelect, (e) => e.child(landingQuestion("waitForChecks")))
-      .child(this.landingSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t));
+      .child(approvalQuestion("approval"))
+      .child(approvalQuestion("onApproval"))
+      .when(fields.waitForChecksSelect, (e) => e.child(approvalQuestion("waitForChecks")))
+      .child(this.approvalSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t));
   }
 
   // A select of approval, onApproval, waitForChecks or close, leading with the choice that removes it from the entry
   // and opening on the entry's value or that choice.
-  landingSelect(key, title, sentence, choices, fallbacks, t) {
+  approvalSelect(key, title, sentence, choices, fallbacks, t) {
     const options = [{ id: CLEAR_CHOICE, label: fallbacks[key].label }, ...choices];
     return this.question(title, sentence, t, (controls) => controls
-      .child(this.selects[key].render(t, { options, value: this.chosenLanding[key] ?? CLEAR_CHOICE,
-        onChoose: (id, cx) => this.chooseLanding(key, id === CLEAR_CHOICE ? null : id, cx) })));
+      .child(this.selects[key].render(t, { options, value: this.chosenApproval[key] ?? CLEAR_CHOICE,
+        onChoose: (id, cx) => this.chooseApproval(key, id === CLEAR_CHOICE ? null : id, cx) })));
   }
 
   // What applies without the entry's model or effort.

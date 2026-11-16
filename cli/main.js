@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
-import { closeSettings, landingSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
+import { closeSettings, approvalSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
@@ -163,7 +163,7 @@ async function spaceName([id]) {
 }
 
 const SETTINGS = {
-  approval: landingSettings, onApproval: landingSettings, waitForChecks: landingSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
+  approval: approvalSettings, onApproval: approvalSettings, waitForChecks: approvalSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
   workModel: workSettings, workEffort: workSettings, workPrompt: workSettings,
 };
 

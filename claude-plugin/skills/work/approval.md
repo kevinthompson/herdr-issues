@@ -1,6 +1,6 @@
 # Asking for approval with `approval: ask`
 
-Read this beside `SKILL.md` when `issues setting approval` prints `ask`: the person approves the change in this session before it lands, before the branch merges into main with `onApproval: merge`, or before it's pushed and its pull request opens with `onApproval: pull-request`.
+Read this beside `SKILL.md` when `issues setting approval` prints `ask`: the person approves the change in this session before the branch merges into main with `onApproval: merge`, or before it's pushed and its pull request opens with `onApproval: pull-request`.
 
 1. Once **Verification** passes, and with `onApproval: pull-request` the review in step 1 of `merge-pull-request.md` is done, move a Linear issue to in review with `issues status <issue ID> in-review`. A GitHub issue keeps its status, since it shows as in review only while a pull request links it; a Beads issue stays `in_progress`.
 2. **Check the merge first,** with `onApproval: merge`, so approving merges straight away: run `issues merge --check <issue ID>` from the worktree. It makes every check `issues merge` makes, including a trial merge, and changes nothing.
@@ -20,5 +20,5 @@ Read this beside `SKILL.md` when `issues setting approval` prints `ask`: the per
    | `pull-request` | `true` | `ask` | Approving this work will push this branch, open a pull request, wait for its checks to pass and then ask whether to close the worktree. |
 
 5. When the session finds its branch already merged into main (`git merge-base --is-ancestor HEAD main`), the person approved it that way: don't merge again, but continue from the merged state, running **Verification** on main only when `SKILL.md` step 10 says it's needed, and marking the issue done if it isn't yet.
-6. Once they approve in the session, leave the space's waiting mark in place while the branch lands, and land it as `SKILL.md` step 10 says. When `issues merge` still refuses, because main moved on while the session waited or what step 2 said to fix wasn't fixed, first withdraw the mark as `SKILL.md` step 12 says, then make the branch mergeable as step 2 does and ask again from step 3.
+6. Once they approve in the session, leave the space's waiting mark in place while you finish, and finish as `SKILL.md` step 10 says. When `issues merge` still refuses, because main moved on while the session waited or what step 2 said to fix wasn't fixed, first withdraw the mark as `SKILL.md` step 12 says, then make the branch mergeable as step 2 does and ask again from step 3.
 7. If they ask for changes instead, first withdraw the mark as `SKILL.md` step 12 says, then make them, commit them, run **Verification** again, and ask again from step 2 with a fresh summary.

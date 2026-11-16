@@ -288,7 +288,7 @@ export class WorktreeDialog {
       .child(h_flex().justify_end().text_size(11).text_color(t.dim).child("\u2191\u2193 choose \u00b7 \u21b5 open \u00b7 esc close"));
   }
 
-  // Each check's finding as it lands, then, once all have answered, the verdict on removing the checkout.
+  // Each check's finding as it arrives, then, once all have answered, the verdict on removing the checkout.
   renderChecks(t) {
     const findings = removalFindings({ ...this.removal?.checks, warning: props()?.warning });
     const row = ({ result, text }) => h_flex().gap(6).items_start()
