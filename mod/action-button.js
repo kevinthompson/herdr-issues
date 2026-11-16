@@ -1,7 +1,7 @@
 // The issue view's action bar buttons: the same size as each other, drawn like the native pane header's, with
-// only the primary action filled.
+// only the primary action filled and the rest outlined.
 import { div, svg } from "gpui-kit";
-import { actionButtonState, DISABLED_OPACITY } from "./action-button-state.js";
+import { actionButtonState } from "./action-button-state.js";
 
 /** @import { Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -17,7 +17,7 @@ const PRIMARY_HOVER_OPACITY = 0.85;
  * @param {Theme} t
  */
 export function actionButton({ id, icon, tooltip, onClick, primary = false, enabled = true, busy = false }, t) {
-  const state = actionButtonState({ enabled, busy });
+  const state = actionButtonState({ primary, enabled, busy });
   const glyph = svg(`mods/issues/icons/${state.icon ?? icon}.svg`).size(ICON_PX);
   return div()
     .id(id)
@@ -33,6 +33,7 @@ export function actionButton({ id, icon, tooltip, onClick, primary = false, enab
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
     .when(primary, (e) => e.bg(t.solid).text_color(t.solid_foreground))
     .when(!primary, (e) => e.text_color(t.dim))
+    .when(state.outlined, (e) => e.border_1().border_color(t.border))
     .when(state.opacity < 1, (e) => e.opacity(state.opacity))
     .when(state.interactive, (e) =>
       e
@@ -50,6 +51,7 @@ export function actionButton({ id, icon, tooltip, onClick, primary = false, enab
  * @returns {NativeElement}
  */
 export function textActionButton({ id, label, onClick, primary = false, enabled = true }, t) {
+  const state = actionButtonState({ primary, enabled });
   return div()
     .id(id)
     .flex_none()
@@ -63,8 +65,9 @@ export function textActionButton({ id, label, onClick, primary = false, enabled 
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
     .when(primary, (e) => e.bg(t.solid).text_color(t.solid_foreground))
     .when(!primary, (e) => e.text_color(t.dim))
-    .when(!enabled, (e) => e.opacity(DISABLED_OPACITY))
-    .when(enabled, (e) =>
+    .when(state.outlined, (e) => e.border_1().border_color(t.border))
+    .when(state.opacity < 1, (e) => e.opacity(state.opacity))
+    .when(state.interactive, (e) =>
       e
         .cursor_pointer()
         .hover((s) => (primary ? s.opacity(PRIMARY_HOVER_OPACITY) : s.bg(t.hover).text_color(t.foreground)))

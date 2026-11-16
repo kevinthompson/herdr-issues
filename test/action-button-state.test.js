@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { actionButtonState } from "../mod/action-button-state.js";
 
 test("an idle button is clickable at full opacity with its own icon", () => {
-  assert.deepEqual(actionButtonState({}), { interactive: true, icon: null, spin: 0, opacity: 1 });
+  assert.deepEqual(actionButtonState({}), { interactive: true, icon: null, spin: 0, opacity: 1, outlined: true });
 });
 
 test("a busy button spins rotate-cw for a second and ignores clicks", () => {
@@ -22,4 +22,14 @@ test("a disabled button is at half opacity and ignores clicks", () => {
 
 test("a busy button that is also disabled still spins", () => {
   assert.equal(actionButtonState({ enabled: false, busy: true }).icon, "rotate-cw");
+});
+
+test("a secondary button is outlined and a primary one is not", () => {
+  assert.equal(actionButtonState({}).outlined, true);
+  assert.equal(actionButtonState({ primary: true }).outlined, false);
+});
+
+test("a disabled or busy secondary button stays outlined", () => {
+  assert.equal(actionButtonState({ enabled: false }).outlined, true);
+  assert.equal(actionButtonState({ busy: true }).outlined, true);
 });
