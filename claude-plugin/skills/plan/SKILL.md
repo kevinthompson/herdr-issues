@@ -22,6 +22,9 @@ Turn the work described in `$ARGUMENTS` or the conversation into a series of iss
 
    Never invent product or creative content (copy, names, designs, features the person hasn't asked for): ask for it, or record in the issue that the person provides it. Stop asking once every issue could meet the bar in step 3 of `../create/writing.md`.
 
-5. **Propose the breakdown.** List the issues in order: a short imperative title, one sentence of goal, and its blockers. Each is one branch and one pull request, as `../create/writing.md` requires; split anything larger. Revise with the person until they approve it; don't write any issue before then.
+5. **Propose the breakdown.** Each issue is one branch and one pull request, as `../create/writing.md` requires; split anything larger.
+   - Write the breakdown in your response text, before asking anything, as a numbered Markdown list in order: one issue per item, with a short imperative title, one sentence of goal and its blockers on their own sub-items.
+   - Then ask for approval with AskUserQuestion, keeping the question short (for example "Approve the four issues listed above?"). The question is one line and the person may see only the dialog, so never repeat the breakdown in the question or its option labels.
+   - When the person asks for revisions, show the revised list again the same way, then ask again. Don't write any issue before they approve it.
 6. **Write and file the issues** here, as `../create/writing.md` says: run `issues context <words>` in the main checkout, then write the approved breakdown in order, with each issue's goal, blockers and everything the interview settled for its Context, filed in the destination from step 2: in Linear, with the project and milestone set on each issue, and for a `mine` scope, each issue assigned to the person.
 7. **Report** each issue's ID, title and link, in order, any existing issue found covering the work, any assumption the person should confirm, and anything still waiting on the person, such as content they will provide.
