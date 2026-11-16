@@ -35,7 +35,7 @@ async function load(url, key) {
 }
 
 // The avatar's path for image(), or null until it is on disk. The first request for an avatar starts
-// its download and hands onLoading the promise of its path, so the caller can redraw when it lands.
+// its download and hands onLoading the promise of its path, so the caller can redraw when it arrives.
 export function avatarImage(url, onLoading) {
   if (!url) return null;
   const key = fileKey(url);

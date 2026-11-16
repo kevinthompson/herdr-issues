@@ -5,7 +5,7 @@
 // with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open the
-// issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge lands a
+// issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge brings a
 // finished branch in main (merge.js) and removes its worktree. A finished session's `issues close` closes its space
 // through the removal dialog once the session is idle (close-request.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
@@ -310,7 +310,7 @@ export default class Issues extends View {
   }
 
   // Reads the repository's worktrees and branches for the issues just listed, after the list shows, and
-  // deletes the branches of done issues that have landed in main, so finished work leaves nothing behind.
+  // deletes the branches of done issues that have been merged into main, so finished work leaves nothing behind.
   scanRepository(project, generation, cx) {
     cx.spawn(async (cx) => {
       const repository = await repositoryState(this.issues, project).catch(() => null);
@@ -334,7 +334,7 @@ export default class Issues extends View {
   }
 
   // Checks the mod's own checkout for an update when the panel loads and every updateCheckHours after, and
-  // notices an update Update started having landed. Any failure is silent: the footer just shows nothing.
+  // notices an update Update started having finished. Any failure is silent: the footer just shows nothing.
   checkForUpdate(cx) {
     if (this.checkingUpdate || Date.now() - (this.updateCheckedAt ?? -Infinity) < this.updateCheckMs) return;
     this.checkingUpdate = true;

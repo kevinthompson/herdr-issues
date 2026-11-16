@@ -18,7 +18,7 @@
 // spaceName, approval, onApproval, waitForChecks and close are optional at the top level and in any entry, an
 // entry's winning, and are checked the same way in either; worktreeSetup is optional in any entry. In spaceName,
 // <issueId> is the issue's ID and <repo> the repository's name without its owner; without it, an issue's space is
-// named after its ID. approval is whether a session asks the person before its work lands, ask or auto, ask
+// named after its ID. approval is whether a session asks the person to approve its work, ask or auto, ask
 // without it; onApproval is how the branch then reaches main, merge (locally) or pull-request, a pull request
 // without it when origin is on GitHub, else merge; waitForChecks, true or false, false without it, is whether a
 // session with a pull request stays until its checks pass. The retired merge and complete still apply where a
@@ -226,7 +226,7 @@ export function ownApproval(source) {
   };
 }
 
-// How the repository's issue branches land in main: approval, whether a session asks the person first ("ask")
+// The repository's approval settings: approval, whether a session asks the person first ("ask")
 // or goes straight on ("auto"); onApproval, how the branch reaches main once approved ("merge" locally or
 // "pull-request"); and waitForChecks, whether a session with a pull request stays until its checks pass. Each is
 // the entry's, else the top level's, else its default, where each place's retired merge and complete stand in for
@@ -312,7 +312,7 @@ async function changeEntry(main, change) {
   forgetLookups();
 }
 
-// Makes `setting`, a tracker with its team or repo and how work lands (approval, onApproval, and waitForChecks
+// Makes `setting`, a tracker with its team or repo and its approval settings (approval, onApproval, and waitForChecks
 // for a pull request), the choices of the repository whose main checkout is `main`. It replaces those keys and the
 // retired merge and complete in the repository's entry but keeps that entry's other keys.
 export async function saveSetupChoices(main, setting) {
@@ -345,7 +345,7 @@ function withValues(entry, values) {
   return changed;
 }
 
-// Sets how the repository whose main checkout is `main` lands its work: `approval`, `onApproval` and
+// Sets the approval settings of the repository whose main checkout is `main`: `approval`, `onApproval` and
 // `waitForChecks`, each of which null removes so the global value or its default applies. It also removes the
 // retired merge and complete, which those three replace, so pass all three. It changes only those keys of the
 // repository's existing entry, and writes nothing for a value trackerSetting would refuse or a repository without

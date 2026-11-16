@@ -1,6 +1,6 @@
 // The settings at issues.json's top level, which apply to every repository without its own: the settings view's
 // Global form (settings.js). It shows only the settings that have a top-level version: whether a session asks for
-// approval before its work lands, approval; how the branch then gets into main, onApproval; whether a session waits
+// approval of its work, approval; how the branch then gets into main, onApproval; whether a session waits
 // for its pull request's checks, waitForChecks, shown for a pull request or the default onApproval, which is a
 // pull request for a repository on GitHub (settings-fields.js), where a retired merge and complete open as the
 // values they mean and any change to the three saves all three; what a finished session does about its worktree,

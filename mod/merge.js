@@ -1,5 +1,5 @@
 // Merges an issue's branch into main in the repository's main checkout and marks the issue done, for repositories
-// whose work lands locally (onApproval "merge"). `issues merge` and the issue view's Merge button both run
+// whose approved work merges locally (onApproval "merge"). `issues merge` and the issue view's Merge button both run
 // mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly.
 // `issues merge --check` runs checkMerge, mergeIssue's checks alone, so a session can confirm before asking for
 // approval that approving will merge: it tests the merge with git merge-tree and changes no checkout or ref.

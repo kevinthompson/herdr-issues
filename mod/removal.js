@@ -5,7 +5,7 @@
 // - branch: branchState's answer (worktree.js), null when no branch is checked out;
 // - warning: work outside the checkout that removing it would leave behind, or none.
 // Every space gets every check: a session marked done working with `issues complete` may have handed off before its
-// branch landed, so that mark says nothing about whether the checkout is safe to remove.
+// branch was merged, so that mark says nothing about whether the checkout is safe to remove.
 
 export const PASS = "pass";
 // A failure that loses work existing only in this checkout.
@@ -14,7 +14,7 @@ export const LOSS = "loss";
 export const CAUTION = "caution";
 
 // Runs the checks side by side through `lookups`, { dirty, submodules, branch }, handing each answer to
-// `answered(name, result)` as it lands.
+// `answered(name, result)` as it arrives.
 export function runChecks(lookups, answered) {
   return Promise.all(["dirty", "submodules", "branch"].map((name) => Promise.resolve().then(lookups[name])
     .catch((error) => ({ error: String(error?.message ?? error) }))

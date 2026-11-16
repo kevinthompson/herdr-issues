@@ -2,7 +2,7 @@
 // apply to the choices above them (settings-fields.js): the name of the space on its main checkout, its name,
 // typed in with the default as placeholder, where emptying the field removes it from the entry; where its issues
 // live, its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be
-// saved, with Linear's team once Linear is checked; whether a session asks for approval before its work lands,
+// saved, with Linear's team once Linear is checked; whether a session asks for approval of its work,
 // its approval; how the branch then gets into main, its onApproval; only when the onApproval that applies is a
 // pull request, whether the session waits for its checks, its waitForChecks; what a finished session does about
 // its worktree, its close, each of these leading with a choice that removes it from the entry, labeled with what

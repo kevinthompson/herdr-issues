@@ -92,7 +92,7 @@ export async function isMergedInto(repo, base, on) {
   return mergedTree.ok && baseTree.ok && mergedTree.out.split("\n")[0] === baseTree.out;
 }
 
-// The URL of the branch's open or draft pull request when the repository's work lands through pull requests
+// The URL of the branch's open or draft pull request when the repository's approved work opens pull requests
 // (onApproval "pull-request"), so a pushed branch with one is safe to remove, else null: also when the settings
 // can't be read or gh can't answer, so the dialog asks for main.
 async function completingPullRequest(repo, branch, on) {

@@ -2,10 +2,10 @@
 // Set Up Issues button walks through one question per page, with Back at the top left and the step and Cancel,
 // which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
 // back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; whether
-// a session asks for approval before its work lands; how the branch then gets into main; for a pull request,
+// a session asks for approval of its work; how the branch then gets into main; for a pull request,
 // whether the session waits for its checks; and a review of the choices, which points to the
 // gear's settings (settings.js) for the rest. Only Save on the
-// review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. How work lands
+// review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. Approval
 // proposes the repository's current or default settings. A configured tracker that fails to load with a
 // SetupProblem (trackers/problems.js) shows the problem and its fix, with Check again and a way to choose a
 // different tracker. A Linear API key that is missing, unreadable or refused, at either point, comes with a
@@ -21,7 +21,7 @@ import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 const TEAM_PICKS = "issues.setupTeams";
 const ANSWER_LABEL_PX = 80;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
-// How work lands, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
+// Approval, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
 // the choices, each with what it means.
 export const APPROVAL_QUESTIONS = {
   approval: {

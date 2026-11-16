@@ -7,7 +7,7 @@ import { div } from "gpui-kit";
 import { v_flex, h_flex, Select, Popup } from "gpui-base";
 
 const TRIGGER_MAX_PX = 280, LIST_WIDTH_PX = 280, LIST_PADDING = 5, OPTION_INSET = 9;
-// A press on the trigger that closed the open list by landing outside it shouldn't open it again on release, and
+// A press on the trigger that closed the open list by falling outside it shouldn't open it again on release, and
 // one the Select root already answered with an open change shouldn't toggle it back.
 const PRESS_SETTLED_MS = 400;
 

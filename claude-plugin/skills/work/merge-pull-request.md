@@ -1,4 +1,4 @@
-# Landing with `onApproval: pull-request`
+# Finishing with `onApproval: pull-request`
 
 Read this beside `SKILL.md` when `issues setting onApproval` prints `pull-request`, or when the issue's branch already has a pull request with review on it.
 

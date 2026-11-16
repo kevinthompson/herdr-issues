@@ -3,7 +3,7 @@
 // issue's space name (space-name.js). A tab the person named keeps its name. `issues mark` renames the session's
 // space with one of space-name.js's marks for whether the session is working, waiting on the person or done. `issues complete` labels
 // the terminal once the session is done working and has handed off to the person, whether or not its branch has
-// landed, which `issues complete --cancel` withdraws when the person asks for more changes, also clearing the ✅ that
+// been merged, which `issues complete --cancel` withdraws when the person asks for more changes, also clearing the ✅ that
 // earlier versions put before the tab's name, and `issues close` labels it to ask the panel to close the session's
 // space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
