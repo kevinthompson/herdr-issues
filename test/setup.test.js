@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 import { git, temporaryFolder } from "./support/repository.js";
 
 const repositoryFile = (path) => fileURLToPath(new URL(`../${path}`, import.meta.url));
-const checkoutFiles = ["setup", "scripts/setup-json.js", "mod/keys.json"];
+const checkoutFiles = ["setup", "scripts/setup-json.js", "scripts/terminal-output.sh", "mod/keys.json"];
 const modKeys = JSON.parse(readFileSync(repositoryFile("mod/keys.json"), "utf8"));
 
 // A committed main checkout holding what setup runs, at `path`.
@@ -69,6 +69,19 @@ test("setup installs the mod, the CLI and the keys without claude, and warns tha
     result.stderr,
     /claude is not installed, so the Claude plugin .* was skipped; install Claude Code and run setup again/,
   );
+  assert.match(result.stdout, /^== Mod and CLI\n {2}\[done\] Linked /m);
+  assert.match(
+    result.stdout,
+    /^== Summary\n {2}\[done\] Installed the Issues mod, the issues command and the mod's keys\n {2}\[skip\] Skipped the Claude plugin, since claude is not installed\n/m,
+  );
+  assert.match(result.stdout, /^ {2}\[todo\] Add .*\/\.local\/bin to PATH$/m);
+});
+
+test("setup prints no escape sequences when its output isn't a terminal", (t) => {
+  const { output } = runSetupWithLayouts(t, { layouts: { main: false, work: false }, shown: "main" });
+
+  assert.match(output, /\[done\]/);
+  assert.equal(output.includes("\x1b"), false);
 });
 
 test("setup adds the marketplace and installs the plugin when claude is installed", (t) => {
@@ -94,6 +107,8 @@ test("setup adds the marketplace and installs the plugin when claude is installe
     new RegExp(`plugin marketplace add ${checkout}\\n(.*\\n)*plugin install issues@herdr-issues\\n`),
   );
   assert.doesNotMatch(result.stderr, /Claude plugin .* was skipped/);
+  assert.match(result.stdout, /^ {2}\[done\] Installed the issues@herdr-issues plugin$/m);
+  assert.match(result.stdout, /^ {2}\[todo\] Start a new Claude Code session to load the plugin$/m);
 });
 
 // Runs setup with the marketplace already pointing at the checkout and the plugin installed, `enabled` or not,
@@ -133,7 +148,7 @@ test("setup updates an installed plugin and turns it on when it was turned off",
   const { commands, stdout } = runSetupWithInstalledPlugin(t, { enabled: false });
 
   assert.match(commands, /plugin update issues@herdr-issues\n(.*\n)*plugin enable issues@herdr-issues --scope user\n/);
-  assert.match(stdout, /issues@herdr-issues plugin was turned off; turning it on/);
+  assert.match(stdout, /issues@herdr-issues plugin was turned off; turned it on/);
 });
 
 test("setup updates an installed plugin that is turned on without enabling it again", (t) => {
@@ -287,7 +302,7 @@ terminalTest(
     assert.match(output, /node is not installed/);
     assert.match(output, /Install it with devbox \(devbox global add nodejs\)\?/);
     assert.equal(commands, "devbox global add nodejs\n");
-    assert.match(output, /your shell profile doesn't evaluate devbox global shellenv/);
+    assert.match(output, /Your shell profile doesn't evaluate devbox global shellenv/);
     assert.match(output, /is a linked worktree/);
     assert.equal(result.status, 1);
   },
@@ -378,7 +393,7 @@ const sidePanelLayout = (withIssues = false) => ({
 
 // Runs setup, without claude, against Herdr's `layouts` (name: shows the Issues panel), main being shipped, with
 // Herdr showing `shown`; `answers` runs it on a pseudo-terminal. The herdr-app stub reports no open window.
-function runSetupWithLayouts(t, { layouts, shown, answers = null }) {
+function runSetupWithLayouts(t, { layouts, shown, answers = null, noColor = false }) {
   const folder = temporaryFolder(t);
   const checkout = createCheckout(join(folder, "clone"));
   const home = join(folder, "home");
@@ -391,7 +406,12 @@ function runSetupWithLayouts(t, { layouts, shown, answers = null }) {
   writeFileSync(join(appHome, "shared.json"), JSON.stringify({ layout: shown, "sidebar.width": 268 }));
   writeFileSync(join(appHome, "keys.json"), "{}");
 
-  const env = { HOME: home, HERDR_APP_HOME: appHome, PATH: [binWithoutClaude(folder), "/usr/bin", "/bin"].join(":") };
+  const env = {
+    HOME: home,
+    HERDR_APP_HOME: appHome,
+    PATH: [binWithoutClaude(folder), "/usr/bin", "/bin"].join(":"),
+    ...(noColor && { NO_COLOR: "1" }),
+  };
   const setup = join(checkout, "setup");
   const result = answers
     ? spawnSync("python3", ["-c", answerInTerminal, setup, ...answers], { encoding: "utf8", env })
@@ -458,6 +478,16 @@ terminalTest(
   },
 );
 
+terminalTest("setup styles its output on a terminal and prints no escape sequences with NO_COLOR", (t) => {
+  const run = (noColor) =>
+    runSetupWithLayouts(t, { layouts: { main: false, work: false }, shown: "work", answers: ["1"], noColor });
+
+  assert.equal(run(false).output.includes("\x1b["), true);
+  const { output } = run(true);
+  assert.match(output, /\[done\] Added the Issues panel to the work layout/);
+  assert.equal(output.includes("\x1b"), false);
+});
+
 terminalTest("setup offers to switch to the layout it added the panel to when Herdr shows another", (t) => {
   const { output, readAppJson } = runSetupWithLayouts(t, {
     layouts: { main: false, work: false },
@@ -466,7 +496,7 @@ terminalTest("setup offers to switch to the layout it added the panel to when He
   });
 
   assert.match(output, /Added the Issues panel to the work layout/);
-  assert.match(output, /Switch to work, which has it, and open with it from now on\? \[y\/N\]/);
+  assert.match(output, /Switch to work, which has it, and open with it from now on\?([^\n]*\n){2}[^\n]*\[y\/N\]/);
   assert.equal(readAppJson("shared.json").layout, "work");
 });
 
