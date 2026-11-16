@@ -22,7 +22,10 @@ import {
   PULL_REQUEST_COMPLETES, parsePollSeconds, parseUpdateCheckHours, saveTopLevelSettings, topLevelSettings,
 } from "./trackers/setting.js";
 
-const DEFAULT_MERGE_LABEL = "Default (a pull request on GitHub, else review)";
+const DEFAULT_MERGE_CHOICE = {
+  id: CLEAR_CHOICE, label: "Default",
+  detail: "A pull request when the repository's origin is on GitHub, and a merge after you review it otherwise.",
+};
 const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
 
 const TYPED_QUESTIONS = [
@@ -128,7 +131,7 @@ export class GlobalSettings extends SettingsForm {
     const fields = this.fields();
     const { problems } = this.typed();
     return this.saveRow(content
-      .child(this.selectQuestion("merge", "How does work get into main?", null, [{ id: CLEAR_CHOICE, label: DEFAULT_MERGE_LABEL }, ...MERGE_CHOICES], t,
+      .child(this.selectQuestion("merge", "How does work get into main?", null, [DEFAULT_MERGE_CHOICE, ...MERGE_CHOICES], t,
         (controls) => controls.when(fields.mergedNote, (e) => e.child(this.note(COMPLETE_WITHOUT_PULL_REQUEST, t)))))
       .when(fields.completeSelect, (e) => e.child(this.selectQuestion("complete", "When is the work complete?", COMPLETE_SENTENCE,
         [{ id: CLEAR_CHOICE, label: `Default (${choiceLabel(COMPLETE_CHOICES, DEFAULT_PULL_REQUEST_COMPLETE)})` }, ...COMPLETE_CHOICES], t)))
