@@ -118,6 +118,24 @@ test("tab rename compares the space with the name the repository's spaceName tem
   assert.deepEqual(calls, [["do", "tab.rename", "--id", "tab-session", "--name", "Tab names"]]);
 });
 
+for (const [template, space] of [[undefined, "󰄱 #72"], ["<repo> <issueId>", "󰄱 name #72"]]) {
+  test(`tab rename leaves out the ID in a space named ${space}, which ends with the issue's space name`, async (t) => {
+    inRepository(t, template);
+    const calls = stubApp(t, listing("Claude", space));
+    const { code } = await run(t, ["tab", "rename", "#72", "Tab names"]);
+    assert.equal(code, 0);
+    assert.deepEqual(calls, [["do", "tab.rename", "--id", "tab-session", "--name", "Tab names"]]);
+  });
+}
+
+test("tab rename prefixes the ID when the issue's space name ends the space's name without whitespace before it", async (t) => {
+  inRepository(t);
+  const calls = stubApp(t, listing("Claude", "abc#72"));
+  const { code } = await run(t, ["tab", "rename", "#72", "Tab names"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["do", "tab.rename", "--id", "tab-session", "--name", "#72 Tab names"]]);
+});
+
 test("tab rename leaves a tab the person named", async (t) => {
   inRepository(t);
   const calls = stubApp(t, listing("Review"));

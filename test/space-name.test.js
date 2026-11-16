@@ -25,9 +25,15 @@ test("a space named with a bare Linear or GitHub ID names that issue", () => {
 });
 
 test("a space whose name isn't an issue ID names no issue", () => {
-  for (const name of ["herdr-issues", "abc-12", "ABC-12 notes", "#12a", "12", "ABC-", ""]) {
+  for (const name of ["herdr-issues", "abc-12", "ABC-12 notes", "#12a", "12", "ABC-", "", "abc#123", "#123 later"]) {
     assert.equal(issueIdInSpaceName(name), undefined, name);
   }
+});
+
+test("a space whose name ends with an issue ID after whitespace names that issue", () => {
+  assert.equal(issueIdInSpaceName("󰄱 #123"), "#123");
+  assert.equal(issueIdInSpaceName("anything #123"), "#123");
+  assert.equal(issueIdInSpaceName("󰄱 ABC-12"), "ABC-12");
 });
 
 test("a space named by the template names the issue in it", () => {
@@ -35,13 +41,19 @@ test("a space named by the template names the issue in it", () => {
   assert.equal(issueIdInSpaceName("name #12", named), "#12");
   assert.equal(issueIdInSpaceName("name ABC-3", named), "ABC-3");
   assert.equal(issueIdInSpaceName("#12", named), "#12");
-  assert.equal(issueIdInSpaceName("other #12", named), undefined);
+  assert.equal(issueIdInSpaceName("other#12", named), undefined);
   assert.equal(issueIdInSpaceName("name #12 extra", named), undefined);
 });
 
+test("a space whose name ends with the template's name after whitespace names the issue in it", () => {
+  const named = { template: "<repo> <issueId>", repo: "herdr-issues" };
+  assert.equal(issueIdInSpaceName("󰄱 herdr-issues #76", named), "#76");
+  assert.equal(issueIdInSpaceName("󰄱 herdr-issues ABC-3", named), "ABC-3");
+});
+
 test("the template's other text is matched literally", () => {
-  assert.equal(issueIdInSpaceName("[a.b] #4", { template: "[<repo>] <issueId>", repo: "a.b" }), "#4");
-  assert.equal(issueIdInSpaceName("[axb] #4", { template: "[<repo>] <issueId>", repo: "a.b" }), undefined);
+  assert.equal(issueIdInSpaceName("[a.b]#4", { template: "[<repo>]<issueId>", repo: "a.b" }), "#4");
+  assert.equal(issueIdInSpaceName("[axb]#4", { template: "[<repo>]<issueId>", repo: "a.b" }), undefined);
 });
 
 test("a template naming the issue twice needs the same ID both times", () => {
@@ -61,5 +73,6 @@ test("issueIdOfSpace reads back the name issueSpaceName gives, with the reposito
 test("issueIdOfSpace reads a bare ID in a repository without a template", async (t) => {
   const project = repository(t);
   assert.equal(await issueIdOfSpace(project, "#76"), "#76");
-  assert.equal(await issueIdOfSpace(project, "name #76"), undefined);
+  assert.equal(await issueIdOfSpace(project, "name #76"), "#76");
+  assert.equal(await issueIdOfSpace(project, "name#76"), undefined);
 });
