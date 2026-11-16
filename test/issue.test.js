@@ -6,6 +6,7 @@ import {
   groupIssues,
   holdingBlockers,
   holdsNoIssues,
+  shortDate,
   statusIcon,
   stripBadges,
   waitingIssues,
@@ -216,5 +217,17 @@ describe("statusIcon", () => {
     assert.equal(statusIcon("unknown"), null);
     assert.equal(statusIcon("started"), null);
     assert.equal(statusIcon(undefined), null);
+  });
+});
+
+describe("shortDate", () => {
+  const now = new Date(2026, 10, 16);
+
+  test("names the month and day of a time this year", () => {
+    assert.equal(shortDate(new Date(2026, 2, 5, 14).toISOString(), now), "Mar 5");
+  });
+
+  test("adds the year to a time in another year", () => {
+    assert.equal(shortDate(new Date(2025, 11, 31, 9).toISOString(), now), "Dec 31, 2025");
   });
 });
