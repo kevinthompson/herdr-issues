@@ -20,6 +20,8 @@
 # It refuses in a linked worktree, whose folder goes away when the worktree closes.
 # Running it again re-links the mod and the CLI and updates the plugin to this checkout's version, turning it
 # back on if it was turned off.
+# It prints each of these as a step through scripts/terminal-output.sh, ending with a summary of what it installed,
+# what it skipped and what is left for the person to do.
 #
 # Needs herdr-app, git and node 22.15 or later, which it offers to install with devbox or Homebrew. Claude Code
 # (claude) is needed only for the issues:* skills and hooks, and gh only for repositories tracked in GitHub Issues.
@@ -36,42 +38,22 @@ keys_file="$herdr_home/keys.json"
 cli_link="$HOME/.local/bin/issues"
 setup_json="$repo_root/scripts/setup-json.js"
 
-colors_stream() {
-  [[ -t $1 && -z ${NO_COLOR:-} ]]
-}
+# shellcheck source=scripts/terminal-output.sh
+source "$repo_root/scripts/terminal-output.sh"
 
-print_in_color() {
-  local stream=$1 sgr=$2
-  shift 2
-  if colors_stream "$stream"; then
-    printf '\e[%sm%s\e[0m\n' "$sgr" "$*" >&"$stream"
-  else
-    printf '%s\n' "$*" >&"$stream"
-  fi
-}
+# What the summary lists.
+installed=()
+skipped=()
+to_do=()
 
-# Prompts from read -p and select go to stderr.
-prompt_text() {
-  if colors_stream 2; then
-    printf '\e[36m%s\e[0m' "$1"
-  else
-    printf '%s' "$1"
-  fi
-}
-
-success() { print_in_color 1 32 "$@"; }
-info() { printf '%s\n' "$*"; }
-note() { print_in_color 1 1 "$(cat)"; }
-prompt() { print_in_color 1 36 "$@"; }
-warning() { print_in_color 2 33 "$@"; }
-error() { print_in_color 2 31 "$@"; }
+step "Requirements"
 
 missing=()
 for command in herdr-app git; do
   command -v "$command" >/dev/null || missing+=("$command")
 done
 if ((${#missing[@]})); then
-  error "setup: missing required commands: ${missing[*]}"
+  error_line "Missing required commands: ${missing[*]}"
   exit 1
 fi
 
@@ -94,14 +76,6 @@ node_problem() {
   echo "node $found_version is too old"
 }
 
-# Answers no without asking when standard input isn't a terminal.
-confirm() {
-  local answer
-  [[ -t 0 ]] || return 1
-  read -r -p "$(prompt_text "$1 [y/N] ")" answer || return 1
-  [[ $answer == [yY]* ]]
-}
-
 devbox_lists_packages() {
   command -v devbox >/dev/null && devbox global list 2>/dev/null | grep -q '^\* '
 }
@@ -115,8 +89,8 @@ node_install_command() {
 
 describe_node_install() {
   case $1 in
-    devbox) info "  $(node_install_command devbox) adds Node to devbox's global packages, which shells find through devbox global shellenv." ;;
-    brew) info "  $(node_install_command brew) installs Node with Homebrew for every shell, or upgrades the Node Homebrew already installed." ;;
+    devbox) echo "$(node_install_command devbox) adds Node to devbox's global packages, which shells find through devbox global shellenv." ;;
+    brew) echo "$(node_install_command brew) installs Node with Homebrew for every shell, or upgrades the Node Homebrew already installed." ;;
   esac
 }
 
@@ -127,17 +101,19 @@ warn_unless_profile_evaluates_devbox() {
     "$HOME/.profile" "$HOME/.config/fish/config.fish"; do
     grep -qs 'devbox global shellenv' "$profile" && return
   done
-  warning "setup: warning: your shell profile doesn't evaluate devbox global shellenv, so Herdr and Claude Code won't find node; add this line to it: eval \"\$(devbox global shellenv)\""
+  warning_line "Your shell profile doesn't evaluate devbox global shellenv, so Herdr and Claude Code won't find node; add this line to it: eval \"\$(devbox global shellenv)\""
+  to_do+=("Add eval \"\$(devbox global shellenv)\" to your shell profile")
 }
 
 install_node_with() {
   local manager=$1 command
   command=$(node_install_command "$manager")
-  info "Running $command"
+  detail_line "Running $command"
   if ! $command; then
-    error "setup: $command failed"
+    error_line "$command failed"
     return 1
   fi
+  done_line "Installed Node with $manager"
   if [[ $manager == devbox ]]; then
     eval "$(devbox global shellenv)"
     warn_unless_profile_evaluates_devbox
@@ -148,30 +124,28 @@ install_node_with() {
 # Offers to install Node with the person's package manager; fails when nothing was installed.
 offer_node_install() {
   [[ -t 0 ]] || return 1
-  local managers=() manager choice choices=() decline_choice="Don't install"
+  local managers=() manager explanations=() choices=() decline_choice="Don't install"
   devbox_lists_packages && managers+=(devbox)
   command -v brew >/dev/null && managers+=(brew)
   ((${#managers[@]})) || return 1
 
-  prompt "setup: $1; the issues CLI needs Node $minimum_node_version or later."
-  info "The issues command, which the Issues panel and the issues:* skills run, is a Node program."
+  warning_line "$1; the issues CLI needs Node $minimum_node_version or later."
+  explanations=("The issues command, which the Issues panel and the issues:* skills run, is a Node program.")
   for manager in "${managers[@]}"; do
-    describe_node_install "$manager"
+    explanations+=("$(describe_node_install "$manager")")
   done
   if ((${#managers[@]} == 1)); then
     manager=${managers[0]}
-    confirm "Install it with $manager ($(node_install_command "$manager"))?" || return 1
+    ask_question "Install it with $manager ($(node_install_command "$manager"))?" "${explanations[@]}"
+    answer_yes || return 1
   else
     for manager in "${managers[@]}"; do
       choices+=("$manager ($(node_install_command "$manager"))")
     done
-    prompt "Which package manager should install Node?"
-    PS3=$(prompt_text "Choose a number: ")
-    select choice in "${choices[@]}" "$decline_choice"; do
-      [[ -n $choice ]] && break
-    done
-    [[ -n $choice && $choice != "$decline_choice" ]] || return 1
-    manager=${choice%% *}
+    ask_question "Which package manager should install Node?" "${explanations[@]}"
+    choose "${choices[@]}" "$decline_choice" || return 1
+    [[ $chosen != "$decline_choice" ]] || return 1
+    manager=${chosen%% *}
   fi
   install_node_with "$manager"
 }
@@ -182,14 +156,20 @@ require_node() {
   [[ -z $problem ]] && return
   offer_node_install "$problem" && problem=$(node_problem)
   [[ -z $problem ]] && return
-  error "setup: $problem; the issues CLI needs Node $minimum_node_version or later"
-  error "setup: install it, then run setup again"
+  error_line "$problem; the issues CLI needs Node $minimum_node_version or later"
+  error_line "Install it, then run setup again"
   exit 1
 }
 require_node
 
-command -v gh >/dev/null ||
-  warning "setup: warning: gh, GitHub's command line tool, is not installed; without it the Issues panel and the issues command can't read or change issues in repositories tracked in GitHub Issues. Install it with brew install gh (or see https://cli.github.com), then sign in with gh auth login."
+found=(herdr-app git "node $(node --version | sed 's/^v//')")
+if command -v gh >/dev/null; then
+  found+=(gh)
+else
+  warning_line "gh, GitHub's command line tool, is not installed; without it the Issues panel and the issues command can't read or change issues in repositories tracked in GitHub Issues. Install it with brew install gh (or see https://cli.github.com), then sign in with gh auth login."
+  to_do+=("Install gh for repositories tracked in GitHub Issues")
+fi
+done_line "Found $(join_list "${found[@]}")"
 
 refuse_linked_worktree() {
   local git_dir common_dir main_checkout
@@ -197,33 +177,38 @@ refuse_linked_worktree() {
   common_dir=$(git -C "$repo_root" rev-parse --path-format=absolute --git-common-dir)
   [[ $git_dir == "$common_dir" ]] && return
   main_checkout=$(git -C "$repo_root" worktree list --porcelain | sed -n '1s/^worktree //p')
-  error "setup: $repo_root is a linked worktree; installing from it would point the mod, the issues CLI and the plugin at a folder that goes away when the worktree closes"
-  error "setup: run ./setup from the main checkout instead: cd $main_checkout && ./setup"
+  error_line "$repo_root is a linked worktree; installing from it would point the mod, the issues CLI and the plugin at a folder that goes away when the worktree closes"
+  error_line "Run ./setup from the main checkout instead: cd $main_checkout && ./setup"
   exit 1
 }
 refuse_linked_worktree
 
 link_mod() {
   if [[ -e $mod_link && ! -L $mod_link ]]; then
-    error "setup: $mod_link exists and is not a symlink; move it aside and run setup again"
+    error_line "$mod_link exists and is not a symlink; move it aside and run setup again"
     exit 1
   fi
   mkdir -p "$(dirname "$mod_link")"
   ln -sfn "$mod_root" "$mod_link"
-  success "Linked $mod_link -> $mod_root"
+  done_line "Linked $mod_link -> $mod_root"
+  installed+=("the Issues mod")
 }
 
 link_cli() {
   if [[ -e $cli_link && ! -L $cli_link ]]; then
-    error "setup: $cli_link exists and is not a symlink; move it aside and run setup again"
+    error_line "$cli_link exists and is not a symlink; move it aside and run setup again"
     exit 1
   fi
   mkdir -p "$(dirname "$cli_link")"
   ln -sfn "$repo_root/bin/issues" "$cli_link"
-  success "Linked $cli_link -> $repo_root/bin/issues"
+  done_line "Linked $cli_link -> $repo_root/bin/issues"
+  installed+=("the issues command")
   case ":$PATH:" in
     *":$(dirname "$cli_link"):"*) ;;
-    *) warning "setup: warning: $(dirname "$cli_link") is not on PATH; add it to run the issues command" ;;
+    *)
+      warning_line "$(dirname "$cli_link") is not on PATH; add it to run the issues command"
+      to_do+=("Add $(dirname "$cli_link") to PATH")
+      ;;
   esac
 }
 
@@ -231,6 +216,18 @@ link_cli() {
 # claude binary crashes trying to watch it; its plugin commands never read input.
 claude_plugin() {
   claude plugin "$@" </dev/null
+}
+
+# Runs a claude plugin command, printing the result line on success, or the command's output on failure.
+run_claude_plugin() {
+  local result=$1 output
+  shift
+  if ! output=$(claude_plugin "$@" 2>&1); then
+    error_line "claude plugin $* failed"
+    [[ -z $output ]] || detail_line "$output"
+    exit 1
+  fi
+  [[ -z $result ]] || done_line "$result"
 }
 
 marketplace_path() {
@@ -247,50 +244,57 @@ plugin_enabled() {
 
 install_plugin() {
   if ! command -v claude >/dev/null; then
-    warning "setup: warning: claude is not installed, so the Claude plugin with the issues:* skills and hooks was skipped; install Claude Code and run setup again to add it. Without it, the Issues panel still lists issues, but Claude Code sessions can't work them with skills such as /issues:work. Claude Code installs with: curl -fsSL https://claude.ai/install.sh | bash"
+    warning_line "claude is not installed, so the Claude plugin with the issues:* skills and hooks was skipped; install Claude Code and run setup again to add it. Without it, the Issues panel still lists issues, but Claude Code sessions can't work them with skills such as /issues:work. Claude Code installs with: curl -fsSL https://claude.ai/install.sh | bash"
+    skipped+=("the Claude plugin, since claude is not installed")
     return
   fi
 
   local registered_path
   registered_path=$(marketplace_path)
   if [[ -n $registered_path && $registered_path != "$repo_root" ]]; then
-    info "The $marketplace marketplace points to $registered_path; pointing it to $repo_root"
-    claude_plugin marketplace remove "$marketplace"
+    detail_line "The $marketplace marketplace points to $registered_path; pointing it to $repo_root"
+    run_claude_plugin "" marketplace remove "$marketplace"
     registered_path=""
   fi
 
   if [[ -z $registered_path ]]; then
-    claude_plugin marketplace add "$repo_root"
+    run_claude_plugin "Added the $marketplace marketplace from $repo_root" marketplace add "$repo_root"
   else
-    claude_plugin marketplace update "$marketplace"
+    run_claude_plugin "Updated the $marketplace marketplace" marketplace update "$marketplace"
   fi
 
   if plugin_installed; then
-    claude_plugin update "$plugin"
+    run_claude_plugin "Updated the $plugin plugin" update "$plugin"
     if ! plugin_enabled; then
-      info "The $plugin plugin was turned off; turning it on"
-      claude_plugin enable "$plugin" --scope user
+      run_claude_plugin "The $plugin plugin was turned off; turned it on" enable "$plugin" --scope user
     fi
   else
-    claude_plugin install "$plugin"
+    run_claude_plugin "Installed the $plugin plugin" install "$plugin"
   fi
+  installed+=("the Claude plugin")
+  to_do+=("Start a new Claude Code session to load the plugin")
 }
 
 # Adds each of the mod's keys the person hasn't bound; a key they bound to another action stays theirs.
 merge_keys() {
   if [[ ! -f $keys_file ]]; then
-    warning "setup: $keys_file not found; Herdr writes it the first time it opens. Without it the mod's keys, such as cmd-shift-i to show or hide the Issues panel, aren't bound. Open Herdr once and run setup again to add them."
+    warning_line "$keys_file not found; Herdr writes it the first time it opens. Without it the mod's keys, such as cmd-shift-i to show or hide the Issues panel, aren't bound. Open Herdr once and run setup again to add them."
+    skipped+=("the mod's keys, since Herdr hasn't written keys.json yet")
+    to_do+=("Open Herdr once and run setup again to add the mod's keys")
     return
   fi
 
-  local kept status=0
+  local kept kept_line status=0
   kept=$(node "$setup_json" merge-keys "$keys_file" "$mod_root/keys.json") || status=$?
-  [[ -z $kept ]] || warning "$kept"
   case $status in
-    0) success "Added the mod's keys to $keys_file" ;;
-    10) success "$keys_file already has the mod's keys" ;;
+    0) done_line "Added the mod's keys to $keys_file" ;;
+    10) done_line "$keys_file already has the mod's keys" ;;
     *) exit "$status" ;;
   esac
+  installed+=("the mod's keys")
+  [[ -z $kept ]] || while IFS= read -r kept_line; do
+    warning_line "$kept_line"
+  done <<<"$kept"
 }
 
 layout_shows_mod() {
@@ -306,16 +310,16 @@ shipped_layout_names() {
 }
 
 print_manual_layout_steps() {
-  note <<EOF
-No layout shows the Issues panel yet, so Herdr won't show it. Herdr's shipped layouts can't be changed, since
-Herdr replaces them each time it starts, so the panel goes in a personal layout.
-To show the Issues panel, make a personal copy of a layout and add the mod beside its side panel:
-  herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
-Then add this column right after the node whose id is panel in $layouts_dir/main-issues.json:
-  { "id": "issues-panel", "type": "column", "size": { "weight": 1 }, "min": 32, "max": 900,
-    "children": [{ "id": "issues", "type": "block", "content": { "mod": "issues" } }] }
-and give the node whose id is main "size": { "weight": 2 }, so the panel keeps its share as the window resizes.
-EOF
+  skipped_line "No layout shows the Issues panel yet, so Herdr won't show it."
+  detail_line "Herdr's shipped layouts can't be changed, since Herdr replaces them each time it starts, so the panel goes in a personal layout."
+  detail_line "To show the Issues panel, make a personal copy of a layout and add the mod beside its side panel:"
+  code_line "herdr-app do layout.clone '{\"name\":\"main\",\"as\":\"main-issues\"}'"
+  detail_line "Then add this column right after the node whose id is panel in $layouts_dir/main-issues.json:"
+  code_line '{ "id": "issues-panel", "type": "column", "size": { "weight": 1 }, "min": 32, "max": 900,'
+  code_line '  "children": [{ "id": "issues", "type": "block", "content": { "mod": "issues" } }] }'
+  detail_line "and give the node whose id is main \"size\": { \"weight\": 2 }, so the panel keeps its share as the window resizes."
+  skipped+=("the Issues panel layout")
+  to_do+=("Add the Issues panel to a layout with the steps under Layout")
 }
 
 add_panel_beside_panel_body() {
@@ -328,7 +332,7 @@ move_panel_out_of_panel_body() {
   local status=0
   node "$setup_json" move-panel "$1" || status=$?
   case $status in
-    0) success "Gave the Issues panel in the $(basename "$1" .json) layout a column that keeps its share of the window" ;;
+    0) done_line "Gave the Issues panel in the $(basename "$1" .json) layout a column that keeps its share of the window" ;;
     10) ;;
     *) exit "$status" ;;
   esac
@@ -347,7 +351,7 @@ show_layout() {
   else
     node "$setup_json" show-layout "$herdr_home/shared.json" "$1"
   fi
-  success "Herdr now shows the $1 layout, and opens with it until you switch layouts"
+  done_line "Herdr now shows the $1 layout, and opens with it until you switch layouts"
 }
 
 switch_layout_command() {
@@ -356,37 +360,39 @@ switch_layout_command() {
 
 # Asks to show the layout with the Issues panel in place of the one Herdr shows, or says how to switch to it.
 offer_to_show_layout() {
-  local shown=$1 with_panel=$2
+  local shown=$1 with_panel=$2 answered_yes=""
   if [[ -t 0 ]]; then
-    echo
-    info "Herdr opens with the layout it showed last, so switching to $with_panel now also makes it the layout Herdr opens with, until you switch layouts again with ctrl-shift-l."
+    ask_question "Herdr shows the $shown layout, which has no Issues panel. Switch to $with_panel, which has it, and open with it from now on?" \
+      "Herdr opens with the layout it showed last, so switching to $with_panel now also makes it the layout Herdr opens with, until you switch layouts again with ctrl-shift-l."
+    answer_yes && answered_yes=1
   fi
-  if confirm "Herdr shows the $shown layout, which has no Issues panel. Switch to $with_panel, which has it, and open with it from now on?"; then
+  if [[ -n $answered_yes ]]; then
     show_layout "$with_panel"
   else
-    warning "The Issues panel is in the $with_panel layout, but Herdr shows the $shown layout; switch to it with: $(switch_layout_command "$with_panel")"
+    warning_line "The Issues panel is in the $with_panel layout, but Herdr shows the $shown layout; switch to it with: $(switch_layout_command "$with_panel")"
+    to_do+=("Switch to the $with_panel layout to see the Issues panel")
   fi
 }
 
 # Writes the copy itself instead of running layout.clone, which needs an open window and switches it to the copy.
 copy_main_layout() {
   local name version
-  echo
-  info "The new layout's name is how you switch to it, with herdr-app do layout.switch or by cycling layouts with ctrl-shift-l. Setup writes it to $layouts_dir/<name>.json."
+  ask_question "Name for the new layout" \
+    "The new layout's name is how you switch to it, with herdr-app do layout.switch or by cycling layouts with ctrl-shift-l. Setup writes it to $layouts_dir/<name>.json."
   while true; do
-    read -r -p "$(prompt_text "Name for the new layout [main-issues]: ")" name || return 1
-    name=${name:-main-issues}
+    answer_text "[main-issues] " || return 1
+    name=${answer:-main-issues}
     if [[ ! $name =~ ^[A-Za-z0-9._-]+$ ]]; then
-      prompt "Use only letters, numbers, dots, dashes and underscores."
+      detail_line "Use only letters, numbers, dots, dashes and underscores."
     elif [[ -e $layouts_dir/$name.json ]]; then
-      prompt "$layouts_dir/$name.json already exists; choose another name."
+      detail_line "$layouts_dir/$name.json already exists; choose another name."
     else
       break
     fi
   done
   version=$(herdr-app --version | awk '{ print $NF }')
   node "$setup_json" copy-layout "$layouts_dir/main.json" "$layouts_dir/$name.json" "$version"
-  success "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
+  done_line "Copied the main layout to $layouts_dir/$name.json with the Issues panel"
   layout_with_panel=$name
 }
 
@@ -394,7 +400,9 @@ copy_main_layout() {
 add_panel_to_layout() {
   layouts_dir="$herdr_home/layouts"
   if [[ ! -d $layouts_dir ]]; then
-    warning "setup: $layouts_dir not found; Herdr writes its layouts there the first time it opens. Without a layout that shows it, the Issues panel doesn't appear. Open Herdr once and run setup again to add the Issues panel."
+    warning_line "$layouts_dir not found; Herdr writes its layouts there the first time it opens. Without a layout that shows it, the Issues panel doesn't appear. Open Herdr once and run setup again to add the Issues panel."
+    skipped+=("the Issues panel layout, since Herdr hasn't written its layouts yet")
+    to_do+=("Open Herdr once and run setup again to add the Issues panel")
     return
   fi
 
@@ -418,10 +426,11 @@ add_panel_to_layout() {
 
   if ((${#showing[@]})); then
     if printf '%s\n' "${showing[@]}" | grep -qxF "$shown"; then
-      success "The Issues panel is in the $shown layout, which Herdr shows"
+      done_line "The Issues panel is in the $shown layout, which Herdr shows"
     else
       offer_to_show_layout "$shown" "${showing[0]}"
     fi
+    installed+=("the Issues panel layout")
     return
   fi
 
@@ -430,34 +439,30 @@ add_panel_to_layout() {
     return
   fi
 
-  local copy_choice="Copy main into a new layout" skip_choice="Skip" labels=() choice
+  local copy_choice="Copy main into a new layout" skip_choice="Skip" labels=()
   for name in ${candidates[@]+"${candidates[@]}"}; do
     if [[ $name == "$shown" ]]; then labels+=("$name (shown now)"); else labels+=("$name"); fi
   done
   [[ -f $layouts_dir/main.json ]] && labels+=("$copy_choice")
   labels+=("$skip_choice")
 
-  echo
   if ((${#candidates[@]} == 0)) && [[ -f $layouts_dir/main.json ]]; then
-    info "Herdr ships with a main layout that can't be changed, since Herdr replaces it each time it starts. You don't have a personal layout to add the Issues panel to."
-    info "Copy main into a new layout makes a personal copy of main with the Issues panel in a column beside its side panel, under a name you choose next."
-    info "Skip changes no layout and prints the steps to add the Issues panel yourself."
-    prompt "Would you like to create a new personal layout with the Issues panel?"
+    ask_question "Would you like to create a new personal layout with the Issues panel?" \
+      "Herdr ships with a main layout that can't be changed, since Herdr replaces it each time it starts. You don't have a personal layout to add the Issues panel to." \
+      "Copy main into a new layout makes a personal copy of main with the Issues panel in a column beside its side panel, under a name you choose next." \
+      "Skip changes no layout and prints the steps to add the Issues panel yourself."
   else
-    info "A layout is the arrangement of Herdr's window: where its spaces, terminals and side panel go. Herdr shows one layout at a time, and the Issues panel appears only in a layout that has it."
+    local explanations=("A layout is the arrangement of Herdr's window: where its spaces, terminals and side panel go. Herdr shows one layout at a time, and the Issues panel appears only in a layout that has it.")
     ((${#candidates[@]} == 0)) ||
-      info "Choosing one of your personal layouts adds the Issues panel to it, in a column of its own beside the side panel."
+      explanations+=("Choosing one of your personal layouts adds the Issues panel to it, in a column of its own beside the side panel.")
     [[ ! -f $layouts_dir/main.json ]] ||
-      info "Copy main into a new layout leaves your layouts as they are and makes a personal copy of main with the Issues panel, under a name you choose next."
-    info "Skip changes no layout and prints the steps to add the Issues panel yourself."
-    prompt "Herdr shows the $shown layout. Which layout should show the Issues panel?"
+      explanations+=("Copy main into a new layout leaves your layouts as they are and makes a personal copy of main with the Issues panel, under a name you choose next.")
+    explanations+=("Skip changes no layout and prints the steps to add the Issues panel yourself.")
+    ask_question "Herdr shows the $shown layout. Which layout should show the Issues panel?" "${explanations[@]}"
   fi
-  PS3=$(prompt_text "Choose a number: ")
-  select choice in "${labels[@]}"; do
-    [[ -n $choice ]] && break
-  done
+  choose "${labels[@]}" || chosen=$skip_choice
   local layout_with_panel=""
-  case ${choice:-$skip_choice} in
+  case $chosen in
     "$skip_choice")
       print_manual_layout_steps
       ;;
@@ -465,11 +470,12 @@ add_panel_to_layout() {
       copy_main_layout || print_manual_layout_steps
       ;;
     *)
-      layout_with_panel=${candidates[REPLY - 1]}
+      layout_with_panel=${candidates[chosen_index]}
       add_panel_beside_panel_body "$layouts_dir/$layout_with_panel.json"
-      success "Added the Issues panel to the $layout_with_panel layout"
+      done_line "Added the Issues panel to the $layout_with_panel layout"
       ;;
   esac
+  [[ -z $layout_with_panel ]] || installed+=("the Issues panel layout")
   [[ -z $layout_with_panel || $layout_with_panel == "$shown" ]] || offer_to_show_layout "$shown" "$layout_with_panel"
 }
 
@@ -477,20 +483,32 @@ add_panel_to_layout() {
 # run the checks and the pre-commit hook that `npm ci`'s prepare script installs.
 install_dev_dependencies() {
   [[ -z ${SKIP_DEV_DEPENDENCIES:-} && -f $repo_root/package-lock.json ]] || return 0
+  step "Development dependencies"
   (cd "$repo_root" && npm ci --silent)
-  success "Installed the development dependencies and the pre-commit hook"
+  done_line "Installed the development dependencies and the pre-commit hook"
+  installed+=("the development dependencies")
+}
+
+print_summary() {
+  local item
+  step "Summary"
+  ((${#installed[@]} == 0)) || done_line "Installed $(join_list "${installed[@]}")"
+  for item in ${skipped[@]+"${skipped[@]}"}; do
+    skipped_line "Skipped $item"
+  done
+  for item in ${to_do[@]+"${to_do[@]}"}; do
+    todo_line "$item"
+  done
 }
 
 install_dev_dependencies
+step "Mod and CLI"
 link_mod
 link_cli
+step "Keys"
 merge_keys
+step "Claude plugin"
 install_plugin
+step "Layout"
 add_panel_to_layout
-
-echo
-if command -v claude >/dev/null; then
-  note <<<"Done. Start a new Claude Code session to load the plugin."
-else
-  note <<<"Done."
-fi
+print_summary

@@ -4,7 +4,7 @@ import path from "node:path";
 const quoted = (files) => files.map((file) => `'${file}'`).join(" ");
 
 const shellScripts =
-  /^(bootstrap|install|setup|uninstall|scripts\/(check-shell|pre-commit)|\.claude\/hooks\/reload-mod\.sh|claude-plugin\/hooks\/[^/]+\.sh)$/;
+  /^(bootstrap|install|setup|uninstall|scripts\/(check-shell|pre-commit|terminal-output\.sh)|\.claude\/hooks\/reload-mod\.sh|claude-plugin\/hooks\/[^/]+\.sh)$/;
 
 export default {
   "*.{js,mjs}": (files) => [`eslint --fix ${quoted(files)}`, `prettier --write ${quoted(files)}`],
