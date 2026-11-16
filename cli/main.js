@@ -6,7 +6,7 @@ import { closeSettings, landingSettings, nameSettings, pollSettings, updateSetti
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
-import { needsNewBranch, STATUSES } from "../mod/issue.js";
+import { isUnstarted, needsNewBranch, STATUSES } from "../mod/issue.js";
 import { issueSpaceName, markedSpaceName, newIssueSpaceName, SPACE_MARKS, spaceNameEndsWith, unmarkedSpaceName } from "../mod/space-name.js";
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
@@ -53,7 +53,8 @@ Commands:
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a new Herdr space named after the issue and
-                           marked working, as mark working does: 󰄱 <space name>
+                           marked working, as mark working does: 󰄱 <space name>. An issue in triage, backlog or todo
+                           is first marked in progress, as start does; a refused start only warns
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
@@ -339,12 +340,22 @@ function worktreeOptions(args) {
   return options;
 }
 
+async function startBeforeOpening(issue) {
+  try {
+    await startIssue(await currentTracker(), issue.id);
+    console.log(`Started ${issue.id}`);
+  } catch (error) {
+    console.error(`issues: couldn't mark ${issue.id} in progress: ${error.message}; opening its worktree anyway`);
+  }
+}
+
 async function worktree(args) {
   const { id, branch, isNew, name, claudeMessage } = worktreeOptions(args);
   const cwd = process.cwd();
   if (!id) return openWorktree({ cwd, branch, isNew, name: name ?? branch, claudeMessage });
   const issue = await issueToWork(id);
   console.log(`${issue.id} is on ${issue.branch}`);
+  if (isUnstarted(issue)) await startBeforeOpening(issue);
   const spaceName = newIssueSpaceName(name ?? await issueSpaceName(await currentProject(), issue.id));
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }

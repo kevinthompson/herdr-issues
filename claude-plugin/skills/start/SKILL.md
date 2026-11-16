@@ -5,7 +5,7 @@ argument-hint: <issue IDs, or "next <N>">
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/start.sh:*), Bash(issues worktree:*), Bash(issues next:*), Bash(issues show:*)
 ---
 
-Start the issues named in `$ARGUMENTS`, each in its own worktree space. This session only starts them: never mark them in progress or do any of their work here; each space's session does that with `/issues:work`.
+Start the issues named in `$ARGUMENTS`, each in its own worktree space. This session only starts them: `issues worktree` marks each one not yet started in progress as it opens the space, and each space's session does the work with `/issues:work`; never do any of it here.
 
 ## Started before this message
 
