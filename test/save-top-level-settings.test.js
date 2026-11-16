@@ -19,11 +19,11 @@ const repos = { "~/Code/web": { tracker: "linear", team: "WEB", close: "manual",
 test("saving changes only the given top-level keys and keeps repos and every other key", async () => {
   writeSettings({ pollSeconds: 30, futureSetting: { kept: true }, close: "ask", repos });
 
-  await saveTopLevelSettings({ close: "auto", merge: "pull-request", complete: "pull-request-passing", workPrompt: "  House rules.\n" });
+  await saveTopLevelSettings({ close: "auto", approval: "auto", onApproval: "pull-request", waitForChecks: true, workPrompt: "  House rules.\n" });
 
   assert.deepEqual(readSettings(), {
     pollSeconds: 30, futureSetting: { kept: true }, close: "auto",
-    merge: "pull-request", complete: "pull-request-passing", workPrompt: "House rules.", repos,
+    approval: "auto", onApproval: "pull-request", waitForChecks: true, workPrompt: "House rules.", repos,
   });
   assert.deepEqual(Object.keys(readSettings()).at(-1), "repos");
   assert.equal((await topLevelSettings()).close, "auto");
@@ -50,7 +50,9 @@ test("a value or pair the top level couldn't hold, or a repository-only key, wri
   const before = readFileSync(settingsPath(), "utf8");
   const refusals = [
     [{ close: "always" }, /issues\.json needs a close of manual, ask, auto/],
-    [{ merge: "auto" }, /issues\.json merges with auto, so its complete can only be merged/],
+    [{ approval: "sometimes" }, /issues\.json needs an approval of ask, auto/],
+    [{ waitForChecks: "yes" }, /issues\.json needs a waitForChecks of true or false/],
+    [{ merge: "auto" }, /merge isn't a setting for every repository/],
     [{ pollSeconds: 5 }, /pollSeconds that's a whole number of seconds, 10 or more/],
     [{ updateCheckHours: 0.5 }, /updateCheckHours that's a whole number of hours/],
     [{ workModel: "two words" }, /needs a workModel of inherit/],
@@ -64,12 +66,14 @@ test("a value or pair the top level couldn't hold, or a repository-only key, wri
   assert.ok(existsSync(settingsPath()));
 });
 
-test("changing merge with complete together is checked as a pair", async () => {
-  writeSettings({ merge: "pull-request", complete: "pull-request-open", repos });
+test("saving a landing setting removes the retired merge and complete, and other saves keep them", async () => {
+  writeSettings({ merge: "pull-request", complete: "pull-request-passing", repos });
 
-  await saveTopLevelSettings({ merge: "auto", complete: null });
+  await saveTopLevelSettings({ close: "auto" });
+  assert.deepEqual(readSettings(), { merge: "pull-request", complete: "pull-request-passing", close: "auto", repos });
 
-  assert.deepEqual(readSettings(), { merge: "auto", repos });
+  await saveTopLevelSettings({ approval: "ask", onApproval: "pull-request", waitForChecks: false });
+  assert.deepEqual(readSettings(), { close: "auto", approval: "ask", onApproval: "pull-request", waitForChecks: false, repos });
 });
 
 test("a typed update check interval is a whole number of hours, 1 or more, or blank", () => {

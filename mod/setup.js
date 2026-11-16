@@ -1,8 +1,9 @@
 // The panel's view for a repository whose issues it can't list. With no tracker, it shows a blank state whose
 // Set Up Issues button walks through one question per page, with Back at the top left and the step and Cancel,
 // which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
-// back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; how work
-// gets into main; for a pull request, when the work is complete; and a review of the choices, which points to the
+// back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; whether
+// a session asks for approval before its work lands; how the branch then gets into main; for a pull request,
+// whether the session waits for its checks; and a review of the choices, which points to the
 // gear's settings (settings.js) for the rest. Only Save on the
 // review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. How work lands
 // proposes the repository's current or default settings. A configured tracker that fails to load with a
@@ -13,22 +14,38 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { button, collapseButton } from "./detail.js";
-import { mergeSettings, resolveMergeSettings, saveSetupChoices } from "./trackers/setting.js";
+import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
+import { landingSettings, resolveLandingSettings, saveSetupChoices } from "./trackers/setting.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 
 const TEAM_PICKS = "issues.setupTeams";
 const ANSWER_LABEL_PX = 80;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
-export const MERGE_CHOICES = [
-  { id: "auto", label: "Merge automatically", detail: "The branch merges into main on this computer as soon as its work is done." },
-  { id: "review", label: "Merge after I review", detail: "The branch merges into main on this computer once you approve it." },
-  { id: "pull-request", label: "Open a pull request", detail: "The branch lands in main through a pull request." },
-];
-const COMPLETE_CHOICES = [
-  { id: "pull-request-open", label: "Once the pull request is open", detail: "The session can finish and the worktree close as soon as the pull request is open." },
-  { id: "pull-request-passing", label: "Once its checks pass", detail: "The session waits for the pull request's checks to pass, then can finish while it waits for review." },
-  { id: "merged", label: "Once it merges", detail: "The work stays open until the pull request merges into main." },
-];
+// How work lands, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
+// the choices, each with what it means.
+export const LANDING_QUESTIONS = {
+  approval: {
+    title: "Before the work lands, ask for approval?", sentence: null,
+    choices: [
+      { id: "ask", label: "Ask me", detail: "The session shows you what changed and waits for your approval before it merges or opens a pull request." },
+      { id: "auto", label: "Don't ask", detail: "The session merges or opens a pull request as soon as its work is verified." },
+    ],
+  },
+  onApproval: {
+    title: "Once approved", sentence: "How the branch gets into main.",
+    choices: [
+      { id: "merge", label: "Merge into main", detail: "The branch merges into main on this computer." },
+      { id: "pull-request", label: "Open a pull request", detail: "The session pushes the branch and opens a pull request." },
+    ],
+  },
+  waitForChecks: {
+    title: "Wait for the pull request's checks?", sentence: null,
+    choices: [
+      { id: "no", label: "Don't wait", detail: "The session hands off as soon as the pull request is open, and you follow its checks." },
+      { id: "yes", label: "Wait for checks", detail: "The session stays until the pull request's checks pass, fixing the failures its branch caused." },
+    ],
+  },
+};
 
 // A plain sentence for a folder no tracker can serve because it's on another machine.
 export function untrackableView(sentence, t) {
@@ -75,13 +92,14 @@ export class TrackerSetup {
     this.main = main; this.onSaved = onSaved;
     this.failure = null; this.choosingAnother = false; this.settingUp = false;
     this.step = "tracker"; this.saving = false; this.saveProblem = null;
-    // The proposed merge and complete once the tracker is ready, and the answers to them.
-    this.merge = null; this.complete = null; this.proposed = null;
+    // The proposed approval, onApproval and waitForChecks once the tracker is ready, and the answers to them, with
+    // waitForChecks as its select's id (settings-fields.js).
+    this.answers = {}; this.proposed = null;
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
       alongside: () => this.proposeLanding(),
-      onReady: (proposed, cx) => { this.proposed = proposed; this.goTo(this.tracker.choice === "linear" ? "team" : "merge", cx); },
-      onTeam: (cx) => { if (this.step === "team") this.goTo("merge", cx); },
+      onReady: (proposed, cx) => { this.proposed = proposed; this.goTo(this.tracker.choice === "linear" ? "team" : "approval", cx); },
+      onTeam: (cx) => { if (this.step === "team") this.goTo("approval", cx); },
     });
   }
 
@@ -91,11 +109,12 @@ export class TrackerSetup {
     if (!failure) this.choosingAnother = false;
   }
 
-  // The steps for the answers so far; before how work lands is chosen, the proposed choice decides whether
-  // completion is asked.
+  // The steps for the answers so far; before onApproval is chosen, the proposed choice decides whether waiting
+  // for checks is asked.
   steps() {
-    const merge = this.merge ?? this.proposed?.merge ?? "pull-request";
-    return ["tracker", ...(this.tracker.choice === "linear" ? ["team"] : []), "merge", ...(merge === "pull-request" ? ["complete"] : []), "review"];
+    const onApproval = this.answers.onApproval ?? this.proposed?.onApproval ?? "pull-request";
+    return ["tracker", ...(this.tracker.choice === "linear" ? ["team"] : []), "approval", "onApproval",
+      ...(onApproval === "pull-request" ? ["waitForChecks"] : []), "review"];
   }
 
   // Drops every answer and returns to the blank state; a check still running is ignored once it finishes.
@@ -106,7 +125,7 @@ export class TrackerSetup {
   }
 
   forgetAnswers() {
-    Object.assign(this, { step: "tracker", choosingAnother: false, saveProblem: null, merge: null, complete: null, proposed: null });
+    Object.assign(this, { step: "tracker", choosingAnother: false, saveProblem: null, answers: {}, proposed: null });
     this.tracker.reset();
   }
 
@@ -125,30 +144,27 @@ export class TrackerSetup {
 
   // An entry that fails to load proposes the defaults instead of its own settings.
   async proposeLanding() {
-    const proposed = await mergeSettings({ root: this.main, on: null }).catch(() => resolveMergeSettings(this.main, null));
-    return proposed.merge === "pull-request" ? proposed : { ...proposed, complete: "pull-request-open" };
+    const proposed = await landingSettings({ root: this.main, on: null }).catch(() => resolveLandingSettings(this.main, null));
+    return { ...proposed, waitForChecks: checksChoiceId(proposed.waitForChecks) };
   }
 
   takePickedTeam(cx) {
     this.tracker.takePickedTeam(cx);
   }
 
-  chooseMerge(merge, cx) {
-    this.merge = merge;
-    if (merge !== "pull-request") this.complete = null;
-    this.goTo(merge === "pull-request" ? "complete" : "review", cx);
-  }
-
-  chooseComplete(complete, cx) {
-    this.complete = complete;
-    this.goTo("review", cx);
+  // Answers approval, onApproval or waitForChecks, and goes on to the next step.
+  chooseLanding(key, id, cx) {
+    this.answers = { ...this.answers, [key]: id };
+    const steps = this.steps();
+    this.goTo(steps[steps.indexOf(key) + 1], cx);
   }
 
   save(cx) {
     const { choice, team } = this.tracker;
+    const { approval, onApproval, waitForChecks } = this.answers;
     const setting = {
       tracker: choice, ...(choice === "linear" && { team }),
-      merge: this.merge, ...(this.merge === "pull-request" && { complete: this.complete }),
+      approval, onApproval, ...(onApproval === "pull-request" && { waitForChecks: waitForChecksOf(waitForChecks) }),
     };
     Object.assign(this, { saving: true, saveProblem: null });
     cx.spawn(async (cx) => {
@@ -178,8 +194,9 @@ export class TrackerSetup {
         onClick: (cx) => { this.settingUp = true; cx.notify(); },
       }, t));
     }
-    const page = { tracker: this.trackerPage, team: this.teamPage, merge: this.mergePage, complete: this.completePage, review: this.reviewPage }[this.step];
-    return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(page.call(this, content, t));
+    const page = { tracker: this.trackerPage, team: this.teamPage, review: this.reviewPage }[this.step];
+    const shown = page ? page.call(this, content, t) : this.landingPage(this.step, content, t);
+    return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(shown);
   }
 
   // Back at the top left, as an open issue has its way back, and where the step falls at the top right.
@@ -224,25 +241,24 @@ export class TrackerSetup {
   teamPage(content, t) {
     return this.question(content, "Which Linear team?", "The panel lists this team's issues.", t)
       .child(this.tracker.teamDropdown("setup-team", t))
-      .when(Boolean(this.tracker.team), (e) => e.child(h_flex().child(button("setup-team-next", "Next", (cx) => this.goTo("merge", cx), t, { primary: true }))));
+      .when(Boolean(this.tracker.team), (e) => e.child(h_flex().child(button("setup-team-next", "Next", (cx) => this.goTo("approval", cx), t, { primary: true }))));
   }
 
-  mergePage(content, t) {
-    return this.question(content, "How does work get into main?", null, t)
-      .child(this.options("merge", MERGE_CHOICES, { chosen: this.merge, proposed: this.proposed?.merge, onChoose: (id, cx) => this.chooseMerge(id, cx) }, t));
-  }
-
-  completePage(content, t) {
-    return this.question(content, "When is the work complete?", "When a session can finish and the issue's worktree is safe to close.", t)
-      .child(this.options("complete", COMPLETE_CHOICES, { chosen: this.complete, proposed: this.proposed?.complete, onChoose: (id, cx) => this.chooseComplete(id, cx) }, t));
+  // The page for approval, onApproval or waitForChecks.
+  landingPage(key, content, t) {
+    const { title, sentence, choices } = LANDING_QUESTIONS[key];
+    return this.question(content, title, sentence, t)
+      .child(this.options(key, choices, { chosen: this.answers[key], proposed: this.proposed?.[key], onChoose: (id, cx) => this.chooseLanding(key, id, cx) }, t));
   }
 
   reviewPage(content, t) {
+    const landingAnswer = (key) => answerLabel(LANDING_QUESTIONS[key].choices, this.answers[key]);
     const answers = [
       ["Tracker", answerLabel(TRACKERS, this.tracker.choice)],
       ...(this.tracker.choice === "linear" ? [["Team", this.tracker.teamLabel()]] : []),
-      ["Work lands", answerLabel(MERGE_CHOICES, this.merge)],
-      ...(this.merge === "pull-request" ? [["Complete", answerLabel(COMPLETE_CHOICES, this.complete)]] : []),
+      ["Approval", landingAnswer("approval")],
+      ["Once approved", landingAnswer("onApproval")],
+      ...(this.answers.onApproval === "pull-request" ? [["Checks", landingAnswer("waitForChecks")]] : []),
     ];
     return this.question(content, "Review your setup", "Save writes these choices for this repository. Go back to change one.", t)
       .child(v_flex().flex_none().gap(6).children(answers.map(([name, value]) => h_flex().gap(8).text_size(12)

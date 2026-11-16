@@ -61,7 +61,7 @@ Each tracker needs credentials:
 
 The Claude sessions that work issues run on your own Claude Code model and effort unless `issues.json`'s `workModel` and `workEffort` set them, at the top level or in a repository's entry.
 
-Settings at the top level of `issues.json` apply to every repository without its own: how work gets into main and when it's complete (`merge` and `complete`), what a finished session does about its worktree (`close`), how issue spaces are named (`spaceName`), and the poll interval and issue sessions' model and effort. `workPrompt` is instructions appended to issue sessions' system prompt; a repository's is added after the top level's rather than replacing it. The gear in the panel's header opens its settings: **Repository** edits the focused repository's entry, and **Global** edits these top-level settings.
+Settings at the top level of `issues.json` apply to every repository without its own: whether a session asks before its work lands, how the branch then gets into main and whether it waits for a pull request's checks (`approval`, `onApproval` and `waitForChecks`), what a finished session does about its worktree (`close`), how issue spaces are named (`spaceName`), and the poll interval and issue sessions' model and effort. `workPrompt` is instructions appended to issue sessions' system prompt; a repository's is added after the top level's rather than replacing it. The gear in the panel's header opens its settings: **Repository** edits the focused repository's entry, and **Global** edits these top-level settings.
 
 [Configuration](docs/configuration.md) covers creating the Linear key and every setting in `issues.json`.
 

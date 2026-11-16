@@ -1,8 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CLEAR_CHOICE, OTHER_WORK_MODEL, globalSettingsFields, settingsFields, workModelChoice } from "../mod/settings-fields.js";
+import {
+  CLEAR_CHOICE, OTHER_WORK_MODEL, checksChoiceId, globalSettingsFields, settingsFields, waitForChecksOf, workModelChoice,
+} from "../mod/settings-fields.js";
 
-const fields = (choices) => settingsFields({ trackerChoice: null, trackerReady: false, merge: "auto", workModel: null, otherWorkModelPicked: false, ...choices });
+const fields = (choices) => settingsFields({ trackerChoice: null, trackerReady: false, onApproval: "merge", workModel: null, otherWorkModelPicked: false, ...choices });
 
 test("Linear's team shows only once Linear is chosen and checked", () => {
   assert.equal(fields({ trackerChoice: "linear", trackerReady: true }).teamSelect, true);
@@ -10,10 +12,25 @@ test("Linear's team shows only once Linear is chosen and checked", () => {
   assert.equal(fields({ trackerChoice: "github", trackerReady: true }).teamSelect, false);
 });
 
-test("when the work is complete shows only for a pull request, with a note for the other merges", () => {
-  assert.deepEqual([fields({ merge: "pull-request" }).completeSelect, fields({ merge: "pull-request" }).mergedNote], [true, false]);
-  for (const merge of ["auto", "review"]) assert.deepEqual([fields({ merge }).completeSelect, fields({ merge }).mergedNote], [false, true]);
-  assert.deepEqual([fields({ merge: null }).completeSelect, fields({ merge: null }).mergedNote], [false, false]);
+test("waiting for checks shows only when the onApproval that applies is a pull request", () => {
+  assert.equal(fields({ onApproval: "pull-request" }).waitForChecksSelect, true);
+  assert.equal(fields({ onApproval: "merge" }).waitForChecksSelect, false);
+  assert.equal(fields({ onApproval: null }).waitForChecksSelect, false);
+  assert.equal(fields({ onApproval: null, fallbackOnApproval: "pull-request" }).waitForChecksSelect, true);
+  assert.equal(fields({ onApproval: null, fallbackOnApproval: "merge" }).waitForChecksSelect, false);
+  assert.equal(fields({ onApproval: "merge", fallbackOnApproval: "pull-request" }).waitForChecksSelect, false);
+});
+
+test("the Global form shows waiting for checks for a pull request or the default onApproval", () => {
+  const global = (onApproval) => globalSettingsFields({ onApproval, workModel: null, otherWorkModelPicked: false });
+  assert.equal(global(null).waitForChecksSelect, true);
+  assert.equal(global("pull-request").waitForChecksSelect, true);
+  assert.equal(global("merge").waitForChecksSelect, false);
+});
+
+test("waitForChecks converts to and from its select's ids", () => {
+  assert.deepEqual([true, false, null].map(checksChoiceId), ["yes", "no", null]);
+  assert.deepEqual(["yes", "no", null].map(waitForChecksOf), [true, false, null]);
 });
 
 test("the typed model shows for Other or a saved model the select doesn't list", () => {
@@ -28,17 +45,4 @@ test("the workModel select shows the listed model, Other, or the choice that rem
   assert.equal(workModelChoice(null, false), CLEAR_CHOICE);
   assert.equal(workModelChoice("claude-opus-4-1", false), OTHER_WORK_MODEL);
   assert.equal(workModelChoice(null, true), OTHER_WORK_MODEL);
-});
-
-test("the Global form shows when the work is complete for a pull request or the default merge", () => {
-  const global = (merge) => globalSettingsFields({ merge, workModel: null, otherWorkModelPicked: false });
-  for (const merge of [null, "pull-request"]) assert.deepEqual([global(merge).completeSelect, global(merge).mergedNote], [true, false]);
-  for (const merge of ["auto", "review"]) assert.deepEqual([global(merge).completeSelect, global(merge).mergedNote], [false, true]);
-});
-
-test("when the work is complete shows for the cleared merge when the merge that applies is a pull request", () => {
-  const cleared = (fallbackMerge) => fields({ merge: null, fallbackMerge });
-  assert.deepEqual([cleared("pull-request").completeSelect, cleared("pull-request").mergedNote], [true, false]);
-  for (const merge of ["auto", "review"]) assert.deepEqual([cleared(merge).completeSelect, cleared(merge).mergedNote], [false, true]);
-  assert.deepEqual([fields({ merge: "auto", fallbackMerge: "pull-request" }).completeSelect], [false]);
 });

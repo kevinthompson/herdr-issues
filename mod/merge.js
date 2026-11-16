@@ -1,14 +1,12 @@
 // Merges an issue's branch into main in the repository's main checkout and marks the issue done, for repositories
-// whose work lands locally (merge "review" or "auto"). `issues merge` and the issue view's Merge button both run
+// whose work lands locally (onApproval "merge"). `issues merge` and the issue view's Merge button both run
 // mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly.
 import { exec } from "herdr";
 import { checkouts, MAIN_BRANCHES } from "./worktree.js";
-import { mergeSettings } from "./trackers/setting.js";
+import { landingSettings } from "./trackers/setting.js";
 import { announceIssueChange } from "./changes.js";
 
 export class MergeRefusal extends Error {}
-
-const LOCAL_MERGES = ["review", "auto"];
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -25,8 +23,8 @@ const commitsMainLacks = async (main, branch, on) =>
 // commits main lacks and nothing uncommitted. Anything mergeIssue checks besides is reported when it's clicked.
 export async function canOfferMerge(branch, project) {
   if (!branch || project.on != null) return false;
-  const { merge } = await mergeSettings(project).catch(() => ({ merge: null }));
-  if (!LOCAL_MERGES.includes(merge)) return false;
+  const { onApproval } = await landingSettings(project).catch(() => ({ onApproval: null }));
+  if (onApproval !== "merge") return false;
   const [main, ...linked] = await checkouts(project.root, project.on);
   const worktree = linked.find((checkout) => checkout.branch === branch);
   if (!main || !worktree || !MAIN_BRANCHES.includes(main.branch)) return false;
@@ -37,8 +35,8 @@ export async function canOfferMerge(branch, project) {
 // Checks every reason not to merge before changing anything; returns the main checkout, { path, branch }.
 async function mergeableMain(branch, project) {
   const { on } = project;
-  const { merge } = await mergeSettings(project);
-  if (!LOCAL_MERGES.includes(merge)) {
+  const { onApproval } = await landingSettings(project);
+  if (onApproval === "pull-request") {
     throw new MergeRefusal(`This repository merges through pull requests: merge ${branch}'s pull request instead.`);
   }
   const [main, ...linked] = await checkouts(project.root, on);

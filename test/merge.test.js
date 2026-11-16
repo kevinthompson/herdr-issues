@@ -91,12 +91,14 @@ describe("mergeIssue", () => {
     await assertRefuses(setup, /doesn't merge cleanly into main, so nothing was merged: README/);
   });
 
-  test("refuses a repository that merges through pull requests, pointing to the pull request", async (t) => {
-    const setup = setUp(t);
-    mkdirSync(join(settingsPath(), ".."), { recursive: true });
-    writeFileSync(settingsPath(), JSON.stringify({ repos: { [setup.repository]: { tracker: "beads", merge: "pull-request" } } }));
-    await assertRefuses(setup, /merges through pull requests: merge feature's pull request instead/);
-  });
+  for (const landing of [{ onApproval: "pull-request" }, { merge: "pull-request" }]) {
+    test(`refuses a repository with ${JSON.stringify(landing)}, pointing to the pull request`, async (t) => {
+      const setup = setUp(t);
+      mkdirSync(join(settingsPath(), ".."), { recursive: true });
+      writeFileSync(settingsPath(), JSON.stringify({ repos: { [setup.repository]: { tracker: "beads", ...landing } } }));
+      await assertRefuses(setup, /merges through pull requests: merge feature's pull request instead/);
+    });
+  }
 });
 
 describe("canOfferMerge", () => {

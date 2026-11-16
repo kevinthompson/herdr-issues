@@ -10,14 +10,6 @@ import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, workModelChoice } from "./settings-fields.js";
 import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
 
-export const COMPLETE_CHOICES = [
-  { id: "pull-request-open", label: "Once the pull request is open", detail: "Once the branch is pushed with an open pull request, without waiting for its checks." },
-  { id: "pull-request-passing", label: "Once its checks pass", detail: "Once the pull request is open and its checks pass, while it waits for review." },
-  { id: "merged", label: "Once it merges", detail: "Once the branch is in main." },
-];
-export const COMPLETE_SENTENCE = "When a session can finish and the issue's worktree is safe to close.";
-export const COMPLETE_WITHOUT_PULL_REQUEST = "Without a pull request, the work is complete once its branch is in main.";
-
 export const CLOSE_CHOICES = [
   { id: "ask", label: "Ask me", detail: "The session asks whether to close its worktree, and closes it if you say yes." },
   { id: "auto", label: "Close it", detail: "The session closes its worktree without asking." },

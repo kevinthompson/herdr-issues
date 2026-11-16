@@ -2,9 +2,9 @@
 
 ## Choosing a tracker
 
-A repository with no entry in `issues.json` shows a setup view in the panel: choose **GitHub Issues**, **Linear** (then a team) or **Beads**, and the panel checks what that tracker needs, asks how work gets into main (see [`merge` and `complete`](#merge-and-complete)), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
+A repository with no entry in `issues.json` shows a setup view in the panel: choose **GitHub Issues**, **Linear** (then a team) or **Beads**, and the panel checks what that tracker needs, asks how work lands (see [`approval`, `onApproval` and `waitForChecks`](#approval-onapproval-and-waitforchecks)), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
 
-Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `merge` and `complete`, `close`, `spaceName`, `pollSeconds`, `updateCheckHours`, `workModel`, `workEffort` and `workPrompt`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
+Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `approval`, `onApproval`, `waitForChecks`, `close`, `spaceName`, `pollSeconds`, `updateCheckHours`, `workModel`, `workEffort` and `workPrompt`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
 
 For saved Linear views, a GitHub repository other than origin's, and the other options the panel doesn't offer, run this in a Claude Code session in the repository:
 
@@ -73,20 +73,25 @@ An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2
 
 A `spaceName` at the top level of `issues.json` names the issue spaces of every repository without its own.
 
-### `merge` and `complete`
+### `approval`, `onApproval` and `waitForChecks`
 
-These two settings say how an issue's branch gets into main and when its work counts as complete. An issue is done once its branch is in main, whichever you choose.
+These settings say how an issue's branch lands in main. An issue is done once its branch is in main, whichever you choose.
 
-- `merge`: `auto` merges the branch into main locally without waiting; `review` merges it locally once you approve; `pull-request` lands it through a pull request. Without the setting, it's `pull-request` when the repository's origin is on GitHub, else `review`.
-- `complete`: when the work counts as complete, so a Claude session can stop and the issue's worktree is safe to remove. `merged` means once the branch is in main; `pull-request-open` means once the branch is pushed with an open pull request, without waiting for its checks; `pull-request-passing` means once that pull request's checks also pass. Only `merge: "pull-request"` allows `pull-request-open` and `pull-request-passing`, and `pull-request-open` is that setting's default; with `auto` or `review`, the work is complete once merged.
+- `approval`: `ask` (the default) has the session summarize its commits and changed files and wait for your approval before it merges or opens a pull request; `auto` goes straight on once the work is verified.
+- `onApproval`: how the branch reaches main once approved. `merge` merges it into main on this computer; `pull-request` pushes it and opens a pull request. Without the setting, it's `pull-request` when the repository's origin is on GitHub, else `merge`.
+- `waitForChecks`: with `onApproval: "pull-request"`, `true` keeps the session until the pull request's checks pass, fixing failures its branch caused; `false` (the default) hands off as soon as the pull request is open.
+
+A branch pushed with an open pull request counts as safe to remove whenever `onApproval` is `pull-request`.
 
 ```json
-"~/Code/herdr-issues": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
+"~/Code/herdr-issues": { "tracker": "github", "approval": "ask", "onApproval": "pull-request", "waitForChecks": true }
 ```
 
-Either can also go at the top level of `issues.json`, for every repository; a repository's own value wins, and the default applies without either. A `complete` that needs a pull request applies only when the `merge` that wins is `pull-request`, so a repository's `merge: "review"` under a top-level `complete: "pull-request-passing"` completes once merged. The top level's pair is checked like an entry's: a `pull-request-open` or `pull-request-passing` complete beside an `auto` or `review` merge is refused.
+Each can also go at the top level of `issues.json`, for every repository; a repository's own value wins, and the default applies without either.
 
-The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
+The retired `merge` and `complete` settings still work where these aren't set: `merge: "auto"` means `approval: "auto"` and `onApproval: "merge"`; `"review"` means `"ask"` and `"merge"`; `"pull-request"` means `onApproval: "pull-request"`, with `approval` at its default. `complete: "pull-request-passing"` means `waitForChecks: true`, and its other values `false`. Saving any of the new settings from the panel or `/issues:config` removes `merge` and `complete` there.
+
+The panel's setup view asks for these when it sets up a repository's tracker, proposing the current values or the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting approval`, `issues setting onApproval` and `issues setting waitForChecks` print a repository's settings, with their defaults applied.
 
 ### `close`
 

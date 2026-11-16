@@ -1,9 +1,0 @@
-# Finishing with `merge: review`
-
-Read this beside `SKILL.md` when `issues setting merge` prints `review`: the person reviews the change in this session before it merges.
-
-1. Once **Verification** passes, move a Linear issue to in review with `issues status <issue ID> in-review`. A GitHub issue keeps its status, since it shows as in review only while a pull request links it; a Beads issue stays `in_progress`.
-2. Stop and ask for approval. The session is done working until the person answers, so first run `issues complete <issue ID>` to mark its Herdr tab with ✅, skipping it without comment when `$HC_TERMINAL_ID` is empty or `herdr-app` isn't installed. Then summarize the change with `git diff --stat main...HEAD` and what each commit on the branch does, and ask the person to approve the merge. Say they can also approve it themselves with the Merge button in the issue's view in the Herdr issues panel, or by running `issues merge <issue ID>`; either merges the branch into main and marks the issue done.
-3. When the session finds its branch already merged into main (`git merge-base --is-ancestor HEAD main`), the person approved it that way: don't merge again, but continue from the merged state, running **Verification** on main only when `SKILL.md` step 10 says it's needed, and marking the issue done if it isn't yet.
-4. Once they approve in the session, leave the ✅ in place while the branch lands, and run `issues merge <issue ID>` from the worktree, which checks that the merge can go cleanly, merges the branch into main in the main checkout, marks the issue done and refreshes the panel. If it refuses, say why and resolve it. Then run **Verification** on main only when `SKILL.md` step 10 says it's needed.
-5. If they ask for changes instead, first withdraw the mark as `SKILL.md` step 12 says, then make them, commit them, run **Verification** again, and ask again with a fresh summary.

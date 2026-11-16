@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, test } from "node:test";
+import { defaults, stubHerdr } from "./support/herdr.js";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
@@ -56,37 +57,80 @@ describe("close", () => {
   });
 });
 
-describe("merge and complete", () => {
+describe("approval, onApproval and waitForChecks", () => {
+  // Every landing setting `issues setting` prints for the repository, as { approval, onApproval, waitForChecks }.
+  async function landing(t, repository) {
+    const printed = {};
+    for (const key of ["approval", "onApproval", "waitForChecks"]) printed[key] = (await setting(t, repository, key)).out;
+    return printed;
+  }
+
+  test("the defaults apply without either, merging for a repository without a GitHub origin", async (t) => {
+    const repository = repositoryWith(t, {});
+    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "merge", waitForChecks: "false" });
+  });
+
+  test("the default onApproval is a pull request for a repository with a GitHub origin", async (t) => {
+    stubHerdr(t, {
+      exec: (command, args, options) => (command === "gh" ? Promise.resolve({ code: 0, stdout: "owner/name\n", stderr: "" }) : defaults.exec(command, args, options)),
+    });
+    const repository = repositoryWith(t, {});
+    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "pull-request", waitForChecks: "false" });
+  });
+
   test("the entry's win over the top level's", async (t) => {
     const repository = repositoryWith(t, {
-      entry: { merge: "pull-request", complete: "merged" },
-      topLevel: { merge: "pull-request", complete: "pull-request-passing" },
+      entry: { approval: "auto", onApproval: "merge", waitForChecks: false },
+      topLevel: { approval: "ask", onApproval: "pull-request", waitForChecks: true },
     });
-    assert.equal((await setting(t, repository, "merge")).out, "pull-request");
-    assert.equal((await setting(t, repository, "complete")).out, "merged");
+    assert.deepEqual(await landing(t, repository), { approval: "auto", onApproval: "merge", waitForChecks: "false" });
   });
 
   test("the top level's apply without the entry's", async (t) => {
-    const repository = repositoryWith(t, { topLevel: { merge: "pull-request", complete: "pull-request-passing" } });
-    assert.equal((await setting(t, repository, "merge")).out, "pull-request");
-    assert.equal((await setting(t, repository, "complete")).out, "pull-request-passing");
+    const repository = repositoryWith(t, { topLevel: { approval: "auto", onApproval: "pull-request", waitForChecks: true } });
+    assert.deepEqual(await landing(t, repository), { approval: "auto", onApproval: "pull-request", waitForChecks: "true" });
   });
 
-  test("the top level's complete applies under the entry's pull request merge", async (t) => {
-    const repository = repositoryWith(t, { entry: { merge: "pull-request" }, topLevel: { complete: "merged" } });
-    assert.equal((await setting(t, repository, "complete")).out, "merged");
+  const retiredMeanings = [
+    [{ merge: "auto" }, { approval: "auto", onApproval: "merge", waitForChecks: "false" }],
+    [{ merge: "review" }, { approval: "ask", onApproval: "merge", waitForChecks: "false" }],
+    [{ merge: "pull-request" }, { approval: "ask", onApproval: "pull-request", waitForChecks: "false" }],
+    [{ merge: "pull-request", complete: "pull-request-passing" }, { approval: "ask", onApproval: "pull-request", waitForChecks: "true" }],
+    [{ merge: "pull-request", complete: "pull-request-open" }, { approval: "ask", onApproval: "pull-request", waitForChecks: "false" }],
+    [{ merge: "pull-request", complete: "merged" }, { approval: "ask", onApproval: "pull-request", waitForChecks: "false" }],
+  ];
+  for (const [retired, meaning] of retiredMeanings) {
+    test(`an entry's retired ${JSON.stringify(retired)} means ${JSON.stringify(meaning)}`, async (t) => {
+      assert.deepEqual(await landing(t, repositoryWith(t, { entry: retired })), meaning);
+    });
+
+    test(`a top level's retired ${JSON.stringify(retired)} means the same`, async (t) => {
+      assert.deepEqual(await landing(t, repositoryWith(t, { topLevel: retired })), meaning);
+    });
+  }
+
+  test("a place's new keys win over its own retired ones", async (t) => {
+    const repository = repositoryWith(t, { entry: { merge: "auto", complete: "pull-request-passing", approval: "ask", onApproval: "pull-request", waitForChecks: false } });
+    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "pull-request", waitForChecks: "false" });
   });
 
-  test("the defaults apply without either, review for a repository without a GitHub origin", async (t) => {
-    const repository = repositoryWith(t, {});
-    assert.equal((await setting(t, repository, "merge")).out, "review");
-    assert.equal((await setting(t, repository, "complete")).out, "merged");
+  test("an entry's retired keys win over the top level's new ones", async (t) => {
+    const repository = repositoryWith(t, { entry: { merge: "review" }, topLevel: { approval: "auto", onApproval: "pull-request", waitForChecks: true } });
+    assert.deepEqual(await landing(t, repository), { approval: "ask", onApproval: "merge", waitForChecks: "true" });
   });
 
-  test("a repository's review merge completes once merged under a top-level pull-request-passing", async (t) => {
-    const repository = repositoryWith(t, { entry: { merge: "review" }, topLevel: { merge: "pull-request", complete: "pull-request-passing" } });
-    assert.equal((await setting(t, repository, "merge")).out, "review");
-    assert.equal((await setting(t, repository, "complete")).out, "merged");
+  test("an entry's retired pull-request merge leaves approval to the top level", async (t) => {
+    const repository = repositoryWith(t, { entry: { merge: "pull-request" }, topLevel: { approval: "auto" } });
+    assert.deepEqual(await landing(t, repository), { approval: "auto", onApproval: "pull-request", waitForChecks: "false" });
+  });
+
+  test("merge and complete are no longer settings the CLI prints", async (t) => {
+    const repository = repositoryWith(t, { entry: { merge: "auto" } });
+    for (const key of ["merge", "complete"]) {
+      const result = await setting(t, repository, key);
+      assert.equal(result.code, 2);
+      assert.match(result.err, new RegExp(`has no key ${key}`));
+    }
   });
 });
 
@@ -112,9 +156,11 @@ describe("spaceName", () => {
 describe("a top level that an entry couldn't hold is refused", () => {
   const cases = [
     { key: "close", topLevel: { close: "always" }, message: /issues\.json needs a close of manual, ask, auto/ },
-    { key: "merge", topLevel: { merge: "rebase" }, message: /issues\.json needs a merge of auto, review, pull-request/ },
-    { key: "complete", topLevel: { complete: "soon" }, message: /issues\.json needs a complete of merged, pull-request-open, pull-request-passing/ },
-    { key: "complete", topLevel: { merge: "auto", complete: "pull-request-open" }, message: /issues\.json merges with auto, so its complete can only be merged/ },
+    { key: "approval", topLevel: { approval: "sometimes" }, message: /issues\.json needs an approval of ask, auto/ },
+    { key: "onApproval", topLevel: { onApproval: "rebase" }, message: /issues\.json needs an onApproval of merge, pull-request/ },
+    { key: "waitForChecks", topLevel: { waitForChecks: "yes" }, message: /issues\.json needs a waitForChecks of true or false/ },
+    { key: "onApproval", topLevel: { merge: "rebase" }, message: /issues\.json needs a merge of auto, review, pull-request/ },
+    { key: "waitForChecks", topLevel: { complete: "soon" }, message: /issues\.json needs a complete of merged, pull-request-open, pull-request-passing/ },
     { key: "close", topLevel: { spaceName: 41 }, message: /issues\.json has a spaceName that isn't text/ },
   ];
   for (const { key, topLevel, message } of cases) {
