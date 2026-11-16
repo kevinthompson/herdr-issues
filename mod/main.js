@@ -27,6 +27,7 @@ import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName, headerTitlePieces } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
+import { filterRow } from "./filter-row.js";
 import { groupIssues, groupCountText, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, LabelMenu, openMenu, openScopeMenu, openLabelMenu, openIssueLabelsMenu, selectedScope, selectedLabel } from "./menu.js";
@@ -126,15 +127,6 @@ const pullRequestBadge = (count, t) => h_flex().flex_none().gap(3).items_center(
   .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(11))
   .child(div().child(String(count)));
 
-function scopeDropdown(id, label, onClick, t) {
-  return h_flex().id(id).min_w(0).h(24).px(8).gap(6).items_center().rounded(6).border_1().border_color(t.border)
-    .text_size(11).text_color(t.foreground).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
-    .on_click(() => onClick())
-    .child(div().min_w(0).truncate().child(label))
-    .child(div().flex_none().text_color(t.dim).child("▾"));
-}
-
-const SCOPE_DROPDOWN_MAX_PX = 260;
 const REFRESH_ICON_PX = 15, ALERT_ICON_PX = 15;
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
@@ -997,10 +989,7 @@ export default class Issues extends View {
     const listed = scopes ? { scopes, ...this.currentScope() } : {};
     const openMenu = { scope: openScopeMenu, label: openLabelMenu };
     return listFilters(listed, labels, label).map((filter) =>
-      h_flex().flex_none().px(14).py(8).gap(8).items_center().border_b(1).border_color(t.border)
-        .child(div().flex_none().text_size(11).font_semibold().text_color(t.dim).child(`${filter.heading}:`))
-        .child(scopeDropdown(filter.id, filter.shown, () => openMenu[filter.menu](filter.options, filter.selected, this.scopeKey), t)
-          .flex_shrink(1).max_w(SCOPE_DROPDOWN_MAX_PX)));
+      filterRow(filter.id, filter.heading, filter.shown, () => openMenu[filter.menu](filter.options, filter.selected, this.scopeKey), t));
   }
 
   header(t) {
@@ -1088,7 +1077,7 @@ export default class Issues extends View {
     this.openSpaceIssue(cx);
     this.applyFieldEdits(cx);
     this.setup?.takePickedTeam(cx);
-    this.settingsView?.takePickedTeam(cx);
+    this.settingsView?.takePicks(cx);
     const t = theme(), issue = this.findIssue(this.openId);
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];
