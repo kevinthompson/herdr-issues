@@ -32,7 +32,7 @@ import {
 /** @typedef {{ nodes: LinearAttachment[] }} LinearAttachments */
 
 /**
- * An issue as ISSUE_FIELDS selects it; `description` only comes with ISSUE.
+ * An issue as ISSUE_FIELDS selects it; `description` and `comments` only come with ISSUE.
  * @typedef {object} LinearIssueNode
  * @property {string} id
  * @property {string} identifier
@@ -56,7 +56,10 @@ import {
  * @property {{ nodes: { type: string, issue: { identifier: string, state: LinearState } }[] }} inverseRelations
  * @property {LinearAttachments} attachments
  * @property {string | null} [description]
+ * @property {{ nodes: LinearComment[] }} [comments]
  */
+
+/** @typedef {{ user: { name: string } | null, botActor: { name: string } | null, createdAt: string, body: string }} LinearComment */
 
 /**
  * @typedef {object} LinearProject
@@ -93,6 +96,7 @@ const API_URL = "https://api.linear.app/graphql";
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const RECENTLY_FINISHED = 10;
+const COMMENTS = 100;
 // How long a view's saved filter, or a team's name and projects, is reused before it is read again, to pick up
 // edits made in Linear.
 const VIEW_FILTER_TTL_MS = 10 * 60 * 1000;
@@ -130,7 +134,8 @@ const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
   projects(first: 50, filter: { status: { type: { nin: ["completed", "canceled"] } } }) { nodes {
     id name url priority status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
 
-const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description } }`;
+const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description
+  comments(first: ${COMMENTS}, orderBy: createdAt) { nodes { user { name } botActor { name } createdAt body } } } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const VIEWER = "query { viewer { id } }";
@@ -421,6 +426,18 @@ function originRepoName(root) {
   });
 }
 
+// Linear doesn't say which way `orderBy` sorts, so the comments are sorted here.
+/** @param {LinearComment[]} comments */
+function oldestFirst(comments) {
+  return comments
+    .map((comment) => ({
+      author: comment.user?.name ?? comment.botActor?.name ?? "Unknown",
+      created: comment.createdAt,
+      body: comment.body.trim(),
+    }))
+    .sort((a, b) => a.created.localeCompare(b.created));
+}
+
 /**
  * @param {LinearIssueNode} node
  * @param {string | null} repoName
@@ -458,6 +475,7 @@ function toIssue(node, repoName) {
     created: node.createdAt,
     completed: node.completedAt ?? null,
     body: node.description === undefined ? null : (node.description ?? "").trim(),
+    comments: node.comments ? oldestFirst(node.comments.nodes) : null,
     pullRequests,
     updated: node.updatedAt,
     url: node.url,

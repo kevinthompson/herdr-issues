@@ -1,12 +1,13 @@
 // One issue, drawn inside the panel in place of the list: a way back, its status and priority
 // (each a dropdown), its labels (with a dropdown that adds and removes them), its other details and its Markdown body, which Edit swaps for an editor. Merge shows
 // when the issue's finished branch can merge into main from here (merge.js).
-// Task-list items in the body are checkboxes that check off in place.
+// Task-list items in the body are checkboxes that check off in place. A Linear or GitHub issue's comments follow
+// the body, read-only, and hide while it is edited.
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
-import { dueStatus, statusIcon } from "./issue.js";
+import { dueStatus, shortDate, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme, labelTint } from "./colors.js";
 import { collapseButton, headerBar } from "./header.js";
 import { rowBeneathHeader } from "./filter-row.js";
@@ -661,6 +662,41 @@ function body(view, t) {
               .on_link_click(onLink)
               .when(index > 0 && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
           : taskItem(/** @type {TaskSegment} */ (segment), view, t),
+      ),
+    )
+    .when(Boolean(issue.comments?.length), (e) => e.child(comments(view, t)));
+}
+
+/**
+ * The issue's comments, oldest first, read-only: task-list items in them are plain Markdown, not checkboxes.
+ * @param {Pick<DetailView, "issue" | "onLink" | "linkFiles">} view
+ * @param {Theme} t
+ */
+function comments({ issue, onLink, linkFiles }, t) {
+  return v_flex()
+    .flex_none()
+    .mt(AFTER_TASKS_PX)
+    .pt(10)
+    .gap(12)
+    .border_t(1)
+    .border_color(t.border)
+    .child(div().text_size(11).font_semibold().text_color(t.muted).child("Comments"))
+    .children(
+      (issue.comments ?? []).map((comment, index) =>
+        v_flex()
+          .gap(2)
+          .child(
+            h_flex()
+              .gap(6)
+              .text_size(11)
+              .child(div().min_w(0).truncate().font_semibold().child(comment.author))
+              .child(div().flex_none().text_color(t.dim).child(shortDate(comment.created))),
+          )
+          .child(
+            TextView.markdown(`issue-comment-${issue.id}-${index}`, linkFiles(comment.body))
+              .selectable()
+              .on_link_click(onLink),
+          ),
       ),
     );
 }

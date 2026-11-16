@@ -200,7 +200,12 @@ function withLoadedBodies(issues, previous) {
   return issues.map((issue) => {
     const before = issue.body === null && loaded.get(issue.id);
     if (!before) return issue;
-    return { ...issue, body: before.body, bodyStale: before.bodyStale || before.updated !== issue.updated };
+    return {
+      ...issue,
+      body: before.body,
+      comments: before.comments,
+      bodyStale: before.bodyStale || before.updated !== issue.updated,
+    };
   });
 }
 
@@ -882,7 +887,7 @@ export default class Issues extends View {
       try {
         const full = await tracker.get(issue.id);
         if (!full) throw new Error(`${issue.id} was not found`);
-        Object.assign(issue, { body: full.body, updated: full.updated, bodyStale: false });
+        Object.assign(issue, { body: full.body, comments: full.comments, updated: full.updated, bodyStale: false });
       } catch (/** @type {any} */ e) {
         this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`;
       }

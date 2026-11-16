@@ -339,3 +339,14 @@ export function dueStatus(issue, now = new Date()) {
   const date = `${MONTHS[month - 1]} ${day}${year === now.getFullYear() ? "" : `, ${year}`}`;
   return { text: `Due ${date}`, urgency };
 }
+
+// The local day an ISO time falls on, as "Nov 16", with the year when it isn't this year's.
+/**
+ * @param {string} time
+ * @param {Date} [now]
+ */
+export function shortDate(time, now = new Date()) {
+  const date = new Date(time);
+  const year = date.getFullYear() === now.getFullYear() ? "" : `, ${date.getFullYear()}`;
+  return `${MONTHS[date.getMonth()]} ${date.getDate()}${year}`;
+}
