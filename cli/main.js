@@ -13,7 +13,7 @@ import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, markedSpaceName, renameSpace,
+  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, markedSpaceName, renameSpace,
   renameTab, sessionTab, SPACE_MARKS, uncompletedTabName, unmarkedSpaceName,
 } from "./tab.js";
 
@@ -44,10 +44,10 @@ Commands:
                            Start the name of the space holding $HC_TERMINAL_ID with the state's mark, replacing a mark
                            already there; leave a space not named after the issue as it is
   complete <id>            Mark the session done working, handed off to the person: label $HC_TERMINAL_ID
-                           issues.complete=<id> and prefix its tab's name with ✅, even a name the person chose, once;
-                           it says nothing about the branch, which removing the worktree checks for itself
+                           issues.complete=<id>; it says nothing about the branch, which removing the worktree checks
+                           for itself
   complete --cancel <id>   Withdraw that when the work continues: remove the issues.complete label from $HC_TERMINAL_ID
-                           and the ✅ from its tab's name
+                           and a leading ✅ that earlier versions put in its tab's name
   close <id>               Ask the issues panel to close the session's space once $HC_TERMINAL_ID is idle: label it
                            issues.close=<id>; the panel removes the worktree without asking only when every check passes
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
@@ -208,9 +208,7 @@ async function complete(args) {
   if (!issueId) throw new UsageError("complete needs an issue ID");
   const tab = await sessionTab();
   await labelComplete(tab, issueId);
-  const newName = completedTabName(tab.name);
-  if (newName !== tab.name) await renameTab(tab, newName);
-  console.log(`Marked ${issueId} complete in the tab ${newName}`);
+  console.log(`Marked ${issueId} complete in the tab ${tab.name}`);
 }
 
 async function cancelComplete([issueId, ...rest]) {

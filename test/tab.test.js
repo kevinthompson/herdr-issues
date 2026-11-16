@@ -214,24 +214,12 @@ test("--help lists mark", async (t) => {
   assert.match(out, /^ {2}mark <working\|waiting\|done> <id>/m);
 });
 
-for (const tabName of ["Claude", "Review"]) {
-  test(`complete labels the session's terminal and marks a tab named ${tabName} with ✅`, async (t) => {
-    const calls = stubApp(t, listing(tabName));
-    const { code, out } = await run(t, ["complete", "#72"]);
-    assert.equal(code, 0);
-    assert.deepEqual(calls, [
-      ["hc", "label", "t2", "issues.complete=#72"],
-      ["do", "tab.rename", "--id", "tab-session", "--name", `✅ ${tabName}`],
-    ]);
-    assert.match(out, new RegExp(`✅ ${tabName}`));
-  });
-}
-
-test("complete leaves a tab already marked with ✅ as it is", async (t) => {
-  const calls = stubApp(t, listing("✅ Review"));
-  const { code } = await run(t, ["complete", "#72"]);
+test("complete labels the session's terminal and leaves the tab's name as it is", async (t) => {
+  const calls = stubApp(t, listing("Review"));
+  const { code, out } = await run(t, ["complete", "#72"]);
   assert.equal(code, 0);
   assert.deepEqual(calls, [["hc", "label", "t2", "issues.complete=#72"]]);
+  assert.equal(out, "Marked #72 complete in the tab Review");
 });
 
 test("complete --cancel removes the complete label and the ✅ from the tab's name", async (t) => {

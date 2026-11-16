@@ -3,10 +3,10 @@
 // issue's space name (space-name.js). A tab the person named keeps its name. `issues mark` starts the name of the
 // session's space with a mark for whether the session is working, waiting on the person or done, replacing any mark
 // already there, but only in a space whose unmarked name ends with the issue's space name. `issues complete` labels
-// the terminal and marks the tab, whatever its name, with ✅ once the session is done working and has handed off to
-// the person, whether or not its branch has landed, which `issues complete --cancel` withdraws when the person asks
-// for more changes, and `issues close`
-// labels it to ask the panel to close the session's space, which `issues close --cancel` withdraws.
+// the terminal once the session is done working and has handed off to the person, whether or not its branch has
+// landed, which `issues complete --cancel` withdraws when the person asks for more changes, also clearing the ✅ that
+// earlier versions put before the tab's name, and `issues close` labels it to ask the panel to close the session's
+// space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
 import { spaceNameEndsWith } from "../mod/space-name.js";
 
@@ -55,9 +55,8 @@ export async function renameSpace(tab, name) {
   await herdrApp(["do", "space.rename", "--id", tab.spaceId, "--name", name]);
 }
 
-export const COMPLETE_MARK = "✅ ";
-
-export const completedTabName = (name) => (name.startsWith(COMPLETE_MARK) ? name : `${COMPLETE_MARK}${name}`);
+// Earlier versions of `issues complete` put this before the tab's name.
+const COMPLETE_MARK = "✅ ";
 
 export const uncompletedTabName = (name) => (name.startsWith(COMPLETE_MARK) ? name.slice(COMPLETE_MARK.length) : name);
 
