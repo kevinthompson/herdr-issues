@@ -69,6 +69,8 @@ An issue's worktree space is named after the issue's ID, such as `#41` or `CAL-2
 "~/Code/herdr-issues": { "tracker": "github", "spaceName": "<repo><issueId>" }
 ```
 
+A `spaceName` at the top level of `issues.json` names the issue spaces of every repository without its own.
+
 ### `merge` and `complete`
 
 These two settings say how an issue's branch gets into main and when its work counts as complete. An issue is done once its branch is in main, whichever you choose.
@@ -79,6 +81,8 @@ These two settings say how an issue's branch gets into main and when its work co
 ```json
 "~/Code/herdr-issues": { "tracker": "github", "merge": "pull-request", "complete": "merged" }
 ```
+
+Either can also go at the top level of `issues.json`, for every repository; a repository's own value wins, and the default applies without either. A `complete` that needs a pull request applies only when the `merge` that wins is `pull-request`, so a repository's `merge: "review"` under a top-level `complete: "pull-request-passing"` completes once merged. The top level's pair is checked like an entry's: a `pull-request-open` or `pull-request-passing` complete beside an `auto` or `review` merge is refused.
 
 The panel's setup view asks for both when it sets up a repository's tracker, proposing the defaults. To show, change or clear them later, run `/issues:config` in Claude. `issues setting merge` and `issues setting complete` print a repository's settings, with their defaults applied.
 
@@ -95,6 +99,8 @@ The session closes its worktree with `issues close`, which asks the issues panel
 ```json
 "~/Code/herdr-issues": { "tracker": "github", "close": "auto" }
 ```
+
+A `close` at the top level of `issues.json` applies to every repository without its own.
 
 A personal instruction that tells Claude to always ask you to close worktrees with cmd+shift+w, such as one in your global `~/.claude/CLAUDE.md`, overrides `ask` and `auto`; reword it for this setting to take effect. The panel's settings view and `/issues:config` change `close`, and `issues setting close` prints it.
 

@@ -3,18 +3,18 @@
 // which /issues:work runs, both name spaces here, and the panel reads the issue ID back out of a space's
 // name here to open that space's issue.
 import { mainCheckout } from "./location.js";
-import { repositoryName, trackerSetting } from "./trackers/setting.js";
+import { repositoryName, spaceNameTemplate, trackerSetting } from "./trackers/setting.js";
 
 // A Linear ID such as ABC-12, or a GitHub ID such as #12.
 const ISSUE_ID = String.raw`[A-Z][A-Z0-9]*-\d+|#\d+`;
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-// The repository's `spaceName` template and the repository name its `<repo>` stands for.
+// The repository's `spaceName` template, its entry's or else the top level's, and the repository name its `<repo>`
+// stands for.
 async function spaceTemplate(project) {
-  const setting = await trackerSetting(project);
-  const template = setting?.spaceName;
+  const template = await spaceNameTemplate(project);
   if (!template) return { template: null, repo: "" };
-  const repo = template.includes("<repo>") ? await repositoryName(await mainCheckout(project.root, project.on), setting) : "";
+  const repo = template.includes("<repo>") ? await repositoryName(await mainCheckout(project.root, project.on), await trackerSetting(project)) : "";
   return { template, repo };
 }
 

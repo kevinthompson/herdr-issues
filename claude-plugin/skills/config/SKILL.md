@@ -39,7 +39,9 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
 
 `issues setting merge` and `issues setting complete`, run in the repository, print the settings with their defaults applied.
 
-`close` is optional, in the repository's entry, and says what a finished `/issues:work` session does about its worktree. Explain it in these words:
+`merge`, `complete`, `close` and `spaceName` can also go at the top level of `issues.json`, beside `repos`, for every repository: a repository's own value wins, then the top level's, then the default. A `complete` that needs a pull request applies only when the `merge` that wins is `pull-request`; otherwise the work is complete once merged. The top level's `merge` and `complete` are refused together like an entry's. The panel's settings view edits the top level under **Global**; when step 1 shows a setting, say whether it comes from the repository's entry or the top level.
+
+`close` is optional, in the repository's entry or at the top level, and says what a finished `/issues:work` session does about its worktree. Explain it in these words:
 
 - `ask` (the default): the session asks whether to close the worktree, and closes it if the person says yes.
 - `auto`: the session closes the worktree without asking.

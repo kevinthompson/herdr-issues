@@ -2,6 +2,7 @@
 // are keyed by their main checkout's path, ~ for the home folder, so worktrees share their repository's choice:
 // { "pollSeconds": 120,                                             how often every panel polls its tracker
 //   "updateCheckHours": 6,                                          how often the panel checks for its own update
+//   "merge": "auto", "close": "manual",                             what every repository without its own uses
 //   "repos": {
 //     "~/Code/web":      { "tracker": "linear", "team": "WEB",      a Linear team, with saved views as extra lists
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
@@ -14,11 +15,12 @@
 // of seconds of at least 10; an entry's overrides the top level's, and pollSettings resolves it, 60 without either.
 // updateCheckHours, at the top level only, is how often the panel fetches its own checkout's origin to offer an
 // update (update.js), a whole number of hours of at least 1; updateSettings resolves it, 6 without it.
-// spaceName, merge, complete and worktreeSetup are optional in any entry. In spaceName, <issueId> is the issue's ID
-// and <repo> the repository's name without its owner; without it, an issue's space is named after its ID. merge is
-// how an issue's branch gets into main, and complete is when its work counts as complete; mergeSettings says what
-// each value means and resolves their defaults. worktreeSetup is a shell command `issues worktree` runs in each new
-// checkout (cli/worktree.js). close, also optional in any entry, is what a finished /issues:work session does about
+// spaceName, merge, complete and close are optional at the top level and in any entry, an entry's winning, and
+// are checked the same way in either; worktreeSetup is optional in any entry. In spaceName, <issueId> is the
+// issue's ID and <repo> the repository's name without its owner; without it, an issue's space is named after its
+// ID. merge is how an issue's branch gets into main, and complete is when its work counts as complete;
+// mergeSettings says what each value means and resolves their defaults. worktreeSetup is a shell command `issues
+// worktree` runs in each new checkout (cli/worktree.js). close is what a finished /issues:work session does about
 // its worktree: manual tells the person to close it with cmd+shift+w, ask asks whether to close it now, and auto
 // closes it, the last two with `issues close`; closeSettings resolves it, ask without it.
 // name, also optional in any entry, names the space `issues worktree` and the worktree dialog open on the main
@@ -50,6 +52,7 @@ const TRACKERS = ["linear", "github", "beads"];
 const MERGES = ["auto", "review", "pull-request"];
 const COMPLETES = ["merged", "pull-request-open", "pull-request-passing"];
 export const PULL_REQUEST_COMPLETES =["pull-request-open", "pull-request-passing"];
+export const DEFAULT_PULL_REQUEST_COMPLETE = "pull-request-open";
 export const CLOSES = ["manual", "ask", "auto"];
 export const DEFAULT_CLOSE = "ask";
 export const DEFAULT_POLL_SECONDS = 60;
@@ -98,13 +101,36 @@ function checkWorkSettings(settings, where) {
   if (settings?.workPrompt != null && typeof settings.workPrompt !== "string") throw badSetting(`${where} has a workPrompt that isn't text`);
 }
 
+function checkMergePair({ merge, complete } = {}, where) {
+  if (merge != null && !MERGES.includes(merge)) throw badMergeSetting(`${where} needs a merge of ${MERGES.join(", ")}`);
+  if (complete != null && !COMPLETES.includes(complete)) throw badMergeSetting(`${where} needs a complete of ${COMPLETES.join(", ")}`);
+  if (PULL_REQUEST_COMPLETES.includes(complete) && merge && merge !== "pull-request") {
+    throw badMergeSetting(`${where} merges with ${merge}, so its complete can only be merged`);
+  }
+}
+
+// The settings both the top level and an entry take, checked the same way in either.
+function checkSharedSettings(settings, where) {
+  checkPollSeconds(settings?.pollSeconds, where);
+  checkWorkSettings(settings, where);
+  if (settings?.spaceName != null && typeof settings.spaceName !== "string") throw badSetting(`${where} has a spaceName that isn't text`);
+  checkChoice(settings?.close, "close", CLOSES, where);
+  checkMergePair(settings ?? {}, where);
+}
+
+function checkTopLevel(settings) {
+  checkSharedSettings(settings, "issues.json");
+  checkUpdateCheckHours(settings?.updateCheckHours);
+}
+
 const readCheckedSettings = async () => {
   const settings = await readSettings();
-  checkPollSeconds(settings?.pollSeconds, "issues.json");
-  checkUpdateCheckHours(settings?.updateCheckHours);
-  checkWorkSettings(settings, "issues.json");
+  checkTopLevel(settings);
   return settings;
 };
+
+// issues.json's top level, which applies to every repository without its own value, or {} without the file.
+export const topLevelSettings = async () => (await readCheckedSettings()) ?? {};
 
 // The repository's entry, or null when it has none.
 export async function trackerSetting({ root, on }) {
@@ -116,17 +142,9 @@ export async function trackerSetting({ root, on }) {
   if (!setting) return null;
   if (!TRACKERS.includes(setting.tracker)) throw badSetting(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
   if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
-  if (setting.spaceName != null && typeof setting.spaceName !== "string") throw badSetting(`issues.json's ${key} has a spaceName that isn't text`);
-  checkPollSeconds(setting.pollSeconds, `issues.json's ${key}`);
-  checkWorkSettings(setting, `issues.json's ${key}`);
+  checkSharedSettings(setting, `issues.json's ${key}`);
   if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
   if (setting.name != null && typeof setting.name !== "string") throw badSetting(`issues.json's ${key} has a name that isn't text`);
-  checkChoice(setting.close, "close", CLOSES, `issues.json's ${key}`);
-  if (setting.merge != null && !MERGES.includes(setting.merge)) throw badMergeSetting(`issues.json's ${key} needs a merge of ${MERGES.join(", ")}`);
-  if (setting.complete != null && !COMPLETES.includes(setting.complete)) throw badMergeSetting(`issues.json's ${key} needs a complete of ${COMPLETES.join(", ")}`);
-  if (PULL_REQUEST_COMPLETES.includes(setting.complete) && setting.merge && setting.merge !== "pull-request") {
-    throw badMergeSetting(`issues.json's ${key} merges with ${setting.merge}, so its complete can only be merged`);
-  }
   return setting;
 }
 
@@ -182,21 +200,32 @@ const hasGitHubOrigin =(main) => githubRepository(main, {}).then(() => true, () 
 // once the person approves) or "pull-request"; without the setting, a pull request when origin is on GitHub,
 // else review. complete is "merged" (once the branch is in main), "pull-request-open" (once it's pushed with an
 // open pull request) or "pull-request-passing" (once that pull request's checks pass); only a pull request allows
-// the last two, and "pull-request-open" is its default.
+// the last two, and "pull-request-open" is its default. Each is the entry's, else the top level's, else its default.
 export async function mergeSettings(project) {
-  return resolveMergeSettings(await mainCheckout(project.root, project.on), await trackerSetting(project));
+  const setting = await trackerSetting(project);
+  return resolveMergeSettings(await mainCheckout(project.root, project.on), setting, await topLevelSettings());
 }
 
-// mergeSettings for the repository whose main checkout is `main`, from `setting`, its entry or null.
-export async function resolveMergeSettings(main, setting) {
-  const merge = setting?.merge ?? (await hasGitHubOrigin(main) ? "pull-request" : "review");
-  const complete = merge === "pull-request" ? setting?.complete ?? "pull-request-open" : "merged";
+// mergeSettings for the repository whose main checkout is `main`, from `setting`, its entry or null, and
+// `topLevel`, issues.json's top level or null. A complete that needs a pull request doesn't apply when the merge
+// that wins isn't one, wherever each was set.
+export async function resolveMergeSettings(main, setting, topLevel = null) {
+  const merge = setting?.merge ?? topLevel?.merge ?? (await hasGitHubOrigin(main) ? "pull-request" : "review");
+  const complete = merge === "pull-request" ? setting?.complete ?? topLevel?.complete ?? DEFAULT_PULL_REQUEST_COMPLETE : "merged";
   return { merge, complete };
 }
 
-// What a finished issue session does about its worktree: the entry's close, else ask.
+// What a finished issue session does about its worktree: the entry's close, else the top level's, else ask.
 export async function closeSettings(project) {
-  return { close: (await trackerSetting(project))?.close ?? DEFAULT_CLOSE };
+  const setting = await trackerSetting(project), settings = await topLevelSettings();
+  return { close: setting?.close ?? settings.close ?? DEFAULT_CLOSE };
+}
+
+// The template that names the repository's issue spaces (space-name.js): the entry's spaceName, else the top
+// level's, null without either or when it's blank.
+export async function spaceNameTemplate(project) {
+  const setting = await trackerSetting(project), settings = await topLevelSettings();
+  return setting?.spaceName?.trim() || settings.spaceName?.trim() || null;
 }
 
 // The repository's name without its owner: the GitHub repository's for GitHub, else the main checkout's folder's.
