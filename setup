@@ -113,6 +113,13 @@ node_install_command() {
   esac
 }
 
+describe_node_install() {
+  case $1 in
+    devbox) info "  $(node_install_command devbox) adds Node to devbox's global packages, which shells find through devbox global shellenv." ;;
+    brew) info "  $(node_install_command brew) installs Node with Homebrew for every shell, or upgrades the Node Homebrew already installed." ;;
+  esac
+}
+
 # Herdr and Claude Code find devbox's global packages only through a shell profile that evaluates its shellenv.
 warn_unless_profile_evaluates_devbox() {
   local zsh_home=${ZDOTDIR:-$HOME} profile
@@ -147,6 +154,10 @@ offer_node_install() {
   ((${#managers[@]})) || return 1
 
   prompt "setup: $1; the issues CLI needs Node $minimum_node_version or later."
+  info "The issues command, which the Issues panel and the issues:* skills run, is a Node program."
+  for manager in "${managers[@]}"; do
+    describe_node_install "$manager"
+  done
   if ((${#managers[@]} == 1)); then
     manager=${managers[0]}
     confirm "Install it with $manager ($(node_install_command "$manager"))?" || return 1
@@ -177,7 +188,8 @@ require_node() {
 }
 require_node
 
-command -v gh >/dev/null || warning "setup: warning: gh is not installed; repositories tracked in GitHub Issues need it"
+command -v gh >/dev/null ||
+  warning "setup: warning: gh, GitHub's command line tool, is not installed; without it the Issues panel and the issues command can't read or change issues in repositories tracked in GitHub Issues. Install it with brew install gh (or see https://cli.github.com), then sign in with gh auth login."
 
 refuse_linked_worktree() {
   local git_dir common_dir main_checkout
@@ -235,7 +247,7 @@ plugin_enabled() {
 
 install_plugin() {
   if ! command -v claude >/dev/null; then
-    warning "setup: warning: claude is not installed, so the Claude plugin with the issues:* skills and hooks was skipped; install Claude Code and run setup again to add it"
+    warning "setup: warning: claude is not installed, so the Claude plugin with the issues:* skills and hooks was skipped; install Claude Code and run setup again to add it. Without it, the Issues panel still lists issues, but Claude Code sessions can't work them with skills such as /issues:work. Claude Code installs with: curl -fsSL https://claude.ai/install.sh | bash"
     return
   fi
 
@@ -267,7 +279,7 @@ install_plugin() {
 # Adds each of the mod's keys the person hasn't bound; a key they bound to another action stays theirs.
 merge_keys() {
   if [[ ! -f $keys_file ]]; then
-    warning "setup: $keys_file not found; open Herdr once and run setup again to add the mod's keys"
+    warning "setup: $keys_file not found; Herdr writes it the first time it opens. Without it the mod's keys, such as cmd-shift-i to show or hide the Issues panel, aren't bound. Open Herdr once and run setup again to add them."
     return
   fi
 
@@ -295,6 +307,8 @@ shipped_layout_names() {
 
 print_manual_layout_steps() {
   note <<EOF
+No layout shows the Issues panel yet, so Herdr won't show it. Herdr's shipped layouts can't be changed, since
+Herdr replaces them each time it starts, so the panel goes in a personal layout.
 To show the Issues panel, make a personal copy of a layout and add the mod beside its side panel:
   herdr-app do layout.clone '{"name":"main","as":"main-issues"}'
 Then add this column right after the node whose id is panel in $layouts_dir/main-issues.json:
@@ -343,6 +357,10 @@ switch_layout_command() {
 # Asks to show the layout with the Issues panel in place of the one Herdr shows, or says how to switch to it.
 offer_to_show_layout() {
   local shown=$1 with_panel=$2
+  if [[ -t 0 ]]; then
+    echo
+    info "Herdr opens with the layout it showed last, so switching to $with_panel now also makes it the layout Herdr opens with, until you switch layouts again with ctrl-shift-l."
+  fi
   if confirm "Herdr shows the $shown layout, which has no Issues panel. Switch to $with_panel, which has it, and open with it from now on?"; then
     show_layout "$with_panel"
   else
@@ -353,6 +371,8 @@ offer_to_show_layout() {
 # Writes the copy itself instead of running layout.clone, which needs an open window and switches it to the copy.
 copy_main_layout() {
   local name version
+  echo
+  info "The new layout's name is how you switch to it, with herdr-app do layout.switch or by cycling layouts with ctrl-shift-l. Setup writes it to $layouts_dir/<name>.json."
   while true; do
     read -r -p "$(prompt_text "Name for the new layout [main-issues]: ")" name || return 1
     name=${name:-main-issues}
@@ -374,7 +394,7 @@ copy_main_layout() {
 add_panel_to_layout() {
   layouts_dir="$herdr_home/layouts"
   if [[ ! -d $layouts_dir ]]; then
-    warning "setup: $layouts_dir not found; open Herdr once and run setup again to add the Issues panel"
+    warning "setup: $layouts_dir not found; Herdr writes its layouts there the first time it opens. Without a layout that shows it, the Issues panel doesn't appear. Open Herdr once and run setup again to add the Issues panel."
     return
   fi
 
@@ -418,7 +438,20 @@ add_panel_to_layout() {
   labels+=("$skip_choice")
 
   echo
-  prompt "Herdr shows the $shown layout. Which layout should show the Issues panel?"
+  if ((${#candidates[@]} == 0)) && [[ -f $layouts_dir/main.json ]]; then
+    info "Herdr ships with a main layout that can't be changed, since Herdr replaces it each time it starts. You don't have a personal layout to add the Issues panel to."
+    info "Copy main into a new layout makes a personal copy of main with the Issues panel in a column beside its side panel, under a name you choose next."
+    info "Skip changes no layout and prints the steps to add the Issues panel yourself."
+    prompt "Would you like to create a new personal layout with the Issues panel?"
+  else
+    info "A layout is the arrangement of Herdr's window: where its spaces, terminals and side panel go. Herdr shows one layout at a time, and the Issues panel appears only in a layout that has it."
+    ((${#candidates[@]} == 0)) ||
+      info "Choosing one of your personal layouts adds the Issues panel to it, in a column of its own beside the side panel."
+    [[ ! -f $layouts_dir/main.json ]] ||
+      info "Copy main into a new layout leaves your layouts as they are and makes a personal copy of main with the Issues panel, under a name you choose next."
+    info "Skip changes no layout and prints the steps to add the Issues panel yourself."
+    prompt "Herdr shows the $shown layout. Which layout should show the Issues panel?"
+  fi
   PS3=$(prompt_text "Choose a number: ")
   select choice in "${labels[@]}"; do
     [[ -n $choice ]] && break

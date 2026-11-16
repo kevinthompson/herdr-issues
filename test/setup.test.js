@@ -64,6 +64,7 @@ test("setup installs the mod, the CLI and the keys without claude, and warns tha
     ...modKeys.global,
   });
   assert.match(result.stdout, /To show the Issues panel/);
+  assert.doesNotMatch(result.stdout, /Which layout|create a new personal layout/);
   assert.match(
     result.stderr,
     /claude is not installed, so the Claude plugin .* was skipped; install Claude Code and run setup again/,
@@ -266,6 +267,8 @@ terminalTest("setup installs node with Homebrew when the person agrees, then car
   });
 
   assert.match(output, /node 20\.19\.1 is too old/);
+  assert.match(output, /The issues command, which the Issues panel and the issues:\* skills run, is a Node program/);
+  assert.match(output, /brew install node installs Node with Homebrew for every shell/);
   assert.match(output, /Install it with brew \(brew install node\)\?/);
   assert.equal(commands, "brew install node\n");
   assert.match(output, /is a linked worktree/);
@@ -427,6 +430,7 @@ terminalTest(
       answers: ["y"],
     });
 
+    assert.match(output, /Herdr opens with the layout it showed last, so switching to development now also makes it/);
     assert.match(output, /Herdr shows the main layout, which has no Issues panel\. Switch to development/);
     assert.match(output, /Herdr now shows the development layout/);
     assert.deepEqual(readAppJson("shared.json"), { layout: "development", "sidebar.width": 268 });
@@ -442,6 +446,9 @@ terminalTest(
       answers: ["1"],
     });
 
+    assert.match(output, /A layout is the arrangement of Herdr's window/);
+    assert.match(output, /adds the Issues panel to it, in a column of its own beside the side panel/);
+    assert.match(output, /Skip changes no layout and prints the steps to add the Issues panel yourself/);
     assert.match(output, /Herdr shows the work layout\. Which layout should show the Issues panel\?/);
     assert.match(output, /1\) work \(shown now\)/);
     assert.match(output, /2\) alpha/);
@@ -461,4 +468,16 @@ terminalTest("setup offers to switch to the layout it added the panel to when He
   assert.match(output, /Added the Issues panel to the work layout/);
   assert.match(output, /Switch to work, which has it, and open with it from now on\? \[y\/N\]/);
   assert.equal(readAppJson("shared.json").layout, "work");
+});
+
+terminalTest("setup explains that main can't be changed when there is no personal layout", (t) => {
+  const { result, output } = runSetupWithLayouts(t, { layouts: { main: false }, shown: "main", answers: ["2"] });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(output, /Herdr ships with a main layout that can't be changed/);
+  assert.match(output, /You don't have a personal layout to add the Issues panel to/);
+  assert.match(output, /Would you like to create a new personal layout with the Issues panel\?/);
+  assert.match(output, /1\) Copy main into a new layout/);
+  assert.match(output, /2\) Skip/);
+  assert.match(output, /To show the Issues panel, make a personal copy/);
 });
