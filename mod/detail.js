@@ -8,7 +8,8 @@ import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme, labelTint } from "./colors.js";
-import { collapseButton, headerBar, HEADER_HEIGHT_PX } from "./header.js";
+import { collapseButton, headerBar } from "./header.js";
+import { rowBeneathHeader } from "./filter-row.js";
 import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
@@ -664,6 +665,21 @@ function body(view, t) {
 }
 
 /**
+ * @param {Pick<DetailView, "failedEditAlert" | "refreshButton" | "settingsButton" | "onCollapse">} view
+ * @param {Theme} t
+ */
+export const detailHeader = (view, t) =>
+  headerBar(
+    {
+      icon: "issues",
+      title: "Issues",
+      secondary: "Detail",
+      trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
+    },
+    t,
+  );
+
+/**
  * @param {DetailView} view
  * @param {Theme} t
  */
@@ -673,25 +689,10 @@ export function issueDetail(view, t) {
     .id("issue-detail")
     .size_full()
     .min_h(0)
+    .child(detailHeader(view, t))
     .child(
-      headerBar(
-        {
-          title: "Issues",
-          secondary: "Issue Detail",
-          trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
-        },
-        t,
-      ),
-    )
-    .child(
-      h_flex()
-        .h(HEADER_HEIGHT_PX)
-        .flex_none()
-        .px(10)
+      rowBeneathHeader(t)
         .gap(ACTION_GAP_PX)
-        .items_center()
-        .border_b(1)
-        .border_color(t.border)
         .child(actionButton({ id: "issue-back", icon: "chevron-left", tooltip: "Back to issues", onClick: onBack }, t))
         .child(div().flex_1().min_w(0))
         .child(editActions(view, t))
