@@ -18,7 +18,15 @@ import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, GLOBAL_SECTIONS, yesNoChoiceId, globalSettingsFields, yesNoValue } from "./settings-fields.js";
-import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
+import {
+  AGENT_QUESTIONS,
+  CLOSE_CHOICES,
+  SETTING_LABELS,
+  SettingsForm,
+  WORK_PROMPT_ROWS,
+  spaceNameLabel,
+  workPromptLabel,
+} from "./settings-form.js";
 import {
   AGENT_DEFAULTS,
   DEFAULT_APPROVAL,
@@ -41,9 +49,9 @@ import {
 /** @import { Theme } from "./menu.js" */
 /** @import { SelectOption } from "./select.js" */
 /** @import { ApprovalKey } from "./setup.js" */
-/** @import { AgentKey, AgentValues, SaveRequest } from "./settings-form.js" */
+/** @import { AgentKey, AgentValues, SaveRequest, SettingLabel } from "./settings-form.js" */
 
-/** @typedef {{ key: string, title: string, placeholder: string, parse: (text: string) => string | number | null, sentence: string }} TypedQuestion */
+/** @typedef {{ key: string, label: SettingLabel, placeholder: string, parse: (text: string) => string | number | null }} TypedQuestion */
 /** @typedef {Record<string, string | number | boolean | null>} SavedValues */
 
 /** @type {SelectOption} */
@@ -62,30 +70,33 @@ const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?
 const TYPED_QUESTIONS = [
   {
     key: "spaceName",
-    title: "Issue space name",
+    label: spaceNameLabel("Empty uses the issue's ID."),
     placeholder: "<issueId>",
     parse: (/** @type {string} */ text) => text.trim() || null,
-    sentence:
-      "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to name spaces after the issue's ID.",
   },
   {
     key: "pollSeconds",
-    title: "Poll interval",
+    label: {
+      title: "Poll interval",
+      sentence: `Seconds between checks of each repository's tracker, 10 or more. Empty polls every ${DEFAULT_POLL_SECONDS} seconds.`,
+    },
     placeholder: String(DEFAULT_POLL_SECONDS),
     parse: parsePollSeconds,
-    sentence: `How often, in whole seconds of 10 or more, the panel asks each repository's tracker for its issues. Leave it empty to poll every ${DEFAULT_POLL_SECONDS} seconds.`,
   },
   {
     key: "updateCheckHours",
-    title: "Update check interval",
+    label: {
+      title: "Update check interval",
+      sentence: `Hours between checks for an update to the panel, 1 or more. Empty checks every ${DEFAULT_UPDATE_CHECK_HOURS} hours.`,
+    },
     placeholder: String(DEFAULT_UPDATE_CHECK_HOURS),
     parse: parseUpdateCheckHours,
-    sentence: `How often, in whole hours of 1 or more, the panel checks for an update to itself. Leave it empty to check every ${DEFAULT_UPDATE_CHECK_HOURS} hours.`,
   },
 ];
 const SELECT_KEYS = [...APPROVAL_QUESTION_KEYS, "close"];
-const WORK_PROMPT_SENTENCE =
-  "Instructions appended to the system prompt of every Claude session that works an issue. A repository's own prompt is added after this one.";
+const WORK_PROMPT_LABEL = workPromptLabel(
+  "Added to the system prompt of each session that works an issue. A repository's own prompt follows it.",
+);
 
 export class GlobalSettings extends SettingsForm {
   /**
@@ -109,9 +120,12 @@ export class GlobalSettings extends SettingsForm {
   load(cx) {
     this.selects = {
       ...Object.fromEntries(
-        Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`global-${key}`, title, cx)]),
+        Object.keys(APPROVAL_QUESTIONS).map((key) => [
+          key,
+          new SelectMenu(`global-${key}`, SETTING_LABELS[/** @type {ApprovalKey} */ (key)].title, cx),
+        ]),
       ),
-      close: new SelectMenu("global-close", "How are worktrees closed?", cx),
+      close: new SelectMenu("global-close", SETTING_LABELS.close.title, cx),
       ...this.agentSelects("global", cx),
     };
     cx.spawn(async (cx) => {
@@ -315,21 +329,17 @@ export class GlobalSettings extends SettingsForm {
       close: () =>
         this.selectQuestion(
           "close",
-          "How are worktrees closed?",
-          CLOSE_SENTENCE,
           [{ id: CLEAR_CHOICE, label: `Default (${choiceLabel(CLOSE_CHOICES, DEFAULT_CLOSE)})` }, ...CLOSE_CHOICES],
           t,
         ),
       workPrompt: () =>
         this.workPromptInput &&
-        this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
-          controls.child(this.textareaField(this.workPromptInput, t)),
-        ),
+        this.question(WORK_PROMPT_LABEL, t, (controls) => controls.child(this.textareaField(this.workPromptInput, t))),
     };
-    for (const { key, title, sentence } of TYPED_QUESTIONS)
+    for (const { key, label } of TYPED_QUESTIONS)
       questions[key] = () =>
         this.typedInputs &&
-        this.question(title, sentence, t, (controls) =>
+        this.question(label, t, (controls) =>
           controls.child(this.textField(this.typedInputs[key], t)).when(Boolean(problems[key]), (e) =>
             e.child(
               div()
@@ -354,20 +364,17 @@ export class GlobalSettings extends SettingsForm {
    * @param {Theme} t
    */
   approvalQuestion(key, defaultChoice, t) {
-    const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
-    return this.selectQuestion(key, title, sentence, [defaultChoice, ...choices], t);
+    return this.selectQuestion(key, [defaultChoice, ...APPROVAL_QUESTIONS[key].choices], t);
   }
 
   // A select of an approval question or close, opening on the top level's value or Default.
   /**
-   * @param {string} key
-   * @param {string} title
-   * @param {string | null} sentence
+   * @param {ApprovalKey | "close"} key
    * @param {SelectOption[]} options
    * @param {Theme} t
    */
-  selectQuestion(key, title, sentence, options, t) {
-    return this.question(title, sentence, t, (controls) =>
+  selectQuestion(key, options, t) {
+    return this.question(SETTING_LABELS[key], t, (controls) =>
       controls.child(
         this.selects[key].render(t, {
           options,

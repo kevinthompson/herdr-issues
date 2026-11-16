@@ -90,3 +90,10 @@ export function rowHover(t) {
 // dark panel, and the theme's color for bars in a light one, where a shade toward `raised` is too faint to see.
 /** @param {Theme} t */
 export const fieldBar = (t) => (isLightTheme(t) ? t.chrome : (mixColors(t.surface, t.raised, 0.35) ?? t.surface));
+
+// A settings card's fill and a chip on it: the panel's color moved a little, then further, toward its text, so
+// each reads as a step off the panel in light and dark themes.
+/** @param {Theme} t */
+export const cardFill = (t) => mixColors(t.surface, t.foreground, 0.03) ?? t.raised;
+/** @param {Theme} t */
+export const chipFill = (t) => mixColors(t.surface, t.foreground, 0.1) ?? t.raised;
