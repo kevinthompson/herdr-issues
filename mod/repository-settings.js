@@ -1,21 +1,22 @@
 // The focused repository's settings, a form of the settings view (settings.js), whose fields show only when they
-// apply to the choices above them (settings-fields.js): the name of the space on its main checkout, its name,
-// typed in with the default as placeholder, where emptying the field removes it from the entry; where its issues
-// live, its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be
-// saved, with Linear's team once Linear is checked; whether a session asks for approval of its work,
-// its approval; how the branch then gets into main, its onApproval; only when the onApproval that applies is a
-// pull request, whether the session waits for its checks, its waitForChecks; what a finished session does about
-// its worktree, its close, each of these leading with a choice that removes it from the entry, labeled with what
-// applies in its place, such as "Global (Open a pull request)" or "Default (Ask me)", where the default onApproval
-// is a pull request for an origin on GitHub; the command run in each new worktree, its
-// worktreeSetup; the name of each issue's space, its
-// spaceName; how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10
-// seconds before it can be saved; then the model and effort of the sessions that work its issues, its workModel
-// and workEffort, whose choice that removes them from the entry is labeled with the global value, such as
-// "Global (opus)", or the default; and last the text appended to those sessions' system prompt after the global
-// prompt, its workPrompt, in a soft-wrapped textarea several rows tall, where emptying it removes it from the
-// entry. Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what applies without it as
-// the placeholder, naming the global value where one is set. It opens on the entry's own settings, with each
+// apply to the choices above them (settings-fields.js), grouped under section headings (REPOSITORY_SECTIONS).
+// Tracker: the name of the space on its main checkout, its name, typed in with the default as placeholder, where
+// emptying the field removes it from the entry; and where its issues live, its tracker, which a different choice
+// checks as the setup view does (tracker-choice.js) before it can be saved, with Linear's team once Linear is
+// checked. Approval: whether a session asks for approval of its work, its approval; how the branch then gets into
+// main, its onApproval; and only when the onApproval that applies is a pull request, whether the session waits for
+// its checks, its waitForChecks. Worktrees: the command run in each new worktree, its worktreeSetup; the name of
+// each issue's space, its spaceName; and what a finished session does about its worktree, its close. The approval
+// selects and close each lead with a choice that removes it from the entry, labeled with what applies in its place,
+// such as "Global (Open a pull request)" or "Default (Ask me)", where the default onApproval is a pull request for
+// an origin on GitHub. Issue sessions: the model and effort of the sessions that work its issues, its workModel and
+// workEffort, whose choice that removes them from the entry is labeled with the global value, such as
+// "Global (opus)", or the default; and the text appended to those sessions' system prompt after the global prompt,
+// its workPrompt, in a soft-wrapped textarea several rows tall, where emptying it removes it from the entry. Panel:
+// how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10 seconds
+// before it can be saved. Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what
+// applies without it as the placeholder, naming the global value where one is set. It opens on the entry's own
+// settings, with each
 // select the entry doesn't set on its choice that removes it; an entry's retired merge and complete show as the
 // approval, onApproval and waitForChecks they mean. Each change saves as it's made (settings-form.js), writing only
 // the changed keys (saveTrackerChoice, saveApprovalSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
@@ -25,7 +26,13 @@ import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
-import { CLEAR_CHOICE, checksChoiceId, settingsFields, waitForChecksOf } from "./settings-fields.js";
+import {
+  CLEAR_CHOICE,
+  REPOSITORY_SECTIONS,
+  checksChoiceId,
+  settingsFields,
+  waitForChecksOf,
+} from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
@@ -76,26 +83,23 @@ const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?
 const NAME_SENTENCE =
   "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
 
-/** @type {{ key: RepositoryKey, title: string, sentence: string }[]} */
-const REPOSITORY_QUESTIONS = [
-  {
-    key: "worktreeSetup",
+/** @type {Record<RepositoryKey, { title: string, sentence: string }>} */
+const REPOSITORY_QUESTIONS = {
+  worktreeSetup: {
     title: "Worktree setup command",
     sentence: "A shell command run in each new issue worktree, such as npm install. Leave it empty to run nothing.",
   },
-  {
-    key: "spaceName",
+  spaceName: {
     title: "Issue space name",
     sentence:
       "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to use the global name, or the issue's ID without one.",
   },
-  {
-    key: "pollSeconds",
+  pollSeconds: {
     title: "Poll interval",
     sentence:
       "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the global interval or the default.",
   },
-];
+};
 
 const WORK_PROMPT_SENTENCE =
   "Instructions appended after the global prompt, if any, to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use only the global prompt.";
@@ -461,55 +465,49 @@ export class RepositorySettings extends SettingsForm {
    * @param {Theme} t
    */
   form(content, t) {
-    const fields = this.fields();
-    return this.errorLine(content, t)
-      .when(Boolean(this.nameInput), (e) =>
-        e.child(
-          this.question("Repository name", NAME_SENTENCE, t, (controls) =>
-            controls.child(this.textField(this.nameInput, t)),
-          ),
-        ),
-      )
-      .child(this.trackerSection(fields, t))
-      .when(Boolean(this.approvalSettings), (e) => this.approvalQuestions(e, fields, t))
-      .when(Boolean(this.repositoryInputs), (e) =>
-        e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))),
-      )
-      .when(Boolean(this.agentSources), (e) =>
-        e.children(
-          AGENT_QUESTIONS.map((question) =>
-            this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t),
-          ),
-        ),
-      )
-      .when(Boolean(this.workPromptInput), (e) =>
-        e.child(
-          this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
-            controls.child(this.textareaField(this.workPromptInput, t)),
-          ),
-        ),
-      );
+    return this.sections(this.errorLine(content, t), REPOSITORY_SECTIONS, this.questionRenderer(t), t);
   }
 
-  // The approval, onApproval, waitForChecks and close selects, waitForChecks only when the onApproval that applies
-  // is a pull request.
+  // The question for each setting's key, or null while it hasn't loaded or doesn't apply: waitForChecks only when
+  // the onApproval that applies is a pull request.
   /**
-   * @param {NativeElement} content
-   * @param {ReturnType<RepositorySettings["fields"]>} fields
    * @param {Theme} t
+   * @returns {(key: string) => NativeElement | null}
    */
-  approvalQuestions(content, fields, t) {
-    const fallbacks = this.approvalFallbacks();
+  questionRenderer(t) {
+    const fields = this.fields();
+    const fallbacks = this.approvalSettings ? this.approvalFallbacks() : null;
     /** @param {ApprovalKey} key */
     const approvalQuestion = (key) => {
       const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
       return this.approvalSelect(key, title, sentence, choices, fallbacks, t);
     };
-    return content
-      .child(approvalQuestion("approval"))
-      .child(approvalQuestion("onApproval"))
-      .when(fields.waitForChecksSelect, (e) => e.child(approvalQuestion("waitForChecks")))
-      .child(this.approvalSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t));
+    /** @type {Record<string, () => NativeElement | null>} */
+    const questions = {
+      name: () =>
+        this.nameInput &&
+        this.question("Repository name", NAME_SENTENCE, t, (controls) =>
+          controls.child(this.textField(this.nameInput, t)),
+        ),
+      tracker: () => this.trackerSection(fields, t),
+      approval: () => fallbacks && approvalQuestion("approval"),
+      onApproval: () => fallbacks && approvalQuestion("onApproval"),
+      waitForChecks: () => (fallbacks && fields.waitForChecksSelect ? approvalQuestion("waitForChecks") : null),
+      close: () =>
+        fallbacks &&
+        this.approvalSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t),
+      workPrompt: () =>
+        this.workPromptInput &&
+        this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
+          controls.child(this.textareaField(this.workPromptInput, t)),
+        ),
+    };
+    for (const key of REPOSITORY_FIELDS)
+      questions[key] = () => this.repositoryInputs && this.repositoryQuestion(key, REPOSITORY_QUESTIONS[key], t);
+    for (const question of AGENT_QUESTIONS)
+      questions[question.key] = () =>
+        this.agentSources && this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t);
+    return (key) => questions[key]?.() ?? null;
   }
 
   // A select of approval, onApproval, waitForChecks or close, leading with the choice that removes it from the entry
@@ -575,10 +573,11 @@ export class RepositorySettings extends SettingsForm {
 
   // A typed setting; the poll interval says below its field why it can't be saved.
   /**
-   * @param {{ key: RepositoryKey, title: string, sentence: string }} question
+   * @param {RepositoryKey} key
+   * @param {{ title: string, sentence: string }} question
    * @param {Theme} t
    */
-  repositoryQuestion({ key, title, sentence }, t) {
+  repositoryQuestion(key, { title, sentence }, t) {
     const problem = key === "pollSeconds" ? this.pollSecondsProblem() : null;
     return this.question(title, sentence, t, (controls) =>
       controls.child(this.textField(this.repositoryInputs[key], t)).when(Boolean(problem), (e) =>

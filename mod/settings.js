@@ -7,8 +7,10 @@
 // load when the view opens and save each change to their own scope as it's made, the header saying Saving… while
 // one writes; switching scope leaves the hidden form's waiting save to run. Back writes any save still waiting for
 // typing to pause, then returns to the list once every save is done, or stays on the form whose save failed to
-// show its error. Each setting is a select menu (select.js) whose open list says what each option means, or a typed
-// field, with its description below its controls.
+// show its error. Each form groups its settings in one scrolling column under section headings styled as the list's
+// status headings, in the order Tracker, Approval, Worktrees, Issue sessions and Panel, showing only the sections it
+// has (settings-fields.js); nothing is collapsed. Each setting is a select menu (select.js) whose open list says
+// what each option means, or a typed field, with its description below its controls.
 import { div } from "gpui-kit";
 import { v_flex } from "gpui-base";
 import { shared, setShared } from "herdr";
