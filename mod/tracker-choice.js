@@ -40,7 +40,7 @@ export const markdown = (id, text, color) => TextView.markdown(id, text).flex_no
 export class TrackerChoice {
   // main: the repository's main checkout. picks: the shared state the team dropdown hands its pick back through.
   // alongside(): more work the check waits for; onReady(its result, cx) runs once the chosen tracker's check
-  // passes. onTeam(cx) runs once a team is picked.
+  // passes. onTeam(cx) runs once a team is picked, from the owner's render, where Herdr refuses cx.notify().
   constructor(main, { picks, alongside = async () => null, onReady, onTeam }) {
     this.main = main; this.picks = picks; this.alongside = alongside; this.onReady = onReady; this.onTeam = onTeam;
     this.choice = null; this.teams = null; this.team = null; this.checking = false; this.problem = null;
