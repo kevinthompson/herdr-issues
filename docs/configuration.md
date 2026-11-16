@@ -146,3 +146,7 @@ The panel's Start and Continue, and `/issues:start` through `issues worktree --c
 ```
 
 `issues setting workModel` and `issues setting workEffort` print a repository's settings, with their defaults applied, and `/issues:config` shows and changes them. A change applies to sessions started after it.
+
+### `workPrompt`
+
+Instructions appended to the system prompt of those sessions with `claude --append-system-prompt`, such as house rules for tests. Set it at the top level of `issues.json` for every repository, in a repository's entry, or both: a session gets the top level's prompt, then the repository's after a blank line. A blank prompt counts as unset. `issues setting workPrompt` prints what a repository's sessions get.

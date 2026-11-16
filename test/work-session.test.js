@@ -86,14 +86,15 @@ describe("the Claude session's model and effort", () => {
 describe("the Claude session's work prompt", () => {
   beforeEach(() => forgetLookups());
 
-  test("appends the repository's workPrompt to the system prompt as one argument", async (t) => {
+  test("appends the top level's and the repository's workPrompt to the system prompt as one argument", async (t) => {
     stubClaude(t, { installed: true });
     const repository = createRepository(temporaryFolder(t));
     const workPrompt = `Run "npm test" before each commit.\nDon't use 'git stash'.`;
     writeSettings({ workPrompt: "Top level", repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt } } });
     const project = { root: repository, on: null };
-    assert.deepEqual(await workSessionArgv(project), ["claude", "--append-system-prompt", workPrompt]);
-    assert.deepEqual((await workIssueSession(issue, project)).argv, ["claude", "--append-system-prompt", workPrompt]);
+    const appended = `Top level\n\n${workPrompt}`;
+    assert.deepEqual(await workSessionArgv(project), ["claude", "--append-system-prompt", appended]);
+    assert.deepEqual((await workIssueSession(issue, project)).argv, ["claude", "--append-system-prompt", appended]);
   });
 
   test("uses the top level's workPrompt without the repository's", async (t) => {

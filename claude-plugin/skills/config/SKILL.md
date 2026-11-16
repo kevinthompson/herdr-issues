@@ -59,6 +59,8 @@ The file holds no secrets. Linear's API key lives apart from it, in the macOS Ke
 
 `issues setting workModel` and `issues setting workEffort` print them with their defaults applied. A change applies to sessions started after it.
 
+`workPrompt` is optional too, at the top level or in the repository's entry: instructions appended to those sessions' system prompt. A repository's prompt doesn't replace the top level's: sessions get the top level's, then the repository's after a blank line. `issues setting workPrompt` prints the combined prompt.
+
 1. **Read the current state.** Read the repository's entry and the top-level settings in `issues.json`, if any; in the main checkout, read `git remote get-url origin`, `issues tracker --json`, `issues setting merge`, `issues setting complete`, `issues setting close`, `issues setting name`, `issues setting workModel` and `issues setting workEffort`. Say what the repository uses today: its tracker, from `issues tracker`'s `kind` with its `team` or `repo` (or what it printed when it fails, such as that the repository has no tracker), and how work lands, what finished sessions do about their worktrees, what its main checkout's space is named, and the model and effort issue sessions work on, saying which settings are set, where, and which are defaults. For `show`, stop here.
 2. **Choose what to change.**
    - `merge <value>`, `complete <value>`, `close <value>`, `name <name>` or `clear <key>` change only that setting: go to step 5.

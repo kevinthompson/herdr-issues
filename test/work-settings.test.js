@@ -74,16 +74,22 @@ test("issues setting workPrompt prints nothing without a prompt", async (t) => {
   assert.equal(result.err, "");
 });
 
-test("a repository's workPrompt overrides the top level's", async (t) => {
+test("a repository's workPrompt follows the top level's after a blank line", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workPrompt: "Top level", repos: { [repository]: githubEntry({ workPrompt: "Run the tests.\nCommit often." }) } });
-  assert.equal((await setting(t, repository, "workPrompt")).out, "Run the tests.\nCommit often.");
+  writeSettings({ workPrompt: " Top level\n", repos: { [repository]: githubEntry({ workPrompt: "Run the tests.\nCommit often." }) } });
+  assert.equal((await setting(t, repository, "workPrompt")).out, "Top level\n\nRun the tests.\nCommit often.");
 });
 
-test("a top-level workPrompt applies without the repository's", async (t) => {
+test("a top-level workPrompt applies alone without the repository's", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workPrompt: "Top level", repos: { [repository]: githubEntry() } });
+  writeSettings({ workPrompt: "Top level", repos: { [repository]: githubEntry({ workPrompt: "  " }) } });
   assert.equal((await setting(t, repository, "workPrompt")).out, "Top level");
+});
+
+test("a repository's workPrompt applies alone without the top level's", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ repos: { [repository]: githubEntry({ workPrompt: "Run the tests." }) } });
+  assert.equal((await setting(t, repository, "workPrompt")).out, "Run the tests.");
 });
 
 test("a repository's workPrompt that isn't text is refused", async (t) => {
