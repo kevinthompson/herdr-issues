@@ -1,6 +1,8 @@
 // Merges an issue's branch into main in the repository's main checkout and marks the issue done, for repositories
 // whose approved work merges locally (onApproval "merge"). `issues merge` and the issue view's Merge button both run
-// mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly.
+// mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly. With
+// pushAfterMerge, it then pushes main to the remote main tracks. Once the merge is made it stays, and a failure to
+// mark the issue done or to push main throws a MergedWithProblems saying the branch was merged.
 // `issues merge --check` runs checkMerge, mergeIssue's checks alone, so a session can confirm before asking for
 // approval that approving will merge: it tests the merge with git merge-tree and changes no checkout or ref.
 /**
@@ -14,6 +16,7 @@ import { approvalSettings } from "./trackers/setting.js";
 import { announceIssueChange } from "./changes.js";
 
 export class MergeRefusal extends Error {}
+export class MergedWithProblems extends Error {}
 
 /**
  * @param {string} cwd
@@ -122,8 +125,9 @@ export async function checkMerge(issue, project) {
   return main;
 }
 
-// Merges the issue's branch into main with a merge commit, then marks the issue done and tells every panel.
-// A conflicting merge is aborted, leaving the main checkout as it was. Returns the main branch's name.
+// Merges the issue's branch into main with a merge commit, then marks the issue done, tells every panel, and with
+// pushAfterMerge pushes main. A conflicting merge is aborted, leaving the main checkout as it was. Returns
+// { mainBranch, pushed }, the main branch's name and whether it was pushed.
 /**
  * @param {Issue} issue
  * @param {Tracker} tracker
@@ -146,9 +150,27 @@ export async function mergeIssue(issue, tracker, project) {
     (error) => error,
   );
   await announceIssueChange();
-  if (marking)
-    throw new Error(
-      `Merged ${branch} into ${main.branch}, but could not mark ${issue.id} done: ${marking.message ?? marking}`,
-    );
-  return main.branch;
+  const { pushAfterMerge } = await approvalSettings(project);
+  const pushProblem = pushAfterMerge ? await pushMain(main, on) : null;
+  const problems = [
+    ...(marking ? [`could not mark ${issue.id} done: ${marking.message ?? marking}`] : []),
+    ...(pushProblem ? [`could not push ${main.branch}: ${pushProblem}`] : []),
+  ];
+  if (problems.length)
+    throw new MergedWithProblems(`Merged ${branch} into ${main.branch}, but ${problems.join("; and ")}`);
+  return { mainBranch: main.branch, pushed: pushAfterMerge };
+}
+
+// Pushes the main checkout's branch to the remote it tracks; returns why it couldn't, or null once it's pushed.
+/**
+ * @param {Checkout} main
+ * @param {string | null | undefined} on
+ */
+async function pushMain(main, on) {
+  const remote = (await git(main.path, ["config", "--get", `branch.${main.branch}.remote`], on)).out;
+  if (!remote) return `${main.branch} has no upstream remote`;
+  const pushed = await git(main.path, ["push", remote, main.branch], on);
+  if (pushed.ok) return null;
+  const reason = pushed.err.split("\n").filter((/** @type {string} */ line) => line && !line.startsWith("hint:"));
+  return reason.join(" ") || "git push failed";
 }

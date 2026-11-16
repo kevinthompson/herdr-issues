@@ -106,8 +106,9 @@ Commands:
                            is first marked in progress, as start does; a refused start only warns
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
-  merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
-                           refuse, changing nothing, when it can't merge cleanly or onApproval is pull-request
+  merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done, then push
+                           main when pushAfterMerge is true; refuse, changing nothing, when it can't merge cleanly or
+                           onApproval is pull-request
   merge --check <id>       Make every check merge makes, including a trial merge that changes no checkout, and change
                            nothing: exit 0 when merge would go through, else print merge's refusal and exit 1
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
@@ -515,8 +516,10 @@ async function merge(args) {
       console.log(`${issue.branch} merges cleanly into ${main.branch}`);
       return;
     }
-    const mainBranch = await mergeIssue(issue, await currentTracker(), await currentProject());
-    console.log(`Merged ${issue.branch} into ${mainBranch} and marked ${issue.id} done`);
+    const { mainBranch, pushed } = await mergeIssue(issue, await currentTracker(), await currentProject());
+    console.log(
+      `Merged ${issue.branch} into ${mainBranch}${pushed ? `, pushed ${mainBranch}` : ""} and marked ${issue.id} done`,
+    );
   } catch (error) {
     throw error instanceof MergeRefusal ? new Refusal(error.message) : error;
   }

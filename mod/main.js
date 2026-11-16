@@ -102,7 +102,7 @@ import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
 import { stillWaitingForSpace } from "./opening-wait.js";
-import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
+import { canOfferMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 
 /** @import { Context, AsyncContext, Color } from "gpui-kit" */
@@ -1359,7 +1359,10 @@ export default class Issues extends View {
             notify({ title: "Could not remove the worktree", body: String(error) }),
           );
       } catch (/** @type {any} */ e) {
-        this.detailError = e instanceof MergeRefusal ? e.message : `Could not merge: ${e.message ?? e}`;
+        this.detailError =
+          e instanceof MergeRefusal || e instanceof MergedWithProblems
+            ? e.message
+            : `Could not merge: ${e.message ?? e}`;
       }
       this.opening = null;
       this.refresh(cx);
