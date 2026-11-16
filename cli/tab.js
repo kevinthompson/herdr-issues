@@ -1,10 +1,12 @@
 // `issues tab`: the Herdr tab holding this session's terminal ($HC_TERMINAL_ID), and renaming it after the
-// issue the session works, as /issues:work does. A tab the person named keeps its name. `issues complete` labels
+// issue the session works, as /issues:work does, prefixed with the issue's ID unless the space's name ends with the
+// issue's space name (space-name.js). A tab the person named keeps its name. `issues complete` labels
 // the terminal and marks the tab, whatever its name, with ✅ once the session is done working and has handed off to
 // the person, whether or not its branch has landed, which `issues complete --cancel` withdraws when the person asks
 // for more changes, and `issues close`
 // labels it to ask the panel to close the session's space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
+import { spaceNameEndsWith } from "../mod/space-name.js";
 
 async function herdrApp(args) {
   const result = await exec("herdr-app", args);
@@ -27,7 +29,7 @@ export const isUnnamed = (name) => name === "Claude" || /^\d+$/.test(name);
 
 // The issue's ID goes in the name only when the space's name doesn't already show which issue it is.
 export const issueTabName = ({ tab, issueId, issueSpace, name }) =>
-  tab.space === issueSpace ? name : `${issueId} ${name}`;
+  spaceNameEndsWith(tab.space, issueSpace) ? name : `${issueId} ${name}`;
 
 export async function renameTab(tab, name) {
   await herdrApp(["do", "tab.rename", "--id", tab.id, "--name", name]);
