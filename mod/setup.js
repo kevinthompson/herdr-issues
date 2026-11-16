@@ -13,8 +13,8 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
-import { button } from "./detail.js";
-import { collapseButton, headerBar, iconButton } from "./header.js";
+import { button, icon } from "./detail.js";
+import { collapseButton, headerBar } from "./header.js";
 import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
@@ -404,33 +404,56 @@ export class TrackerSetup {
     return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(shown);
   }
 
-  // Back at the top left, as an open issue has its way back, and where the step falls at the top right.
+  // The panel's header, then a row with the way back at the left and where the step falls beside it.
   /**
    * @param {Theme} t
    */
   stepBar(t) {
+    const { backShown, backEnabled, stepText } = this.stepBarState();
+    return v_flex()
+      .w_full()
+      .flex_none()
+      .child(
+        headerBar(
+          {
+            icon: "issues",
+            title: "Issues",
+            secondary: "Setup",
+            trailing: [
+              this.failure ? null : button("setup-cancel", "Cancel", (cx) => this.cancel(cx), t),
+              collapseButton(this.onCollapse, t),
+            ],
+          },
+          t,
+        ),
+      )
+      .child(
+        h_flex()
+          .px(10)
+          .py(8)
+          .gap(8)
+          .items_center()
+          .when(backShown, (e) =>
+            e.child(
+              button("setup-back", icon("chevron-left"), (cx) => this.back(cx), t, {
+                tooltip: "Back",
+                enabled: backEnabled,
+              }),
+            ),
+          )
+          .child(div().text_size(12).text_color(t.dim).child(stepText)),
+      );
+  }
+
+  // Back shows when a step has a previous one or a failure is showing, and does nothing while checking or saving.
+  stepBarState() {
     const steps = this.steps(),
       index = steps.indexOf(this.step);
-    const canGoBack = index > 0 || Boolean(this.failure),
-      busy = this.tracker.checking || this.saving;
-    return headerBar(
-      {
-        leading: canGoBack
-          ? iconButton(
-              { id: "setup-back", icon: "chevron-left", tooltip: "Back", onClick: busy ? null : (cx) => this.back(cx) },
-              t,
-            )
-          : null,
-        icon: "issues",
-        title: "Set up issues",
-        secondary: `Step ${index + 1} of ${steps.length}`,
-        trailing: [
-          this.failure ? null : button("setup-cancel", "Cancel", (cx) => this.cancel(cx), t),
-          collapseButton(this.onCollapse, t),
-        ],
-      },
-      t,
-    );
+    return {
+      backShown: index > 0 || Boolean(this.failure),
+      backEnabled: !(this.tracker.checking || this.saving),
+      stepText: `Step ${index + 1} of ${steps.length}`,
+    };
   }
 
   // A page's question, a sentence under it, and its options, each with what it means. The current answer is

@@ -1,6 +1,6 @@
 // The header bar every view of the panel draws, and its icon button, with the values of Herdr's own pane
 // header (the built-in `pane` mod) so the panel reads as part of the same UI: a 30px bar with a leading
-// element, a medium-weight title, dim secondary text that truncates, then the buttons on the right.
+// icon, a medium-weight title, dim secondary text that truncates, then the buttons on the right.
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 
@@ -42,11 +42,11 @@ export const collapseButton = (onCollapse, t) =>
   iconButton({ id: "issues-collapse", icon: "panel-right-close", tooltip: "Collapse panel", onClick: onCollapse }, t);
 
 /**
- * @param {{ icon?: string, leading?: NativeElement | null, title: string, secondary?: string | null, trailing?: (NativeElement | null)[] }} props
- *   `icon` is the leading icon's name in mod/icons; `leading` replaces it with an element, such as a back button.
+ * @param {{ icon?: string, title: string, secondary?: string | null, trailing?: (NativeElement | null)[] }} props
+ *   `icon` is the leading icon's name in mod/icons.
  * @param {Theme} t
  */
-export function headerBar({ icon, leading, title, secondary, trailing = [] }, t) {
+export function headerBar({ icon, title, secondary, trailing = [] }, t) {
   return h_flex()
     .h(HEADER_HEIGHT_PX)
     .w_full()
@@ -58,8 +58,7 @@ export function headerBar({ icon, leading, title, secondary, trailing = [] }, t)
     .border_b(1)
     .border_color(t.border)
     .text_size(12)
-    .when(Boolean(leading), (e) => e.child(leading))
-    .when(!leading && Boolean(icon), (e) =>
+    .when(Boolean(icon), (e) =>
       e.child(svg(`mods/issues/icons/${icon}.svg`).size(HEADER_ICON_PX).flex_none().text_color(t.dim)),
     )
     .child(div().flex_none().truncate().max_w(TITLE_MAX_WIDTH_PX).font_medium().text_color(t.foreground).child(title))

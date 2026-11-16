@@ -471,6 +471,13 @@ export function workButton(
 }
 
 /**
+ * A button's label that is an icon, redrawn in the button's text color.
+ * @param {string} name
+ * @returns {(color: Color) => NativeElement}
+ */
+export const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
+
+/**
  * Continue for an issue in progress, otherwise Start, or Go to space when a space already shows the
  * worktree: the issue view's filled primary action.
  * @param {DetailView} view
