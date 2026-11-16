@@ -12,7 +12,7 @@ Run without arguments, it asks which tracker to use: a Linear team, GitHub Issue
 
 - the tracker: `linear <team key>`, `github [owner/name]` or `beads`;
 - a Linear repository's [saved views](configuration.md#views): `view [<name>] <url>` adds one, naming it from Linear when the name is left out, `view clear <name>` removes one, and `views` lists them;
-- how work is approved and reaches main: `approval <ask|auto>`, `onApproval <merge|pull-request>` and `waitForChecks <true|false>`;
+- how work is approved and reaches main: `approval <ask|auto>`, `onApproval <merge|pull-request>`, `waitForChecks <true|false>` and `pushAfterMerge <true|false>`;
 - whether finished sessions close their worktrees: `close <ask|auto>`;
 - the repository's space name: `name <name>`;
 - the command run in each new worktree: `worktreeSetup <command>`;
