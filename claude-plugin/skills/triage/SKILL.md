@@ -32,14 +32,14 @@ Bring the issues named in `$ARGUMENTS`, or picked as below, up to the bar `/issu
 
 5. **Settle what only the person can.** When the issue waits on a decision, content, or intent the code can't answer, interview the person now with focused multiple-choice questions (AskUserQuestion), a round at a time, until the issue can be written. Never invent creative or product content; when the person wants to leave it for later, name what's missing in the issue.
 
-6. **Size it.** When the issue needs more than one branch or pull request, or has separable outcomes, propose a split: list each slice's title, goal and blockers, and ask the person to approve or adjust it before writing anything. Once approved, rewrite the original as the first slice in the steps below, and file the other slices here, before or after saving the original, as `../create/writing.md` says: run `issues context <words>` in the main checkout, then write each slice from its title, goal, blockers (the original's ID where a slice depends on it) and what this triage settled for its Context.
+6. **Size it.** When the issue needs more than one branch or pull request, or has separable outcomes, propose a split: list each slice's title, goal and blockers, and ask the person to approve or adjust it with AskUserQuestion before writing anything, putting the list in the approving option's `preview` so the dialog shows it without your response text. Once approved, rewrite the original as the first slice in the steps below, and file the other slices here, before or after saving the original, as `../create/writing.md` says: run `issues context <words>` in the main checkout, then write each slice from its title, goal, blockers (the original's ID where a slice depends on it) and what this triage settled for its Context.
 
 7. **Rewrite it.** Bring the issue to the bar: testable acceptance criteria, Out of scope, Verification commands that exist, Context naming real code and the reason for the work, and correct blockers (add or remove the Linear blocking relations, GitHub issue dependencies or Beads `blocks` dependencies the work reveals). For a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after.
    - Also suggest a priority with a one-line reason, and ask the person to confirm or change it.
    - For Linear and Beads, ask which status to leave it in, Todo or Backlog, offering Todo first when nothing blocks it. An issue in Linear's Triage state always leaves Triage.
    - **Not yet worked** (step 3): rewrite the description itself.
    - **Already worked**, or others have commented: ask whether to revise the description or add a comment, since rewriting could erase what others rely on.
-   - Show the person a summary of what changes and why, and save only once they approve, adjusting it first if they ask.
+   - Show the person a summary of what changes and why, and save only once they approve, adjusting it first if they ask. Ask for approval with AskUserQuestion, putting the summary in the approving option's `preview` so the dialog shows it without your response text.
    - When you show the rewritten issue itself, write it straight into your reply as Markdown so the terminal renders it, never inside a code block or an HTML tag such as `<details>`, and set it off with horizontal rules.
 
 8. **Save.**
