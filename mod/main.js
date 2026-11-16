@@ -97,7 +97,7 @@ import { issueIdOfSpace, panelIssueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { collapseState } from "./collapse.js";
 import { isSectionOpen, setSectionOpen } from "./open-sections.js";
-import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
+import { TrackerSetup, untrackableView, notARepositoryView, emptyListView } from "./setup.js";
 import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
@@ -1788,12 +1788,6 @@ export default class Issues extends View {
     });
   }
 
-  /** @param {Group[]} groups */
-  emptyText(groups) {
-    if (!this.loaded) return "Loading…";
-    return holdsNoIssues(groups) ? "Use /issues:create to create an issue" : null;
-  }
-
   // The scope listed now: { scope, project, milestone }, a milestone's under its project.
   /** @returns {NonNullable<ReturnType<typeof findScope>>} */
   currentScope() {
@@ -1896,7 +1890,7 @@ export default class Issues extends View {
       label = this.shownLabel(labels);
     const groups = this.groups(label),
       error = this.error ?? this.detailError,
-      emptyText = this.emptyText(groups);
+      listsNoIssues = this.loaded && holdsNoIssues(groups);
     const shown = this.shownCounts(groups),
       idColumnWidth = this.idColumnWidth(groups);
     this.revealGroup(groups);
@@ -1928,14 +1922,8 @@ export default class Issues extends View {
           .p(6)
           .gap(1)
           .children(groups.map((group, index) => this.group(group, shown[index], idColumnWidth, t)))
-          .when(Boolean(emptyText) && !error, (e) =>
-            e.child(
-              div()
-                .p(8)
-                .text_color(t.dim)
-                .child(emptyText ?? ""),
-            ),
-          ),
+          .when(!this.loaded && !error, (e) => e.child(div().p(8).text_color(t.dim).child("Loading…")))
+          .when(listsNoIssues && !error, (e) => e.child(emptyListView(t))),
       );
   }
 
