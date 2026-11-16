@@ -32,7 +32,9 @@
 //          comments ([{ author, created, body }] oldest first, the first 100, for Linear and GitHub issues;
 //          null until tracker.get loads them, like body), updated (when the tracker
 //          can say), labelColors ({ label: "#rrggbb" }, for Linear issues),
-//          labelParts ({ label: { group, value } } for each Linear label in a group), assignee (a name, for Linear issues),
+//          labelParts ({ label: { group, value } } for each Linear label in a group),
+//          project ({ id, name, color } of the Linear project the issue belongs to, or null; not a label),
+//          assignee (a name, for Linear issues),
 //          assigneeId (the assignee's user ID, or null, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
@@ -65,6 +67,8 @@
  * @property {string} value
  */
 
+/** @typedef {{ id: string, name: string, color: string }} IssueProject */
+
 /**
  * @typedef {object} Issue
  * @property {string} id
@@ -87,6 +91,7 @@
  * @property {string} [updated]
  * @property {Record<string, string>} [labelColors]
  * @property {Record<string, LabelParts>} [labelParts]
+ * @property {IssueProject | null} [project]
  * @property {string} [assignee]
  * @property {string | null} [assigneeId]
  * @property {string | null} [assigneeAvatar]

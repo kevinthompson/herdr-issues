@@ -254,15 +254,17 @@ function groupedLabelChip({ group, value }, color, t) {
 }
 
 /**
- * @param {Pick<Issue, "labels" | "labelColors" | "labelParts">} issue
+ * @param {Pick<Issue, "labels" | "labelColors" | "labelParts" | "project">} issue
  * @param {Theme} t
  */
-export const labelChips = ({ labels, labelColors, labelParts }, t) =>
-  labels.map((label) =>
+export const labelChips = ({ labels, labelColors, labelParts, project }, t, { withProject = true } = {}) => [
+  ...(project && withProject ? [groupedLabelChip({ group: "Project", value: project.name }, project.color, t)] : []),
+  ...labels.map((label) =>
     labelParts?.[label]
       ? groupedLabelChip(labelParts[label], labelColors?.[label], t)
       : labelChip(label, labelColors?.[label], t),
-  );
+  ),
+];
 
 /**
  * The issue's labels, then, where they can change, a button opening the dropdown that adds and removes them.
@@ -327,7 +329,9 @@ function facts(view, t) {
         iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t),
       ),
     )
-    .when(view.issue.labels.length > 0 || view.labelsEditable, (e) => e.child(labelsRow(view, t)));
+    .when(view.issue.labels.length > 0 || Boolean(view.issue.project) || view.labelsEditable, (e) =>
+      e.child(labelsRow(view, t)),
+    );
 }
 
 /** @type {Record<string, [string, string]>} */
