@@ -1,6 +1,7 @@
 // Which fields the settings view (settings.js) shows for the choices made so far, apart from the view so the tests
-// can run it without the kit: Linear's team once Linear is chosen and checked; when the work is complete only for a
-// pull request, with a note under the merge select otherwise; and workModel's typed model only when its select is
+// can run it without the kit: Linear's team once Linear is chosen and checked; when the work is complete only when
+// the merge that applies is a pull request, the global value or default when the merge select is on its choice
+// that removes it, with a note under the merge select otherwise; and workModel's typed model only when its select is
 // on Other, which it is when the person picks it or the entry already holds a model the select doesn't list. The
 // Global form's (global-settings.js) differ only in showing when the work is complete for the default merge too.
 import { SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
@@ -16,11 +17,14 @@ export function workModelChoice(workModel, otherPicked) {
   return workModel ?? CLEAR_CHOICE;
 }
 
-export function settingsFields({ trackerChoice, trackerReady, merge, workModel, otherWorkModelPicked }) {
+// merge is the repository's own, null on the choice that removes it, when fallbackMerge, the global value or the
+// default, applies instead.
+export function settingsFields({ trackerChoice, trackerReady, merge, fallbackMerge = null, workModel, otherWorkModelPicked }) {
+  const appliedMerge = merge ?? fallbackMerge;
   return {
     teamSelect: trackerChoice === "linear" && trackerReady,
-    completeSelect: merge === "pull-request",
-    mergedNote: Boolean(merge) && merge !== "pull-request",
+    completeSelect: appliedMerge === "pull-request",
+    mergedNote: Boolean(appliedMerge) && appliedMerge !== "pull-request",
     workModelInput: workModelChoice(workModel, otherWorkModelPicked) === OTHER_WORK_MODEL,
   };
 }

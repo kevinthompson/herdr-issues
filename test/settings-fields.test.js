@@ -35,3 +35,10 @@ test("the Global form shows when the work is complete for a pull request or the 
   for (const merge of [null, "pull-request"]) assert.deepEqual([global(merge).completeSelect, global(merge).mergedNote], [true, false]);
   for (const merge of ["auto", "review"]) assert.deepEqual([global(merge).completeSelect, global(merge).mergedNote], [false, true]);
 });
+
+test("when the work is complete shows for the cleared merge when the merge that applies is a pull request", () => {
+  const cleared = (fallbackMerge) => fields({ merge: null, fallbackMerge });
+  assert.deepEqual([cleared("pull-request").completeSelect, cleared("pull-request").mergedNote], [true, false]);
+  for (const merge of ["auto", "review"]) assert.deepEqual([cleared(merge).completeSelect, cleared(merge).mergedNote], [false, true]);
+  assert.deepEqual([fields({ merge: "auto", fallbackMerge: "pull-request" }).completeSelect], [false]);
+});

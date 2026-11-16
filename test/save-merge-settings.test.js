@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
-import { saveMergeSettings, settingsPath } from "../mod/trackers/setting.js";
+import { landingSettings, saveMergeSettings, settingsPath } from "../mod/trackers/setting.js";
 import { main } from "../cli/main.js";
 
 function writeSettings(settings) {
@@ -85,4 +85,37 @@ test("a repository without an entry gets none from saving merge settings", async
 
   await assert.rejects(saveMergeSettings(repository, { merge: "auto" }), /no entry in issues\.json/);
   assert.equal(readFileSync(settingsPath(), "utf8"), before);
+});
+
+test("a null merge or complete removes it from the entry, so the global value or default applies", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ merge: "auto", repos: { [repository]: { tracker: "beads", merge: "pull-request", complete: "pull-request-passing" } } });
+
+  await saveMergeSettings(repository, { merge: null, complete: null });
+
+  assert.deepEqual(readSettings().repos[repository], { tracker: "beads" });
+  assert.equal(await setting(t, repository, "merge"), "auto");
+  assert.equal(await setting(t, repository, "complete"), "merged");
+});
+
+test("a pull request's complete can be kept while merge falls back on a pull request", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ merge: "pull-request", repos: { [repository]: { tracker: "beads", merge: "auto" } } });
+
+  await saveMergeSettings(repository, { merge: null, complete: "pull-request-passing" });
+
+  assert.deepEqual(readSettings().repos[repository], { tracker: "beads", complete: "pull-request-passing" });
+  assert.equal(await setting(t, repository, "merge"), "pull-request");
+  assert.equal(await setting(t, repository, "complete"), "pull-request-passing");
+});
+
+test("landing settings give the entry's and top level's own merge, complete and close, and the default merge", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ complete: "merged", close: "auto", repos: { [repository]: { tracker: "beads", merge: "pull-request" } } });
+
+  assert.deepEqual(await landingSettings({ root: repository, on: null }), {
+    entry: { merge: "pull-request", complete: null, close: null },
+    topLevel: { merge: null, complete: "merged", close: "auto" },
+    defaultMerge: "review",
+  });
 });

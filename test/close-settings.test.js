@@ -83,3 +83,13 @@ test("a repository without an entry gets none from saving close", async (t) => {
   await assert.rejects(saveCloseSetting(repository, "auto"), /no entry in issues\.json/);
   assert.equal(readFileSync(settingsPath(), "utf8"), before);
 });
+
+test("a null close removes it from the entry, so the global value applies", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ close: "manual", repos: { [repository]: githubEntry({ close: "auto" }) } });
+
+  await saveCloseSetting(repository, null);
+
+  assert.deepEqual(readSettings().repos[repository], githubEntry());
+  assert.equal((await closeSetting(t, repository)).out, "manual");
+});
