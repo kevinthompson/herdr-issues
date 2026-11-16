@@ -71,6 +71,11 @@ test("names a label in a group after its group", async (t) => {
   assert.equal(issue.labelColors["cloud-agent > plan"], "#4ea7fc");
 });
 
+test("gives a label in a group its group and value apart, by its full name", async (t) => {
+  const { issue } = await trackerWith(t);
+  assert.deepEqual(issue.labelParts, { "cloud-agent > plan": { group: "cloud-agent", value: "plan" } });
+});
+
 test("lists the team's labels, without the groups that hold them", async (t) => {
   const { tracker, labelTeams } = await trackerWith(t);
   assert.deepEqual(await tracker.labels(), [

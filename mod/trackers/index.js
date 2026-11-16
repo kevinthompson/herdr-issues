@@ -29,7 +29,8 @@
 // Issue: { id, title, status, priority (0 none … 4 low), order (a number, or null),
 //          labels (names; a Linear label in a group is "group > name"), blockedBy,
 //          branch, url (the issue's web page, for Linear and GitHub issues), created, body (null until loaded: tracker.get loads it), updated (when the tracker
-//          can say), labelColors ({ label: "#rrggbb" }, for Linear issues), assignee (a name, for Linear issues),
+//          can say), labelColors ({ label: "#rrggbb" }, for Linear issues),
+//          labelParts ({ label: { group, value } } for each Linear label in a group), assignee (a name, for Linear issues),
 //          assigneeId (the assignee's user ID, or null, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
@@ -55,6 +56,12 @@
  */
 
 /**
+ * @typedef {object} LabelParts
+ * @property {string} group
+ * @property {string} value
+ */
+
+/**
  * @typedef {object} Issue
  * @property {string} id
  * @property {string} title
@@ -74,6 +81,7 @@
  * @property {string | null} [body] Null until tracker.get loads it.
  * @property {string} [updated]
  * @property {Record<string, string>} [labelColors]
+ * @property {Record<string, LabelParts>} [labelParts]
  * @property {string} [assignee]
  * @property {string | null} [assigneeId]
  * @property {string | null} [assigneeAvatar]
