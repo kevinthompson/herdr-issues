@@ -4,7 +4,7 @@ This repository holds the Herdr app's Issues panel mod and the Claude Code plugi
 
 ## Setting up for development
 
-Clone the repository and run `./setup` from its main checkout. It needs `herdr-app`, `claude`, `git` and `node`, and `gh` for repositories tracked in GitHub Issues. It links the checkout's `mod/` folder into Herdr's mods folder, links `bin/issues` into `~/.local/bin`, merges the mod's key bindings and installs the Claude plugin. Run from a linked worktree, it refuses and changes nothing.
+Clone the repository and run `./setup` from its main checkout. It needs `herdr-app`, `git` and `node` 22.15 or later, `claude` for the plugin, which it skips with a warning without it, and `gh` for repositories tracked in GitHub Issues. It links the checkout's `mod/` folder into Herdr's mods folder, links `bin/issues` into `~/.local/bin`, merges the mod's key bindings and installs the Claude plugin. Run from a linked worktree, it refuses and changes nothing.
 
 Running `./setup` again is safe. See [Installing for development](AGENTS.md#installing-for-development).
 

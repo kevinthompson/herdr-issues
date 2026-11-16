@@ -26,9 +26,13 @@ Click an issue to open it in place of the list. Its status and priority are drop
 
 ## Starting work
 
-**Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue, or a shell tab when Claude Code isn't installed. **Continue** reopens an issue already in progress, and **Go to space** switches to the space that already shows it. When the work is finished, the Claude session ends with a message saying the worktree can be closed.
+**Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue, or a shell tab when Claude Code isn't installed. **Continue** reopens an issue already in progress, and **Go to space** switches to the space that already shows it. When the work is finished, the Claude session ends with a message saying so and, as the repository's [`close`](configuration.md#close) setting says, asks whether to close the worktree or closes it.
+
+In a repository whose approved work merges locally (`onApproval` is `merge`), an issue whose worktree has commits main lacks and nothing uncommitted shows **Merge**, which merges its branch into main, marks the issue done and removes its worktree.
 
 ## Removing a worktree
+
+**Cmd-Shift-W** closes the focused space; for a worktree's space, it removes the worktree too once every removal check passes, and opens the dialog below otherwise.
 
 The mod includes a dialog that removes a worktree and closes its space. It shows whether the branch is merged or pushed, and warns about uncommitted changes before anything is lost; the branch itself is kept. Open it from a key or another mod with:
 
