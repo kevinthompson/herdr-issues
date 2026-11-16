@@ -1741,7 +1741,7 @@ export default class Issues extends View {
 
   render(cx) {
     if (this.menu) return this.menu.render();
-    if (this.worktreeDialog) return this.worktreeDialog.render(cx);
+    if (this.worktreeDialog) return this.worktreeDialog.render();
     this.keepListCurrent(cx);
     this.noticeSpaceSwitch();
     if (this.collapse.collapsed) return this.strip(theme());
