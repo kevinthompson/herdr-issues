@@ -118,7 +118,7 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
 
 export function collapseButton(onCollapse, t) {
   return div().id("issues-collapse").flex_none().size(24).flex().items_center().justify_center().rounded(6)
-    .border_1().border_color(t.border).bg(t.raised).cursor_pointer().hover((s) => s.bg(t.hover))
+    .border_1().border_color(t.border).bg(t.raised).tooltip("Collapse panel").cursor_pointer().hover((s) => s.bg(t.hover))
     .on_click(() => onCollapse())
     .child(svg("mods/issues/icons/panel-right-close.svg").size(15).text_color(t.foreground));
 }
