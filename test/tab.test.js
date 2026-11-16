@@ -162,6 +162,34 @@ test("complete leaves a tab already marked with ✅ as it is", async (t) => {
   assert.deepEqual(calls, [["hc", "label", "t2", "issues.complete=#72"]]);
 });
 
+test("complete --cancel removes the complete label and the ✅ from the tab's name", async (t) => {
+  const calls = stubApp(t, listing("✅ Review ✅"));
+  const { code, out } = await run(t, ["complete", "--cancel", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [
+    ["hc", "label", "t2", "issues.complete="],
+    ["do", "tab.rename", "--id", "tab-session", "--name", "Review ✅"],
+  ]);
+  assert.equal(out, "Withdrew #72's completion in the tab Review ✅");
+});
+
+test("complete --cancel on a tab without ✅ only removes the complete label", async (t) => {
+  const calls = stubApp(t, listing("Review"));
+  const { code } = await run(t, ["complete", "--cancel", "#72"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, [["hc", "label", "t2", "issues.complete="]]);
+});
+
+for (const args of [["complete", "--cancel"], ["complete", "--cancel", "--all"], ["complete", "--cancel", "#72", "#73"]]) {
+  test(`${args.join(" ")} fails with a usage error`, async (t) => {
+    const calls = stubApp(t, listing("✅ Review"));
+    const { code, err } = await run(t, args);
+    assert.equal(code, 2);
+    assert.match(err, /complete --cancel needs one issue ID/);
+    assert.deepEqual(calls, []);
+  });
+}
+
 test("close labels the session's terminal so the panel closes its space, and changes nothing else", async (t) => {
   const calls = stubApp(t, listing("✅ Review"));
   const { code, out } = await run(t, ["close", "#72"]);
@@ -230,4 +258,5 @@ test("--help lists complete", async (t) => {
   const { code, out } = await run(t, ["--help"]);
   assert.equal(code, 0);
   assert.match(out, /^ {2}complete <id> /m);
+  assert.match(out, /^ {2}complete --cancel <id> /m);
 });

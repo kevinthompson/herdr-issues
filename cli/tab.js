@@ -1,6 +1,7 @@
 // `issues tab`: the Herdr tab holding this session's terminal ($HC_TERMINAL_ID), and renaming it after the
 // issue the session works, as /issues:work does. A tab the person named keeps its name. `issues complete` labels
-// the terminal and marks the tab, whatever its name, with ✅ once the session's work is finished, and `issues close`
+// the terminal and marks the tab, whatever its name, with ✅ once the session's work is finished, which
+// `issues complete --cancel` withdraws when the person asks for more changes, and `issues close`
 // labels it to ask the panel to close the session's space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
 
@@ -35,12 +36,16 @@ export const COMPLETE_MARK = "✅ ";
 
 export const completedTabName = (name) => (name.startsWith(COMPLETE_MARK) ? name : `${COMPLETE_MARK}${name}`);
 
+export const uncompletedTabName = (name) => (name.startsWith(COMPLETE_MARK) ? name.slice(COMPLETE_MARK.length) : name);
+
 async function labelTerminal(terminal, label) {
   const result = await exec("hc", ["label", terminal, label]);
   if (result.code !== 0) throw new Error(`hc label: ${(result.stderr || result.stdout).trim().split("\n").pop()}`);
 }
 
 export const labelComplete = (tab, issueId) => labelTerminal(tab.terminal, `issues.complete=${issueId}`);
+
+export const clearComplete = (tab) => labelTerminal(tab.terminal, "issues.complete=");
 
 // The panel watches for this label and closes the space once the terminal is idle (mod/close-request.js).
 export const labelCloseRequest = (tab, issueId) => labelTerminal(tab.terminal, `issues.close=${issueId}`);
