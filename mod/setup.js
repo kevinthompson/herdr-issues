@@ -39,10 +39,13 @@ export const LANDING_QUESTIONS = {
     ],
   },
   waitForChecks: {
-    title: "Wait for the pull request's checks?", sentence: null,
+    title: "Wait for the pull request's checks?",
+    sentence: "Once the pull request opens, after your approval when approval is Ask me, the session can wait for its checks. "
+      + "When a check fails because of the branch, it fixes the failure, pushes and waits again; a failure the branch didn't cause "
+      + "is noted on the issue. The worktree stays open while it waits, and once the checks pass the session finishes and the close setting applies.",
     choices: [
-      { id: "no", label: "Don't wait", detail: "The session hands off as soon as the pull request is open, and you follow its checks." },
-      { id: "yes", label: "Wait for checks", detail: "The session stays until the pull request's checks pass, fixing the failures its branch caused." },
+      { id: "no", label: "Don't wait", detail: "The session finishes, and the close setting applies, as soon as the pull request opens. You follow its checks and fix any failures." },
+      { id: "yes", label: "Wait for checks", detail: "The session and its worktree stay open until the checks pass, so failures are fixed before the worktree closes." },
     ],
   },
 };
