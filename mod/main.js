@@ -2048,6 +2048,7 @@ export default class Issues extends View {
                 trackerName: this.tracker?.name,
                 onLink: (url, cx) => this.openLink(issue, url, cx),
                 linkFiles: (markdown) => linkCodeSpanFiles(markdown, this.project.root, this.filesInBody(issue, cx)),
+                avatarPath: (url) => avatarImage(url, (loading) => this.avatarLoads.push(loading)),
                 startable: canStartWork(issue, this.issues),
                 opening: this.opening?.id === issue.id,
                 loading: this.opening?.id === issue.id && !this.opening.merging,
