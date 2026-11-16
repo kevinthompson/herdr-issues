@@ -36,14 +36,14 @@ function nativeIconButton(icon, state, t) {
  * The start button keeping its emphasis: a filled chip the height of an icon button's box, holding the icon.
  * @param {string} state @param {Theme} t
  */
-function emphasizedStartButton(state, t) {
+function emphasizedStartButton(state, t, { height = ICON_PX + 6, padding = 7 } = {}) {
   const busy = state === "busy";
   return div()
     .flex_none()
     .flex()
     .items_center()
-    .px(7)
-    .h(ICON_PX + 6)
+    .px(padding)
+    .h(height)
     .rounded(4)
     .bg(t.solid)
     .text_color(t.solid_foreground)
@@ -85,7 +85,7 @@ function currentBar(state, t) {
 /**
  * A 30px bar in the native header's proportions: the ID as the header's medium-weight 12px title in the
  * foreground color, then the actions on the right.
- * @param {"native" | "emphasis"} variant @param {string} state @param {Theme} t
+ * @param {"native" | "emphasis" | "large-emphasis"} variant @param {string} state @param {Theme} t
  */
 function restyledBar(variant, state, t) {
   return h_flex()
@@ -101,7 +101,11 @@ function restyledBar(variant, state, t) {
     .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.foreground).child("#190"))
     .child(nativeIconButton("pencil", state, t))
     .child(nativeIconButton("pull-request", state, t))
-    .child(variant === "native" ? nativeIconButton("git-branch-plus", state, t) : emphasizedStartButton(state, t));
+    .child(
+      variant === "native"
+        ? nativeIconButton("git-branch-plus", state, t)
+        : emphasizedStartButton(state, t, variant === "large-emphasis" ? { height: 26, padding: 10 } : undefined),
+    );
 }
 
 /** @param {string} text @param {Theme} t */
@@ -122,5 +126,8 @@ export function actionBarPrototypes(t) {
     .overflow_y_scrollbar()
     .child(section("Current: 38px, 11px accent ID, outlined buttons", (state) => currentBar(state, t)))
     .child(section("A: native icon buttons throughout, 30px", (state) => restyledBar("native", state, t)))
-    .child(section("B: native icon buttons, filled start button, 30px", (state) => restyledBar("emphasis", state, t)));
+    .child(section("B: native icon buttons, filled start button, 30px", (state) => restyledBar("emphasis", state, t)))
+    .child(
+      section("B2: B with the start button at today's 26px size", (state) => restyledBar("large-emphasis", state, t)),
+    );
 }
