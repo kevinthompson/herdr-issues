@@ -34,6 +34,20 @@ Running it again is safe, and is how plugin changes are installed. A person who 
 
 `herdr-app check` proves the mod loads, not that it looks right. Don't verify a change with screenshots unless the person asks for them, even when an issue lists `herdr-app shot`: the running window is the one they work in. When they do, save a frame with `herdr-app shot <file>.png` (the path must end in `.png`) with the change loaded in the running window. `herdr-app status` reports the layout and any mod errors, and `herdr-app --skill` explains driving the window: inspecting spaces and running its commands.
 
+## UI design guidance
+
+Forms in the panel, such as the settings view, follow these conventions; `mod/settings-form.js` implements them.
+
+- **Page.** The header bar already names the view, so the row beneath it holds only Back on the left and any scope control on the right, without repeating a title.
+- **Sections.** Group related fields into sections. A section's heading is small (11px), bold, muted and in capitals, set above its group rather than inside it, and the space between sections is larger than the space inside one. Each section's fields sit in one card with a 1px border and rounded corners and a 1px divider between fields.
+- **Background.** Surfaces vary subtly rather than sharing one flat color: a card's fill sits a few percent from the panel's color toward its text color, mixed with `mixColors` in `mod/colors.js` so it works in light and dark themes, and a chip sits further from it. Use the theme's colors and mixes of them, never fixed hex values.
+- **Rows.** Each field is a row of two columns: its label and description on the left, taking the remaining width, and its control on the right, in a column no wider than 280px, aligned to the top of the row. Every row in a card uses the same padding, so labels and controls line up down the card.
+- **Labels.** A label is a short noun phrase in sentence case, semibold at the body size, such as "Approve work" or "Setup command"; it names the setting and doesn't ask a question. The section supplies shared context, so a label doesn't repeat it: "Model" under Issue sessions, not "Issue sessions' model". Guided flows such as setup may still ask questions.
+- **Descriptions.** Beneath the label, a muted 12px description of one or two short sentences says what the setting does, then what leaving it empty or on its default does, in the form "Empty uses …". It doesn't restate the label, the choices or the control's placeholder.
+- **Controls.** Selects and single-line text fields fill the control column at the same height; a field's placeholder shows what applies when it's empty. A multi-line field spans the whole row beneath its label instead. A validation problem shows in red beneath its control.
+- **Dependent fields.** A field that applies only after another's choice follows it in the same card, aligned with the other rows rather than indented, with the condition in small muted text above its label, such as "After merging", on the panel's own color so it reads as set into the card. It's hidden while the condition doesn't hold.
+- **Placeholders a field understands,** such as `<issueId>`, are listed beneath its description as small monospace chips, each with what it stands for, rather than explained in a sentence.
+
 ## Issues
 
 This repository's own issues are tracked in GitHub Issues at `kevinthompson/herdr-issues`, so its entry in `~/.config/herdr-app/issues.json` sets `"tracker": "github"`. Work them with the `issues:*` skills, for example `/issues:work #2`; an issue's branch is `<number>-<title as a slug>`.
