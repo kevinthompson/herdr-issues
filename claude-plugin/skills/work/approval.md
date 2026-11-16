@@ -1,14 +1,14 @@
 # Asking for approval with `approval: ask`
 
-Read this beside `SKILL.md` when `issues setting approval` prints `ask`: the person approves the change in this session before the branch merges into main with `onApproval: merge`, or before it's pushed and its pull request opens with `onApproval: pull-request`.
+Read this beside `SKILL.md` when `issues setting approval` prints `ask`: the person approves the change in this session before the branch is merged or its pull request opened.
 
-1. Once **Verification** passes, and with `onApproval: pull-request` the review in step 1 of `merge-pull-request.md` is done, move a Linear issue to in review with `issues status <issue ID> in-review`. A GitHub issue keeps its status, since it shows as in review only while a pull request links it; a Beads issue stays `in_progress`.
-2. **Check the merge first,** with `onApproval: merge`, so approving merges straight away: run `issues merge --check <issue ID>` from the worktree. It makes every check `issues merge` makes, including a trial merge, and changes nothing.
+1. Once **Verification** passes, and with `onApproval: pull-request` the review in step 1 of `merge-pull-request.md` is done, move a Linear issue to in review with `issues status <issue ID> in-review`. A GitHub issue keeps its status; a Beads issue stays `in_progress`.
+2. **Check the merge first,** with `onApproval: merge`: run `issues merge --check <issue ID>` from the worktree.
    - It exits 0: go on to step 3.
    - It refuses because the branch doesn't merge cleanly into main: merge main into the branch in the worktree (`git merge main`), resolve the conflicts, commit the merge, run **Verification** again and check again.
    - It refuses for something outside the branch, such as uncommitted changes in the main checkout or the main checkout on another branch: ask anyway, and say in the message what must be fixed before approving will merge.
-3. Stop and ask for approval. The session is done working until the person answers, so first run `issues complete <issue ID>` and `issues mark waiting <issue ID>` to mark its Herdr space as waiting on the person. Then summarize the change with `git diff --stat main...HEAD` and what each commit on the branch does. With `onApproval: merge`, say they can also approve it themselves with the Merge button in the issue's view in the Herdr issues panel, or by running `issues merge <issue ID>`; either merges the branch into main and marks the issue done. End the message, just before the question, with the sentence below that says what approving will do.
-4. **What approving will do.** Read `issues setting onApproval`, `issues setting waitForChecks` and `issues setting close`, and use this sentence word for word as the message's last sentence before the question. `waitForChecks` applies only with `pull-request`.
+3. Stop and ask for approval. First run `issues complete <issue ID>` and `issues mark waiting <issue ID>`. Then summarize the change with `git diff --stat main...HEAD` and what each commit on the branch does. With `onApproval: merge`, say they can also approve it themselves with the Merge button in the issue's view in the Herdr issues panel, or by running `issues merge <issue ID>`; either merges the branch into main and marks the issue done. End the message, just before the question, with the sentence below that says what approving will do.
+4. **What approving will do.** Read `issues setting onApproval`, `issues setting waitForChecks` and `issues setting close`, and use this sentence word for word as the message's last sentence before the question.
 
    | `onApproval` | `waitForChecks` | `close` | Sentence |
    | --- | --- | --- | --- |
