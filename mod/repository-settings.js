@@ -81,7 +81,7 @@ export class RepositorySettings extends SettingsForm {
     this.selects = {
       tracker: new SelectMenu("settings-tracker", "Issue tracker", cx),
       ...Object.fromEntries(Object.entries(LANDING_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`settings-${key}`, title, cx)])),
-      close: new SelectMenu("settings-close", "When the work is complete, close the worktree?", cx),
+      close: new SelectMenu("settings-close", "How are worktrees closed?", cx),
       ...this.agentSelects("settings", cx),
     };
     cx.spawn(async (cx) => {
@@ -297,7 +297,7 @@ export class RepositorySettings extends SettingsForm {
       .child(landingQuestion("approval"))
       .child(landingQuestion("onApproval"))
       .when(fields.waitForChecksSelect, (e) => e.child(landingQuestion("waitForChecks")))
-      .child(this.landingSelect("close", "When the work is complete, close the worktree?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t));
+      .child(this.landingSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t));
   }
 
   // A select of approval, onApproval, waitForChecks or close, leading with the choice that removes it from the entry

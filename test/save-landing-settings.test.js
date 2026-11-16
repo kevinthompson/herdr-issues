@@ -107,3 +107,12 @@ test("landing sources give the entry's and top level's own values, the retired k
     defaultOnApproval: "merge",
   });
 });
+
+test("landing sources give the retired close of manual as ask, so the settings forms show it that way", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ close: "manual", repos: { [repository]: { tracker: "beads", close: "manual" } } });
+
+  const sources = await landingSources({ root: repository, on: null });
+  assert.equal(sources.entry.close, "ask");
+  assert.equal(sources.topLevel.close, "ask");
+});

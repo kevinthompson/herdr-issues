@@ -18,7 +18,7 @@ import { CLEAR_CHOICE, checksChoiceId, globalSettingsFields, waitForChecksOf } f
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import {
   AGENT_DEFAULTS, DEFAULT_APPROVAL, DEFAULT_CLOSE, DEFAULT_POLL_SECONDS, DEFAULT_UPDATE_CHECK_HOURS, DEFAULT_WAIT_FOR_CHECKS,
-  LANDING_KEYS, ownLanding, parsePollSeconds, parseUpdateCheckHours, saveTopLevelSettings, topLevelSettings,
+  LANDING_KEYS, closeChoice, ownLanding, parsePollSeconds, parseUpdateCheckHours, saveTopLevelSettings, topLevelSettings,
 } from "./trackers/setting.js";
 
 const DEFAULT_ON_APPROVAL_CHOICE = {
@@ -49,7 +49,7 @@ export class GlobalSettings extends SettingsForm {
   load(cx) {
     this.selects = {
       ...Object.fromEntries(Object.entries(LANDING_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`global-${key}`, title, cx)])),
-      close: new SelectMenu("global-close", "When the work is complete, close the worktree?", cx),
+      close: new SelectMenu("global-close", "How are worktrees closed?", cx),
       ...this.agentSelects("global", cx),
     };
     cx.spawn(async (cx) => {
@@ -57,7 +57,8 @@ export class GlobalSettings extends SettingsForm {
         const settings = await topLevelSettings();
         const value = (key) => (typeof settings[key] === "string" ? settings[key].trim() || null : settings[key] ?? null);
         this.saved = {
-          ...Object.fromEntries(["close", ...TYPED_QUESTIONS.map(({ key }) => key), "workPrompt"].map((key) => [key, value(key)])),
+          ...Object.fromEntries([...TYPED_QUESTIONS.map(({ key }) => key), "workPrompt"].map((key) => [key, value(key)])),
+          close: closeChoice(value("close")),
           ...ownLanding(settings),
         };
         this.chosen = { ...Object.fromEntries(SELECT_KEYS.map((key) => [key, this.saved[key]])), waitForChecks: checksChoiceId(this.saved.waitForChecks) };
@@ -144,7 +145,7 @@ export class GlobalSettings extends SettingsForm {
       .child(this.landingQuestion("onApproval", DEFAULT_ON_APPROVAL_CHOICE, t))
       .when(fields.waitForChecksSelect, (e) => e.child(this.landingQuestion("waitForChecks",
         { id: CLEAR_CHOICE, label: `Default (${choiceLabel(LANDING_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})` }, t)))
-      .child(this.selectQuestion("close", "When the work is complete, close the worktree?", CLOSE_SENTENCE,
+      .child(this.selectQuestion("close", "How are worktrees closed?", CLOSE_SENTENCE,
         [{ id: CLEAR_CHOICE, label: `Default (${choiceLabel(CLOSE_CHOICES, DEFAULT_CLOSE)})` }, ...CLOSE_CHOICES], t))
       .when(Boolean(this.typedInputs), (e) => e.children(TYPED_QUESTIONS.map(({ key, title, sentence }) => this.question(title, sentence, t, (controls) => controls
         .child(this.textField(this.typedInputs[key], t))

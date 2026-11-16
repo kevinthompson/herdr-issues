@@ -1,7 +1,7 @@
 ---
 name: config
 description: Choose where a repository's issues are tracked (a Linear team, GitHub Issues or a local Beads database), how its work lands in main (its approval, onApproval and waitForChecks settings) and whether finished sessions close their worktrees (its close setting), by writing its entry in the Herdr app's issues.json, which the issues panel and the other issues skills read, and check the credentials that tracker needs, or set the command run in each new worktree, or the model and effort of the Claude sessions that work issues. Use when asked to configure, set up or change a repository's issue tracker or how its work is merged, for example "/issues:config", "track this repo's issues in Linear", "set up issues for this repo", "merge this repo's work without pull requests", "don't ask before merging" or "show this repo's approval setting".
-argument-hint: [linear <team key> | github [owner/name] | beads | approval <ask|auto> [--all] | onApproval <merge|pull-request> [--all] | waitForChecks <true|false> [--all] | close <ask|auto|manual> | clear <approval|onApproval|waitForChecks|close|name> | name <name> | workModel <model> [--all] | workEffort <effort> [--all] | clear <workModel|workEffort> [--all] | worktreeSetup [<command> | clear] | show]
+argument-hint: [linear <team key> | github [owner/name] | beads | approval <ask|auto> [--all] | onApproval <merge|pull-request> [--all] | waitForChecks <true|false> [--all] | close <ask|auto> | clear <approval|onApproval|waitForChecks|close|name> | name <name> | workModel <model> [--all] | workEffort <effort> [--all] | clear <workModel|workEffort> [--all] | worktreeSetup [<command> | clear] | show]
 ---
 
 Set where the current repository's issues live and how its work lands in main, from `$ARGUMENTS` or by asking, and make sure this machine can reach that tracker.
@@ -45,7 +45,7 @@ The retired `merge` and `complete` keys still apply where these three aren't set
 
 - `ask` (the default): the session asks whether to close the worktree, and closes it if the person says yes.
 - `auto`: the session closes the worktree without asking.
-- `manual`: the session tells the person to close the worktree with cmd+shift+w.
+- The retired `manual` is read as `ask`. Never write it; when step 1 finds it, show it as `ask`.
 - Closing waits until the session's final message is shown, then removes the worktree without a dialog only when every removal check passes; otherwise the removal dialog opens.
 
 `issues setting close` prints it with its default applied. When the person sets `ask` or `auto`, tell them that a personal instruction telling sessions to always ask them to close worktrees with cmd+shift+w, such as one in their global `~/.claude/CLAUDE.md`, overrides this setting, and that they need to reword it for `close` to take effect. Don't change that file yourself.

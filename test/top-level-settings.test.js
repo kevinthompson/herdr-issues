@@ -42,8 +42,8 @@ function repositoryWith(t, { entry = {}, topLevel = {} }) {
 
 describe("close", () => {
   test("the entry's wins over the top level's", async (t) => {
-    const repository = repositoryWith(t, { entry: { close: "manual" }, topLevel: { close: "auto" } });
-    assert.equal((await setting(t, repository, "close")).out, "manual");
+    const repository = repositoryWith(t, { entry: { close: "ask" }, topLevel: { close: "auto" } });
+    assert.equal((await setting(t, repository, "close")).out, "ask");
   });
 
   test("the top level's applies without the entry's", async (t) => {
@@ -155,7 +155,7 @@ describe("spaceName", () => {
 
 describe("a top level that an entry couldn't hold is refused", () => {
   const cases = [
-    { key: "close", topLevel: { close: "always" }, message: /issues\.json needs a close of manual, ask, auto/ },
+    { key: "close", topLevel: { close: "always" }, message: /issues\.json needs a close of ask, auto/ },
     { key: "approval", topLevel: { approval: "sometimes" }, message: /issues\.json needs an approval of ask, auto/ },
     { key: "onApproval", topLevel: { onApproval: "rebase" }, message: /issues\.json needs an onApproval of merge, pull-request/ },
     { key: "waitForChecks", topLevel: { waitForChecks: "yes" }, message: /issues\.json needs a waitForChecks of true or false/ },
