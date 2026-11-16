@@ -636,6 +636,21 @@ function body(view, t) {
 }
 
 /**
+ * @param {Pick<DetailView, "failedEditAlert" | "refreshButton" | "settingsButton" | "onCollapse">} view
+ * @param {Theme} t
+ */
+export const detailHeader = (view, t) =>
+  headerBar(
+    {
+      icon: "issues",
+      title: "Issues",
+      secondary: "Detail",
+      trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
+    },
+    t,
+  );
+
+/**
  * @param {DetailView} view
  * @param {Theme} t
  */
@@ -645,16 +660,7 @@ export function issueDetail(view, t) {
     .id("issue-detail")
     .size_full()
     .min_h(0)
-    .child(
-      headerBar(
-        {
-          title: "Issues",
-          secondary: "Issue Detail",
-          trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
-        },
-        t,
-      ),
-    )
+    .child(detailHeader(view, t))
     .child(
       h_flex()
         .h(HEADER_HEIGHT_PX)
