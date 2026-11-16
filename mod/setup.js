@@ -32,7 +32,7 @@ export const LANDING_QUESTIONS = {
     ],
   },
   onApproval: {
-    title: "Once approved", sentence: "How the branch gets into main.",
+    title: "When work is approved...", sentence: "How the branch gets into main.",
     choices: [
       { id: "merge", label: "Merge into main", detail: "The branch merges into main on this computer." },
       { id: "pull-request", label: "Open a pull request", detail: "The session pushes the branch and opens a pull request." },
@@ -257,7 +257,7 @@ export class TrackerSetup {
       ["Tracker", answerLabel(TRACKERS, this.tracker.choice)],
       ...(this.tracker.choice === "linear" ? [["Team", this.tracker.teamLabel()]] : []),
       ["Approval", landingAnswer("approval")],
-      ["Once approved", landingAnswer("onApproval")],
+      ["When work is approved...", landingAnswer("onApproval")],
       ...(this.answers.onApproval === "pull-request" ? [["Checks", landingAnswer("waitForChecks")]] : []),
     ];
     return this.question(content, "Review your setup", "Save writes these choices for this repository. Go back to change one.", t)
