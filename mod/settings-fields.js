@@ -4,8 +4,8 @@
 // onApproval select is on its choice that removes it; and workModel's typed model only when its select is on
 // Other, which it is when the person picks it or the entry already holds a model the select doesn't list. The
 // Global form's (global-settings.js) differ only in showing the checks question for the default onApproval too.
-// The checks question's select holds waitForChecks as the ids yes and no, which checksChoiceId and waitForChecksOf
-// convert. Both forms group their questions under the same section headings in the same order, each form showing
+// A yes-or-no question's select holds its setting, such as waitForChecks, as the ids yes and no, which
+// yesNoChoiceId and yesNoValue convert. Both forms group their questions under the same section headings in the same order, each form showing
 // only the sections and questions it has: REPOSITORY_SECTIONS and GLOBAL_SECTIONS, keyed by each question's setting,
 // where name is the repository's name and tracker includes Linear's team.
 import { SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
@@ -67,15 +67,15 @@ export const GLOBAL_SECTIONS = sectionsWith([
 export const isTypedWorkModel = (model) => model != null && !SUGGESTED_WORK_MODELS.includes(model);
 
 /**
- * @param {boolean | null | undefined} waitForChecks
+ * @param {boolean | null | undefined} value
  * @returns {string | null}
  */
-export const checksChoiceId = (waitForChecks) => (waitForChecks == null ? null : waitForChecks ? "yes" : "no");
+export const yesNoChoiceId = (value) => (value == null ? null : value ? "yes" : "no");
 /**
  * @param {string | null | undefined} id
  * @returns {boolean | null}
  */
-export const waitForChecksOf = (id) => (id == null ? null : id === "yes");
+export const yesNoValue = (id) => (id == null ? null : id === "yes");
 
 // The workModel select's value: the listed model, Other, or the choice that removes it from the entry.
 /**

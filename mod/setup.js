@@ -16,7 +16,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { button, icon } from "./detail.js";
 import { collapseButton, headerBar } from "./header.js";
-import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
+import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
@@ -302,7 +302,7 @@ export class TrackerSetup {
     const proposed = await approvalSettings({ root: this.main, on: null }).catch(() =>
       resolveApprovalSettings(this.main, null),
     );
-    return { ...proposed, waitForChecks: checksChoiceId(proposed.waitForChecks) };
+    return { ...proposed, waitForChecks: yesNoChoiceId(proposed.waitForChecks) };
   }
 
   /**
@@ -369,7 +369,7 @@ export class TrackerSetup {
       ...(choice === "linear" && { team }),
       approval,
       onApproval,
-      ...(onApproval === "pull-request" && { waitForChecks: waitForChecksOf(waitForChecks) }),
+      ...(onApproval === "pull-request" && { waitForChecks: yesNoValue(waitForChecks) }),
     };
     Object.assign(this, { saving: true, saveProblem: null });
     cx.spawn(async (cx) => {

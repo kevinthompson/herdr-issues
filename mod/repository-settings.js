@@ -26,13 +26,7 @@ import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
-import {
-  CLEAR_CHOICE,
-  REPOSITORY_SECTIONS,
-  checksChoiceId,
-  settingsFields,
-  waitForChecksOf,
-} from "./settings-fields.js";
+import { CLEAR_CHOICE, REPOSITORY_SECTIONS, yesNoChoiceId, settingsFields, yesNoValue } from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
@@ -189,7 +183,7 @@ export class RepositorySettings extends SettingsForm {
         this.approvalSettings = approvalSettings;
         this.savedApproval = {
           ...approvalSettings.entry,
-          waitForChecks: checksChoiceId(approvalSettings.entry.waitForChecks),
+          waitForChecks: yesNoChoiceId(approvalSettings.entry.waitForChecks),
         };
         this.chosenApproval = { ...this.savedApproval };
         this.savedName = name.entry;
@@ -303,7 +297,7 @@ export class RepositorySettings extends SettingsForm {
      * @param {string | null} defaultValue
      */
     const fallback = (key, choices, defaultValue) => {
-      const own = key === "waitForChecks" ? checksChoiceId(topLevel.waitForChecks) : topLevel[key];
+      const own = key === "waitForChecks" ? yesNoChoiceId(topLevel.waitForChecks) : topLevel[key];
       const value = own ?? defaultValue;
       return { value, label: `${own != null ? "Global" : "Default"} (${choiceLabel(choices, value)})` };
     };
@@ -313,7 +307,7 @@ export class RepositorySettings extends SettingsForm {
       waitForChecks: fallback(
         "waitForChecks",
         APPROVAL_QUESTIONS.waitForChecks.choices,
-        checksChoiceId(DEFAULT_WAIT_FOR_CHECKS),
+        yesNoChoiceId(DEFAULT_WAIT_FOR_CHECKS),
       ),
       close: fallback("close", CLOSE_CHOICES, DEFAULT_CLOSE),
     };
@@ -424,7 +418,7 @@ export class RepositorySettings extends SettingsForm {
         if (approvalChanged)
           await saveApprovalSettings(this.main, {
             ...approvalSettings,
-            waitForChecks: waitForChecksOf(approvalSettings.waitForChecks),
+            waitForChecks: yesNoValue(approvalSettings.waitForChecks),
           });
         if (closeChanged) await saveCloseSetting(this.main, close);
         if (nameChanged) await saveNameSetting(this.main, name);

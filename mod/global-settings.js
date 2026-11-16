@@ -16,13 +16,7 @@ import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
-import {
-  CLEAR_CHOICE,
-  GLOBAL_SECTIONS,
-  checksChoiceId,
-  globalSettingsFields,
-  waitForChecksOf,
-} from "./settings-fields.js";
+import { CLEAR_CHOICE, GLOBAL_SECTIONS, yesNoChoiceId, globalSettingsFields, yesNoValue } from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import {
   AGENT_DEFAULTS,
@@ -135,7 +129,7 @@ export class GlobalSettings extends SettingsForm {
         };
         this.chosen = {
           ...Object.fromEntries(SELECT_KEYS.map((key) => [key, this.saved[key]])),
-          waitForChecks: checksChoiceId(/** @type {boolean | null} */ (this.saved.waitForChecks)),
+          waitForChecks: yesNoChoiceId(/** @type {boolean | null} */ (this.saved.waitForChecks)),
         };
         this.typedInputs = Object.fromEntries(
           TYPED_QUESTIONS.map(({ key, placeholder }) => {
@@ -209,7 +203,7 @@ export class GlobalSettings extends SettingsForm {
     return {
       approval,
       onApproval,
-      waitForChecks: this.fields().waitForChecksSelect ? waitForChecksOf(waitForChecks) : null,
+      waitForChecks: this.fields().waitForChecksSelect ? yesNoValue(waitForChecks) : null,
     };
   }
 
@@ -295,7 +289,7 @@ export class GlobalSettings extends SettingsForm {
               "waitForChecks",
               {
                 id: CLEAR_CHOICE,
-                label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})`,
+                label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, yesNoChoiceId(DEFAULT_WAIT_FOR_CHECKS))})`,
               },
               t,
             )
