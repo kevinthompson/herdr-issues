@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, test } from "node:test";
 import { closeWorktreeSpace, removalInFlight, forgetRemoval } from "../mod/worktree-removal.js";
 import { defaults, stubHerdr } from "./support/herdr.js";
-import { createRepository, git, temporaryFolder } from "./support/repository.js";
+import { commitFile, createRepository, git, temporaryFolder } from "./support/repository.js";
 
 const never = () => new Promise(() => {});
 const immediately = () => Promise.resolve();
@@ -14,15 +14,16 @@ async function waitFor(condition) {
   assert.ok(condition(), "timed out waiting");
 }
 
-// A repository with a linked worktree on `feature`, a space showing it whose session finished with `issues complete`
-// (so the branch check is skipped), and the herdr calls closing it makes. With `nested`, the space started in the main
-// checkout and another worktree's space nests under it. `holdGit(arg)` holds every git command carrying `arg` until
-// the returned release is called.
-function worktreeSpace(t, { spaceId, nested = false }) {
+// A repository with a linked worktree on `feature`, a space showing it whose session marked itself done working with
+// `issues complete`, and the herdr calls closing it makes. With `unmerged`, the branch has a commit main lacks. With
+// `nested`, the space started in the main checkout and another worktree's space nests under it. `holdGit(arg)` holds
+// every git command carrying `arg` until the returned release is called.
+function worktreeSpace(t, { spaceId, nested = false, unmerged = false }) {
   const folder = temporaryFolder(t);
   const repository = createRepository(folder);
   const worktree = join(folder, "feature");
   git(repository, "worktree", "add", "-q", "-b", "feature", worktree);
+  if (unmerged) commitFile(worktree, "work.txt", "unmerged\n");
   const spaceList = [{ id: spaceId, machine: null, folder: nested ? repository : worktree, tabs: [{ id: `${spaceId}-tab` }] }];
   const paneList = [{ pane: `${spaceId}-pane`, terminal: `${spaceId}-terminal`, tab: `${spaceId}-tab`, cwd: worktree }];
   if (nested) {
@@ -66,6 +67,15 @@ describe("closeWorktreeSpace", () => {
     assert.deepEqual(closes(), [["space.close", { id: "clean", confirmed: true }]]);
     assert.equal(existsSync(worktree), false);
     assert.equal(removalInFlight("clean"), undefined);
+  });
+
+  test("checks the branch of a space whose session ran issues complete, and asks when it isn't merged", async (t) => {
+    const { worktree, calls, closes } = worktreeSpace(t, { spaceId: "handed-off", unmerged: true });
+    await closeWorktreeSpace("handed-off", { sleep: never });
+    assert.equal(removalInFlight("handed-off").checks.branch.mergedInto, null);
+    assert.equal(calls.overlays.length, 1);
+    assert.deepEqual(closes(), []);
+    assert.equal(existsSync(worktree), true);
   });
 
   test("opens the dialog on the running checks once they outlast the delay", async (t) => {

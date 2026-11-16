@@ -4,9 +4,9 @@
 // them again, once they've run for DIALOG_DELAY_MS, or at once when a check fails, `ask` is set or other spaces nest
 // under this one. One removal runs per space until it finishes or its dialog closes.
 
-import { exec, run, spaces, panes, terminals, openOverlay } from "herdr";
+import { exec, run, spaces, panes, openOverlay } from "herdr";
 import { branchState, checkouts } from "./worktree.js";
-import { checksAnswered, removalFindings, removesWithoutAsking, runChecks, sessionComplete, PASS } from "./removal.js";
+import { checksAnswered, removalFindings, removesWithoutAsking, runChecks, PASS } from "./removal.js";
 
 export const DIALOG_DELAY_MS = 300;
 
@@ -100,7 +100,7 @@ export class WorktreeRemoval {
     this.space = space;
     this.repo = repo;
     this.on = space.machine;
-    this.checks = { complete: sessionComplete(space, panes(), terminals()) };
+    this.checks = {};
     this.nestedSpaces = null;
     this.listeners = new Set();
     this.finished = Promise.all([
@@ -108,7 +108,7 @@ export class WorktreeRemoval {
         dirty: () => uncommitted(repo.top, this.on),
         submodules: async () => (await submodules(repo.top, this.on)).unpushed,
         branch: () => branchState(repo, this.on),
-      }, this.checks, (name, result) => { this.checks[name] = result; this.changed(); }),
+      }, (name, result) => { this.checks[name] = result; this.changed(); }),
       nestedWorktreeSpaces(space, repo, this.on).catch(() => []).then((nested) => { this.nestedSpaces = nested; this.changed(); }),
     ]).then(() => {});
   }
