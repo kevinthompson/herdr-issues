@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
 import {
-  COLLAPSED_PX, collapsibleNodeId, isCollapsed, noticeWidth, remembersWidth, toggleCollapsed,
+  COLLAPSED_PX, collapseState, collapsibleNodeId, isCollapsed, noticeWidth, remembersWidth, toggleCollapsed,
 } from "../mod/collapse.js";
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
@@ -136,4 +136,54 @@ test("expanding beside unsized siblings takes half their default weight", (t) =>
   });
   toggleCollapsed(COLLAPSED_PX);
   assert.deepEqual(resizes, [{ id: "issues-panel", weight: 0.5 }]);
+});
+
+// Herdr applies a resize later, so the panel measures the new width only after the toggle returns.
+function panelBesideTerminals(t, { sized = true } = {}) {
+  const node = { id: "issues-panel", type: "column", size: { weight: 1 }, children: [issuesBlock] };
+  const root = sized ? workBody([{ id: "main", type: "block", size: { weight: 2 } }, node]) : { id: "root", type: "column", children: [issuesBlock] };
+  stubHerdr(t, { layout: () => root, shared: () => undefined, setShared: () => {}, run: () => {} });
+  return collapseState();
+}
+
+test("a toggled collapse counts as collapsed before any narrower width is measured", (t) => {
+  const panel = panelBesideTerminals(t);
+  panel.noticeWidth(368);
+  assert.equal(panel.collapsed, false);
+  panel.toggle();
+  assert.equal(panel.collapsed, true);
+  panel.noticeWidth(200);
+  assert.equal(panel.collapsed, true);
+  panel.noticeWidth(COLLAPSED_PX);
+  assert.equal(panel.collapsed, true);
+});
+
+test("a width measured narrow by a drag collapses the panel, and expanding draws the list once it's wide", (t) => {
+  const panel = panelBesideTerminals(t);
+  panel.noticeWidth(368);
+  panel.noticeWidth(40);
+  assert.equal(panel.collapsed, true);
+  panel.toggle();
+  assert.equal(panel.collapsed, true);
+  panel.noticeWidth(368);
+  assert.equal(panel.collapsed, false);
+});
+
+test("a toggle that can't resize leaves the panel drawing the list", (t) => {
+  const unplaced = panelBesideTerminals(t, { sized: false });
+  unplaced.noticeWidth(368);
+  unplaced.toggle();
+  assert.equal(unplaced.collapsed, false);
+
+  const unmeasured = panelBesideTerminals(t);
+  unmeasured.toggle();
+  assert.equal(unmeasured.collapsed, false);
+});
+
+test("toggling again while the collapse is pending expands the panel", (t) => {
+  const panel = panelBesideTerminals(t);
+  panel.noticeWidth(368);
+  panel.toggle();
+  panel.toggle();
+  assert.equal(panel.collapsed, false);
 });

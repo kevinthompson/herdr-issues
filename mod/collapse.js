@@ -1,5 +1,5 @@
 // Collapsing the panel to a thin strip and expanding it again, by resizing the layout node that holds it.
-// Whether it's collapsed is read from the panel's own width, so a divider dragged narrow collapses it too.
+// Whether it's collapsed is read from the panel's own width, so a divider dragged narrow collapses it too, or from a toggle that is still resizing.
 import { layout, run, setShared, shared } from "herdr";
 
 const MOD = "issues";
@@ -64,16 +64,38 @@ export function noticeWidth(width) {
 
 // Herdr remembers the node's size in the layout, so the panel stays collapsed or expanded in every space.
 // Expanded, the panel is sized by weight, so it keeps its share as the window resizes; collapsed, it's a strip
-// fixed in px.
+// fixed in px. Returns "collapse" or "expand" for the resize it ran, or null when the layout allowed none.
 export function toggleCollapsed(width) {
   const sized = sizedNode(layout());
-  if (!sized || width == null) return;
+  if (!sized || width == null) return null;
   const { id } = sized.node;
   if (isCollapsed(width)) {
     const remembered = shared(expandedSizeKey())?.weight;
     run("layout.resize", { id, weight: isWeight(remembered) ? remembered : defaultExpandedWeight(sized) });
-  } else {
-    rememberExpandedWeight(sized);
-    run("layout.resize", { id, px: COLLAPSED_PX });
+    return "expand";
   }
+  rememberExpandedWeight(sized);
+  run("layout.resize", { id, px: COLLAPSED_PX });
+  return "collapse";
+}
+
+// Whether the panel draws as the strip. A toggle that collapses it counts as collapsed at once, until the
+// measured width catches up, so no frame lays the content out in the narrowing container; a width measured
+// narrow by a drag collapses it too.
+export function collapseState() {
+  let collapsePending = false;
+  let width;
+  return {
+    get width() { return width; },
+    get collapsed() { return collapsePending || isCollapsed(width); },
+    noticeWidth(measured) {
+      width = measured;
+      if (isCollapsed(measured)) collapsePending = false;
+      noticeWidth(measured);
+    },
+    toggle() {
+      const direction = toggleCollapsed(collapsePending ? COLLAPSED_PX : width);
+      if (direction) collapsePending = direction === "collapse";
+    },
+  };
 }
