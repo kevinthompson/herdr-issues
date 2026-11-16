@@ -282,6 +282,7 @@ export default class Issues extends View {
 
   // Saved settings refresh the list at once, so the panel acts on them without waiting for the next poll.
   openSettings(cx) {
+    if (this.hasUnsavedEdits()) { this.detailError = "Save or cancel your edits first"; cx.notify(); return; }
     const view = new SettingsView(this.project, this.scopeKey, this.tracker, {
       onBack: (cx) => { if (this.settingsView === view) this.settingsView = null; cx.notify(); },
       onSaved: (cx) => { if (this.settingsView === view) this.settingsView = null; this.refresh(cx); },
@@ -1088,12 +1089,15 @@ export default class Issues extends View {
     const t = theme(), issue = this.findIssue(this.openId);
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];
-    const content = issue
+    const content = issue && this.settingsView
+      ? this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() })
+      : issue
       ? (this.loadBody(issue, cx), issueDetail({
         issue, writable: this.tracker?.writable, prioritized: this.prioritized(),
         editor: this.editing?.state ?? null, saving: this.saving, error: this.detailError, ...this.links,
         failedEditAlert: this.failedEditAlert(t),
         refreshButton: this.refreshButton(t),
+        settingsButton: this.canOpenSettings() ? settingsButton((cx) => this.openSettings(cx), t) : null,
         assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
         blocking: blockedIssues(issue, this.issues),
         onBack: (cx) => this.back(cx),

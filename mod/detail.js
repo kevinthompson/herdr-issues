@@ -219,6 +219,7 @@ export function issueDetail(view, t) {
       .child(div().flex_1())
       .when(Boolean(view.failedEditAlert), (e) => e.child(view.failedEditAlert))
       .child(view.refreshButton)
+      .when(Boolean(view.settingsButton), (e) => e.child(view.settingsButton))
       .child(collapseButton(view.onCollapse, t)))
     .child(h_flex().h(38).flex_none().px(10).gap(8).items_center().border_b(1).border_color(t.border)
       .child(div().flex_1().min_w(0).pl(4).truncate().text_size(11).text_color(t.accent).child(issue.id))
