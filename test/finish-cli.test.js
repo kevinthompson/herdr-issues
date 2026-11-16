@@ -276,3 +276,37 @@ test("--help lists finish", async (t) => {
   assert.equal(code, 0);
   assert.match(out, /^ {2}finish <id> /m);
 });
+
+test("finish --discarded accepts an unmerged branch and hands off with a decision question", async (t) => {
+  inWorktree(t, { onApproval: "merge", close: "ask" }, { merged: false });
+  const calls = stubTools(t);
+  const { code, out } = await run(t, ["finish", "#72", "--discarded"]);
+  assert.equal(code, 0);
+  assert.deepEqual(calls, HANDOFF_CALLS);
+  assert.match(out, /Finished by a decision recorded in the issue; its branch is deliberately not merged\./);
+  assert.match(out, /Question: This issue is finished by a decision, and its branch is not being merged\./);
+});
+
+test("finish --discarded still writes the summary above the block when approval and close are both auto", async (t) => {
+  inWorktree(t, { approval: "auto", onApproval: "merge", close: "auto" }, { merged: false });
+  stubTools(t);
+  const { code, out } = await run(t, ["finish", "#72", "--discarded"]);
+  assert.equal(code, 0);
+  assert.match(out, /End your final message with this block/);
+});
+
+test("finish --discarded refuses uncommitted work, changing nothing", async (t) => {
+  const worktree = inWorktree(t, { onApproval: "merge" }, { merged: false });
+  writeFileSync(join(worktree, "draft"), "unsaved\n");
+  const calls = stubTools(t);
+  const { code, err } = await run(t, ["finish", "#72", "--discarded"]);
+  assert.equal(code, 1);
+  assert.deepEqual(calls, []);
+  assert.match(err, /The worktree has uncommitted changes/);
+});
+
+test("finish refuses --canceled together with --discarded", async (t) => {
+  const { code, err } = await run(t, ["finish", "#72", "--canceled", "--discarded"]);
+  assert.equal(code, 2);
+  assert.match(err, /can't be combined/);
+});

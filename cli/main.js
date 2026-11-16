@@ -88,13 +88,15 @@ Commands:
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
                            Outside a Herdr terminal, with $HC_TERMINAL_ID empty or herdr-app not installed, tab rename,
                            mark, complete and close, with or without --cancel, do nothing and print nothing
-  finish <id> [--canceled] [--checks-recorded]
+  finish <id> [--canceled | --discarded] [--checks-recorded]
                            End a finished issue session: check its worktree is safe to remove (nothing uncommitted, and
                            the branch merged into main or, with onApproval pull-request, pushed with an open pull
                            request whose checks pass when waitForChecks is true), else list what's outstanding, change
                            nothing and exit 1; then run complete, mark done and, with close ask or auto, close, and
                            print the final block the session ends with and, with close ask, the question to ask.
-                           --canceled: the person canceled the work, so skip the checks; --checks-recorded: failing
+                           --canceled: the person canceled the work, so skip the checks; --discarded: the issue ended
+                           in a decision recorded in an issue comment and its branch is deliberately not merged, so
+                           skip the merged-or-pull-request check but still refuse uncommitted work; --checks-recorded: failing
                            checks are recorded in an issue comment as not caused by the branch
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a new Herdr space named after the issue and
@@ -317,9 +319,10 @@ async function close(args) {
 }
 
 function finishOptions(args) {
-  const options = { id: null, canceled: false, checksRecorded: false };
+  const options = { id: null, canceled: false, checksRecorded: false, discarded: false };
   for (const arg of args) {
     if (arg === "--canceled") options.canceled = true;
+    else if (arg === "--discarded") options.discarded = true;
     else if (arg === "--checks-recorded") options.checksRecorded = true;
     else if (arg.startsWith("-") || options.id) throw new UsageError(`finish: unexpected ${arg}`);
     else options.id = arg;
@@ -329,10 +332,19 @@ function finishOptions(args) {
 }
 
 async function finish(args) {
-  const { id, canceled, checksRecorded } = finishOptions(args);
+  const { id, canceled, checksRecorded, discarded } = finishOptions(args);
+  if (canceled && discarded) throw new UsageError("finish: --canceled and --discarded can't be combined");
   const project = await currentProject();
   const { approval, onApproval, waitForChecks } = await approvalSettings(project);
-  const work = await finishedWork({ id, cwd: process.cwd(), onApproval, waitForChecks, canceled, checksRecorded });
+  const work = await finishedWork({
+    id,
+    cwd: process.cwd(),
+    onApproval,
+    waitForChecks,
+    canceled,
+    checksRecorded,
+    discarded,
+  });
   if (work.outstanding.length) {
     throw new Refusal(
       [
@@ -348,9 +360,9 @@ async function finish(args) {
     await mark(["done", id]);
     await close([id]);
   }
-  const onlyBlock = approval === "auto" && closeSetting === "auto";
+  const onlyBlock = approval === "auto" && closeSetting === "auto" && !discarded;
   console.log(
-    `\n${finishInstructions({ id, result: work.result, close: closeSetting, onlyBlock, canceled, pullRequestOpen: work.pullRequestOpen })}`,
+    `\n${finishInstructions({ id, result: work.result, close: closeSetting, onlyBlock, canceled, discarded, pullRequestOpen: work.pullRequestOpen })}`,
   );
 }
 

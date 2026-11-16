@@ -1,7 +1,8 @@
 // `issues finish`: whether an issue session's worktree is safe to remove, and the final message the session ends
 // with once it is. The work is safe to remove when nothing is uncommitted and the branch is merged into main or, in a
 // repository whose approved work opens pull requests, pushed with an open pull request whose checks pass when
-// waitForChecks is true; or when the person canceled it. finishedWork answers that, and finishInstructions writes the
+// waitForChecks is true; or when the person canceled it, or the issue ended in a decision (discarded) whose branch is
+// deliberately not merged, which still needs everything committed. finishedWork answers that, and finishInstructions writes the
 // final block and, for close ask, the question to ask. cli/main.js runs the Herdr commands between them.
 import { exec } from "herdr";
 import { MAIN_BRANCHES } from "../mod/worktree.js";
@@ -76,11 +77,25 @@ async function pullRequestState({ id, branch, head, cwd, waitForChecks, checksRe
 
 // { outstanding: what keeps the worktree from being safe to remove, result: the final block's sentence,
 // pullRequestOpen }.
-export async function finishedWork({ id, cwd, onApproval, waitForChecks, canceled = false, checksRecorded = false }) {
+export async function finishedWork({
+  id,
+  cwd,
+  onApproval,
+  waitForChecks,
+  canceled = false,
+  checksRecorded = false,
+  discarded = false,
+}) {
   if (canceled) return { outstanding: [], result: "The work was canceled." };
   const outstanding = [];
   if ((await git(cwd, "status", "--porcelain")).out)
     outstanding.push("The worktree has uncommitted changes: commit them.");
+  if (discarded) {
+    return {
+      outstanding,
+      result: "Finished by a decision recorded in the issue; its branch is deliberately not merged.",
+    };
+  }
   const branch = (await git(cwd, "branch", "--show-current")).out;
   if (!branch) return { outstanding: [...outstanding, "No branch is checked out."] };
   const main = await localMainBranch(cwd);
@@ -104,18 +119,20 @@ export const CLOSING_LINES = {
 export const finishedBlock = (id, result, closingLine) =>
   ["---", "", `## ✅ Session finished: ${id}`, "", result, "", `**${closingLine}**`].join("\n");
 
-function closeQuestion({ canceled, pullRequestOpen }) {
+function closeQuestion({ canceled, discarded, pullRequestOpen }) {
   const whatHappened = canceled
     ? "This issue's work was canceled."
-    : pullRequestOpen
-      ? "This issue is complete and its pull request has been opened."
-      : "This issue is complete and the work has been merged.";
+    : discarded
+      ? "This issue is finished by a decision, and its branch is not being merged."
+      : pullRequestOpen
+        ? "This issue is complete and its pull request has been opened."
+        : "This issue is complete and the work has been merged.";
   return `${whatHappened} Would you like to close this worktree? You can also close it later with cmd+shift+w.`;
 }
 
 // What the session ends with. `close` is the close setting, or null outside Herdr; `onlyBlock`: nobody reads the
 // final message before the space closes, so nothing goes above the block.
-export function finishInstructions({ id, result, close, onlyBlock, canceled, pullRequestOpen }) {
+export function finishInstructions({ id, result, close, onlyBlock, canceled, discarded, pullRequestOpen }) {
   const closingLine = close ? CLOSING_LINES[close] : CLOSING_LINES.outsideHerdr;
   const block = finishedBlock(id, result, closingLine);
   const lead = onlyBlock
@@ -128,7 +145,7 @@ export function finishInstructions({ id, result, close, onlyBlock, canceled, pul
     block,
     "",
     "Then ask with AskUserQuestion, writing nothing else after the block:",
-    `  Question: ${closeQuestion({ canceled, pullRequestOpen })}`,
+    `  Question: ${closeQuestion({ canceled, discarded, pullRequestOpen })}`,
     "  Choices: Close it, Keep it open",
     'On Close it: end with one short line, such as "Closing this worktree.", and no tool call.',
     `On Keep it open: run issues close --cancel ${id}, then end with the block again, its closing line changed to:`,
