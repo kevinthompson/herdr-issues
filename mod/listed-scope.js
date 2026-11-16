@@ -3,9 +3,11 @@
 // joined by " > ", e.g. "Web > Checkout redesign > Milestone 1". Also titles the panel's header
 // "Issues > <name> > <source>".
 import { findScope } from "./trackers/linear.js";
+/** @import { Tracker } from "./trackers/index.js" */
 
 const UNKNOWN_TRACKER_NAME = "Expand Issues";
 
+/** @param {Tracker | null | undefined} tracker @param {string} [scopeId] */
 export function listedScopeName(tracker, scopeId) {
   if (!tracker) return UNKNOWN_TRACKER_NAME;
   if (!tracker.scopes) return tracker.name || UNKNOWN_TRACKER_NAME;
@@ -16,4 +18,5 @@ export function listedScopeName(tracker, scopeId) {
 
 // The pieces the header shows after "Issues", each after a ">": the repository's resolved name setting, once it
 // has loaded, then the tracker's plain name as its source.
+/** @param {Tracker} tracker @param {string | null | undefined} name */
 export const headerTitlePieces = (tracker, name) => [name, tracker.name].filter(Boolean);

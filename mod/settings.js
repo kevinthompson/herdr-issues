@@ -18,6 +18,13 @@ import { GlobalSettings } from "./global-settings.js";
 import { openScopeMenu } from "./menu.js";
 import { RepositorySettings } from "./repository-settings.js";
 
+/** @import { AsyncContext, Context } from "gpui-kit" */
+/** @import { CurrentTracker } from "./repository-settings.js" */
+/** @import { Theme } from "./menu.js" */
+/** @import { Project } from "./trackers/index.js" */
+
+/** @typedef {RepositorySettings | GlobalSettings} Form */
+
 const SCOPE_PICKS = "issues.settingsScopes";
 const SCOPES = [
   { id: "repository", label: "Repository" },
@@ -27,9 +34,16 @@ const SCOPES = [
 export class SettingsView {
   // project: the focused { root, on }; main: its repository's main checkout; current: the tracker the panel lists,
   // { kind, team?, repo? }. onSaved(cx) runs after each save is written.
+  /**
+   * @param {Project} project
+   * @param {string} main
+   * @param {CurrentTracker} current
+   * @param {{ onBack: (cx: Context) => void, onSaved: (cx: AsyncContext) => void }} callbacks
+   */
   constructor(project, main, current, { onBack, onSaved }) {
     this.main = main;
     this.onBack = onBack;
+    /** @type {{ repository: RepositorySettings, global: GlobalSettings } & Record<string, Form>} */
     this.forms = {
       repository: new RepositorySettings(project, main, current, { onSaved }),
       global: new GlobalSettings({ onSaved }),
@@ -39,6 +53,9 @@ export class SettingsView {
     this.leaving = false;
   }
 
+  /**
+   * @param {Context} cx
+   */
   load(cx) {
     for (const form of Object.values(this.forms)) form.load(cx);
   }
@@ -46,6 +63,9 @@ export class SettingsView {
   // Takes the team and the scope picked in their popups, which hand them over through shared state. The panel
   // calls this from its render, before drawing the view, so the render that follows shows the picks; Herdr
   // refuses cx.notify() there and shows the view's last render with an error instead.
+  /**
+   * @param {Context} cx
+   */
   takePicks(cx) {
     this.forms.repository.takePickedTeam(cx);
     const picks = /** @type {Record<string, any>} */ (shared(SCOPE_PICKS) ?? {}),
@@ -66,6 +86,9 @@ export class SettingsView {
   }
 
   // A save that failed before this Back has shown its error already, so only one failing now keeps the view open.
+  /**
+   * @param {Context} cx
+   */
   back(cx) {
     for (const form of Object.values(this.forms)) {
       form.saveFailed = false;
@@ -76,6 +99,9 @@ export class SettingsView {
   }
 
   // Returns to the list once Back's saves are done, unless one failed, whose form then shows its error.
+  /**
+   * @param {Context} cx
+   */
   leaveOnceSaved(cx) {
     if (!this.leaving || this.saving()) return;
     this.leaving = false;
@@ -88,6 +114,10 @@ export class SettingsView {
     this.onBack(cx);
   }
 
+  /**
+   * @param {Theme} t
+   * @param {{ onCollapse: Parameters<typeof collapseButton>[0] }} props
+   */
   render(t, { onCollapse }) {
     const form = this.shown();
     const shownLabel = SCOPES.find(({ id }) => id === this.scope)?.label ?? "";
@@ -110,6 +140,10 @@ export class SettingsView {
       );
   }
 
+  /**
+   * @param {Theme} t
+   * @param {Parameters<typeof collapseButton>[0]} onCollapse
+   */
   bar(t, onCollapse) {
     return h_flex()
       .h(42)

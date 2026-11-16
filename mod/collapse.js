@@ -15,12 +15,36 @@ const DEFAULT_SHARE_OF_SIBLING_WEIGHT = 0.5;
 // Herdr's weight for a node without a size.
 const UNSIZED_WEIGHT = 1;
 
+/**
+ * @typedef {object} LayoutNode
+ * @property {string} id
+ * @property {string} [type]
+ * @property {{ mod?: string }} [content]
+ * @property {LayoutNode[]} [children]
+ * @property {boolean} [hidden]
+ * @property {{ weight?: number, px?: number }} [size]
+ */
+
+/** @typedef {{ node: LayoutNode, row: LayoutNode }} SizedNode */
+
+/** @param {number | null | undefined} width */
 export const isCollapsed = (width) => width != null && width < COLLAPSED_BELOW_PX;
+/** @param {number | null | undefined} width */
 export const remembersWidth = (width) => width != null && width >= REMEMBERED_MIN_PX;
 
 // The node a divider sizes the panel by, with the row laying it out: the innermost node holding the panel, or
 // the panel's own block, whose parent lays its children out in a row. Null when the layout doesn't place the panel.
+/**
+ * @param {LayoutNode | null} root
+ * @returns {SizedNode | null}
+ */
 function sizedNode(root) {
+  /**
+   * @param {LayoutNode} node
+   * @param {LayoutNode | null} parent
+   * @param {SizedNode | null} candidate
+   * @returns {SizedNode | null | undefined}
+   */
   const search = (node, parent, candidate) => {
     const sized = parent?.type === "row" ? { node, row: parent } : candidate;
     if (node.content?.mod === MOD) return sized ?? null;
@@ -33,9 +57,12 @@ function sizedNode(root) {
   return root ? (search(root, null, null) ?? null) : null;
 }
 
+/** @param {LayoutNode | null} root */
 export const collapsibleNodeId = (root) => sizedNode(root)?.node.id ?? null;
 
+/** @param {unknown} value */
 const isWeight = (value) => typeof value === "number" && value > 0;
+/** @param {LayoutNode | undefined} node */
 const weightOf = (node) => (isWeight(node?.size?.weight) ? node.size.weight : null);
 
 // Shared, so the weight to return to outlasts this copy of the mod and follows the layout into every space. The
@@ -44,12 +71,14 @@ const expandedSizeKey = () => `issues.expandedSize:${shared("layout") ?? "main"}
 
 // The node's weight as the layout states it, never its measured width: that is zoomed and inside the node's
 // padding, and a size in px wouldn't keep the panel's share as the window resizes.
+/** @param {SizedNode} sized */
 function rememberExpandedWeight({ node }) {
   const weight = weightOf(node);
   if (weight != null && /** @type {any} */ (shared(expandedSizeKey()))?.weight !== weight)
     setShared(expandedSizeKey(), { weight });
 }
 
+/** @param {SizedNode} sized */
 function defaultExpandedWeight({ node, row }) {
   const weighted = row.children.filter((sibling) => sibling !== node && !sibling.hidden && sibling.size?.px == null);
   const siblingWeight = weighted.reduce((sum, sibling) => sum + (weightOf(sibling) ?? UNSIZED_WEIGHT), 0);
@@ -57,17 +86,22 @@ function defaultExpandedWeight({ node, row }) {
 }
 
 // Called with each width the panel measures, so a divider drag sets the weight it returns to.
+/** @param {number | null | undefined} width */
 export function noticeWidth(width) {
   if (!remembersWidth(width)) return;
-  const sized = sizedNode(layout());
+  const sized = sizedNode(/** @type {LayoutNode | null} */ (layout()));
   if (sized) rememberExpandedWeight(sized);
 }
 
 // Herdr remembers the node's size in the layout, so the panel stays collapsed or expanded in every space.
 // Expanded, the panel is sized by weight, so it keeps its share as the window resizes; collapsed, it's a strip
 // fixed in px. Returns "collapse" or "expand" for the resize it ran, or null when the layout allowed none.
+/**
+ * @param {number | null | undefined} width
+ * @returns {"collapse" | "expand" | null}
+ */
 export function toggleCollapsed(width) {
-  const sized = sizedNode(layout());
+  const sized = sizedNode(/** @type {LayoutNode | null} */ (layout()));
   if (!sized || width == null) return null;
   const { id } = sized.node;
   if (isCollapsed(width)) {
@@ -85,6 +119,7 @@ export function toggleCollapsed(width) {
 // narrow by a drag collapses it too.
 export function collapseState() {
   let collapsePending = false;
+  /** @type {number | undefined} */
   let width;
   return {
     get width() {
@@ -93,6 +128,7 @@ export function collapseState() {
     get collapsed() {
       return collapsePending || isCollapsed(width);
     },
+    /** @param {number} measured */
     noticeWidth(measured) {
       width = measured;
       if (isCollapsed(measured)) collapsePending = false;

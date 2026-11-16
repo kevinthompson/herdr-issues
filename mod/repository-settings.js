@@ -50,13 +50,33 @@ import {
   workPromptSettings,
 } from "./trackers/setting.js";
 
-const TEAM_PICKS = "issues.settingsTeams";
+/** @import { AsyncContext, Context, NativeElement } from "gpui-kit" */
+/** @import { InputState as InputStateType, TextareaState as TextareaStateType } from "gpui-base" */
+/** @import { Theme } from "./menu.js" */
+/** @import { SelectOption } from "./select.js" */
+/** @import { ApprovalKey } from "./setup.js" */
+/** @import { SaveRequest } from "./settings-form.js" */
+/** @import { Project } from "./trackers/index.js" */
 
+/** @typedef {{ kind: string, team?: string, repo?: string }} CurrentTracker */
+/** @typedef {ApprovalKey | "close"} ApprovalChoiceKey */
+/** @typedef {Partial<Record<ApprovalChoiceKey, string | null>>} ApprovalChoices */
+/** @typedef {"worktreeSetup" | "spaceName" | "pollSeconds"} RepositoryKey */
+/** @typedef {Awaited<ReturnType<typeof repositorySettings>>} RepositoryValues */
+
+const TEAM_PICKS = "issues.settingsTeams";
+const REPOSITORY_FIELDS = /** @type {RepositoryKey[]} */ (REPOSITORY_KEYS);
+
+/**
+ * @param {SelectOption[]} choices
+ * @param {string} id
+ */
 const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
 
 const NAME_SENTENCE =
   "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
 
+/** @type {{ key: RepositoryKey, title: string, sentence: string }[]} */
 const REPOSITORY_QUESTIONS = [
   {
     key: "worktreeSetup",
@@ -81,6 +101,9 @@ const WORK_PROMPT_SENTENCE =
   "Instructions appended after the global prompt, if any, to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use only the global prompt.";
 
 // Where the listed issues come from now, such as "Linear team WEB".
+/**
+ * @param {CurrentTracker} current
+ */
 function currentTrackerLabel({ kind, team, repo }) {
   if (kind === "linear") return `Linear team ${team}`;
   if (kind === "github") return repo ? `GitHub Issues in ${repo}` : "GitHub Issues";
@@ -90,6 +113,12 @@ function currentTrackerLabel({ kind, team, repo }) {
 export class RepositorySettings extends SettingsForm {
   // project: the focused { root, on }; main: its repository's main checkout; current: the tracker the panel lists,
   // { kind, team?, repo? }.
+  /**
+   * @param {Project} project
+   * @param {string} main
+   * @param {CurrentTracker} current
+   * @param {{ onSaved: (cx: AsyncContext) => void }} callbacks
+   */
   constructor(project, main, current, { onSaved }) {
     super({ onSaved });
     this.project = project;
@@ -107,19 +136,31 @@ export class RepositorySettings extends SettingsForm {
       onTeam: (cx) => this.autosave.schedule(cx, 0),
     });
     // The entry's own approval, onApproval, waitForChecks and close, as their selects' ids, and the chosen ones.
+    /** @type {Awaited<ReturnType<typeof approvalSources>> | null} */
     this.approvalSettings = null;
+    /** @type {ApprovalChoices | null} */
     this.savedApproval = null;
+    /** @type {ApprovalChoices} */
     this.chosenApproval = {};
+    /** @type {string | null} */
     this.savedName = null;
+    /** @type {InputStateType | null} */
     this.nameInput = null;
+    /** @type {RepositoryValues | null} */
     this.savedRepository = null;
+    /** @type {Record<RepositoryKey, InputStateType> | null} */
     this.repositoryInputs = null;
+    /** @type {Awaited<ReturnType<typeof agentSettings>> | null} */
     this.agentSources = null;
+    /** @type {string | null} */
     this.savedWorkPrompt = null;
+    /** @type {TextareaStateType | null} */
     this.workPromptInput = null;
-    this.selects = null;
   }
 
+  /**
+   * @param {Context} cx
+   */
   load(cx) {
     this.selects = {
       tracker: new SelectMenu("settings-tracker", "Issue tracker", cx),
@@ -174,7 +215,11 @@ export class RepositorySettings extends SettingsForm {
 
   // A field for each of pollSeconds, spaceName and worktreeSetup, opening on the entry's value, with what applies
   // without it as the placeholder.
+  /**
+   * @param {RepositoryValues} repository
+   */
   newRepositoryInputs(repository) {
+    /** @type {Record<RepositoryKey, string>} */
     const placeholders = {
       pollSeconds:
         repository.topLevelPollSeconds != null
@@ -183,20 +228,26 @@ export class RepositorySettings extends SettingsForm {
       spaceName: repository.topLevelSpaceName != null ? `Global (${repository.topLevelSpaceName})` : "<issueId>",
       worktreeSetup: "No command",
     };
-    return Object.fromEntries(
-      REPOSITORY_KEYS.map((key) => {
-        const input = InputState.new({
-          placeholder: placeholders[key],
-          value: repository[key] == null ? "" : String(repository[key]),
-        });
-        input.on("change", (_e, cx) => this.edited(cx));
-        input.on("submit", (_e, cx) => this.saveNow(cx));
-        return [key, input];
-      }),
+    return /** @type {Record<RepositoryKey, InputStateType>} */ (
+      Object.fromEntries(
+        REPOSITORY_FIELDS.map((key) => {
+          const input = InputState.new({
+            placeholder: placeholders[key],
+            value: repository[key] == null ? "" : String(repository[key]),
+          });
+          input.on("change", (_e, cx) => this.edited(cx));
+          input.on("submit", (_e, cx) => this.saveNow(cx));
+          return [key, input];
+        }),
+      )
     );
   }
 
   // Choosing the current GitHub or Beads tracker again undoes a change; Linear's is checked again to change its team.
+  /**
+   * @param {string} choice
+   * @param {Context} cx
+   */
   chooseTracker(choice, cx) {
     Object.assign(this, { trackerReady: false, error: null });
     if (choice === this.current.kind && choice !== "linear") {
@@ -208,11 +259,17 @@ export class RepositorySettings extends SettingsForm {
     if (choice === this.current.kind) this.tracker.team = this.current.team;
   }
 
+  /**
+   * @param {Context} cx
+   */
   takePickedTeam(cx) {
     this.tracker.takePickedTeam(cx);
   }
 
   // The tracker to save, or null when it stays as it is.
+  /**
+   * @returns {{ tracker: string, team?: string } | null}
+   */
   trackerChange() {
     const { choice, team } = this.tracker;
     if (!choice || !this.trackerReady) return null;
@@ -222,6 +279,11 @@ export class RepositorySettings extends SettingsForm {
   }
 
   // `value` for approval, onApproval, waitForChecks or close, or null to remove it from the entry.
+  /**
+   * @param {ApprovalChoiceKey} key
+   * @param {string | null} value
+   * @param {Context} cx
+   */
   chooseApproval(key, value, cx) {
     this.chosenApproval = { ...this.chosenApproval, [key]: value };
     this.saveNow(cx);
@@ -231,8 +293,13 @@ export class RepositorySettings extends SettingsForm {
   // where label names whether that's the global value or the default.
   approvalFallbacks() {
     const { topLevel, defaultOnApproval } = this.approvalSettings;
+    /**
+     * @param {ApprovalChoiceKey} key
+     * @param {SelectOption[]} choices
+     * @param {string | null} defaultValue
+     */
     const fallback = (key, choices, defaultValue) => {
-      const own = key === "waitForChecks" ? checksChoiceId(topLevel[key]) : topLevel[key];
+      const own = key === "waitForChecks" ? checksChoiceId(topLevel.waitForChecks) : topLevel[key];
       const value = own ?? defaultValue;
       return { value, label: `${own != null ? "Global" : "Default"} (${choiceLabel(choices, value)})` };
     };
@@ -257,7 +324,12 @@ export class RepositorySettings extends SettingsForm {
   // A hidden waitForChecks doesn't count as a change, though saving another change removes it.
   approvalChanged() {
     if (!this.approvalSettings) return false;
-    const keys = ["approval", "onApproval", ...(this.fields().waitForChecksSelect ? ["waitForChecks"] : [])];
+    /** @type {ApprovalKey[]} */
+    const keys = [
+      "approval",
+      "onApproval",
+      ...(this.fields().waitForChecksSelect ? /** @type {ApprovalKey[]} */ (["waitForChecks"]) : []),
+    ];
     return keys.some((key) => this.chosenApproval[key] !== this.savedApproval[key]);
   }
 
@@ -286,13 +358,14 @@ export class RepositorySettings extends SettingsForm {
   // Each of pollSeconds, spaceName and worktreeSetup whose field differs from the entry, as its value or null.
   repositoryChanges() {
     if (!this.repositoryInputs) return {};
+    /** @type {Record<RepositoryKey, string | number | null | undefined>} */
     const typed = {
       pollSeconds: this.typedPollSeconds().pollSeconds,
       spaceName: this.repositoryInputs.spaceName.value().trim() || null,
       worktreeSetup: this.repositoryInputs.worktreeSetup.value().trim() || null,
     };
     return Object.fromEntries(
-      REPOSITORY_KEYS.filter((key) => typed[key] !== undefined && typed[key] !== this.savedRepository[key]).map(
+      REPOSITORY_FIELDS.filter((key) => typed[key] !== undefined && typed[key] !== this.savedRepository[key]).map(
         (key) => [key, typed[key]],
       ),
     );
@@ -313,6 +386,9 @@ export class RepositorySettings extends SettingsForm {
 
   // The changed keys, after which they're the saved values, or null when nothing changed. A tracker not yet checked
   // or without its team, and a poll interval that can't be saved, aren't changes yet.
+  /**
+   * @returns {SaveRequest | null}
+   */
   saveRequest() {
     if (!this.approvalSettings) return null;
     const trackerChoice = this.trackerChange();
@@ -380,6 +456,10 @@ export class RepositorySettings extends SettingsForm {
     });
   }
 
+  /**
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   form(content, t) {
     const fields = this.fields();
     return this.errorLine(content, t)
@@ -413,8 +493,14 @@ export class RepositorySettings extends SettingsForm {
 
   // The approval, onApproval, waitForChecks and close selects, waitForChecks only when the onApproval that applies
   // is a pull request.
+  /**
+   * @param {NativeElement} content
+   * @param {ReturnType<RepositorySettings["fields"]>} fields
+   * @param {Theme} t
+   */
   approvalQuestions(content, fields, t) {
     const fallbacks = this.approvalFallbacks();
+    /** @param {ApprovalKey} key */
     const approvalQuestion = (key) => {
       const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
       return this.approvalSelect(key, title, sentence, choices, fallbacks, t);
@@ -428,6 +514,14 @@ export class RepositorySettings extends SettingsForm {
 
   // A select of approval, onApproval, waitForChecks or close, leading with the choice that removes it from the entry
   // and opening on the entry's value or that choice.
+  /**
+   * @param {ApprovalChoiceKey} key
+   * @param {string} title
+   * @param {string | null} sentence
+   * @param {SelectOption[]} choices
+   * @param {ReturnType<RepositorySettings["approvalFallbacks"]>} fallbacks
+   * @param {Theme} t
+   */
   approvalSelect(key, title, sentence, choices, fallbacks, t) {
     const options = [{ id: CLEAR_CHOICE, label: fallbacks[key].label }, ...choices];
     return this.question(title, sentence, t, (controls) =>
@@ -442,12 +536,19 @@ export class RepositorySettings extends SettingsForm {
   }
 
   // What applies without the entry's model or effort.
+  /**
+   * @param {import("./settings-form.js").AgentKey} key
+   */
   agentClearLabel(key) {
     const { topLevel } = this.agentSources[key];
     return topLevel != null ? `Global (${topLevel})` : `Default (${AGENT_DEFAULTS[key]})`;
   }
 
   // The tracker in use, the chosen one's check, and Linear's team once Linear is checked.
+  /**
+   * @param {ReturnType<RepositorySettings["fields"]>} fields
+   * @param {Theme} t
+   */
   trackerSection(fields, t) {
     const { choice, checking } = this.tracker;
     return this.question(
@@ -473,6 +574,10 @@ export class RepositorySettings extends SettingsForm {
   }
 
   // A typed setting; the poll interval says below its field why it can't be saved.
+  /**
+   * @param {{ key: RepositoryKey, title: string, sentence: string }} question
+   * @param {Theme} t
+   */
   repositoryQuestion({ key, title, sentence }, t) {
     const problem = key === "pollSeconds" ? this.pollSecondsProblem() : null;
     return this.question(title, sentence, t, (controls) =>

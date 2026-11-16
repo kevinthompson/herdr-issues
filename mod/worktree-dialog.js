@@ -7,6 +7,13 @@
 // (removal.js) says so, and otherwise waits for Enter. It carries on with the checks of a removal closeWorktreeSpace
 // (worktree-removal.js) already started for the space, and starts them itself otherwise.
 
+/**
+ * @import { AsyncContext, Context, KeyEvent } from "gpui-kit"
+ * @import { PaneInfo, SpaceInfo } from "herdr"
+ * @import { Repo } from "./worktree-removal.js"
+ * @typedef {Record<string, `#${string}`>} Theme
+ * @typedef {{ path: string, branch: string | null, main: boolean, at: number }} ListedCheckout
+ */
 import { div } from "gpui-kit";
 import { v_flex, h_flex, InputState, Input, Scrollbar } from "gpui-base";
 import { run, props, closeOverlay, theme, spaces, panes, exec, home, updates } from "herdr";
@@ -14,15 +21,23 @@ import { openBehindArgs } from "./open-behind.js";
 import { nameSettings } from "./trackers/setting.js";
 import { removalFindings, removalVerdict, PASS, LOSS } from "./removal.js";
 import { git, place, repoOf, removalInFlight, startRemoval, forgetRemoval } from "./worktree-removal.js";
+/** @import { WorktreeRemoval } from "./worktree-removal.js" */
 
 // Checkouts go to <ROOT>/<repo>/<branch, slashes as dashes>.
+/** @param {string} home */
 const ROOT = (home) => `${home}/.herdr/worktrees`;
 // Home as ~ (git says C:/Users/x where Windows says C:\Users\x).
+/**
+ * @param {string} path
+ * @param {string} userHome
+ */
 const tilde = (path, userHome) => {
   const [p, h] = [path, userHome].map((s) => s.replace(/\\/g, "/"));
   return p.startsWith(h) ? `~${p.slice(h.length)}` : path;
 };
+/** @param {string} branch */
 const slug = (branch) => branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
+/** @param {number} s */
 const ago = (s) => {
   const d = Date.now() / 1000 - s;
   return d < 3600
@@ -36,6 +51,11 @@ const ago = (s) => {
 
 // Every checkout of a repo (`git worktree list`), the main one first, then
 // the most recently committed: { path, branch, main, at }.
+/**
+ * @param {Repo} repo
+ * @param {string | null | undefined} on
+ * @returns {Promise<ListedCheckout[]>}
+ */
 async function checkouts(repo, on) {
   const list = await git(repo.main, ["worktree", "list", "--porcelain"], on);
   if (!list.ok) return [];
@@ -50,6 +70,7 @@ async function checkouts(repo, on) {
       .map((l) => l.split("\t"))
       .map(([b, at]) => [b, Number(at) || 0]),
   );
+  /** @type {ListedCheckout[]} */
   const out = [];
   for (const block of list.out.split(/\n\n+/)) {
     const lines = block.split("\n");
@@ -62,11 +83,22 @@ async function checkouts(repo, on) {
         .replace(/^refs\/heads\//, "") ?? null;
     out.push({ path, branch, main: out.length === 0, at: branch ? (when.get(branch) ?? 0) : 0 });
   }
-  return out.sort((a, b) => b.main - a.main || b.at - a.at);
+  return out.sort((a, b) => Number(b.main) - Number(a.main) || b.at - a.at);
 }
 
 // The space showing a checkout: its first terminal is in it (the deepest checkout wins).
+/**
+ * @param {string} path
+ * @param {ListedCheckout[]} all
+ * @param {string | null | undefined} on
+ * @param {SpaceInfo[]} spaceList
+ * @param {PaneInfo[]} paneList
+ */
 function spaceOf(path, all, on, spaceList, paneList) {
+  /**
+   * @param {string} p
+   * @param {string} dir
+   */
   const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
   return spaceList.find(
     (s) =>
@@ -81,6 +113,12 @@ function spaceOf(path, all, on, spaceList, paneList) {
 
 // Fetches the branch from origin, where work started elsewhere (another computer, a cloud
 // agent) left it: { found }, or { error } when origin couldn't be asked.
+/**
+ * @param {string} repo
+ * @param {string} branch
+ * @param {string | null | undefined} on
+ * @returns {Promise<{ found?: boolean, error?: string }>}
+ */
 async function remoteBranch(repo, branch, on) {
   if (!(await git(repo, ["remote", "get-url", "origin"], on)).ok) return { found: false };
   const fetched = await git(repo, ["fetch", "origin", `refs/heads/${branch}:refs/remotes/origin/${branch}`], on);
@@ -91,6 +129,11 @@ async function remoteBranch(repo, branch, on) {
 
 // Where a new branch starts: origin's default branch, fetched just now, so new work never
 // starts from a stale or unrelated checkout. "HEAD" in a repo without origin.
+/**
+ * @param {string} repo
+ * @param {string | null | undefined} on
+ * @returns {Promise<{ start?: string, error?: string }>}
+ */
 async function freshStart(repo, on) {
   if (!(await git(repo, ["remote", "get-url", "origin"], on)).ok) return { start: "HEAD" };
   const head = await git(repo, ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], on);
@@ -100,12 +143,15 @@ async function freshStart(repo, on) {
 }
 
 export class WorktreeDialog {
+  /** @param {Context} cx */
   constructor(cx) {
     this.on = this.space()?.machine;
     this.userHome = this.on ? null : home();
     this.opening = props()?.action === "open";
     this.text = props()?.branch ?? "";
+    /** @type {ListedCheckout[] | undefined} */
     this.list = undefined; // open: the checkouts, once read
+    /** @type {string | null} */
     this.mainName = null; // open: the repository's configured name, once read
     this.at = 0;
     this.input = InputState.new({ value: this.text, placeholder: this.opening ? "filter worktrees" : "branch name" });
@@ -131,7 +177,9 @@ export class WorktreeDialog {
     }
     this.busy = false;
     this.error = "";
+    /** @type {Repo | null | undefined} */
     this.repo = undefined; // undefined: looking, null: not in git
+    /** @type {WorktreeRemoval | null} */
     this.removal = null; // remove: the space's WorktreeRemoval, once its repo is known
     this.handle = cx.focus_handle();
     if (props()?.action === "remove") this.handle.focus();
@@ -159,14 +207,14 @@ export class WorktreeDialog {
             checkouts(repo, this.on),
             nameSettings({ root: repo.main, on: this.on }).then(
               ({ name }) => name,
-              () => null,
+              /** @returns {string | null} */ () => null,
             ),
           ]);
         }
         this.repo = repo;
         cx.notify();
         if (repo?.linked && props().action === "remove") {
-          this.removal = inFlight ?? startRemoval(this.space(), repo);
+          this.removal = inFlight ?? startRemoval(/** @type {SpaceInfo} */ (this.space()), repo);
           await this.followChecks(cx);
           if (this.removal.removesWithoutAsking({ ask: props().ask, warning: props().warning })) await this.work(cx);
         }
@@ -180,6 +228,7 @@ export class WorktreeDialog {
   }
 
   // Shows each of the removal's checks as it answers.
+  /** @param {Context} cx */
   async followChecks(cx) {
     const stopFollowing = this.removal.onChange(() => cx.notify());
     cx.notify();
@@ -206,11 +255,13 @@ export class WorktreeDialog {
     closeOverlay(props().overlay);
   }
 
+  /** @param {Context} cx */
   go(cx) {
     if (this.busy || !this.repo || this.checking()) return;
     cx.spawn(async (cx) => this.work(cx));
   }
 
+  /** @param {Context} cx */
   async work(cx) {
     if (this.busy || !this.repo || this.checking()) return;
     this.busy = true;
@@ -262,6 +313,7 @@ export class WorktreeDialog {
     return (this.list ?? []).filter((c) => !f || `${c.branch ?? ""} ${c.path}`.toLowerCase().includes(f));
   }
 
+  /** @param {ListedCheckout | undefined} c */
   open(c) {
     if (!c) return;
     this.close();
@@ -275,6 +327,10 @@ export class WorktreeDialog {
     return this.removal.remove();
   }
 
+  /**
+   * @param {KeyEvent} e
+   * @param {Context} cx
+   */
   key(e, cx) {
     if (e.key === "escape") return this.close();
     if (this.opening) {
@@ -288,12 +344,17 @@ export class WorktreeDialog {
     if (e.key === "enter" && props()?.action === "remove") return this.go(cx);
   }
 
+  /** @param {Theme} t */
   renderOpen(t) {
     const r = this.repo;
     const rows = this.shown();
     const all = this.list ?? [];
     const spaceList = spaces();
     const paneList = panes();
+    /**
+     * @param {ListedCheckout} c
+     * @param {number} i
+     */
     const row = (c, i) => {
       const on = i === this.at;
       const there = spaceOf(c.path, all, this.on, spaceList, paneList);
@@ -413,8 +474,10 @@ export class WorktreeDialog {
   }
 
   // Each check's finding as it arrives, then, once all have answered, the verdict on removing the checkout.
+  /** @param {Theme} t */
   renderChecks(t) {
     const findings = removalFindings({ ...this.removal?.checks, warning: props()?.warning });
+    /** @param {{ result: string, text: string }} finding */
     const row = ({ result, text }) =>
       h_flex()
         .gap(6)

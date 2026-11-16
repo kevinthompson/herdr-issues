@@ -14,6 +14,23 @@ import { requestFieldEdit } from "./edits.js";
 import { labelGroups } from "./label-order.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
 
+/** @import { Issue, Project, TrackerScope } from "./trackers/index.js" */
+/** @import { Context } from "gpui-kit" */
+
+/** @typedef {Record<string, import("gpui-kit").Color>} Theme The mod's theme: the kit's tokens plus the ones herdr adds, such as `dim` and `raised`. */
+
+/**
+ * @typedef {object} MenuOption
+ * @property {string | number} [value]
+ * @property {string} [label]
+ * @property {string | null} [icon]
+ * @property {string} [heading]
+ * @property {string} [subheading]
+ * @property {boolean} [divider]
+ */
+
+/** @typedef {Pick<TrackerScope, "id" | "label" | "group"> & { subgroup?: string }} ScopeOption */
+
 const ROW = 28,
   PADDING = 5,
   WIDTH = 170,
@@ -25,25 +42,46 @@ const ROW = 28,
 // The theme's text color at this opacity, so the band follows light and dark themes.
 const HEADING_TINT_ALPHA = "0a";
 /**
- * @param {Record<string, `#${string}`>} t
+ * @param {Theme} t
  * @returns {`#${string}`}
  */
 const headingTint = (t) =>
   /^#[0-9a-f]{6}$/i.test(t.foreground) ? `${t.foreground}${HEADING_TINT_ALPHA}` : "#00000000";
 
+/** @type {Record<string, MenuOption[]>} */
 const OPTIONS = {
-  status: STATUSES.map((value) => ({ value, label: STATUS_LABELS[value], icon: statusIcon(value) })),
+  status: STATUSES.map((value) => ({
+    value,
+    label: /** @type {Record<string, string>} */ (STATUS_LABELS)[value],
+    icon: statusIcon(value),
+  })),
   priority: [1, 2, 3, 4, 0].map((value) => ({ value, label: PRIORITIES[value] })),
 };
 
+/**
+ * @param {string} field
+ * @param {string | number} value
+ */
 export function optionLabel(field, value) {
   return OPTIONS[field].find((option) => option.value === value)?.label ?? String(value);
 }
 
-// The tracker's statuses, in the menu's order.
+/**
+ * The tracker's statuses, in the menu's order.
+ * @param {string} field
+ * @param {string[] | undefined} statuses
+ */
 const optionsFor = (field, statuses) =>
-  field === "status" && statuses ? OPTIONS.status.filter((option) => statuses.includes(option.value)) : OPTIONS[field];
+  field === "status" && statuses
+    ? OPTIONS.status.filter((option) => /** @type {(string | number)[]} */ (statuses).includes(option.value))
+    : OPTIONS[field];
 
+/**
+ * @param {"status" | "priority"} field
+ * @param {Issue} issue
+ * @param {Project} project
+ * @param {string[] | undefined} [statuses]
+ */
 export function openMenu(field, issue, project, statuses) {
   openOverlay({
     mod: "issues",
@@ -55,8 +93,13 @@ export function openMenu(field, issue, project, statuses) {
   });
 }
 
+/**
+ * @param {MenuOption[]} options
+ * @param {(value: string | number) => boolean} isChecked
+ * @param {(option: MenuOption, cx: Context) => void} onPick
+ */
 function optionList(options, isChecked, onPick) {
-  const t = /** @type {Record<string, `#${string}`>} */ (theme());
+  const t = /** @type {Theme} */ (theme());
   return v_flex()
     .id("issue-field-menu")
     .size_full()
@@ -128,14 +171,21 @@ function optionList(options, isChecked, onPick) {
 // choice outlives a reload.
 const SCOPES = "issues.scopes",
   LABELS = "issues.labels";
+/** @param {string} store */
 const selections = (store) => /** @type {Record<string, string>} */ (shared(store) ?? {});
+/** @param {string} key */
 export const selectedScope = (key) => selections(SCOPES)[key];
+/** @param {string} key */
 export const selectedLabel = (key) => selections(LABELS)[key] || null;
 
 const SCOPE_MENU_WIDTH = 280;
 const SCOPE_MENU_MAX_HEIGHT = 440;
 
 // The scopes as menu options, with a heading before each group and a subheading before each subgroup.
+/**
+ * @param {ScopeOption[]} scopes
+ * @returns {MenuOption[]}
+ */
 function scopeOptions(scopes) {
   return scopes.flatMap((scope, index) => {
     const previous = scopes[index - 1];
@@ -150,6 +200,7 @@ function scopeOptions(scopes) {
 }
 
 const DIVIDER_HEIGHT = DIVIDER_GAP * 2 + 1;
+/** @param {MenuOption[]} options */
 const menuHeight = (options) =>
   options.reduce(
     (height, option, index) =>
@@ -157,6 +208,12 @@ const menuHeight = (options) =>
     PADDING * 2,
   );
 
+/**
+ * @param {ScopeOption[]} scopes
+ * @param {string} current
+ * @param {string} key
+ * @param {string} [store]
+ */
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
   const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
   openOverlay({
@@ -170,7 +227,12 @@ export function openScopeMenu(scopes, current, key, store = SCOPES) {
 }
 
 const ALL_LABELS = "";
-// "All labels", then each label by name.
+/**
+ * "All labels", then each label by name.
+ * @param {string[]} labels
+ * @param {string | null | undefined} current
+ * @param {string} key
+ */
 export function openLabelMenu(labels, current, key) {
   const options = [{ id: ALL_LABELS, label: "All labels" }, ...labels.map((label) => ({ id: label, label }))];
   openScopeMenu(options, current ?? ALL_LABELS, key, LABELS);
@@ -191,6 +253,7 @@ export class ScopeMenu {
 }
 
 export class FieldMenu {
+  /** @param {MenuOption} option */
   pick(option) {
     const { menu: field, root, on, id, current, overlay } = props();
     if (option.value !== current)
@@ -212,7 +275,12 @@ const LABELS_MENU_WIDTH = 240;
 const LABELS_MENU_MAX_HEIGHT = 360;
 
 // The issue's labels, checked, then a divider when both groups have labels, then the tracker's others.
+/**
+ * @param {{ applied: string[], others: string[] }} groups
+ * @returns {MenuOption[]}
+ */
 function issueLabelOptions({ applied, others }) {
+  /** @param {string} label */
   const toOption = (label) => ({ value: label, label });
   return [
     ...applied.map(toOption),
@@ -221,7 +289,12 @@ function issueLabelOptions({ applied, others }) {
   ];
 }
 
-// The tracker's labels are `names`.
+/**
+ * The tracker's labels are `names`.
+ * @param {Issue} issue
+ * @param {Project} project
+ * @param {string[]} names
+ */
 export function openIssueLabelsMenu(issue, project, names) {
   const groups = labelGroups(names, issue.labels);
   openOverlay({
@@ -242,14 +315,15 @@ export class LabelMenu {
       issueLabelOptions(groups),
       (label) => current.includes(label),
       (option) => {
-        const checked = current.includes(option.value);
+        const label = /** @type {string} */ (option.value);
+        const checked = current.includes(label);
         requestFieldEdit({
           root,
           on: on ?? null,
           issueId: id,
           field: "labels",
-          add: checked ? [] : [option.value],
-          remove: checked ? [option.value] : [],
+          add: checked ? [] : [label],
+          remove: checked ? [label] : [],
         });
         closeOverlay(overlay);
       },

@@ -6,6 +6,12 @@
 import { div } from "gpui-kit";
 import { v_flex, h_flex, Select, Popup } from "gpui-base";
 
+/** @import { Context } from "gpui-kit" */
+/** @import { Theme } from "./menu.js" */
+
+/** @typedef {{ id: string, label: string, detail?: string }} SelectOption */
+/** @typedef {(id: string, cx: Context) => void} ChooseHandler */
+
 const TRIGGER_MAX_PX = 280,
   LIST_WIDTH_PX = 280,
   LIST_PADDING = 5,
@@ -15,7 +21,12 @@ const TRIGGER_MAX_PX = 280,
 const PRESS_SETTLED_MS = 400;
 
 export class SelectMenu {
-  // Focus handles outlive renders, so a select is made in an event handler or a task, with its `cx`.
+  /**
+   * Focus handles outlive renders, so a select is made in an event handler or a task, with its `cx`.
+   * @param {string} id
+   * @param {string} label
+   * @param {Context} cx
+   */
   constructor(id, label, cx) {
     this.id = id;
     this.label = label;
@@ -26,6 +37,11 @@ export class SelectMenu {
     this.listFocus = cx.focus_handle();
   }
 
+  /**
+   * @param {SelectOption[]} options
+   * @param {string} value
+   * @param {Context} cx
+   */
   show(options, value, cx) {
     this.open = true;
     this.highlight = Math.max(
@@ -36,6 +52,7 @@ export class SelectMenu {
     cx.notify();
   }
 
+  /** @param {Context} cx */
   close(cx) {
     if (!this.open) return;
     this.open = false;
@@ -43,26 +60,45 @@ export class SelectMenu {
     cx.notify();
   }
 
+  /**
+   * @param {SelectOption | undefined} option
+   * @param {ChooseHandler} onChoose
+   * @param {Context} cx
+   */
   pick(option, onChoose, cx) {
     this.close(cx);
     if (option) onChoose(option.id, cx);
   }
 
+  /**
+   * @param {SelectOption[]} options
+   * @param {string} value
+   * @param {Context} cx
+   */
   pressTrigger(options, value, cx) {
     if (Date.now() - this.settledAt < PRESS_SETTLED_MS) return;
     if (this.open) this.close(cx);
     else this.show(options, value, cx);
   }
 
+  /**
+   * @param {string} key
+   * @param {number} count
+   * @param {Context} cx
+   */
   moveHighlight(key, count, cx) {
-    const step = { up: -1, down: 1 }[key];
+    const step = /** @type {Record<string, number>} */ ({ up: -1, down: 1 })[key];
     if (!step || count === 0) return false;
     this.highlight = Math.min(count - 1, Math.max(0, this.highlight + step));
     cx.notify();
     return true;
   }
 
-  // options: { id, label, detail? }; onChoose(id, cx) runs when one is picked, chosen or not.
+  /**
+   * `onChoose` runs when one is picked, chosen or not.
+   * @param {Theme} t
+   * @param {{ options: SelectOption[], value: string, onChoose: ChooseHandler, enabled?: boolean }} props
+   */
   render(t, { options, value, onChoose, enabled = true }) {
     const chosen = options.find(({ id }) => id === value);
     const trigger = h_flex()
@@ -114,6 +150,12 @@ export class SelectMenu {
       );
   }
 
+  /**
+   * @param {Theme} t
+   * @param {SelectOption[]} options
+   * @param {string} value
+   * @param {ChooseHandler} onChoose
+   */
   list(t, options, value, onChoose) {
     return v_flex()
       .id(`${this.id}-list`)

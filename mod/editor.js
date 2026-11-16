@@ -2,6 +2,7 @@
 // editor in a new tab in the focused space, and the macOS default text editor when neither is set.
 import { exec, focused, run } from "herdr";
 import { openInNeovim } from "./neovim.js";
+/** @import { ExecResult } from "herdr" */
 
 const EDITOR_REFRESH_MS = 60_000;
 const FIELD = "\x1e";
@@ -21,10 +22,15 @@ const START_EDITOR = `PATH=$2; eval "set -- $1 \\"\\$3\\""
 command -v "$1" >/dev/null || { echo "$1: command not found" >&2; exit 127; }
 nohup "$@" >/dev/null 2>&1 &`;
 
+/** @typedef {{ value: string, name: string, command: string, path: string }} EditorDescription */
+
+/** @type {{ editor: Promise<EditorDescription | null>, at: number } | null} */
 let knownEditor = null;
+/** @type {Promise<void> | null} */
 let refreshingEditor = null;
 
 // {value, name, command, path}, or null when neither variable is set.
+/** @returns {Promise<EditorDescription | null>} */
 async function lookUpEditor() {
   const result = await exec("sh", ["-c", ASK_LOGIN_SHELL, "sh", DESCRIBE_EDITOR]);
   const fields = result.stdout.split(FIELD);
@@ -63,17 +69,20 @@ function userEditor() {
   return editor;
 }
 
+/** @param {string} command */
 const isGuiEditor = (command) => command.includes(".app/");
 
 // Binary files such as images go to their own application; text, empty files, folders and files not
 // made yet go to the editor.
+/** @param {string} file */
 export async function isTextFile(file) {
-  const described = await exec("file", ["-b", "--mime", file]).catch(() => null);
+  const described = await exec("file", ["-b", "--mime", file]).catch(/** @returns {ExecResult | null} */ () => null);
   if (described?.code !== 0) return true;
   const [type, charset] = described.stdout.trim().split("; charset=");
   return charset !== "binary" || type.startsWith("inode/");
 }
 
+/** @param {string} file @param {string} folder */
 export async function openInEditor(file, folder) {
   const editor = await userEditor();
   if (!editor) return expectSuccess(await exec("open", ["-t", file]));
@@ -87,6 +96,7 @@ export async function openInEditor(file, folder) {
   run("tab.new", { name: editor.name, space, folder, argv });
 }
 
+/** @param {ExecResult} result */
 function expectSuccess(result) {
   if (result.code !== 0) throw new Error(result.stderr.trim() || `exited with ${result.code}`);
 }

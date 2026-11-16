@@ -12,6 +12,17 @@ import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, workModelChoice } from "./settings-fields.js";
 import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
 
+/** @import { AsyncContext, Context, NativeElement } from "gpui-kit" */
+/** @import { InputState as InputStateType, TextareaState } from "gpui-base" */
+/** @import { Theme } from "./menu.js" */
+/** @import { SelectOption } from "./select.js" */
+
+/** @typedef {"workModel" | "workEffort"} AgentKey */
+/** @typedef {{ key: AgentKey, title: string, sentence: string | null, choices: string[] }} AgentQuestion */
+/** @typedef {{ workModel?: string | null, workEffort?: string | null }} AgentValues */
+/** @typedef {{ write: () => Promise<unknown>, written: () => void }} SaveRequest */
+
+/** @type {SelectOption[]} */
 export const CLOSE_CHOICES = [
   {
     id: "auto",
@@ -27,6 +38,7 @@ export const CLOSE_CHOICES = [
 export const CLOSE_SENTENCE =
   "What a finished session does about its worktree. A worktree that might lose work, or that has other spaces nested under it, always shows the removal dialog first.";
 
+/** @type {AgentQuestion[]} */
 export const AGENT_QUESTIONS = [
   {
     key: "workModel",
@@ -51,16 +63,22 @@ export const WORK_PROMPT_ROWS = 6;
 
 export class SettingsForm {
   // onSaved(cx) runs after each save is written; onSettled(cx), which the view sets, once none is running.
+  /**
+   * @param {{ onSaved: (cx: AsyncContext) => void }} callbacks
+   */
   constructor({ onSaved }) {
     this.onSaved = onSaved;
-    /** @type {(cx?: any) => void} */
+    /** @type {(cx: Context) => void} */
     this.onSettled = () => {};
-    /** @type {Record<string, any>} */
+    /** @type {Record<string, SelectMenu>} */
     this.selects = null;
+    /** @type {AgentValues | null} */
     this.savedAgent = null;
+    /** @type {AgentValues} */
     this.agentValues = {};
     this.otherWorkModelPicked = false;
     this.loading = true;
+    /** @type {string | null} */
     this.error = null;
     this.saveFailed = false;
     this.autosave = new AutosaveQueue({
@@ -72,7 +90,7 @@ export class SettingsForm {
       onSaved: (cx) => this.onSaved(cx),
       onFailed: (e) =>
         Object.assign(this, {
-          error: `Could not save: ${e.message ?? e}`,
+          error: `Could not save: ${/** @type {{ message?: string }} */ (e).message ?? e}`,
           saveFailed: true,
         }),
       onSettled: (cx) => {
@@ -92,6 +110,9 @@ export class SettingsForm {
   }
 
   // A field changed: saves once typing pauses.
+  /**
+   * @param {Context} cx
+   */
   edited(cx) {
     this.error = null;
     this.autosave.schedule(cx);
@@ -99,11 +120,17 @@ export class SettingsForm {
   }
 
   // Each form overrides this with what it writes; a form that writes nothing has nothing to save.
+  /**
+   * @returns {SaveRequest | null}
+   */
   saveRequest() {
     return null;
   }
 
   // A choice was picked or Enter pressed: saves at once, with any typing still waiting.
+  /**
+   * @param {Context} cx
+   */
   saveNow(cx) {
     this.error = null;
     this.autosave.now(cx);
@@ -111,11 +138,18 @@ export class SettingsForm {
   }
 
   // Saves typing still waiting for its pause at once, as the view is left.
+  /**
+   * @param {Context} cx
+   */
   flush(cx) {
     this.autosave.flush(cx);
   }
 
   // A select for each of workModel and workEffort, with ids led by `prefix`.
+  /**
+   * @param {string} prefix
+   * @param {Context} cx
+   */
   agentSelects(prefix, cx) {
     return Object.fromEntries(
       AGENT_QUESTIONS.map(({ key, title }) => [key, new SelectMenu(`${prefix}-${key}`, title, cx)]),
@@ -123,6 +157,9 @@ export class SettingsForm {
   }
 
   // Opens workModel and workEffort on `saved`, each its value or null where unset.
+  /**
+   * @param {AgentValues} saved
+   */
   openAgent(saved) {
     this.savedAgent = saved;
     this.agentValues = { ...saved };
@@ -131,6 +168,11 @@ export class SettingsForm {
 
   // The value for `key`, or null to remove it. workModel's Other keeps the value until a model is typed; a listed
   // model clears the typed one.
+  /**
+   * @param {AgentKey} key
+   * @param {string | null} value
+   * @param {Context} cx
+   */
   chooseAgent(key, value, cx) {
     if (key === "workModel") {
       this.otherWorkModelPicked = value === OTHER_WORK_MODEL;
@@ -142,15 +184,22 @@ export class SettingsForm {
   }
 
   // Emptying the field of a typed model removes workModel.
+  /**
+   * @param {string} text
+   * @param {Context} cx
+   */
   typeWorkModel(text, cx) {
     if (text) this.agentValues = { ...this.agentValues, workModel: text };
     else if (isTypedWorkModel(this.agentValues.workModel)) this.agentValues = { ...this.agentValues, workModel: null };
     this.edited(cx);
   }
 
+  /**
+   * @returns {AgentValues}
+   */
   agentChanges() {
     return Object.fromEntries(
-      Object.keys(AGENT_DEFAULTS)
+      /** @type {AgentKey[]} */ (Object.keys(AGENT_DEFAULTS))
         .filter((key) => this.savedAgent && (this.agentValues[key] ?? null) !== this.savedAgent[key])
         .map((key) => [key, this.agentValues[key] ?? null]),
     );
@@ -158,6 +207,12 @@ export class SettingsForm {
 
   // A select of the setting's values led by the one that removes it, labeled `clearLabel`; workModel's ends with
   // Other, which shows the typed model.
+  /**
+   * @param {AgentQuestion} question
+   * @param {string} clearLabel
+   * @param {boolean} showTypedModel
+   * @param {Theme} t
+   */
   agentQuestion({ key, title, sentence, choices }, clearLabel, showTypedModel, t) {
     const isWorkModel = key === "workModel";
     const options = [
@@ -182,6 +237,10 @@ export class SettingsForm {
   }
 
   // Why the last save failed, leading the form.
+  /**
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   errorLine(content, t) {
     return content.when(Boolean(this.error), (e) =>
       e.child(
@@ -194,6 +253,12 @@ export class SettingsForm {
     );
   }
 
+  /**
+   * @param {string} title
+   * @param {string | null} sentence
+   * @param {Theme} t
+   * @param {(controls: NativeElement) => NativeElement} addControls
+   */
   question(title, sentence, t, addControls) {
     return addControls(v_flex().flex_none().gap(8).pt(4).child(div().font_semibold().child(title))).when(
       Boolean(sentence),
@@ -208,10 +273,18 @@ export class SettingsForm {
     );
   }
 
+  /**
+   * @param {string} text
+   * @param {Theme} t
+   */
   note(text, t) {
     return div().whitespace_normal().text_size(12).text_color(t.dim).child(text);
   }
 
+  /**
+   * @param {InputStateType} state
+   * @param {Theme} t
+   */
   textField(state, t) {
     return Input.new(state)
       .min_w(0)
@@ -227,6 +300,10 @@ export class SettingsForm {
       .text_color(t.foreground);
   }
 
+  /**
+   * @param {TextareaState} state
+   * @param {Theme} t
+   */
   textareaField(state, t) {
     return Textarea.new(state)
       .w_full()

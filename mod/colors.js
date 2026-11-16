@@ -1,9 +1,13 @@
 // Theme colors blended in code, for shades the theme doesn't name, and the shades that differ between
 // light and dark themes.
+/** @typedef {Record<string, string>} Theme The panel theme, as herdr's theme() returns it. */
+
 const HEX = /^#([0-9a-f]{6})$/i;
+/** @param {string} hex */
 const channels = (hex) => [0, 2, 4].map((at) => parseInt(hex.slice(at, at + 2), 16));
 
 // `from` moved `amount` (0 to 1) of the way to `to`; null unless both are #rrggbb.
+/** @param {string} from @param {string} to @param {number} amount @returns {string | null} */
 export function mixColors(from, to, amount) {
   const [a, b] = [HEX.exec(from), HEX.exec(to)];
   if (!a || !b) return null;
@@ -18,6 +22,7 @@ export function mixColors(from, to, amount) {
 }
 
 // A light theme draws dark text. A theme whose text color isn't #rrggbb is taken as dark.
+/** @param {Theme} t */
 export function isLightTheme(t) {
   const match = HEX.exec(t.foreground ?? "");
   if (!match) return false;
@@ -26,6 +31,7 @@ export function isLightTheme(t) {
 }
 
 // Linear's workflow state colors, by status and by the list's Blocked group.
+/** @type {Record<string, string>} */
 const STATUS_COLORS = {
   triage: "#fc7840",
   "in-progress": "#f2c94c",
@@ -37,6 +43,7 @@ const STATUS_COLORS = {
   canceled: "#95a2b3",
 };
 // A due date's theme color by its urgency (dueStatus in issue.js), matching the SLA's colors in the list.
+/** @type {Record<string, string>} */
 export const DUE_COLORS = { overdue: "ansi1", soon: "working", later: "dim" };
 
 // The opacity of a status color's fill, hover and border, as two hex digits, thin so fills stay calm on
@@ -47,6 +54,7 @@ const LIGHT_STATUS_ALPHAS = { fill: "48", hover: "6c", border: "90" };
 const LIGHT_STATUS_DARKENING = 0.4;
 
 // A status's fill, hover and border colors in the theme `t`; null for a status without a color.
+/** @param {string} status @param {Theme} t */
 export function statusTints(status, t) {
   const color = STATUS_COLORS[status];
   if (!color) return null;
@@ -58,6 +66,7 @@ export function statusTints(status, t) {
 
 // A list row's hover. A dark theme's is half as strong as the theme's: half as opaque when it's
 // translucent, otherwise halfway back to the panel's surface. A light theme's is already faint, so it stays whole.
+/** @param {Theme} t */
 export function rowHover(t) {
   if (isLightTheme(t)) return t.hover;
   const translucent = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(t.hover);
@@ -70,4 +79,5 @@ export function rowHover(t) {
 
 // The issue view's bar of fields you can change, set apart from the issue's details: a shade lighter than a
 // dark panel, and the theme's color for bars in a light one, where a shade toward `raised` is too faint to see.
+/** @param {Theme} t */
 export const fieldBar = (t) => (isLightTheme(t) ? t.chrome : (mixColors(t.surface, t.raised, 0.35) ?? t.surface));

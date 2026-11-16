@@ -1,5 +1,21 @@
 // The statuses and priorities every tracker maps its issues onto, and the rules for grouping issues in the
 // list and for whether work on one can start or finish.
+/** @import { Issue } from "./trackers/index.js" */
+
+/**
+ * @typedef {object} Group
+ * @property {string} id
+ * @property {string} label
+ * @property {boolean} [alwaysShown]
+ * @property {boolean} [collapsed]
+ * @property {"backlog" | "done" | "canceled"} [loads]
+ * @property {(a: Issue, b: Issue) => number} [sort]
+ * @property {(issue: Issue, done: Set<string>) => boolean} has
+ */
+
+/**
+ * @typedef {Group & { unloaded?: boolean, cap?: number | null, issues: Issue[] }} ListedGroup
+ */
 
 export const STATUSES = ["triage", "backlog", "todo", "in-progress", "in-review", "done", "canceled"];
 export const STATUS_LABELS = {
@@ -16,11 +32,17 @@ export const PRIORITIES = ["None", "Urgent", "High", "Medium", "Low"];
 // Work starts only on issues nobody has picked up yet, and waits while any of their blockers is unfinished.
 const STARTABLE_STATUSES = ["backlog", "todo"];
 const FINISHED = ["done", "canceled"];
+/** @param {Issue} issue */
 const isStartable = (issue) => STARTABLE_STATUSES.includes(issue.status);
+/**
+ * @param {Issue} issue
+ * @param {Set<string>} done
+ */
 const isUnblocked = (issue, done) => issue.blockedBy.every((id) => done.has(id));
 
 // A group with `loads` starts collapsed, and a tracker may skip listing its issues until it is expanded:
 // backlog issues (which Blocked is built from too), done issues, or canceled ones.
+/** @type {Group[]} */
 const GROUPS = [
   { id: "triage", label: "Triage", has: (issue) => issue.status === "triage" },
   { id: "in-review", label: "In review", has: (issue) => issue.status === "in-review" },
@@ -65,10 +87,20 @@ const GROUPS = [
 
 // By priority (urgent first, "None" last), then by SLA (the soonest breach first, issues without one
 // after), then issues with an order by that number, then by ID in number order.
+/** @param {Issue} issue */
 export const priorityRank = (issue) => issue.priority || PRIORITIES.length;
+/** @param {Issue} issue */
 const slaBreachTime = (issue) => (issue.sla ? Date.parse(issue.sla.breachesAt) : Infinity);
+/**
+ * @param {{ id: string }} a
+ * @param {{ id: string }} b
+ */
 const byId = (a, b) => a.id.localeCompare(b.id, undefined, { numeric: true });
 
+/**
+ * @param {Issue} a
+ * @param {Issue} b
+ */
 export function byPosition(a, b) {
   const byPriority = priorityRank(a) - priorityRank(b);
   if (byPriority) return byPriority;
@@ -83,6 +115,10 @@ export function byPosition(a, b) {
 }
 
 // Most recently completed first. Issues done before completion was recorded follow, newest ID first.
+/**
+ * @param {Issue} a
+ * @param {Issue} b
+ */
 function byRecentlyCompleted(a, b) {
   if (a.completed && b.completed) return b.completed.localeCompare(a.completed);
   if (a.completed || b.completed) return a.completed ? -1 : 1;
@@ -90,6 +126,7 @@ function byRecentlyCompleted(a, b) {
 }
 
 // The issues a tracker must list for the groups `isExpanded` says are open.
+/** @param {(group: Group) => boolean} isExpanded */
 export function loadsFor(isExpanded) {
   return new Set(GROUPS.filter((group) => group.loads && isExpanded(group)).map((group) => group.loads));
 }
@@ -99,27 +136,37 @@ export function loadsFor(isExpanded) {
 // no issues, whether or not it holds any. With a `label`, groups hold only the issues carrying it, while
 // blockers are still read from every issue. When the tracker lists at most `recentlyClosed` finished issues
 // and listed that many, Done and Canceled carry that number as their `cap`, since they may hold more.
+/**
+ * @param {Issue[]} issues
+ * @param {Set<string | undefined>} [unloaded]
+ * @param {string | null} [label]
+ * @param {{ recentlyClosed?: number | null }} [options]
+ * @returns {ListedGroup[]}
+ */
 export function groupIssues(issues, unloaded = new Set(), label = null, { recentlyClosed = null } = {}) {
   const done = new Set(issues.filter((issue) => issue.status === "done").map((issue) => issue.id));
   const shown = label ? issues.filter((issue) => issue.labels.includes(label)) : issues;
   const closedCapReached =
     recentlyClosed !== null && issues.filter((issue) => FINISHED.includes(issue.status)).length >= recentlyClosed;
+  /** @param {Group} group */
   const capOf = (group) => (closedCapReached && FINISHED.includes(group.loads) ? recentlyClosed : null);
-  return GROUPS.map((group) =>
+  return GROUPS.map((/** @type {Group} */ group) =>
     unloaded.has(group.loads)
-      ? { ...group, unloaded: true, issues: [] }
-      : {
+      ? /** @type {ListedGroup} */ ({ ...group, unloaded: true, issues: [] })
+      : /** @type {ListedGroup} */ ({
           ...group,
           cap: capOf(group),
           issues: shown.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition),
-        },
-  ).filter((/** @type {any} */ group) => group.unloaded || group.issues.length || group.alwaysShown);
+        }),
+  ).filter((group) => group.unloaded || group.issues.length || group.alwaysShown);
 }
 
 // Whether no group the list shows holds an issue, so it points the person at creating one.
+/** @param {ListedGroup[]} groups */
 export const holdsNoIssues = (groups) => groups.every((group) => !group.issues.length);
 
 // The count beside a group's title: "20+" for a group capped at 20, or null when its issues weren't listed.
+/** @param {ListedGroup} group */
 export function groupCountText(group) {
   if (group.unloaded) return null;
   return group.cap ? `${group.cap}+` : String(group.issues.length);
@@ -127,12 +174,14 @@ export function groupCountText(group) {
 
 // The Linear icon drawn beside a group or status, or null for one without, such as Unknown status.
 const ICON_IDS = ["triage", "in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"];
+/** @param {string} id */
 export const statusIcon = (id) => (ICON_IDS.includes(id) ? `mods/issues/icons/${id}.png` : null);
 
 const MAX_STRIP_COUNT = 99;
 
 // One badge for each group `groupIssues` returns, in the list's order, with its header's count, shortened to
 // 99+ above 99. An unloaded group's badge has no text, so the strip draws the refresh icon in its place.
+/** @param {ListedGroup[]} groups */
 export function stripBadges(groups) {
   return groups.map((group) => {
     const {
@@ -149,12 +198,16 @@ export function stripBadges(groups) {
 
 // Which issues are done or still open, and which issues each one blocks, read once per list: every row
 // asks, and scanning the whole list for each row is too slow to render a team's hundreds of issues.
+/** @type {WeakMap<Issue[], { done: Set<string>, open: Set<string>, blocking: Map<string, string[]> }>} */
 const relationsByList = new WeakMap();
+/** @param {Issue[]} issues */
 function relations(issues) {
   if (!relationsByList.has(issues)) {
+    /** @type {Set<string>} */
     const done = new Set(),
-      open = new Set(),
-      blocking = new Map();
+      open = new Set();
+    /** @type {Map<string, any[]>} */
+    const blocking = new Map();
     for (const issue of issues) {
       if (issue.status === "done") done.add(issue.id);
       if (!FINISHED.includes(issue.status)) open.add(issue.id);
@@ -170,6 +223,10 @@ function relations(issues) {
   return relationsByList.get(issues);
 }
 
+/**
+ * @param {Issue} issue
+ * @param {Issue[]} issues
+ */
 export function unfinishedBlockers(issue, issues) {
   const { done } = relations(issues);
   return issue.blockedBy.filter((id) => !done.has(id));
@@ -177,32 +234,52 @@ export function unfinishedBlockers(issue, issues) {
 
 // Work underway, being written or waiting on review, continues and finishes the same way.
 const UNDERWAY_STATUSES = ["in-progress", "in-review"];
+/** @param {Issue} issue */
 export const canFinishWork = (issue) => UNDERWAY_STATUSES.includes(issue.status);
 
+/** @param {Issue} issue */
 export const hasPullRequestOnBranch = (issue) =>
   (issue.pullRequests ?? []).some((pullRequest) => pullRequest.branch === issue.branch);
 
 const UNSTARTED_STATUSES = ["triage", "backlog", "todo"];
+/** @param {Issue} issue */
 export const isUnstarted = (issue) => UNSTARTED_STATUSES.includes(issue.status);
 
 // An issue nobody has started, whose branch doesn't exist yet unless a pull request already uses it.
+/** @param {Issue} issue */
 export const needsNewBranch = (issue) => isUnstarted(issue) && !hasPullRequestOnBranch(issue);
 
+/**
+ * @param {Issue} issue
+ * @param {Issue[]} issues
+ */
 export function canStartWork(issue, issues) {
   return isStartable(issue) && unfinishedBlockers(issue, issues).length === 0;
 }
 
 // The unfinished blockers that keep an issue in the Blocked group: none once work could have started.
+/**
+ * @param {Issue} issue
+ * @param {Issue[]} issues
+ */
 export function holdingBlockers(issue, issues) {
   return isStartable(issue) ? unfinishedBlockers(issue, issues) : [];
 }
 
 // The IDs of the issues that name this one in their blocked_by, in number order.
+/**
+ * @param {Issue} issue
+ * @param {Issue[]} issues
+ */
 export function blockedIssues(issue, issues) {
   return relations(issues).blocking.get(issue.id) ?? [];
 }
 
 // The unfinished issues this one still holds up: none once it is done or canceled.
+/**
+ * @param {Issue} issue
+ * @param {Issue[]} issues
+ */
 export function waitingIssues(issue, issues) {
   if (FINISHED.includes(issue.status)) return [];
   const { open } = relations(issues);
@@ -213,6 +290,7 @@ export function waitingIssues(issue, issues) {
 // "low", "medium", "high" or "breached". null without an SLA or once the issue is finished.
 const HOUR_MS = 3600000,
   DAY_MS = 24 * HOUR_MS;
+/** @param {number} ms */
 const duration = (ms) =>
   ms >= DAY_MS
     ? `${Math.floor(ms / DAY_MS)}d`
@@ -220,6 +298,11 @@ const duration = (ms) =>
       ? `${Math.floor(ms / HOUR_MS)}h`
       : `${Math.max(1, Math.floor(ms / 60000))}m`;
 
+/**
+ * @param {Issue} issue
+ * @param {number} [now]
+ * @returns {{ text: string, risk: "low" | "medium" | "high" | "breached" } | null}
+ */
 export function slaStatus(issue, now = Date.now()) {
   if (!issue.sla || FINISHED.includes(issue.status)) return null;
   const { breachesAt, mediumRiskAt, highRiskAt } = issue.sla,
@@ -240,6 +323,11 @@ export function slaStatus(issue, now = Date.now()) {
 const DUE_SOON_DAYS = 3;
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/**
+ * @param {Issue} issue
+ * @param {Date} [now]
+ * @returns {{ text: string, urgency: "overdue" | "soon" | "later" } | null}
+ */
 export function dueStatus(issue, now = new Date()) {
   if (!issue.due || FINISHED.includes(issue.status)) return null;
   const [year, month, day] = issue.due.split("-").map(Number);

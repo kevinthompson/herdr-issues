@@ -9,9 +9,63 @@ import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
 
+/** @import { Context, Color, NativeElement } from "gpui-kit" */
+/** @import { EditorState } from "gpui-base" */
+/** @import { Theme } from "./menu.js" */
+/** @import { Issue, PullRequest } from "./trackers/index.js" */
+
+/** @typedef {{ line: number, indent: number, checked: boolean, text: string, markdown?: undefined }} TaskSegment */
+/** @typedef {{ markdown: string }} MarkdownSegment */
+/** @typedef {MarkdownSegment | TaskSegment} BodySegment */
+
+/**
+ * What the issue view draws: the issue, the state around it and the handlers its controls run.
+ * @typedef {object} DetailView
+ * @property {Issue} issue
+ * @property {string[]} blocking
+ * @property {NativeElement | null} [assignee]
+ * @property {boolean} writable
+ * @property {boolean} prioritized
+ * @property {boolean} labelsEditable
+ * @property {boolean} mergeable
+ * @property {boolean} merging
+ * @property {boolean} opening
+ * @property {boolean} saving
+ * @property {boolean} finishable
+ * @property {boolean} startable
+ * @property {boolean} inSpace
+ * @property {boolean} inActiveSpace
+ * @property {EditorState | null} [editor]
+ * @property {string | null} [error]
+ * @property {NativeElement | null} [failedEditAlert]
+ * @property {NativeElement} refreshButton
+ * @property {NativeElement | null} [settingsButton]
+ * @property {(id: string) => boolean} hasIssue
+ * @property {(id: string, cx: Context) => void} onOpen
+ * @property {(url: string, cx: Context) => void} onLink
+ * @property {(text: string) => string} linkFiles
+ * @property {(field: "status" | "priority", cx: Context) => void} onMenu
+ * @property {(cx: Context) => void} onLabelsMenu
+ * @property {(cx: Context) => void} onBack
+ * @property {(cx: Context) => void} onCollapse
+ * @property {(cx: Context) => void} onStart
+ * @property {(cx: Context) => void} onContinue
+ * @property {(cx: Context) => void} onMerge
+ * @property {(cx: Context) => void} onEdit
+ * @property {(cx: Context) => void} onSave
+ * @property {(cx: Context) => void} onCancel
+ * @property {(line: number, cx: Context) => void} onToggleTask
+ */
+
 const STATUS_ICON_PX = 14;
 
-// The status dropdown is colored only by its status's icon.
+/**
+ * The status dropdown is colored only by its status's icon.
+ * @param {"status" | "priority"} field
+ * @param {string} label
+ * @param {Pick<DetailView, "issue" | "writable" | "onMenu">} view
+ * @param {Theme} t
+ */
 function dropdown(field, label, { issue, writable, onMenu }, t) {
   const icon = field === "status" ? statusIcon(issue.status) : null;
   return h_flex()
@@ -49,8 +103,15 @@ function dropdown(field, label, { issue, writable, onMenu }, t) {
     );
 }
 
-// Issue IDs, each a link that opens that issue when the panel has it, separated by commas. Links
-// stop the pointer events a list row would otherwise take as an open.
+/**
+ * Issue IDs, each a link that opens that issue when the panel has it, separated by commas. Links
+ * stop the pointer events a list row would otherwise take as an open.
+ * @param {string} key
+ * @param {string[]} ids
+ * @param {Pick<DetailView, "hasIssue" | "onOpen">} handlers
+ * @param {Theme} t
+ * @param {Color} color
+ */
 export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
   return h_flex()
     .flex_none()
@@ -82,7 +143,12 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
 const FACT_ROW_PX = 18,
   FACT_ICON_PX = 12;
 
-// One of the issue's facts on a line of its own: its name dimmed, then its value.
+/**
+ * One of the issue's facts on a line of its own: its name dimmed, then its value.
+ * @param {string} label
+ * @param {NativeElement} value
+ * @param {Theme} t
+ */
 function fact(label, value, t) {
   return h_flex()
     .min_h(FACT_ROW_PX)
@@ -92,8 +158,14 @@ function fact(label, value, t) {
     .child(value);
 }
 
-// A fact named by an icon, which names it in words on hover. The icon sits on the first line of a
-// value that wraps or lists several things.
+/**
+ * A fact named by an icon, which names it in words on hover. The icon sits on the first line of a
+ * value that wraps or lists several things.
+ * @param {string} icon
+ * @param {string} name
+ * @param {NativeElement | string} value
+ * @param {Theme} t
+ */
 function iconFact(icon, name, value, t) {
   return h_flex()
     .gap(10)
@@ -111,10 +183,23 @@ function iconFact(icon, name, value, t) {
     .child(div().flex_1().min_w(0).min_h(FACT_ROW_PX).flex().items_center().child(value));
 }
 
+/**
+ * @param {string} key
+ * @param {string} icon
+ * @param {string} name
+ * @param {string[]} ids
+ * @param {Pick<DetailView, "hasIssue" | "onOpen">} view
+ * @param {Theme} t
+ */
 const linkedFact = (key, icon, name, ids, view, t) =>
   iconFact(icon, name, fact(`${name}:`, issueLinks(key, ids, view, t, t.accent), t), t);
 
-// A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
+/**
+ * A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
+ * @param {string} label
+ * @param {Color | string | undefined} color
+ * @param {Theme} t
+ */
 function labelChip(label, color, t) {
   return h_flex()
     .flex_none()
@@ -125,14 +210,30 @@ function labelChip(label, color, t) {
     .border_1()
     .border_color(t.border)
     .text_color(t.muted)
-    .when(Boolean(color), (e) => e.child(div().flex_none().size(6).rounded(3).bg(color)))
+    .when(Boolean(color), (e) =>
+      e.child(
+        div()
+          .flex_none()
+          .size(6)
+          .rounded(3)
+          .bg(/** @type {Color} */ (color)),
+      ),
+    )
     .child(label);
 }
 
+/**
+ * @param {Pick<Issue, "labels" | "labelColors">} issue
+ * @param {Theme} t
+ */
 export const labelChips = ({ labels, labelColors }, t) =>
   labels.map((label) => labelChip(label, labelColors?.[label], t));
 
-// The issue's labels, then, where they can change, a button opening the dropdown that adds and removes them.
+/**
+ * The issue's labels, then, where they can change, a button opening the dropdown that adds and removes them.
+ * @param {Pick<DetailView, "issue" | "labelsEditable" | "onLabelsMenu">} view
+ * @param {Theme} t
+ */
 function labelsRow({ issue, labelsEditable, onLabelsMenu }, t) {
   return h_flex()
     .pt(4)
@@ -161,7 +262,11 @@ function labelsRow({ issue, labelsEditable, onLabelsMenu }, t) {
     );
 }
 
-// `blocking`: the IDs of issues that list this one in their blocked_by.
+/**
+ * `blocking`: the IDs of issues that list this one in their blocked_by.
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
 function facts(view, t) {
   const {
       issue: { blockedBy, branch, pullRequests: attached },
@@ -190,6 +295,7 @@ function facts(view, t) {
     .when(view.issue.labels.length > 0 || view.labelsEditable, (e) => e.child(labelsRow(view, t)));
 }
 
+/** @type {Record<string, [string, string]>} */
 const PULL_REQUEST_STATUSES = {
   draft: ["Draft", "dim"],
   open: ["Open", "ansi2"],
@@ -199,7 +305,13 @@ const PULL_REQUEST_STATUSES = {
   closed: ["Closed", "ansi1"],
 };
 
-// A pull request's status, then its number and title, which open it in the browser when clicked.
+/**
+ * A pull request's status, then its number and title, which open it in the browser when clicked.
+ * @param {string} issueId
+ * @param {PullRequest} pullRequest
+ * @param {DetailView["onLink"]} onLink
+ * @param {Theme} t
+ */
 function pullRequestLine(issueId, pullRequest, onLink, t) {
   const [status, color] = PULL_REQUEST_STATUSES[pullRequest.status] ?? [pullRequest.status, "dim"];
   const reference = pullRequest.number ? `${pullRequest.repo ?? ""}#${pullRequest.number}` : "";
@@ -223,7 +335,11 @@ function pullRequestLine(issueId, pullRequest, onLink, t) {
     );
 }
 
-// The issue's one pull request, or a bulleted list of several.
+/**
+ * The issue's one pull request, or a bulleted list of several.
+ * @param {Pick<DetailView, "issue" | "onLink">} view
+ * @param {Theme} t
+ */
 function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
   if (pullRequests.length === 1) return pullRequestLine(id, pullRequests[0], onLink, t);
   return v_flex()
@@ -243,6 +359,10 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
     );
 }
 
+/**
+ * @param {DetailView["onCollapse"]} onCollapse
+ * @param {Theme} t
+ */
 export function collapseButton(onCollapse, t) {
   return div()
     .id("issues-collapse")
@@ -263,13 +383,25 @@ export function collapseButton(onCollapse, t) {
 }
 
 // An icon has its own color, so a button whose label is an icon redraws it in the hover color.
+/** @type {string | null} */
 let hoveredButton = null;
 
-// A light theme's raised fill barely differs from the panel, so a button there is outlined too.
+/**
+ * A light theme's raised fill barely differs from the panel, so a button there is outlined too.
+ * @param {NativeElement} element
+ * @param {Theme} t
+ */
 const outlinedInLightTheme = (element, t) => element.when(isLightTheme(t), (e) => e.border_1().border_color(t.border));
 
-// Buttons stop the pointer events a list row would otherwise take as an open. A label may be a
-// function of the button's text color, for an icon.
+/**
+ * Buttons stop the pointer events a list row would otherwise take as an open. A label may be a
+ * function of the button's text color, for an icon.
+ * @param {string} id
+ * @param {string | ((color: Color) => NativeElement)} label
+ * @param {(cx: Context) => void} onClick
+ * @param {Theme} t
+ * @param {{ primary?: boolean, enabled?: boolean, tooltip?: string | null, primaryOnHover?: boolean }} [options]
+ */
 export function button(
   id,
   label,
@@ -278,6 +410,7 @@ export function button(
   { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {},
 ) {
   const solidOnHover = primaryOnHover && !primary;
+  /** @type {(style: NativeElement) => NativeElement} */
   const hoverStyle = solidOnHover ? (s) => s.bg(t.solid).text_color(t.solid_foreground) : (s) => s.opacity(0.85);
   const textColor = !enabled
     ? t.dim
@@ -315,10 +448,16 @@ export function button(
     .child(typeof label === "function" ? label(textColor) : label);
 }
 
-// Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
-// whose worktree a space already shows switches to that space instead, and the button stands out to say so,
-// unless that space is the active one. The list's compact button shows the issue's branch for both, so it
-// fits beside a title. Each is disabled while the issue's worktree is opening.
+/**
+ * Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
+ * whose worktree a space already shows switches to that space instead, and the button stands out to say so,
+ * unless that space is the active one. The list's compact button shows the issue's branch for both, so it
+ * fits beside a title. Each is disabled while the issue's worktree is opening.
+ * @param {string} key
+ * @param {Pick<DetailView, "finishable" | "startable" | "inSpace" | "inActiveSpace" | "opening" | "onStart" | "onContinue">} state
+ * @param {Theme} t
+ * @param {{ primary?: boolean, compact?: boolean }} [options]
+ */
 export function workButton(
   key,
   { finishable, startable, inSpace, inActiveSpace, opening, onStart, onContinue },
@@ -334,6 +473,7 @@ export function workButton(
     });
   }
   const style = { primary, primaryOnHover: compact, enabled: !opening };
+  /** @param {Color} color */
   const branchIcon = (color) => svg("mods/issues/icons/git-branch-plus.svg").size(14).text_color(color);
   if (finishable)
     return button(`${key}-continue`, compact ? branchIcon : "Continue", onContinue, t, {
@@ -347,12 +487,24 @@ export function workButton(
   });
 }
 
+/**
+ * @param {string} name
+ * @returns {(color: Color) => NativeElement}
+ */
 const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
 
-// Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
+/**
+ * Continue for an issue in progress, otherwise Start, as an icon: the issue view's primary action.
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
 const workActions = (view, t) => workButton("issue", view, t, { compact: true });
 
-// Merges the issue's finished branch into main, for a repository that merges locally.
+/**
+ * Merges the issue's finished branch into main, for a repository that merges locally.
+ * @param {Pick<DetailView, "issue" | "merging" | "opening" | "onMerge">} view
+ * @param {Theme} t
+ */
 function mergeButton({ issue, merging, opening, onMerge }, t) {
   return button("issue-merge", merging ? "Merging…" : "Merge", onMerge, t, {
     enabled: !opening,
@@ -360,6 +512,10 @@ function mergeButton({ issue, merging, opening, onMerge }, t) {
   });
 }
 
+/**
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
 function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel }, t) {
   if (!writable) return div();
   if (!editor)
@@ -374,6 +530,11 @@ function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel
 const TASK_INDENT_PX = 9;
 const AFTER_TASKS_PX = 14;
 
+/**
+ * @param {TaskSegment} task
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
 function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t) {
   const box = div()
     .id(`task-${issue.id}-${task.line}`)
@@ -410,6 +571,10 @@ function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t)
     );
 }
 
+/**
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
 function body(view, t) {
   const { issue, editor, onLink, linkFiles } = view;
   if (editor) return Editor.new(editor).size_full();
@@ -420,18 +585,22 @@ function body(view, t) {
     .overflow_y_scrollbar()
     .gap(4)
     .children(
-      bodySegments(issue.body).map((segment, index, segments) =>
+      /** @type {BodySegment[]} */ (bodySegments(issue.body)).map((segment, index, segments) =>
         segment.markdown !== undefined
           ? TextView.markdown(`issue-body-${issue.id}-${index}`, linkFiles(segment.markdown))
               .selectable()
               .flex_none()
               .on_link_click(onLink)
               .when(index > 0 && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
-          : taskItem(segment, view, t),
+          : taskItem(/** @type {TaskSegment} */ (segment), view, t),
       ),
     );
 }
 
+/**
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
 export function issueDetail(view, t) {
   const { issue, error, onBack } = view;
   return v_flex()
@@ -515,7 +684,7 @@ export function issueDetail(view, t) {
         .items_center()
         .border_b(1)
         .border_color(t.border)
-        .bg(fieldBar(t))
+        .bg(/** @type {Color} */ (fieldBar(t)))
         .child(dropdown("status", "Status", view, t))
         .when(view.prioritized, (e) => e.child(dropdown("priority", "Priority", view, t))),
     )

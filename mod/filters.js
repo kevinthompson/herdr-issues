@@ -3,8 +3,14 @@
 // listed issues carry, when they carry any. Each is { id, heading, shown, menu, options, selected }: menu
 // "scope" opens openScopeMenu with options as scopes, and menu "label" opens openLabelMenu with options as
 // label names (menu.js).
+/** @import { TrackerScope } from "./trackers/index.js" */
 
-export function listFilters({ scopes, scope, project, milestone } = /** @type {any} */ ({}), labels, label) {
+/**
+ * @param {{ scopes?: TrackerScope[], scope?: TrackerScope, project?: TrackerScope, milestone?: TrackerScope }} listing
+ * @param {string[]} labels
+ * @param {string} [label]
+ */
+export function listFilters({ scopes, scope, project, milestone } = {}, labels, label) {
   const filters = [];
   if (scopes) {
     const listed = project ?? scope;

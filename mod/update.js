@@ -10,12 +10,34 @@
 // finished (finishedUpdate).
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
 
+/**
+ * @typedef {{ checkout: string, commit: string, count: number }} Update
+ * @typedef {{ dismissed?: string | null, updating?: string | null }} UpdateState
+ * @import { ExecResult } from "herdr"
+ * @typedef {Parameters<typeof exec>[2]} ExecOptions
+ */
+
 const FETCH_TIMEOUT_MS = 60_000;
 export const modLinkPath = () => `${appHome()}/mods/issues`;
 export const updateStatePath = () => `${appHome()}/issues-update.json`;
 
-const git = (checkout, args, options) => exec("git", ["-C", checkout, ...args], options).catch(() => null);
+/**
+ * @param {string} checkout
+ * @param {string[]} args
+ * @param {ExecOptions} [options]
+ */
+const git = (checkout, args, options) =>
+  exec("git", ["-C", checkout, ...args], options).catch(/** @returns {ExecResult | null} */ () => null);
+/**
+ * @param {string} checkout
+ * @param {string[]} args
+ * @param {ExecOptions} [options]
+ */
 const succeeds = async (checkout, args, options) => (await git(checkout, args, options))?.code === 0;
+/**
+ * @param {string} checkout
+ * @param {string[]} args
+ */
 async function output(checkout, args) {
   const result = await git(checkout, args);
   return result?.code === 0 ? result.stdout.trim() : null;
@@ -27,6 +49,10 @@ export const modCheckout = () => output(modLinkPath(), ["rev-parse", "--show-top
 
 // What ./install would bring into `checkout`: { checkout, commit, count }, with origin/main's commit and how many
 // commits HEAD lacks, or null when it's up to date, ./install would refuse or the fetch fails.
+/**
+ * @param {string} checkout
+ * @returns {Promise<Update | null>}
+ */
 export async function availableUpdate(checkout) {
   if ((await output(checkout, ["symbolic-ref", "--quiet", "--short", "HEAD"])) !== "main") return null;
   if ((await output(checkout, ["status", "--porcelain"])) !== "") return null;
@@ -37,8 +63,9 @@ export async function availableUpdate(checkout) {
   return { checkout, commit: await output(checkout, ["rev-parse", "origin/main"]), count };
 }
 
+/** @returns {Promise<{ text: string | null, state: UpdateState }>} */
 async function readState() {
-  const text = await readTextFile(updateStatePath()).catch(() => null);
+  const text = await readTextFile(updateStatePath()).catch(/** @returns {string | null} */ () => null);
   try {
     return { text, state: JSON.parse(text ?? "{}") ?? {} };
   } catch {
@@ -46,6 +73,7 @@ async function readState() {
   }
 }
 
+/** @param {UpdateState} change */
 async function changeState(change) {
   const { text, state } = await readState();
   await writeTextFile(updateStatePath(), `${JSON.stringify({ ...state, ...change })}\n`, text);
@@ -60,6 +88,7 @@ export async function offeredUpdate() {
   return state.dismissed === update.commit ? null : update;
 }
 
+/** @param {Update} update */
 export const dismissUpdate = (update) => changeState({ dismissed: update.commit });
 
 // ./install and setup can ask questions, so they run in a terminal. Once they succeed, touching the mod's link
@@ -68,6 +97,7 @@ export const dismissUpdate = (update) => changeState({ dismissed: update.commit 
 const RUN_INSTALL = `"$1" && touch -h "$2"; exec "\${SHELL:-/bin/sh}" -l`;
 
 // The tab Update opens, as tab.new's { name, folder, argv }, after noting the commit it installs.
+/** @param {Update} update */
 export async function installTab(update) {
   await changeState({ updating: update.commit });
   return {

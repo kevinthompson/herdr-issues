@@ -4,6 +4,7 @@
 
 const LAST_VERSION_WITHOUT_FOCUS = [0, 1, 15];
 
+/** @param {string | null | undefined} appVersion */
 function takesFocus(appVersion) {
   const parts = /^(\d+)\.(\d+)\.(\d+)/
     .exec(appVersion ?? "")
@@ -14,4 +15,5 @@ function takesFocus(appVersion) {
   return difference > 0;
 }
 
+/** @param {string | null | undefined} appVersion */
 export const openBehindArgs = (appVersion) => (takesFocus(appVersion) ? { focus: false } : {});

@@ -42,12 +42,106 @@
 // else the one Linear suggests. GitHub issues fill the same fields as Linear's labelColors, assignee,
 // assigneeAvatar and pullRequests; github.js says how their statuses and branches are derived. beads.js says how
 // Beads issues' statuses and priorities map.
+
+/**
+ * @typedef {object} PullRequest
+ * @property {string} url
+ * @property {string} title
+ * @property {string | null} repo
+ * @property {number | null} number
+ * @property {string} status
+ * @property {string | null} branch
+ * @property {string} [fullRepo]
+ */
+
+/**
+ * @typedef {object} Issue
+ * @property {string} id
+ * @property {string} title
+ * @property {string} status One of STATUSES in issue.js.
+ * @property {number} priority 0 none … 4 low.
+ * @property {number | null} order
+ * @property {string[]} labels
+ * @property {string[]} blockedBy
+ * @property {number} [number]
+ * @property {string} [url]
+ * @property {string} [linearId]
+ * @property {string} [teamId]
+ * @property {string[]} [assigneeLogins]
+ * @property {string | null} [branch]
+ * @property {string} [created]
+ * @property {string | null} [completed]
+ * @property {string | null} [body] Null until tracker.get loads it.
+ * @property {string} [updated]
+ * @property {Record<string, string>} [labelColors]
+ * @property {string} [assignee]
+ * @property {string | null} [assigneeId]
+ * @property {string | null} [assigneeAvatar]
+ * @property {{ breachesAt: string, mediumRiskAt: string | null, highRiskAt: string | null } | null} [sla]
+ * @property {string | null} [due]
+ * @property {PullRequest[]} [pullRequests]
+ * @property {string | null} [delegateId]
+ * @property {string | null} [delegate]
+ * @property {string | null} [delegateAvatar]
+ * @property {boolean} [bodyStale] The panel's: the list changed since the body loaded.
+ */
+
+/**
+ * @typedef {object} TrackerScope
+ * @property {string} [id]
+ * @property {string} [label]
+ * @property {string} [group]
+ * @property {string} [team]
+ * @property {string} [url]
+ * @property {string} [subgroup]
+ * @property {TrackerScope[]} [milestones]
+ */
+
+/**
+ * @typedef {object} IssueChanges
+ * @property {string} [status]
+ * @property {number} [priority]
+ * @property {number | null} [order]
+ * @property {string} [body]
+ * @property {string[]} [addLabels]
+ * @property {string[]} [removeLabels]
+ */
+
+/**
+ * @typedef {object} Tracker
+ * @property {"linear" | "github" | "beads"} kind
+ * @property {string} name
+ * @property {string} [team]
+ * @property {string} [repo]
+ * @property {boolean} writable
+ * @property {boolean} [prioritized]
+ * @property {string[]} statuses
+ * @property {TrackerScope[]} [scopes]
+ * @property {number} [recentlyClosed]
+ * @property {(scopeId?: string, loads?: Set<string>) => Promise<Issue[]>} list
+ * @property {(scopeId?: string) => string[]} [deferred]
+ * @property {(id: string) => Promise<Issue | null>} get
+ * @property {() => Promise<string[]>} [labels]
+ * @property {(issue: Issue, changes: IssueChanges) => Promise<void>} update
+ * @property {(issue: Issue) => Promise<void>} start
+ * @property {() => Promise<string>} [viewerId]
+ */
+
+/**
+ * The project a panel shows: its root and, outside a git repository, `on` (location.js).
+ * @typedef {{ root: string, on?: string }} Project
+ */
+
 import { linearTracker } from "./linear.js";
 import { githubTracker } from "./github.js";
 import { beadsTracker } from "./beads.js";
 import { trackerSetting } from "./setting.js";
 
 // The repository's entry in issues.json (setting.js) decides; without one, Linear.
+/**
+ * @param {Project} project
+ * @returns {Promise<Tracker | null>}
+ */
 export async function trackerFor(project) {
   const setting = await trackerSetting(project);
   if (setting?.tracker === "github") return githubTracker(project, setting);

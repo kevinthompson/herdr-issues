@@ -8,10 +8,12 @@ const OPEN_SECTIONS = "issues.openSections";
 
 const openSections = () => /** @type {Record<string, Record<string, boolean>>} */ (shared(OPEN_SECTIONS) ?? {});
 
+/** @param {string} repository @param {{ id: string, collapsed?: boolean }} group */
 export function isSectionOpen(repository, group) {
   return openSections()[repository]?.[group.id] ?? !group.collapsed;
 }
 
+/** @param {string | null | undefined} repository @param {string} groupId @param {boolean} open */
 export function setSectionOpen(repository, groupId, open) {
   if (!repository) return;
   const sections = openSections();
