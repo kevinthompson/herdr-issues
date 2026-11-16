@@ -168,8 +168,8 @@ for (const [state, mark] of Object.entries(MARKS)) {
     const calls = stubApp(t, listing("Claude", "#72"));
     const { code, out } = await run(t, ["mark", state, "#72"]);
     assert.equal(code, 0);
-    assert.deepEqual(calls, [["do", "space.rename", "--id", "space-session", "--name", `${mark}  #72`]]);
-    assert.equal(out, `Marked the space ${state}: ${mark}  #72`);
+    assert.deepEqual(calls, [["do", "space.rename", "--id", "space-session", "--name", `${mark}   #72`]]);
+    assert.equal(out, `Marked the space ${state}: ${mark}   #72`);
   });
 }
 
@@ -178,7 +178,7 @@ test("mark replaces a mark already on the space's name", async (t) => {
   const calls = stubApp(t, listing("Claude", `${MARKS.waiting} name #72`));
   const { code } = await run(t, ["mark", "done", "#72"]);
   assert.equal(code, 0);
-  assert.deepEqual(calls, [["do", "space.rename", "--id", "space-session", "--name", `${MARKS.done}  name #72`]]);
+  assert.deepEqual(calls, [["do", "space.rename", "--id", "space-session", "--name", `${MARKS.done}   name #72`]]);
 });
 
 test("mark leaves a space not named after the issue as it is", async (t) => {
@@ -192,11 +192,11 @@ test("mark leaves a space not named after the issue as it is", async (t) => {
 
 test("mark changes nothing when the space already has the state's mark", async (t) => {
   inRepository(t);
-  const calls = stubApp(t, listing("Claude", `${MARKS.done}  #72`));
+  const calls = stubApp(t, listing("Claude", `${MARKS.done}   #72`));
   const { code, out } = await run(t, ["mark", "done", "#72"]);
   assert.equal(code, 0);
   assert.deepEqual(calls, []);
-  assert.equal(out, `The space is already marked done: ${MARKS.done}  #72`);
+  assert.equal(out, `The space is already marked done: ${MARKS.done}   #72`);
 });
 
 for (const args of [["mark"], ["mark", "finished", "#72"], ["mark", "done"], ["mark", "done", "#72", "#73"]]) {

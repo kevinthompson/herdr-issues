@@ -2,7 +2,7 @@
 // issues.json (trackers/setting.js) with its placeholders filled in. The panel and `issues space-name`,
 // which /issues:work runs, both name spaces here, and the panel reads the issue ID back out of a space's
 // name here to open that space's issue. A space's name matches an issue's space name when it ends with it, after
-// the start of the name or whitespace, so a mark before the name, such as `󰄱  #123`, still matches. The marks for
+// the start of the name or whitespace, so a mark before the name, such as `󰄱   #123`, still matches. The marks for
 // whether a space's session is working, waiting on the person or done are here too, for `issues mark`, and a new issue
 // space, which the panel and `issues worktree <id>` open, is named marked working from the start.
 import { mainCheckout } from "./location.js";
@@ -23,7 +23,7 @@ export const DONE_MARK = "\u{F0132}";
 export const SPACE_MARKS = { working: WORKING_MARK, waiting: WAITING_MARK, done: DONE_MARK };
 
 // The interface font draws a mark wider than its advance, covering a single space after it.
-const MARK_GAP = "  ";
+const MARK_GAP = "   ";
 const LEADING_MARK = new RegExp(`^(?:${Object.values(SPACE_MARKS).join("|")}) +`, "u");
 
 export const unmarkedSpaceName = (name) => name.replace(LEADING_MARK, "");
