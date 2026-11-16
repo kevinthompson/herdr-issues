@@ -1,6 +1,6 @@
 {
   "name": "issues",
-  "version": "2.27.2",
+  "version": "2.28.0",
   "description": "Plan, write and work issues tracked in Linear, in GitHub Issues or in a local Beads database.",
   "author": {
     "name": "Kevin Thompson",
