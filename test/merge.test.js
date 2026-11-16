@@ -6,7 +6,7 @@ import { commitFile, createRepository, git, temporaryFolder } from "./support/re
 import { stubHerdr } from "./support/herdr.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
-import { canOfferMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
+import { canOfferMerge, checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 
 beforeEach(() => forgetLookups());
 
@@ -123,5 +123,43 @@ describe("canOfferMerge", () => {
     const { repository, project } = setUp(t);
     git(repository, "branch", "-q", "elsewhere", "feature");
     assert.equal(await canOfferMerge("elsewhere", project), false);
+  });
+});
+
+describe("checkMerge", () => {
+  // Every ref, and both checkouts' HEADs and statuses, so a test can show the check changed none of them.
+  const snapshot = ({ repository, worktree }) => ({
+    refs: git(repository, "for-each-ref", "--format=%(refname) %(objectname)"),
+    heads: [head(repository), head(worktree)],
+    statuses: [git(repository, "status", "--porcelain"), git(worktree, "status", "--porcelain")],
+  });
+
+  test("passes a branch that merges cleanly, changing nothing", async (t) => {
+    const setup = setUp(t);
+    commitFile(setup.repository, "other.txt", "from main\n");
+    const before = snapshot(setup);
+    assert.equal((await checkMerge(setup.issue, setup.project)).branch, "main");
+    assert.deepEqual(snapshot(setup), before);
+  });
+
+  test("refuses a branch that conflicts with main, naming the files, changing nothing", async (t) => {
+    const setup = setUp(t);
+    commitFile(setup.worktree, "README", "from the branch\n");
+    commitFile(setup.repository, "README", "from main\n");
+    const before = snapshot(setup);
+    await assert.rejects(checkMerge(setup.issue, setup.project), (error) => {
+      assert.ok(error instanceof MergeRefusal, error.message);
+      assert.equal(error.message, "feature doesn't merge cleanly into main, so nothing was merged: README");
+      return true;
+    });
+    assert.deepEqual(snapshot(setup), before);
+  });
+
+  test("refuses when the main checkout has uncommitted changes, changing nothing", async (t) => {
+    const setup = setUp(t);
+    writeFileSync(join(setup.repository, "README"), "edited\n");
+    const before = snapshot(setup);
+    await assert.rejects(checkMerge(setup.issue, setup.project), /main checkout .* has uncommitted changes/);
+    assert.deepEqual(snapshot(setup), before);
   });
 });
