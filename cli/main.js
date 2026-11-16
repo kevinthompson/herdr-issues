@@ -11,7 +11,9 @@ import { issueSpaceName, markedSpaceName, newIssueSpaceName, SPACE_MARKS, spaceN
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
-import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
+import {
+  bodyHash, ChangeRefusal, changeIssueLabels, checkIssueItems, editIssueBody, MissingItemRefusal, setIssueStatus, startIssue,
+} from "./change.js";
 import {
   clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameSpace, renameTab, sessionTab,
   uncompletedTabName,
@@ -67,6 +69,10 @@ Commands:
   edit <id> --body-file <file> --body-hash <hash>
                            Save the file as the issue's body and refresh the panels; <hash> is the bodyHash show --json
                            printed, and the edit is refused, changing nothing, when the body changed since then
+  check <id> [--except <n>]...
+                           Check every unchecked task-list item (- [ ]) in the issue's body, save it as edit does and
+                           refresh the panels, printing the items checked; --except <n>: leave the nth unchecked item,
+                           counting from 1 in body order, unchecked. A body with nothing to check is left as it is
   label <id> [--add <name>]... [--remove <name>]...
                            Add and remove the issue's labels by name, keeping its others, and refresh the panels;
                            refuse, changing nothing, a name the tracker has no label by. A Linear label in a group
@@ -427,6 +433,38 @@ async function edit(args) {
   console.log(`Saved the body of ${issue.id}`);
 }
 
+function checkOptions(args) {
+  const options = { id: null, keepUnchecked: [] };
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index];
+    if (arg === "--except") {
+      const number = Number(args[++index]);
+      if (!Number.isInteger(number) || number < 1) throw new UsageError("check: --except needs an item number, counting from 1");
+      options.keepUnchecked.push(number);
+    } else if (arg.startsWith("-") || options.id) throw new UsageError(`check: unexpected ${arg}`);
+    else options.id = arg;
+  }
+  if (!options.id) throw new UsageError("check needs an issue ID");
+  return options;
+}
+
+async function check(args) {
+  const { id, keepUnchecked } = checkOptions(args);
+  const { issue, checked, left } = await refusingChanges(async () => {
+    try {
+      return await checkIssueItems(await currentTracker(), id, { keepUnchecked });
+    } catch (error) {
+      throw error instanceof MissingItemRefusal ? new UsageError(`check: ${error.message}`) : error;
+    }
+  });
+  const list = (items) => items.map((item) => `  - ${item}`);
+  if (!checked.length) {
+    console.log(`${issue.id} has no unchecked items to check; its body is unchanged`);
+    return;
+  }
+  console.log([`Checked in ${issue.id}:`, ...list(checked), ...(left.length ? ["Left unchecked:", ...list(left)] : [])].join("\n"));
+}
+
 function labelOptions(args) {
   const options = { id: null, addLabels: [], removeLabels: [] };
   const flags = { "--add": "addLabels", "--remove": "removeLabels" };
@@ -451,7 +489,7 @@ async function label(args) {
   console.log(`${issue.id}: ${changes.join(", ")}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, worktree, merge, status, start, edit, label };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, worktree, merge, status, start, edit, check, label };
 
 const HELP_FLAGS = ["-h", "--help"];
 
