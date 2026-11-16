@@ -15,7 +15,7 @@ import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { button, collapseButton } from "./detail.js";
 import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
-import { landingSettings, resolveLandingSettings, saveSetupChoices } from "./trackers/setting.js";
+import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 
 const TEAM_PICKS = "issues.setupTeams";
@@ -23,7 +23,7 @@ const ANSWER_LABEL_PX = 80;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 // How work lands, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
 // the choices, each with what it means.
-export const LANDING_QUESTIONS = {
+export const APPROVAL_QUESTIONS = {
   approval: {
     title: "How is work approved?", sentence: null,
     choices: [
@@ -100,7 +100,7 @@ export class TrackerSetup {
     this.answers = {}; this.proposed = null;
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
-      alongside: () => this.proposeLanding(),
+      alongside: () => this.proposeApproval(),
       onReady: (proposed, cx) => { this.proposed = proposed; this.goTo(this.tracker.choice === "linear" ? "team" : "approval", cx); },
       onTeam: (cx) => { if (this.step === "team") this.goTo("approval", cx); },
     });
@@ -146,8 +146,8 @@ export class TrackerSetup {
   }
 
   // An entry that fails to load proposes the defaults instead of its own settings.
-  async proposeLanding() {
-    const proposed = await landingSettings({ root: this.main, on: null }).catch(() => resolveLandingSettings(this.main, null));
+  async proposeApproval() {
+    const proposed = await approvalSettings({ root: this.main, on: null }).catch(() => resolveApprovalSettings(this.main, null));
     return { ...proposed, waitForChecks: checksChoiceId(proposed.waitForChecks) };
   }
 
@@ -156,7 +156,7 @@ export class TrackerSetup {
   }
 
   // Answers approval, onApproval or waitForChecks, and goes on to the next step.
-  chooseLanding(key, id, cx) {
+  chooseApproval(key, id, cx) {
     this.answers = { ...this.answers, [key]: id };
     const steps = this.steps();
     this.goTo(steps[steps.indexOf(key) + 1], cx);
@@ -198,7 +198,7 @@ export class TrackerSetup {
       }, t));
     }
     const page = { tracker: this.trackerPage, team: this.teamPage, review: this.reviewPage }[this.step];
-    const shown = page ? page.call(this, content, t) : this.landingPage(this.step, content, t);
+    const shown = page ? page.call(this, content, t) : this.approvalPage(this.step, content, t);
     return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(shown);
   }
 
@@ -248,20 +248,20 @@ export class TrackerSetup {
   }
 
   // The page for approval, onApproval or waitForChecks.
-  landingPage(key, content, t) {
-    const { title, sentence, choices } = LANDING_QUESTIONS[key];
+  approvalPage(key, content, t) {
+    const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
     return this.question(content, title, sentence, t)
-      .child(this.options(key, choices, { chosen: this.answers[key], proposed: this.proposed?.[key], onChoose: (id, cx) => this.chooseLanding(key, id, cx) }, t));
+      .child(this.options(key, choices, { chosen: this.answers[key], proposed: this.proposed?.[key], onChoose: (id, cx) => this.chooseApproval(key, id, cx) }, t));
   }
 
   reviewPage(content, t) {
-    const landingAnswer = (key) => answerLabel(LANDING_QUESTIONS[key].choices, this.answers[key]);
+    const approvalAnswer = (key) => answerLabel(APPROVAL_QUESTIONS[key].choices, this.answers[key]);
     const answers = [
       ["Tracker", answerLabel(TRACKERS, this.tracker.choice)],
       ...(this.tracker.choice === "linear" ? [["Team", this.tracker.teamLabel()]] : []),
-      ["Approval", landingAnswer("approval")],
-      ["When work is approved...", landingAnswer("onApproval")],
-      ...(this.answers.onApproval === "pull-request" ? [["Checks", landingAnswer("waitForChecks")]] : []),
+      ["Approval", approvalAnswer("approval")],
+      ["When work is approved...", approvalAnswer("onApproval")],
+      ...(this.answers.onApproval === "pull-request" ? [["Checks", approvalAnswer("waitForChecks")]] : []),
     ];
     return this.question(content, "Review your setup", "Save writes these choices for this repository. Go back to change one.", t)
       .child(v_flex().flex_none().gap(6).children(answers.map(([name, value]) => h_flex().gap(8).text_size(12)

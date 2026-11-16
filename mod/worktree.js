@@ -2,7 +2,7 @@
 // is a linked worktree, and whether a branch has merged into main.
 
 import { exec, spaces, panes } from "herdr";
-import { landingSettings } from "./trackers/setting.js";
+import { approvalSettings } from "./trackers/setting.js";
 
 async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on }).catch(() => null);
@@ -96,7 +96,7 @@ export async function isMergedInto(repo, base, on) {
 // (onApproval "pull-request"), so a pushed branch with one is safe to remove, else null: also when the settings
 // can't be read or gh can't answer, so the dialog asks for main.
 async function completingPullRequest(repo, branch, on) {
-  const { onApproval } = await landingSettings({ root: repo.main, on }).catch(() => ({ onApproval: "merge" }));
+  const { onApproval } = await approvalSettings({ root: repo.main, on }).catch(() => ({ onApproval: "merge" }));
   if (onApproval !== "pull-request") return null;
   const view = await exec("gh", ["pr", "view", branch, "--json", "state,url"], { cwd: repo.top, on }).catch(() => null);
   if (view?.code !== 0) return null;

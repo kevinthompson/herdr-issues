@@ -5,7 +5,7 @@
 // approval that approving will merge: it tests the merge with git merge-tree and changes no checkout or ref.
 import { exec } from "herdr";
 import { checkouts, MAIN_BRANCHES } from "./worktree.js";
-import { landingSettings } from "./trackers/setting.js";
+import { approvalSettings } from "./trackers/setting.js";
 import { announceIssueChange } from "./changes.js";
 
 export class MergeRefusal extends Error {}
@@ -25,7 +25,7 @@ const commitsMainLacks = async (main, branch, on) =>
 // commits main lacks and nothing uncommitted. Anything mergeIssue checks besides is reported when it's clicked.
 export async function canOfferMerge(branch, project) {
   if (!branch || project.on != null) return false;
-  const { onApproval } = await landingSettings(project).catch(() => ({ onApproval: null }));
+  const { onApproval } = await approvalSettings(project).catch(() => ({ onApproval: null }));
   if (onApproval !== "merge") return false;
   const [main, ...linked] = await checkouts(project.root, project.on);
   const worktree = linked.find((checkout) => checkout.branch === branch);
@@ -37,7 +37,7 @@ export async function canOfferMerge(branch, project) {
 // Checks every reason not to merge before changing anything; returns the main checkout, { path, branch }.
 async function mergeableMain(branch, project) {
   const { on } = project;
-  const { onApproval } = await landingSettings(project);
+  const { onApproval } = await approvalSettings(project);
   if (onApproval === "pull-request") {
     throw new MergeRefusal(`This repository merges through pull requests: merge ${branch}'s pull request instead.`);
   }
