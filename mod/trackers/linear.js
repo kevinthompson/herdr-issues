@@ -197,11 +197,6 @@ const statusRank = (project) => {
   return rank === -1 ? PROJECT_STATUS_ORDER.length : rank;
 };
 
-// The list's sections a scope always shows: Triage only where the scope lists triage issues.
-const SECTIONS = ["in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"];
-const LISTS_TRIAGE = ["team", "triage"];
-export const linearSections = (scopeId) => (LISTS_TRIAGE.includes(scopeId) ? ["triage", ...SECTIONS] : SECTIONS);
-
 // The issue lists a repository can show: { id, label, team?, group?, subgroup?, milestones? }, its default
 // first. My issues stands alone, then the team's lists and saved views under the team's name, then its
 // projects, grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
@@ -449,7 +444,6 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
       return (await issuesIn(scope.id, loads)).map((node) => toIssue(node, repoName));
     },
     deferred: (scopeId) => deferredGroups((findScope(scopes, scopeId)?.scope ?? scopes[0]).id),
-    sections: (scopeId) => linearSections((findScope(scopes, scopeId)?.scope ?? scopes[0]).id),
     get,
     async labels() {
       return (await labelsOf(repo.teamKey)).map((label) => label.name);

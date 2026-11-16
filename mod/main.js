@@ -20,7 +20,7 @@ import { v_flex, h_flex, EditorState, ScrollHandle } from "gpui-base";
 import { theme, props, settings, nextCommand, openOverlay, spaces, panes, terminals, focused, notify, exec, hc, run, watchFolder, appHome, updates } from "herdr";
 import { location, repositoryRoot, mainCheckout, initializeRepository } from "./location.js";
 import { trackerFor } from "./trackers/index.js";
-import { settingsPath, pollSettings, nameSettings, mergeSettings, updateSettings, DEFAULT_POLL_SECONDS, DEFAULT_UPDATE_CHECK_HOURS } from "./trackers/setting.js";
+import { settingsPath, pollSettings, nameSettings, updateSettings, DEFAULT_POLL_SECONDS, DEFAULT_UPDATE_CHECK_HOURS } from "./trackers/setting.js";
 import { offeredUpdate, dismissUpdate, installTab, finishedUpdate } from "./update.js";
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
@@ -28,7 +28,7 @@ import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName, headerTitlePieces } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
 import { filterRow } from "./filter-row.js";
-import { groupIssues, groupCountText, sectionsForMerge, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, groupCountText, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, LabelMenu, openMenu, openScopeMenu, openLabelMenu, openIssueLabelsMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
@@ -201,11 +201,9 @@ export default class Issues extends View {
         const tracker = await trackerFor({ root, on: where.on });
         const { pollSeconds } = await pollSettings({ root, on: where.on });
         const { name: repositoryName } = await nameSettings({ root, on: where.on }).catch(() => ({ name: null }));
-        const { merge } = await mergeSettings({ root, on: where.on }).catch(() => ({ merge: null }));
         if (generation !== this.generation) return;
         this.pollMs = pollSeconds * 1000;
         this.repositoryName = repositoryName;
-        this.merge = merge;
         this.listedScope = scope;
         if (!tracker) { this.showSetup(scopeKey, null, cx); return; }
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
@@ -224,7 +222,7 @@ export default class Issues extends View {
         if (generation !== this.generation) return;
         const leaving = this.openId && !issues.some((each) => each.id === this.openId) ? this.findIssue(this.openId) : null;
         Object.assign(this, { project, tracker, scopeKey, listKey, issues: withLoadedBodies(issues, this.issues), unloaded, error: null, setup: null });
-        this.shownByContext.set(context, { project, tracker, scopeKey, listKey, unloaded, listedScope: scope, repository: null, repositoryName, merge });
+        this.shownByContext.set(context, { project, tracker, scopeKey, listKey, unloaded, listedScope: scope, repository: null, repositoryName });
         if (leaving) this.holdOpenIssue(leaving, tracker, cx);
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.scanRepository(project, generation, cx);
@@ -272,7 +270,7 @@ export default class Issues extends View {
   }
 
   forgetList() {
-    this.project = null; this.tracker = null; this.repositoryName = null; this.merge = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
+    this.project = null; this.tracker = null; this.repositoryName = null; this.issues = []; this.unloaded = new Set(); this.loaded = false; this.repository = null;
     this.scopeKey = null; this.listedScope = undefined; this.listKey = null; this.rowLimit = ROW_LIMIT; this.openingSpaceIssue = null;
     this.setup = null; this.settingsView = null;
   }
@@ -914,9 +912,9 @@ export default class Issues extends View {
   }
 
   groups(label) {
-    const { tracker, listedScope } = this;
-    const sections = sectionsForMerge(tracker?.sections?.(listedScope) ?? [], this.merge);
-    return groupIssues(this.issues, this.unloaded, label, { sections, recentlyClosed: tracker?.recentlyClosed ?? null });
+    const { tracker } = this;
+    if (!tracker) return [];
+    return groupIssues(this.issues, this.unloaded, label, { recentlyClosed: tracker.recentlyClosed ?? null });
   }
 
   // Its issue count, or while its issues aren't listed, … when expanded and so being listed, else a refresh icon.

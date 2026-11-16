@@ -217,7 +217,6 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
       return lists.flat().map((node) => toIssue(node, repo));
     },
     deferred: () => ["done", "canceled"],
-    sections: () => ["in-review", "in-progress", "todo", "blocked", "done", "canceled"],
     recentlyClosed: RECENTLY_CLOSED,
     get,
     labels,

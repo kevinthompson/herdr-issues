@@ -17,7 +17,7 @@ const GROUPS = [
   { id: "triage", label: "Triage", has: (issue) => issue.status === "triage" },
   { id: "in-review", label: "In review", has: (issue) => issue.status === "in-review" },
   { id: "in-progress", label: "In progress", has: (issue) => issue.status === "in-progress" },
-  { id: "todo", label: "Todo", has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
+  { id: "todo", label: "Todo", alwaysShown: true, has: (issue, done) => issue.status === "todo" && isUnblocked(issue, done) },
   { id: "blocked", label: "Blocked", collapsed: true, loads: "backlog", has: (issue, done) => isStartable(issue) && !isUnblocked(issue, done) },
   { id: "backlog", label: "Backlog", collapsed: true, loads: "backlog", has: (issue, done) => issue.status === "backlog" && isUnblocked(issue, done) },
   { id: "unknown", label: "Unknown status", has: (issue) => !STATUSES.includes(issue.status) },
@@ -56,24 +56,20 @@ export function loadsFor(isExpanded) {
   return new Set(GROUPS.filter((group) => group.loads && isExpanded(group)).map((group) => group.loads));
 }
 
-// The groups to show, each with its sorted issues: those in `sections` even when empty, and any other group
-// holding issues. A group whose issues weren't listed (its `loads` is in `unloaded`) shows as unloaded, with
+// The groups to show, each with its sorted issues: Todo even when empty, so the list always says where new
+// issues land, and any other group holding issues. A group whose issues weren't listed (its `loads` is in `unloaded`) shows as unloaded, with
 // no issues, whether or not it holds any. With a `label`, groups hold only the issues carrying it, while
 // blockers are still read from every issue. When the tracker lists at most `recentlyClosed` finished issues
 // and listed that many, Done and Canceled carry that number as their `cap`, since they may hold more.
-export function groupIssues(issues, unloaded = new Set(), label = null, { sections = [], recentlyClosed = null } = {}) {
+export function groupIssues(issues, unloaded = new Set(), label = null, { recentlyClosed = null } = {}) {
   const done = new Set(issues.filter((issue) => issue.status === "done").map((issue) => issue.id));
   const shown = label ? issues.filter((issue) => issue.labels.includes(label)) : issues;
   const closedCapReached = recentlyClosed !== null && issues.filter((issue) => FINISHED.includes(issue.status)).length >= recentlyClosed;
   const capOf = (group) => (closedCapReached && FINISHED.includes(group.loads) ? recentlyClosed : null);
   return GROUPS.map((group) => unloaded.has(group.loads) ? { ...group, unloaded: true, issues: [] }
     : { ...group, cap: capOf(group), issues: shown.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition) })
-    .filter((group) => group.unloaded || group.issues.length || sections.includes(group.id));
+    .filter((group) => group.unloaded || group.issues.length || group.alwaysShown);
 }
-
-// The tracker's `sections` a repository shows even when empty: no In review when its `merge` setting lands
-// work in main without review, so issues only reach In review in it by hand.
-export const sectionsForMerge = (sections, merge) => (merge === "auto" ? sections.filter((id) => id !== "in-review") : sections);
 
 // The count beside a group's title: "20+" for a group capped at 20, or null when its issues weren't listed.
 export function groupCountText(group) {
