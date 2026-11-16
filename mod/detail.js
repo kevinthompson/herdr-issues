@@ -9,6 +9,7 @@ import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
 import { collapseButton, headerBar, iconButton } from "./header.js";
+import { actionBarPrototypes } from "./action-bar-prototypes.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -649,5 +650,6 @@ export function issueDetail(view, t) {
         .child(dropdown("status", "Status", view, t))
         .when(view.prioritized, (e) => e.child(dropdown("priority", "Priority", view, t))),
     )
-    .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)));
+    .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)))
+    .child(div().flex_1().min_h(0).child(actionBarPrototypes(t)));
 }
