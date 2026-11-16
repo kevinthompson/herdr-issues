@@ -1,6 +1,8 @@
 // `issues worktree`: opens a branch in a worktree of the repository holding a folder and, in Herdr, opens it
 // behind what's shown in a space nested under the repository's space, which it opens first, named with the
-// repository's name setting, when no space shows the main checkout. The worktree is the branch's existing one, else a new
+// repository's name setting, when no space shows the main checkout. The new space takes the name it's given, which
+// for an issue is its space name marked working (space-name.js); a space already showing the worktree is selected and
+// keeps its name. The worktree is the branch's existing one, else a new
 // checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. With --claude, the space
 // opens a Claude session on the repository's workModel and workEffort settings. A new worktree gets a copy of the main
 // checkout's .claude/settings.local.json before the repository's worktreeSetup command runs.

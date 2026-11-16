@@ -42,7 +42,7 @@ import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit, showFieldEdit, trackerFields } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { closeWorktreeSpace } from "./worktree-removal.js";
-import { issueSpaceName, issueIdOfSpace } from "./space-name.js";
+import { issueIdOfSpace, panelIssueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { isCollapsed, noticeWidth as rememberWidth, toggleCollapsed } from "./collapse.js";
 import { isSectionOpen, setSectionOpen } from "./open-sections.js";
@@ -816,9 +816,8 @@ export default class Issues extends View {
     return `Could not open the worktree: ${lastLine || `issues worktree exited with ${result.code}`}`;
   }
 
-  // The name the repository gives the issue's space; the issue's ID when the name can't be worked out.
   spaceName(issue) {
-    return this.project ? issueSpaceName(this.project, issue.id).catch(() => issue.id) : Promise.resolve(issue.id);
+    return panelIssueSpaceName(this.project, issue.id);
   }
 
   async openWorktreeDialog(issue, spaceName) {

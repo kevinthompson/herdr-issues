@@ -42,14 +42,16 @@ function repository(t, entry) {
   return root;
 }
 
-function openWorktree(root, bin, branch) {
-  const result = spawnSync(process.execPath, [issuesCli, "worktree", "--branch", branch], {
+function runWorktree(root, bin, args) {
+  const result = spawnSync(process.execPath, [issuesCli, "worktree", ...args], {
     cwd: root,
     encoding: "utf8",
     env: { ...process.env, PATH: [bin, dirname(process.execPath), gitFolder, "/usr/bin", "/bin"].join(":") },
   });
   assert.equal(result.status, 0, result.stderr);
 }
+
+const openWorktree = (root, bin, branch) => runWorktree(root, bin, ["--branch", branch]);
 
 const worktreeFolder = (branch) => join(process.env.HOME, ".herdr/worktrees/checkout", branch);
 
@@ -84,4 +86,53 @@ test("issues worktree finds a named space on the main checkout by its folder and
   openWorktree(root, bin, "existing-space");
 
   assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("existing-space"), name: "existing-space" }]);
+});
+
+const WORKING = "\u{F0131}";
+
+// A gh program whose GitHub Issues hold only issue #7, open, unassigned, unblocked and titled `title`.
+function stubGh(bin, title) {
+  const issue = {
+    number: 7, title, url: "https://github.com/owner/name/issues/7", body: "", createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z", closedAt: null, state: "OPEN", stateReason: null, milestone: null,
+    labels: { nodes: [] }, assignees: { nodes: [] }, blockedBy: { nodes: [] }, closedByPullRequestsReferences: { nodes: [] },
+  };
+  writeFileSync(join(bin, "issue.json"), JSON.stringify({ data: { repository: { issue } } }));
+  writeFileSync(join(bin, "gh"), `#!/bin/sh\ncat '${join(bin, "issue.json")}'\n`);
+  chmodSync(join(bin, "gh"), 0o755);
+}
+
+test("issues worktree <id> opens the issue's space marked working", (t) => {
+  const root = repository(t, { tracker: "github", repo: "owner/name", spaceName: "<repo> <issueId>" });
+  const { bin, spacesOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
+  stubGh(bin, "Mark it");
+
+  runWorktree(root, bin, ["#7"]);
+
+  assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("7-mark-it"), name: `${WORKING} name #7` }]);
+});
+
+test("issues worktree <id> --name marks the name it's given, replacing any mark", (t) => {
+  const root = repository(t, { tracker: "github", repo: "owner/name" });
+  const { bin, spacesOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
+  stubGh(bin, "Name it");
+
+  runWorktree(root, bin, ["#7", "--name", "\u{F0132} Chosen"]);
+
+  assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("7-name-it"), name: `${WORKING} Chosen` }]);
+});
+
+test("issues worktree <id> selects a space already open on the branch without renaming it", (t) => {
+  const root = repository(t, { tracker: "github", repo: "owner/name" });
+  const { bin, spacesOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
+  stubGh(bin, "Keep it");
+  runWorktree(root, bin, ["#7"]);
+  writeFileSync(join(bin, "..", "spaces.json"), JSON.stringify({ spaces: [
+    { id: "s1", name: "name", folder: root, tabs: [] },
+    { id: "s2", name: "#7", folder: worktreeFolder("7-keep-it"), tabs: [] },
+  ] }));
+
+  runWorktree(root, bin, ["#7"]);
+
+  assert.equal(spacesOpened().length, 1);
 });

@@ -3,7 +3,8 @@
 // which /issues:work runs, both name spaces here, and the panel reads the issue ID back out of a space's
 // name here to open that space's issue. A space's name matches an issue's space name when it ends with it, after
 // the start of the name or whitespace, so a mark before the name, such as `󰄱 #123`, still matches. The marks for
-// whether a space's session is working, waiting on the person or done are here too, for `issues mark`.
+// whether a space's session is working, waiting on the person or done are here too, for `issues mark`, and a new issue
+// space, which the panel and `issues worktree <id>` open, is named marked working from the start.
 import { mainCheckout } from "./location.js";
 import { repositoryName, spaceNameTemplate, trackerSetting } from "./trackers/setting.js";
 
@@ -41,6 +42,14 @@ export async function issueSpaceName(project, issueId) {
   const { template, repo } = await spaceTemplate(project);
   if (!template) return issueId;
   return template.replaceAll("<repo>", repo).replaceAll("<issueId>", issueId);
+}
+
+export const newIssueSpaceName = (name) => markedSpaceName(name, "working");
+
+// The name the panel opens an issue's space with: its space name, or its ID when that can't be worked out, marked working.
+export async function panelIssueSpaceName(project, issueId) {
+  const name = project ? await issueSpaceName(project, issueId).catch(() => issueId) : issueId;
+  return newIssueSpaceName(name);
 }
 
 // The issue ID in a space's name: an ID, or the ID in a name the template gives, ending the name.

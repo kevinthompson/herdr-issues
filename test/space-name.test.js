@@ -5,7 +5,7 @@ import { beforeEach, test } from "node:test";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
-import { issueIdInSpaceName, issueIdOfSpace, issueSpaceName } from "../mod/space-name.js";
+import { issueIdInSpaceName, issueIdOfSpace, issueSpaceName, newIssueSpaceName, panelIssueSpaceName } from "../mod/space-name.js";
 
 beforeEach(() => forgetLookups());
 
@@ -75,4 +75,20 @@ test("issueIdOfSpace reads a bare ID in a repository without a template", async 
   assert.equal(await issueIdOfSpace(project, "#76"), "#76");
   assert.equal(await issueIdOfSpace(project, "name #76"), "#76");
   assert.equal(await issueIdOfSpace(project, "name#76"), undefined);
+});
+
+const WORKING = "\u{F0131}";
+
+test("the panel opens an issue's space with its space name marked working", async (t) => {
+  assert.equal(await panelIssueSpaceName(repository(t, "<repo> <issueId>"), "#12"), `${WORKING} name #12`);
+  assert.equal(await panelIssueSpaceName(repository(t), "#12"), `${WORKING} #12`);
+});
+
+test("the panel opens an issue's space marked working when it has no project", async () => {
+  assert.equal(await panelIssueSpaceName(null, "#12"), `${WORKING} #12`);
+});
+
+test("a new issue space's name already carrying a mark is marked working once", () => {
+  assert.equal(newIssueSpaceName(`${WORKING} #12`), `${WORKING} #12`);
+  assert.equal(newIssueSpaceName("\u{F0132} #12"), `${WORKING} #12`);
 });
