@@ -54,7 +54,7 @@ The examples below show one entry each.
 
 ### `tracker`
 
-`linear`, `github` or `beads`. A `linear` entry also needs `team`, the Linear team's key, and can list saved views as extra lists in `views`, each a name and the view's URL. A `github` entry can name a repository other than origin's in `repo`, as `owner/name`.
+`linear`, `github` or `beads`. A `linear` entry also needs `team`, the Linear team's key, and can list saved views as extra lists in [`views`](#views). A `github` entry can name a repository other than origin's in `repo`, as `owner/name`.
 
 `beads` lists the issues in the repository's own [Beads](https://github.com/steveyegge/beads) database, which `bd init` makes in the main checkout's `.beads/` folder; every worktree shares it. Choose it in the panel's setup view or with `/issues:config`, which check that `bd` is installed and offer to make the database when the main checkout has none, keeping it out of git. Its entry names no team or repository:
 
@@ -63,6 +63,29 @@ The examples below show one entry each.
 ```
 
 Beads keeps its database out of git, so changing an issue's status, priority or body, or starting it, never makes a commit. Its statuses show as todo (`open` and `blocked`), in progress, backlog (`deferred`) and done (`closed`), and its priorities P0 to P4 as Urgent, High, Medium, Low and None.
+
+### `views`
+
+A Linear repository's entry can list saved Linear views, which the panel offers in its list dropdown under the team's name, beside the team's triage queue and other issues. `views` maps each view's name, the label the dropdown shows, to the view's URL:
+
+```json
+"~/Code/web": {
+  "tracker": "linear",
+  "team": "WEB",
+  "views": {
+    "Checkout bugs": "https://linear.app/acme/view/checkout-bugs-a8875271fcf5"
+  }
+}
+```
+
+To find a view's URL, open the view in Linear, from **Views** in the sidebar or the team's views, and copy its link from the browser's address bar. The name doesn't have to match the view's name in Linear.
+
+There are two ways to add one:
+
+- **By hand**: add the name and URL to the entry's `views` in `~/.config/herdr-app/issues.json`.
+- **With Claude**: in a Claude Code session in the repository, run `/issues:config view <name> <url>`, or `/issues:config view <url>` to have Claude read the view's name from Linear, or ask in plain words, such as "add this Linear view to the issues panel: <url>". `/issues:config view clear <name>` removes a view, and `/issues:config views` lists them.
+
+The panel watches `issues.json`, so it shows the change without a restart. Only Linear entries have views.
 
 ### `spaceName`
 

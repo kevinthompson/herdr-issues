@@ -2,7 +2,7 @@
 
 **The panel** lists the issues of the repository in the focused pane. Issues can live in any of three trackers, and the panel looks the same for each:
 
-- a Linear team, with its triage queue, projects, milestones and optional saved views;
+- a Linear team, with its triage queue, projects, milestones and optional [saved views](configuration.md#views);
 - GitHub Issues, through the `gh` CLI;
 - a local [Beads](https://github.com/steveyegge/beads) database in the repository's main checkout, through the `bd` CLI.
 
