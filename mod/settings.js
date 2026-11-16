@@ -51,7 +51,8 @@ export class SettingsView {
     const picks = /** @type {Record<string, any>} */ (shared(SCOPE_PICKS) ?? {}),
       scope = picks[this.main];
     if (!scope) return;
-    const { [this.main]: _taken, ...others } = picks;
+    const others = { ...picks };
+    delete others[this.main];
     setShared(SCOPE_PICKS, others);
     if (scope in this.forms) this.scope = scope;
   }

@@ -267,10 +267,12 @@ const commands = {
     if (typeof status?.layout === "string") console.log(status.layout);
   },
   "shown-layout": (sharedPath) => {
-    let shared = {};
+    let shared;
     try {
       shared = readJson(sharedPath);
-    } catch {}
+    } catch {
+      shared = {};
+    }
     console.log(typeof shared.layout === "string" ? shared.layout : "main");
   },
   "show-layout": (sharedPath, name) => {

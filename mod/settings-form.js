@@ -70,7 +70,7 @@ export class SettingsForm {
         cx.notify();
       },
       onSaved: (cx) => this.onSaved(cx),
-      onFailed: (e, _cx) =>
+      onFailed: (e) =>
         Object.assign(this, {
           error: `Could not save: ${e.message ?? e}`,
           saveFailed: true,
