@@ -2,17 +2,20 @@
 // apply to the choices above them (settings-fields.js): the name of the space on its main checkout, its name,
 // typed in with the default as placeholder, where emptying the field removes it from the entry; where its issues
 // live, its tracker, which a different choice checks as the setup view does (tracker-choice.js) before it can be
-// saved, with Linear's team once Linear is checked; how its work gets into main, and, only for a pull request,
-// when the work is complete, its merge and complete in issues.json; what a finished session does about its
-// worktree, its close; the command run in each new worktree, its worktreeSetup; the name of each issue's space, its
+// saved, with Linear's team once Linear is checked; how its work gets into main, and, only when the merge that
+// applies is a pull request, when the work is complete, its merge and complete in issues.json; what a finished
+// session does about its worktree, its close, each of these three leading with a choice that removes it from the
+// entry, labeled with what applies in its place, such as "Global (Open a pull request)" or "Default (Ask me)", where
+// the default merge is a pull request for an origin on GitHub; the command run in each new worktree, its
+// worktreeSetup; the name of each issue's space, its
 // spaceName; how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10
 // seconds before it can be saved; then the model and effort of the sessions that work its issues, its workModel
 // and workEffort, whose choice that removes them from the entry is labeled with the global value, such as
 // "Global (opus)", or the default; and last the text appended to those sessions' system prompt after the global
 // prompt, its workPrompt, in a soft-wrapped textarea several rows tall, where emptying it removes it from the
 // entry. Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what applies without it as
-// the placeholder, naming the global value where one is set. It opens on the settings in effect, the global
-// values and defaults applied, as `issues setting` prints them. Save
+// the placeholder, naming the global value where one is set. It opens on the entry's own settings, with each
+// select the entry doesn't set on its choice that removes it. Save
 // waits for a different tracker's check to pass and, for Linear, a team, and writes only the changed keys
 // (saveTrackerChoice, saveMergeSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
 // saveAgentSettings and saveWorkPrompt in setting.js).
@@ -20,20 +23,22 @@ import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { MERGE_CHOICES } from "./setup.js";
 import { SelectMenu } from "./select.js";
-import { settingsFields } from "./settings-fields.js";
+import { CLEAR_CHOICE, settingsFields } from "./settings-fields.js";
 import {
   AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, COMPLETE_CHOICES, COMPLETE_SENTENCE, COMPLETE_WITHOUT_PULL_REQUEST,
   SettingsForm, WORK_PROMPT_ROWS,
 } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
-  AGENT_DEFAULTS, DEFAULT_POLL_SECONDS, DEFAULT_PULL_REQUEST_COMPLETE, REPOSITORY_KEYS,
-  agentSettings, closeSettings, mergeSettings, nameSettings, parsePollSeconds, repositorySettings,
+  AGENT_DEFAULTS, DEFAULT_CLOSE, DEFAULT_POLL_SECONDS, DEFAULT_PULL_REQUEST_COMPLETE, REPOSITORY_KEYS,
+  agentSettings, landingSettings, nameSettings, parsePollSeconds, repositorySettings,
   saveAgentSettings, saveCloseSetting, saveMergeSettings, saveNameSetting, saveRepositorySettings, saveTrackerChoice,
   saveWorkPrompt, workPromptSettings,
 } from "./trackers/setting.js";
 
 const TEAM_PICKS = "issues.settingsTeams";
+
+const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
 
 const NAME_SENTENCE = "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
 
@@ -64,8 +69,7 @@ export class RepositorySettings extends SettingsForm {
       onReady: (_none, cx) => { this.trackerReady = true; cx.notify(); },
       onTeam: () => {},
     });
-    this.saved = null; this.merge = null; this.complete = null;
-    this.savedClose = null; this.close = null;
+    this.landing = null; this.merge = null; this.complete = null; this.close = null;
     this.savedName = null; this.nameInput = null;
     this.savedRepository = null; this.repositoryInputs = null;
     this.agentSources = null;
@@ -83,12 +87,11 @@ export class RepositorySettings extends SettingsForm {
     };
     cx.spawn(async (cx) => {
       try {
-        const [merge, { close }, name, repository, agent, workPrompt] = await Promise.all([
-          mergeSettings(this.project), closeSettings(this.project), nameSettings(this.project),
+        const [landing, name, repository, agent, workPrompt] = await Promise.all([
+          landingSettings(this.project), nameSettings(this.project),
           repositorySettings(this.project), agentSettings(this.project), workPromptSettings(this.project),
         ]);
-        this.saved = merge; Object.assign(this, merge);
-        this.savedClose = close; this.close = close;
+        this.landing = landing; Object.assign(this, landing.entry);
         this.savedName = name.entry;
         this.nameInput = InputState.new({ placeholder: name.defaultName, value: name.entry ?? "" });
         this.nameInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
@@ -148,29 +151,40 @@ export class RepositorySettings extends SettingsForm {
     return Boolean(choice) && (checking || !this.trackerReady || (choice === "linear" && !team));
   }
 
-  // A pull request completes as it was saved, or as its default; anything else completes once merged.
-  chooseMerge(merge, cx) {
-    const savedPullRequestComplete = this.saved?.merge === "pull-request" ? this.saved.complete : DEFAULT_PULL_REQUEST_COMPLETE;
-    Object.assign(this, { merge, complete: merge === "pull-request" ? savedPullRequestComplete : "merged", error: null });
+  // `value` for merge, complete or close, or null to remove it from the entry.
+  chooseLanding(key, value, cx) {
+    Object.assign(this, { [key]: value, error: null });
     cx.notify();
   }
 
-  chooseComplete(complete, cx) {
-    Object.assign(this, { complete, error: null });
-    cx.notify();
+  // The merge, complete and close that apply without the entry's own, each { value, label }, where label names
+  // whether that's the global value or the default.
+  landingFallbacks() {
+    const { topLevel, defaultMerge } = this.landing;
+    const fallback = (key, choices, defaultValue) => {
+      const value = topLevel[key] ?? defaultValue;
+      return { value, label: `${topLevel[key] != null ? "Global" : "Default"} (${choiceLabel(choices, value)})` };
+    };
+    return {
+      merge: fallback("merge", MERGE_CHOICES, defaultMerge),
+      complete: fallback("complete", COMPLETE_CHOICES, DEFAULT_PULL_REQUEST_COMPLETE),
+      close: fallback("close", CLOSE_CHOICES, DEFAULT_CLOSE),
+    };
   }
 
-  chooseClose(close, cx) {
-    Object.assign(this, { close, error: null });
-    cx.notify();
+  // Only a pull request keeps a complete; any other merge completes once merged.
+  completeToSave() {
+    return this.fields().completeSelect ? this.complete : null;
   }
 
   mergeChanged() {
-    return Boolean(this.merge) && (this.merge !== this.saved?.merge || this.complete !== this.saved?.complete);
+    if (!this.landing) return false;
+    const { entry } = this.landing;
+    return this.merge !== entry.merge || (this.fields().completeSelect && this.complete !== entry.complete);
   }
 
   closeChanged() {
-    return Boolean(this.close) && this.close !== this.savedClose;
+    return Boolean(this.landing) && this.close !== this.landing.entry.close;
   }
 
   // The typed name, or null when the field is empty, so the repository's name applies.
@@ -227,15 +241,15 @@ export class RepositorySettings extends SettingsForm {
   save(cx) {
     if (!this.canSave()) return;
     const trackerChoice = this.trackerChange();
-    const mergeChoice = this.mergeChanged() ? { merge: this.merge, complete: this.merge === "pull-request" ? this.complete : null } : null;
-    const closeChoice = this.closeChanged() ? this.close : null;
+    const mergeChoice = this.mergeChanged() ? { merge: this.merge, complete: this.completeToSave() } : null;
+    const closeChanged = this.closeChanged(), close = this.close;
     const nameChanged = this.nameChanged(), name = this.typedName();
     const repositoryChanges = this.repositoryChanges(), agentChanges = this.agentChanges();
     const workPromptChanged = this.workPromptChanged(), workPrompt = this.typedWorkPrompt();
     this.runSave(cx, async () => {
       if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
       if (mergeChoice) await saveMergeSettings(this.main, mergeChoice);
-      if (closeChoice) await saveCloseSetting(this.main, closeChoice);
+      if (closeChanged) await saveCloseSetting(this.main, close);
       if (nameChanged) await saveNameSetting(this.main, name);
       if (Object.keys(repositoryChanges).length > 0) await saveRepositorySettings(this.main, repositoryChanges);
       if (Object.keys(agentChanges).length > 0) await saveAgentSettings(this.main, agentChanges);
@@ -246,7 +260,7 @@ export class RepositorySettings extends SettingsForm {
   fields() {
     return settingsFields({
       trackerChoice: this.tracker.choice, trackerReady: this.trackerReady, merge: this.merge,
-      workModel: this.agentValues.workModel, otherWorkModelPicked: this.otherWorkModelPicked,
+      fallbackMerge: this.landing ? this.landingFallbacks().merge.value : null, workModel: this.agentValues.workModel, otherWorkModelPicked: this.otherWorkModelPicked,
     });
   }
 
@@ -256,18 +270,31 @@ export class RepositorySettings extends SettingsForm {
       .when(Boolean(this.nameInput), (e) => e.child(this.question("Repository name", NAME_SENTENCE, t,
         (controls) => controls.child(this.textField(this.nameInput, t)))))
       .child(this.trackerSection(fields, t))
-      .child(this.question("How does work get into main?", null, t, (controls) => controls
-        .child(this.selects.merge.render(t, { options: MERGE_CHOICES, value: this.merge, onChoose: (id, cx) => this.chooseMerge(id, cx), enabled: !this.saving }))
-        .when(fields.mergedNote, (e) => e.child(this.note(COMPLETE_WITHOUT_PULL_REQUEST, t)))))
-      .when(fields.completeSelect, (e) => e.child(this.question("When is the work complete?", COMPLETE_SENTENCE, t, (controls) => controls
-        .child(this.selects.complete.render(t, { options: COMPLETE_CHOICES, value: this.complete, onChoose: (id, cx) => this.chooseComplete(id, cx), enabled: !this.saving })))))
-      .child(this.question("When the work is complete, close the worktree?", CLOSE_SENTENCE, t, (controls) => controls
-        .child(this.selects.close.render(t, { options: CLOSE_CHOICES, value: this.close, onChoose: (id, cx) => this.chooseClose(id, cx), enabled: !this.saving }))))
+      .when(Boolean(this.landing), (e) => this.landingQuestions(e, fields, t))
       .when(Boolean(this.repositoryInputs), (e) => e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))))
       .when(Boolean(this.agentSources), (e) => e.children(AGENT_QUESTIONS.map((question) =>
         this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t))))
       .when(Boolean(this.workPromptInput), (e) => e.child(this.question("Work prompt", WORK_PROMPT_SENTENCE, t,
         (controls) => controls.child(this.textareaField(this.workPromptInput, t))))), "settings-save", t);
+  }
+
+  // The merge, complete and close selects, complete only when the merge that applies is a pull request.
+  landingQuestions(content, fields, t) {
+    const fallbacks = this.landingFallbacks();
+    return content
+      .child(this.landingSelect("merge", "How does work get into main?", null, MERGE_CHOICES, fallbacks, t,
+        (controls) => controls.when(fields.mergedNote, (e) => e.child(this.note(COMPLETE_WITHOUT_PULL_REQUEST, t)))))
+      .when(fields.completeSelect, (e) => e.child(this.landingSelect("complete", "When is the work complete?", COMPLETE_SENTENCE, COMPLETE_CHOICES, fallbacks, t)))
+      .child(this.landingSelect("close", "When the work is complete, close the worktree?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t));
+  }
+
+  // A select of merge, complete or close, leading with the choice that removes it from the entry and opening on
+  // the entry's value or that choice.
+  landingSelect(key, title, sentence, choices, fallbacks, t, addMore = (controls) => controls) {
+    const options = [{ id: CLEAR_CHOICE, label: fallbacks[key].label }, ...choices];
+    return this.question(title, sentence, t, (controls) => addMore(controls
+      .child(this.selects[key].render(t, { options, value: this[key] ?? CLEAR_CHOICE, enabled: !this.saving,
+        onChoose: (id, cx) => this.chooseLanding(key, id === CLEAR_CHOICE ? null : id, cx) }))));
   }
 
   // What applies without the entry's model or effort.

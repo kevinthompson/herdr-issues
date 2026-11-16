@@ -212,15 +212,28 @@ export async function mergeSettings(project) {
 // `topLevel`, issues.json's top level or null. A complete that needs a pull request doesn't apply when the merge
 // that wins isn't one, wherever each was set.
 export async function resolveMergeSettings(main, setting, topLevel = null) {
-  const merge = setting?.merge ?? topLevel?.merge ?? (await hasGitHubOrigin(main) ? "pull-request" : "review");
+  const merge = setting?.merge ?? topLevel?.merge ?? await defaultMerge(main);
   const complete = merge === "pull-request" ? setting?.complete ?? topLevel?.complete ?? DEFAULT_PULL_REQUEST_COMPLETE : "merged";
   return { merge, complete };
 }
+
+const defaultMerge = async (main) => (await hasGitHubOrigin(main) ? "pull-request" : "review");
 
 // What a finished issue session does about its worktree: the entry's close, else the top level's, else ask.
 export async function closeSettings(project) {
   const setting = await trackerSetting(project), settings = await topLevelSettings();
   return { close: setting?.close ?? settings.close ?? DEFAULT_CLOSE };
+}
+
+const LANDING_KEYS = ["merge", "complete", "close"];
+
+// Where the repository's merge, complete and close come from: { entry, topLevel, defaultMerge }, the entry's and
+// the top level's own values, null where unset, and the merge that applies without either.
+export async function landingSettings(project) {
+  const setting = await trackerSetting(project), settings = await topLevelSettings();
+  const own = (source) => Object.fromEntries(LANDING_KEYS.map((key) => [key, source?.[key] ?? null]));
+  const main = await mainCheckout(project.root, project.on);
+  return { entry: own(setting), topLevel: own(settings), defaultMerge: await defaultMerge(main) };
 }
 
 // The template that names the repository's issue spaces (space-name.js): the entry's spaceName, else the top
@@ -293,34 +306,39 @@ export async function saveTrackerChoice(main, { tracker, team = null, repo = nul
 }
 
 function checkMergeChoice(merge, complete) {
-  if (!MERGES.includes(merge)) throw badMergeSetting(`merge must be one of ${MERGES.join(", ")}`);
+  if (merge != null && !MERGES.includes(merge)) throw badMergeSetting(`merge must be one of ${MERGES.join(", ")}`);
   if (complete != null && !COMPLETES.includes(complete)) throw badMergeSetting(`complete must be one of ${COMPLETES.join(", ")}`);
-  if (PULL_REQUEST_COMPLETES.includes(complete) && merge !== "pull-request") {
+  if (PULL_REQUEST_COMPLETES.includes(complete) && merge != null && merge !== "pull-request") {
     throw badMergeSetting(`Work that merges with ${merge} is complete only once merged`);
   }
 }
 
-// Sets how the repository whose main checkout is `main` lands its work: `merge`, and `complete`, which null
-// removes so its default applies. It changes only those two keys of the repository's existing entry, and
-// writes nothing for a combination trackerSetting would refuse or a repository without an entry.
+// The entry with each of `values` set, and removed where it's null.
+function withValues(entry, values) {
+  const changed = { ...entry, ...values };
+  for (const [key, value] of Object.entries(values)) if (value == null) delete changed[key];
+  return changed;
+}
+
+// Sets how the repository whose main checkout is `main` lands its work: `merge`, and `complete`, either of which
+// null removes so the global value or its default applies. It changes only those two keys of the repository's
+// existing entry, and writes nothing for a combination trackerSetting would refuse or a repository without an entry.
 export async function saveMergeSettings(main, { merge, complete = null }) {
   checkMergeChoice(merge, complete);
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
-    const changed = { ...entry, merge, complete };
-    if (complete == null) delete changed.complete;
-    return changed;
+    return withValues(entry, { merge, complete });
   });
 }
 
-// Sets what a finished session of the repository whose main checkout is `main` does about its worktree. It changes
-// only close in the repository's existing entry, and writes nothing for a value trackerSetting would refuse or a
-// repository without an entry.
+// Sets what a finished session of the repository whose main checkout is `main` does about its worktree, where null
+// removes it so the global value or its default applies. It changes only close in the repository's existing entry,
+// and writes nothing for a value trackerSetting would refuse or a repository without an entry.
 export async function saveCloseSetting(main, close) {
-  if (!CLOSES.includes(close)) throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
+  if (close != null && !CLOSES.includes(close)) throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
-    return { ...entry, close };
+    return withValues(entry, { close });
   });
 }
 
