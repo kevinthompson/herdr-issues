@@ -15,7 +15,8 @@ The person settles what the work is and why; you supply everything findable. Don
    - acceptance criteria describe only what this issue's work must achieve: the working session follows the repository's guide, so they don't restate its standing rules (tests passing, linting, comment conventions, version bumps and the like) or repeat Verification's commands, though a criterion may still name such a rule when the issue needs something the guide doesn't already require, such as a specific version bump the guide leaves to judgment;
    - for a bug, the first acceptance criterion reproduces it: a test or command that fails before the fix and passes after;
    - Out of scope names the nearby work a reader might wander into;
-   - Context holds what the code doesn't say: the reason for the work and any constraint behind it;
+   - Context points at the files, functions and helpers the work touches and gives what the code doesn't say: the reason for the work and any constraint behind it; it describes how the code works today only where the reason or a constraint depends on it, since the session reads the code itself and a description goes stale when other work changes that code first;
+   - when issues filed together touch the same code, Context names the sibling issue and which one is merged first, rather than describing code the sibling will change;
    - each paragraph and list item is one line, never hard-wrapped, since GitHub keeps every line break.
 
    Creative and product content (story, dialog, art, names, copy) comes from the person: record what they gave, and when an issue needs content they haven't given, say in the issue that the person provides it.
