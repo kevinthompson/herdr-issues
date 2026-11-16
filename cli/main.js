@@ -7,14 +7,14 @@ import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch, STATUSES } from "../mod/issue.js";
-import { issueSpaceName } from "../mod/space-name.js";
+import { issueSpaceName, spaceNameEndsWith } from "../mod/space-name.js";
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, completedTabName, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameTab, sessionTab,
-  uncompletedTabName,
+  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, markedSpaceName, renameSpace,
+  renameTab, sessionTab, SPACE_MARKS, uncompletedTabName, unmarkedSpaceName,
 } from "./tab.js";
 
 const USAGE = `Usage: issues <command> [options]
@@ -40,11 +40,14 @@ Commands:
                            default one: ID and title; fewer when fewer qualify
   tab [--json]             Print the ID, name and space name of the Herdr tab holding $HC_TERMINAL_ID
   tab rename <id> <name>   Rename that tab after the issue, unless the person named it
+  mark <working|waiting|done> <id>
+                           Start the name of the space holding $HC_TERMINAL_ID with the state's mark, replacing a mark
+                           already there; leave a space not named after the issue as it is
   complete <id>            Mark the session done working, handed off to the person: label $HC_TERMINAL_ID
-                           issues.complete=<id> and prefix its tab's name with ✅, even a name the person chose, once;
-                           it says nothing about the branch, which removing the worktree checks for itself
+                           issues.complete=<id>; it says nothing about the branch, which removing the worktree checks
+                           for itself
   complete --cancel <id>   Withdraw that when the work continues: remove the issues.complete label from $HC_TERMINAL_ID
-                           and the ✅ from its tab's name
+                           and a leading ✅ that earlier versions put in its tab's name
   close <id>               Ask the issues panel to close the session's space once $HC_TERMINAL_ID is idle: label it
                            issues.close=<id>; the panel removes the worktree without asking only when every check passes
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
@@ -182,15 +185,30 @@ async function renameSessionTab([issueId, ...words]) {
   console.log(`Renamed the tab to ${newName}`);
 }
 
+async function mark([state, issueId, ...rest]) {
+  if (!SPACE_MARKS[state] || !issueId || rest.length) throw new UsageError(`mark needs a state (${Object.keys(SPACE_MARKS).join(", ")}) and one issue ID`);
+  const tab = await sessionTab();
+  const issueSpace = await issueSpaceName(await currentProject(), issueId);
+  if (!spaceNameEndsWith(unmarkedSpaceName(tab.space), issueSpace)) {
+    console.log(`The space keeps its name, since it isn't named after ${issueId}: ${tab.space}`);
+    return;
+  }
+  const newName = markedSpaceName(tab.space, state);
+  if (newName === tab.space) {
+    console.log(`The space is already marked ${state}: ${newName}`);
+    return;
+  }
+  await renameSpace(tab, newName);
+  console.log(`Marked the space ${state}: ${newName}`);
+}
+
 async function complete(args) {
   if (args[0] === "--cancel") return cancelComplete(args.slice(1));
   const [issueId] = args;
   if (!issueId) throw new UsageError("complete needs an issue ID");
   const tab = await sessionTab();
   await labelComplete(tab, issueId);
-  const newName = completedTabName(tab.name);
-  if (newName !== tab.name) await renameTab(tab, newName);
-  console.log(`Marked ${issueId} complete in the tab ${newName}`);
+  console.log(`Marked ${issueId} complete in the tab ${tab.name}`);
 }
 
 async function cancelComplete([issueId, ...rest]) {
@@ -421,7 +439,7 @@ async function label(args) {
   console.log(`${issue.id}: ${changes.join(", ")}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, complete, close, worktree, merge, status, start, edit, label };
+const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, worktree, merge, status, start, edit, label };
 
 const HELP_FLAGS = ["-h", "--help"];
 
