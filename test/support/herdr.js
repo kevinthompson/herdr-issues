@@ -6,9 +6,16 @@ import * as shim from "../../cli/herdr.js";
 export * from "../../cli/herdr.js";
 
 export const defaults = {
-  exec: shim.exec, spaces: shim.spaces, panes: shim.panes,
-  layout: () => null, run: () => null, shared: () => undefined, setShared: () => null,
-  terminals: () => [], hc: async () => ({ code: 1, stdout: "", stderr: "" }), openOverlay: () => null,
+  exec: shim.exec,
+  spaces: shim.spaces,
+  panes: shim.panes,
+  layout: () => null,
+  run: () => null,
+  shared: () => undefined,
+  setShared: () => null,
+  terminals: () => [],
+  hc: async () => ({ code: 1, stdout: "", stderr: "" }),
+  openOverlay: () => null,
 };
 let current = { ...defaults };
 
@@ -26,5 +33,7 @@ export const openOverlay = (...args) => current.openOverlay(...args);
 // Replaces any of exec, spaces, panes, layout, run, shared, setShared, terminals, hc and openOverlay until the test `t` ends.
 export function stubHerdr(t, replacements) {
   current = { ...defaults, ...replacements };
-  t.after(() => { current = { ...defaults }; });
+  t.after(() => {
+    current = { ...defaults };
+  });
 }

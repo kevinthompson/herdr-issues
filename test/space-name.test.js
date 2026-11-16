@@ -5,7 +5,13 @@ import { beforeEach, test } from "node:test";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
-import { issueIdInSpaceName, issueIdOfSpace, issueSpaceName, newIssueSpaceName, panelIssueSpaceName } from "../mod/space-name.js";
+import {
+  issueIdInSpaceName,
+  issueIdOfSpace,
+  issueSpaceName,
+  newIssueSpaceName,
+  panelIssueSpaceName,
+} from "../mod/space-name.js";
 
 beforeEach(() => forgetLookups());
 

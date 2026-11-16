@@ -57,7 +57,8 @@ let layout = { spaces: [], panes: [] };
 
 async function listJson(command, args) {
   const result = await exec(command, args);
-  if (result.code !== 0) throw new Error(`${command} ${args.join(" ")}: ${(result.stderr || result.stdout).trim().split("\n").pop()}`);
+  if (result.code !== 0)
+    throw new Error(`${command} ${args.join(" ")}: ${(result.stderr || result.stdout).trim().split("\n").pop()}`);
   return JSON.parse(result.stdout);
 }
 
@@ -66,9 +67,16 @@ async function listJson(command, args) {
 export async function readLayout() {
   const [listing, terminals] = await Promise.all([listJson("herdr-app", ["ls"]), listJson("hc", ["ls", "--json"])]);
   const folderOf = new Map(terminals.terminals.map((terminal) => [terminal.address, terminal.cwd]));
-  const panes = listing.spaces.flatMap((space) => space.tabs.flatMap((tab) => tab.terminals.map((terminal) => ({
-    pane: terminal.pane, terminal: terminal.terminal, tab: tab.id, cwd: folderOf.get(terminal.terminal) ?? null,
-  }))));
+  const panes = listing.spaces.flatMap((space) =>
+    space.tabs.flatMap((tab) =>
+      tab.terminals.map((terminal) => ({
+        pane: terminal.pane,
+        terminal: terminal.terminal,
+        tab: tab.id,
+        cwd: folderOf.get(terminal.terminal) ?? null,
+      })),
+    ),
+  );
   layout = { spaces: listing.spaces, panes };
 }
 

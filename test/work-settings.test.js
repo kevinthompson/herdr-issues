@@ -22,7 +22,8 @@ afterEach(() => process.chdir(startingFolder));
 // Runs `issues setting <key>` in `repository`, returning its exit code and what it printed.
 async function setting(t, repository, key) {
   process.chdir(repository);
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(["setting", key]);
@@ -45,7 +46,11 @@ test("top-level workModel and workEffort apply to every repository", async (t) =
 
 test("a repository's workModel and workEffort override the top level's", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workModel: "haiku", workEffort: "low", repos: { [repository]: githubEntry({ workModel: "claude-opus-5-5", workEffort: "high" }) } });
+  writeSettings({
+    workModel: "haiku",
+    workEffort: "low",
+    repos: { [repository]: githubEntry({ workModel: "claude-opus-5-5", workEffort: "high" }) },
+  });
   assert.equal((await setting(t, repository, "workModel")).out, "claude-opus-5-5");
   assert.equal((await setting(t, repository, "workEffort")).out, "high");
 });
@@ -55,7 +60,12 @@ test("a repository's workModel that isn't one word is refused", async (t) => {
   writeSettings({ repos: { [repository]: githubEntry({ workModel: "sonnet --dangerously-skip-permissions" }) } });
   const result = await setting(t, repository, "workModel");
   assert.equal(result.code, 1);
-  assert.match(result.err, new RegExp(`issues.json's ${repository} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`));
+  assert.match(
+    result.err,
+    new RegExp(
+      `issues.json's ${repository} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`,
+    ),
+  );
 });
 
 test("a top-level workEffort that isn't an effort level is refused", async (t) => {
@@ -76,7 +86,10 @@ test("issues setting workPrompt prints nothing without a prompt", async (t) => {
 
 test("a repository's workPrompt follows the top level's after a blank line", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workPrompt: " Top level\n", repos: { [repository]: githubEntry({ workPrompt: "Run the tests.\nCommit often." }) } });
+  writeSettings({
+    workPrompt: " Top level\n",
+    repos: { [repository]: githubEntry({ workPrompt: "Run the tests.\nCommit often." }) },
+  });
   assert.equal((await setting(t, repository, "workPrompt")).out, "Top level\n\nRun the tests.\nCommit often.");
 });
 

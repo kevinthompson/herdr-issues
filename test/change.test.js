@@ -7,14 +7,23 @@ import { ChangeRefusal, setIssueStatus, startIssue } from "../cli/change.js";
 function recordingTracker(t, overrides = {}) {
   const calls = [];
   const counts = { announcements: 0 };
-  stubHerdr(t, { setShared: () => { counts.announcements++; return null; } });
+  stubHerdr(t, {
+    setShared: () => {
+      counts.announcements++;
+      return null;
+    },
+  });
   const tracker = {
     name: "Test",
     writable: true,
     statuses: ["todo", "in-progress", "done"],
     get: async (id) => (id === "#1" ? { id: "#1", status: "todo" } : null),
-    update: async (issue, fields) => { calls.push({ update: issue.id, ...fields }); },
-    start: async (issue) => { calls.push({ start: issue.id }); },
+    update: async (issue, fields) => {
+      calls.push({ update: issue.id, ...fields });
+    },
+    start: async (issue) => {
+      calls.push({ start: issue.id });
+    },
     ...overrides,
   };
   return { tracker, calls, counts };
@@ -46,18 +55,33 @@ test("setIssueStatus refuses a status the tracker can't set, naming the ones it 
   assert.equal(counts.announcements, 0);
 });
 
-for (const [name, change] of [["setIssueStatus", (tracker, id) => setIssueStatus(tracker, id, "done")], ["startIssue", startIssue]]) {
+for (const [name, change] of [
+  ["setIssueStatus", (tracker, id) => setIssueStatus(tracker, id, "done")],
+  ["startIssue", startIssue],
+]) {
   test(`${name} refuses an unknown issue, changing nothing`, async (t) => {
     const { tracker, calls, counts } = recordingTracker(t);
-    await assert.rejects(change(tracker, "#2"), (error) => error instanceof ChangeRefusal && /#2: not found/.test(error.message));
+    await assert.rejects(
+      change(tracker, "#2"),
+      (error) => error instanceof ChangeRefusal && /#2: not found/.test(error.message),
+    );
     assert.deepEqual(calls, []);
     assert.equal(counts.announcements, 0);
   });
 
   test(`${name} refuses a read-only tracker without reading the issue`, async (t) => {
     let reads = 0;
-    const { tracker, calls, counts } = recordingTracker(t, { writable: false, get: async () => { reads++; return null; } });
-    await assert.rejects(change(tracker, "#1"), (error) => error instanceof ChangeRefusal && /can't be changed/.test(error.message));
+    const { tracker, calls, counts } = recordingTracker(t, {
+      writable: false,
+      get: async () => {
+        reads++;
+        return null;
+      },
+    });
+    await assert.rejects(
+      change(tracker, "#1"),
+      (error) => error instanceof ChangeRefusal && /can't be changed/.test(error.message),
+    );
     assert.equal(reads, 0);
     assert.deepEqual(calls, []);
     assert.equal(counts.announcements, 0);

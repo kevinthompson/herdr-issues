@@ -15,16 +15,37 @@ beforeEach(() => forgetLookups());
 afterEach(() => process.chdir(startingFolder));
 
 const ISSUE_NODE = {
-  number: 7, title: "Show an issue", url: `https://github.com/${REPO}/issues/7`, body: "The issue's body.\n",
-  createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z", closedAt: null, state: "OPEN", stateReason: null,
+  number: 7,
+  title: "Show an issue",
+  url: `https://github.com/${REPO}/issues/7`,
+  body: "The issue's body.\n",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-02T00:00:00Z",
+  closedAt: null,
+  state: "OPEN",
+  stateReason: null,
   milestone: null,
-  labels: { nodes: [{ name: "bug", color: "ff0000" }, { name: "cli", color: "00ff00" }] },
+  labels: {
+    nodes: [
+      { name: "bug", color: "ff0000" },
+      { name: "cli", color: "00ff00" },
+    ],
+  },
   assignees: { nodes: [] },
   blockedBy: { nodes: [{ number: 3, state: "OPEN", repository: { nameWithOwner: REPO } }] },
-  closedByPullRequestsReferences: { nodes: [{
-    number: 9, title: "Add show", url: `https://github.com/${REPO}/pull/9`, state: "OPEN", isDraft: true,
-    headRefName: "7-show-an-issue", repository: { nameWithOwner: REPO },
-  }] },
+  closedByPullRequestsReferences: {
+    nodes: [
+      {
+        number: 9,
+        title: "Add show",
+        url: `https://github.com/${REPO}/pull/9`,
+        state: "OPEN",
+        isDraft: true,
+        headRefName: "7-show-an-issue",
+        repository: { nameWithOwner: REPO },
+      },
+    ],
+  },
 };
 
 // A repository tracked in GitHub Issues whose only issue is ISSUE_NODE; other programs, such as git, run.
@@ -43,7 +64,8 @@ function githubRepository(t) {
 }
 
 async function show(t, args) {
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(["show", ...args]);
@@ -54,19 +76,22 @@ test("show prints the issue as text", async (t) => {
   githubRepository(t);
   const result = await show(t, ["#7"]);
   assert.equal(result.code, 0, result.err);
-  assert.equal(result.out, [
-    "#7 Show an issue",
-    "Status: in-review",
-    "Labels: bug, cli",
-    "Blocked by: #3",
-    "Branch: 7-show-an-issue",
-    "Assignee: Unassigned",
-    `Pull requests: https://github.com/${REPO}/pull/9 (draft)`,
-    `URL: https://github.com/${REPO}/issues/7`,
-    "Updated: 2026-01-02T00:00:00Z",
-    "",
-    "The issue's body.",
-  ].join("\n"));
+  assert.equal(
+    result.out,
+    [
+      "#7 Show an issue",
+      "Status: in-review",
+      "Labels: bug, cli",
+      "Blocked by: #3",
+      "Branch: 7-show-an-issue",
+      "Assignee: Unassigned",
+      `Pull requests: https://github.com/${REPO}/pull/9 (draft)`,
+      `URL: https://github.com/${REPO}/issues/7`,
+      "Updated: 2026-01-02T00:00:00Z",
+      "",
+      "The issue's body.",
+    ].join("\n"),
+  );
 });
 
 test("show --json prints the whole issue", async (t) => {

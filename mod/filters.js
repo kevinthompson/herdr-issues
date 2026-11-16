@@ -8,17 +8,35 @@ export function listFilters({ scopes, scope, project, milestone } = {}, labels, 
   const filters = [];
   if (scopes) {
     const listed = project ?? scope;
-    filters.push({ id: "issues-scope", heading: "View", shown: listed.label, menu: "scope", options: scopes, selected: listed.id });
+    filters.push({
+      id: "issues-scope",
+      heading: "View",
+      shown: listed.label,
+      menu: "scope",
+      options: scopes,
+      selected: listed.id,
+    });
   }
   if (project?.milestones.length) {
     const allMilestones = { id: project.id, label: "All milestones" };
     filters.push({
-      id: "issues-milestone", heading: "Milestone", shown: milestone?.label ?? allMilestones.label,
-      menu: "scope", options: [allMilestones, ...project.milestones], selected: milestone?.id ?? project.id,
+      id: "issues-milestone",
+      heading: "Milestone",
+      shown: milestone?.label ?? allMilestones.label,
+      menu: "scope",
+      options: [allMilestones, ...project.milestones],
+      selected: milestone?.id ?? project.id,
     });
   }
   if (labels.length) {
-    filters.push({ id: "issues-label", heading: "Label", shown: label ?? "All labels", menu: "label", options: labels, selected: label });
+    filters.push({
+      id: "issues-label",
+      heading: "Label",
+      shown: label ?? "All labels",
+      menu: "label",
+      options: labels,
+      selected: label,
+    });
   }
   return filters;
 }

@@ -39,7 +39,9 @@ describe("readyCloseRequests", () => {
   });
 
   test("asks for a space on another machine", () => {
-    assert.deepEqual(requestsFor(sessionTerminal("done", undefined, "studio/t2")), [{ terminal: "studio/t2", space: "s2", ask: true }]);
+    assert.deepEqual(requestsFor(sessionTerminal("done", undefined, "studio/t2")), [
+      { terminal: "studio/t2", space: "s2", ask: true },
+    ]);
   });
 });
 

@@ -49,7 +49,10 @@ describe("saveLinearKey", () => {
   test("asks Linear with the key before saving it", async (t) => {
     const requests = stubLinear(t, { accepts: true });
     await saveLinearKey("lin_api_new");
-    assert.deepEqual(requests.map(({ authorization }) => authorization), ["lin_api_new"]);
+    assert.deepEqual(
+      requests.map(({ authorization }) => authorization),
+      ["lin_api_new"],
+    );
   });
 
   test("saves a key Linear accepts in the Keychain and writes no key file", async (t) => {
@@ -159,7 +162,8 @@ describe("linearClient", () => {
   test("reports a Keychain it can't read", async (t) => {
     stubSecurity(t, { code: 51, stdout: "", stderr: "User interaction is not allowed." });
     await assert.rejects(linearClient(), {
-      message: "Couldn't read the Linear API key from the macOS Keychain (User interaction is not allowed.)", fix: /Keychain/,
+      message: "Couldn't read the Linear API key from the macOS Keychain (User interaction is not allowed.)",
+      fix: /Keychain/,
     });
   });
 
@@ -167,7 +171,10 @@ describe("linearClient", () => {
     saveKeychainKey("lin_api_wrong");
     stubLinear(t, { accepts: false });
     const linear = await linearClient();
-    await assert.rejects(linear("query { viewer { id } }"), { message: "Linear refused the API key in the macOS Keychain", fix: /Keychain/ });
+    await assert.rejects(linear("query { viewer { id } }"), {
+      message: "Linear refused the API key in the macOS Keychain",
+      fix: /Keychain/,
+    });
   });
 
   describe("without the Keychain", () => {
@@ -186,7 +193,9 @@ describe("linearClient", () => {
     test("reports a key file that isn't valid JSON", async (t) => {
       stubSecurity(t);
       writeKeyFile("{ not json");
-      await assert.rejects(linearClient(), { message: /Couldn't read the Linear API key from ~\/\.config\/herdr-app\/linear\.json/ });
+      await assert.rejects(linearClient(), {
+        message: /Couldn't read the Linear API key from ~\/\.config\/herdr-app\/linear\.json/,
+      });
     });
   });
 });

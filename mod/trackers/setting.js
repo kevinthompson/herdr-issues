@@ -67,7 +67,7 @@ const RETIRED_COMPLETES = ["merged", "pull-request-open", "pull-request-passing"
 export const CLOSES = ["ask", "auto"];
 export const DEFAULT_CLOSE = "ask";
 const RETIRED_CLOSE = "manual";
-export const closeChoice = (close) => (close === RETIRED_CLOSE ? "ask" : close ?? null);
+export const closeChoice = (close) => (close === RETIRED_CLOSE ? "ask" : (close ?? null));
 export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
 export const DEFAULT_UPDATE_CHECK_HOURS = 6;
@@ -80,14 +80,19 @@ const expandHome = (path) => (path.startsWith("~/") ? `${home()}${path.slice(1)}
 const abbreviateHome = (path) => (path.startsWith(`${home()}/`) ? `~${path.slice(home().length)}` : path);
 
 function parseSettings(text) {
-  try { return JSON.parse(text); } catch (e) { throw settingsUnreadable(`issues.json isn't valid JSON: ${e.message ?? e}`); }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw settingsUnreadable(`issues.json isn't valid JSON: ${e.message ?? e}`);
+  }
 }
 
 const cachedSettings = cachedLookup();
-const readSettings = () => cachedSettings("issues.json", async () => {
-  const text = await readTextFile(settingsPath()).catch(() => null);
-  return text === null ? null : parseSettings(text);
-});
+const readSettings = () =>
+  cachedSettings("issues.json", async () => {
+    const text = await readTextFile(settingsPath()).catch(() => null);
+    return text === null ? null : parseSettings(text);
+  });
 
 function checkPollSeconds(value, where) {
   if (value == null || (Number.isInteger(value) && value >= MIN_POLL_SECONDS)) return;
@@ -96,7 +101,9 @@ function checkPollSeconds(value, where) {
 
 function checkUpdateCheckHours(value) {
   if (value == null || (Number.isInteger(value) && value >= MIN_UPDATE_CHECK_HOURS)) return;
-  throw badSetting(`issues.json needs an updateCheckHours that's a whole number of hours, ${MIN_UPDATE_CHECK_HOURS} or more`);
+  throw badSetting(
+    `issues.json needs an updateCheckHours that's a whole number of hours, ${MIN_UPDATE_CHECK_HOURS} or more`,
+  );
 }
 
 function checkChoice(value, name, choices, where) {
@@ -111,22 +118,29 @@ function checkWorkSettings(settings, where) {
     throw badSetting(`${where} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`);
   }
   checkChoice(settings?.workEffort, "workEffort", EFFORTS, where);
-  if (settings?.workPrompt != null && typeof settings.workPrompt !== "string") throw badSetting(`${where} has a workPrompt that isn't text`);
+  if (settings?.workPrompt != null && typeof settings.workPrompt !== "string")
+    throw badSetting(`${where} has a workPrompt that isn't text`);
 }
 
 function checkApproval({ approval, onApproval, waitForChecks, merge, complete } = {}, where) {
-  if (approval != null && !APPROVALS.includes(approval)) throw badApprovalSetting(`${where} needs an approval of ${APPROVALS.join(", ")}`);
-  if (onApproval != null && !ON_APPROVALS.includes(onApproval)) throw badApprovalSetting(`${where} needs an onApproval of ${ON_APPROVALS.join(", ")}`);
-  if (waitForChecks != null && typeof waitForChecks !== "boolean") throw badApprovalSetting(`${where} needs a waitForChecks of true or false`);
-  if (merge != null && !RETIRED_MERGES.includes(merge)) throw badApprovalSetting(`${where} needs a merge of ${RETIRED_MERGES.join(", ")}`);
-  if (complete != null && !RETIRED_COMPLETES.includes(complete)) throw badApprovalSetting(`${where} needs a complete of ${RETIRED_COMPLETES.join(", ")}`);
+  if (approval != null && !APPROVALS.includes(approval))
+    throw badApprovalSetting(`${where} needs an approval of ${APPROVALS.join(", ")}`);
+  if (onApproval != null && !ON_APPROVALS.includes(onApproval))
+    throw badApprovalSetting(`${where} needs an onApproval of ${ON_APPROVALS.join(", ")}`);
+  if (waitForChecks != null && typeof waitForChecks !== "boolean")
+    throw badApprovalSetting(`${where} needs a waitForChecks of true or false`);
+  if (merge != null && !RETIRED_MERGES.includes(merge))
+    throw badApprovalSetting(`${where} needs a merge of ${RETIRED_MERGES.join(", ")}`);
+  if (complete != null && !RETIRED_COMPLETES.includes(complete))
+    throw badApprovalSetting(`${where} needs a complete of ${RETIRED_COMPLETES.join(", ")}`);
 }
 
 // The settings both the top level and an entry take, checked the same way in either.
 function checkSharedSettings(settings, where) {
   checkPollSeconds(settings?.pollSeconds, where);
   checkWorkSettings(settings, where);
-  if (settings?.spaceName != null && typeof settings.spaceName !== "string") throw badSetting(`${where} has a spaceName that isn't text`);
+  if (settings?.spaceName != null && typeof settings.spaceName !== "string")
+    throw badSetting(`${where} has a spaceName that isn't text`);
   checkChoice(closeChoice(settings?.close), "close", CLOSES, where);
   checkApproval(settings ?? {}, where);
 }
@@ -153,18 +167,23 @@ export async function trackerSetting({ root, on }) {
   const main = await mainCheckout(root, on);
   const [key, setting] = Object.entries(settings?.repos ?? {}).find(([path]) => expandHome(path) === main) ?? [];
   if (!setting) return null;
-  if (!TRACKERS.includes(setting.tracker)) throw badSetting(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
-  if (setting.tracker === "linear" && !setting.team) throw badSetting(`issues.json's ${key} needs the Linear team's key`);
+  if (!TRACKERS.includes(setting.tracker))
+    throw badSetting(`issues.json's ${key} needs a tracker: ${TRACKERS.join(", ")}`);
+  if (setting.tracker === "linear" && !setting.team)
+    throw badSetting(`issues.json's ${key} needs the Linear team's key`);
   checkSharedSettings(setting, `issues.json's ${key}`);
-  if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string") throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
-  if (setting.name != null && typeof setting.name !== "string") throw badSetting(`issues.json's ${key} has a name that isn't text`);
+  if (setting.worktreeSetup != null && typeof setting.worktreeSetup !== "string")
+    throw badSetting(`issues.json's ${key} has a worktreeSetup that isn't text`);
+  if (setting.name != null && typeof setting.name !== "string")
+    throw badSetting(`issues.json's ${key} has a name that isn't text`);
   return setting;
 }
 
 // How often the panel asks the repository's tracker for its list: its entry's pollSeconds, else the top level's,
 // else 60.
 export async function pollSettings(project) {
-  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  const setting = await trackerSetting(project),
+    settings = await readCheckedSettings();
   return { pollSeconds: setting?.pollSeconds ?? settings?.pollSeconds ?? DEFAULT_POLL_SECONDS };
 }
 
@@ -179,7 +198,8 @@ export async function updateSettings() {
 // entry's workModel and workEffort, else the top level's, else inherit and default; and the top level's workPrompt
 // followed by the entry's, a blank line apart, either alone, or no prompt (""). A blank workPrompt counts as unset.
 export async function workSettings(project) {
-  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  const setting = await trackerSetting(project),
+    settings = await readCheckedSettings();
   return {
     workModel: setting?.workModel ?? settings?.workModel ?? DEFAULT_WORK_MODEL,
     workEffort: setting?.workEffort ?? settings?.workEffort ?? DEFAULT_WORK_EFFORT,
@@ -189,7 +209,8 @@ export async function workSettings(project) {
 
 // The repository entry's own workPrompt and the top level's, each null where unset or blank.
 export async function workPromptSettings(project) {
-  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  const setting = await trackerSetting(project),
+    settings = await readCheckedSettings();
   return { entry: setting?.workPrompt?.trim() || null, topLevel: settings?.workPrompt?.trim() || null };
 }
 
@@ -198,15 +219,23 @@ export const AGENT_DEFAULTS = { workModel: DEFAULT_WORK_MODEL, workEffort: DEFAU
 // The agent settings, each as { value, source, entry, topLevel }: the value workSettings resolves, where it comes from ("repository", "top level" or "default"), and the repository's entry's and the
 // top level's own values, null where unset.
 export async function agentSettings(project) {
-  const setting = await trackerSetting(project), settings = await readCheckedSettings();
-  return Object.fromEntries(Object.entries(AGENT_DEFAULTS).map(([key, fallback]) => {
-    const entry = setting?.[key] ?? null, topLevel = settings?.[key] ?? null;
-    const source = entry != null ? "repository" : topLevel != null ? "top level" : "default";
-    return [key, { value: entry ?? topLevel ?? fallback, source, entry, topLevel }];
-  }));
+  const setting = await trackerSetting(project),
+    settings = await readCheckedSettings();
+  return Object.fromEntries(
+    Object.entries(AGENT_DEFAULTS).map(([key, fallback]) => {
+      const entry = setting?.[key] ?? null,
+        topLevel = settings?.[key] ?? null;
+      const source = entry != null ? "repository" : topLevel != null ? "top level" : "default";
+      return [key, { value: entry ?? topLevel ?? fallback, source, entry, topLevel }];
+    }),
+  );
 }
 
-const hasGitHubOrigin =(main) => githubRepository(main, {}).then(() => true, () => false);
+const hasGitHubOrigin = (main) =>
+  githubRepository(main, {}).then(
+    () => true,
+    () => false,
+  );
 
 const RETIRED_MERGE_MEANINGS = {
   auto: { approval: "auto", onApproval: "merge" },
@@ -239,19 +268,21 @@ export async function approvalSettings(project) {
 // approvalSettings for the repository whose main checkout is `main`, from `setting`, its entry or null, and
 // `topLevel`, issues.json's top level or null.
 export async function resolveApprovalSettings(main, setting, topLevel = null) {
-  const entry = ownApproval(setting), top = ownApproval(topLevel);
+  const entry = ownApproval(setting),
+    top = ownApproval(topLevel);
   return {
     approval: entry.approval ?? top.approval ?? DEFAULT_APPROVAL,
-    onApproval: entry.onApproval ?? top.onApproval ?? await defaultOnApproval(main),
+    onApproval: entry.onApproval ?? top.onApproval ?? (await defaultOnApproval(main)),
     waitForChecks: entry.waitForChecks ?? top.waitForChecks ?? DEFAULT_WAIT_FOR_CHECKS,
   };
 }
 
-const defaultOnApproval = async (main) => (await hasGitHubOrigin(main) ? "pull-request" : "merge");
+const defaultOnApproval = async (main) => ((await hasGitHubOrigin(main)) ? "pull-request" : "merge");
 
 // What a finished issue session does about its worktree: the entry's close, else the top level's, else ask.
 export async function closeSettings(project) {
-  const setting = await trackerSetting(project), settings = await topLevelSettings();
+  const setting = await trackerSetting(project),
+    settings = await topLevelSettings();
   return { close: closeChoice(setting?.close) ?? closeChoice(settings.close) ?? DEFAULT_CLOSE };
 }
 
@@ -262,7 +293,8 @@ const RETIRED_APPROVAL_KEYS = ["merge", "complete"];
 // defaultOnApproval }, the entry's and the top level's own values (ownApproval), null where unset, and the
 // onApproval that applies without either.
 export async function approvalSources(project) {
-  const setting = await trackerSetting(project), settings = await topLevelSettings();
+  const setting = await trackerSetting(project),
+    settings = await topLevelSettings();
   const own = (source) => ({ ...ownApproval(source), close: closeChoice(source?.close) });
   const main = await mainCheckout(project.root, project.on);
   return { entry: own(setting), topLevel: own(settings), defaultOnApproval: await defaultOnApproval(main) };
@@ -271,7 +303,8 @@ export async function approvalSources(project) {
 // The template that names the repository's issue spaces (space-name.js): the entry's spaceName, else the top
 // level's, null without either or when it's blank.
 export async function spaceNameTemplate(project) {
-  const setting = await trackerSetting(project), settings = await topLevelSettings();
+  const setting = await trackerSetting(project),
+    settings = await topLevelSettings();
   return setting?.spaceName?.trim() || settings.spaceName?.trim() || null;
 }
 
@@ -302,7 +335,8 @@ const SETUP_KEYS = ["tracker", "team", "repo", ...APPROVAL_KEYS, ...RETIRED_APPR
 async function changeEntry(main, change) {
   const previous = await readTextFile(settingsPath()).catch(() => null);
   const settings = previous === null ? {} : parseSettings(previous);
-  const entries = Object.entries(settings.repos ?? {}), key = abbreviateHome(main);
+  const entries = Object.entries(settings.repos ?? {}),
+    key = abbreviateHome(main);
   const existing = entries.findIndex(([path]) => expandHome(path) === main);
   const changed = change(existing === -1 ? null : entries[existing][1]);
   const others = entries.filter(([path]) => expandHome(path) !== main);
@@ -388,7 +422,8 @@ export const REPOSITORY_KEYS = ["pollSeconds", "spaceName", "worktreeSetup"];
 // The entry's own pollSeconds, spaceName and worktreeSetup, null where unset or blank, and topLevelPollSeconds and
 // topLevelSpaceName, the top level's, which apply without the entry's, null where unset or blank.
 export async function repositorySettings(project) {
-  const setting = await trackerSetting(project), settings = await readCheckedSettings();
+  const setting = await trackerSetting(project),
+    settings = await readCheckedSettings();
   return {
     pollSeconds: setting?.pollSeconds ?? null,
     spaceName: setting?.spaceName?.trim() || null,
@@ -411,13 +446,21 @@ function parseWholeNumber(text, minimum, problem) {
 // The pollSeconds typed as `text`: null when it's blank, else the number. It throws for anything trackerSetting
 // would refuse.
 export function parsePollSeconds(text) {
-  return parseWholeNumber(text, MIN_POLL_SECONDS, `The poll interval must be a whole number of seconds, ${MIN_POLL_SECONDS} or more`);
+  return parseWholeNumber(
+    text,
+    MIN_POLL_SECONDS,
+    `The poll interval must be a whole number of seconds, ${MIN_POLL_SECONDS} or more`,
+  );
 }
 
 // The updateCheckHours typed as `text`: null when it's blank, else the number. It throws for anything the top
 // level would refuse.
 export function parseUpdateCheckHours(text) {
-  return parseWholeNumber(text, MIN_UPDATE_CHECK_HOURS, `The update check interval must be a whole number of hours, ${MIN_UPDATE_CHECK_HOURS} or more`);
+  return parseWholeNumber(
+    text,
+    MIN_UPDATE_CHECK_HOURS,
+    `The update check interval must be a whole number of hours, ${MIN_UPDATE_CHECK_HOURS} or more`,
+  );
 }
 
 function checkRepositoryChanges(changes) {
@@ -435,8 +478,12 @@ function checkRepositoryChanges(changes) {
 // would refuse or a repository without an entry.
 export async function saveRepositorySettings(main, changes) {
   checkRepositoryChanges(changes);
-  const cleaned = Object.fromEntries(Object.entries(changes).map(([key, value]) =>
-    [key, typeof value === "string" ? value.trim() || null : value ?? null]));
+  const cleaned = Object.fromEntries(
+    Object.entries(changes).map(([key, value]) => [
+      key,
+      typeof value === "string" ? value.trim() || null : (value ?? null),
+    ]),
+  );
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
     const changed = { ...entry, ...cleaned };
@@ -450,7 +497,8 @@ function checkAgentChanges(changes) {
     if (!(key in AGENT_DEFAULTS)) throw badSetting(`${key} isn't a model or effort setting`);
     if (value == null) continue;
     if (key === "workModel") {
-      if (!isModelName(value)) throw badSetting("workModel must be inherit, a model alias such as sonnet, or a model's full name");
+      if (!isModelName(value))
+        throw badSetting("workModel must be inherit, a model alias such as sonnet, or a model's full name");
       continue;
     }
     if (!EFFORTS.includes(value)) throw badSetting(`${key} must be one of ${EFFORTS.join(", ")}`);
@@ -484,7 +532,16 @@ export async function saveWorkPrompt(main, prompt) {
   });
 }
 
-export const TOP_LEVEL_KEYS = [...APPROVAL_KEYS, "close", "spaceName", "pollSeconds", "updateCheckHours", "workModel", "workEffort", "workPrompt"];
+export const TOP_LEVEL_KEYS = [
+  ...APPROVAL_KEYS,
+  "close",
+  "spaceName",
+  "pollSeconds",
+  "updateCheckHours",
+  "workModel",
+  "workEffort",
+  "workPrompt",
+];
 
 // Sets the settings in `changes`, any of TOP_LEVEL_KEYS, at the top level of issues.json, creating the file if
 // needed. Text is trimmed, and a null or blank value removes the key, so each repository's own value or the
@@ -494,9 +551,14 @@ export const TOP_LEVEL_KEYS = [...APPROVAL_KEYS, "close", "spaceName", "pollSeco
 export async function saveTopLevelSettings(changes) {
   const unknown = Object.keys(changes).find((key) => !TOP_LEVEL_KEYS.includes(key));
   if (unknown) throw badSetting(`${unknown} isn't a setting for every repository`);
-  if (changes.close != null && !CLOSES.includes(changes.close)) throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
-  const cleaned = Object.entries(changes).map(([key, value]) => [key, typeof value === "string" ? value.trim() || null : value ?? null]);
-  if (Object.keys(changes).some((key) => APPROVAL_KEYS.includes(key))) cleaned.push(...RETIRED_APPROVAL_KEYS.map((key) => [key, null]));
+  if (changes.close != null && !CLOSES.includes(changes.close))
+    throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
+  const cleaned = Object.entries(changes).map(([key, value]) => [
+    key,
+    typeof value === "string" ? value.trim() || null : (value ?? null),
+  ]);
+  if (Object.keys(changes).some((key) => APPROVAL_KEYS.includes(key)))
+    cleaned.push(...RETIRED_APPROVAL_KEYS.map((key) => [key, null]));
   const previous = await readTextFile(settingsPath()).catch(() => null);
   const { repos, ...settings } = previous === null ? {} : parseSettings(previous);
   for (const [key, value] of cleaned) {

@@ -19,9 +19,18 @@ function setUp(t) {
   git(repository, "worktree", "add", "-q", "-b", "feature", worktree);
   commitFile(worktree, "feature.txt", "work\n");
   const updates = [];
-  const tracker = { update: async (issue, fields) => { updates.push({ id: issue.id, ...fields }); } };
+  const tracker = {
+    update: async (issue, fields) => {
+      updates.push({ id: issue.id, ...fields });
+    },
+  };
   const counts = { announcements: 0 };
-  stubHerdr(t, { setShared: () => { counts.announcements++; return null; } });
+  stubHerdr(t, {
+    setShared: () => {
+      counts.announcements++;
+      return null;
+    },
+  });
   const issue = { id: "#7", branch: "feature" };
   return { repository, worktree, tracker, updates, counts, issue, project: { root: repository, on: null } };
 }
@@ -95,7 +104,10 @@ describe("mergeIssue", () => {
     test(`refuses a repository with ${JSON.stringify(approvalSettings)}, pointing to the pull request`, async (t) => {
       const setup = setUp(t);
       mkdirSync(join(settingsPath(), ".."), { recursive: true });
-      writeFileSync(settingsPath(), JSON.stringify({ repos: { [setup.repository]: { tracker: "beads", ...approvalSettings } } }));
+      writeFileSync(
+        settingsPath(),
+        JSON.stringify({ repos: { [setup.repository]: { tracker: "beads", ...approvalSettings } } }),
+      );
       await assertRefuses(setup, /merges through pull requests: merge feature's pull request instead/);
     });
   }

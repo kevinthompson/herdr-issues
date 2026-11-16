@@ -3,21 +3,51 @@ import { readFile } from "node:fs/promises";
 import { text } from "node:stream/consumers";
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
-import { closeSettings, approvalSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
+import {
+  closeSettings,
+  approvalSettings,
+  nameSettings,
+  pollSettings,
+  updateSettings,
+  workSettings,
+} from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { isUnstarted, needsNewBranch, STATUSES } from "../mod/issue.js";
-import { issueSpaceName, markedSpaceName, newIssueSpaceName, SPACE_MARKS, spaceNameEndsWith, unmarkedSpaceName } from "../mod/space-name.js";
+import {
+  issueSpaceName,
+  markedSpaceName,
+  newIssueSpaceName,
+  SPACE_MARKS,
+  spaceNameEndsWith,
+  unmarkedSpaceName,
+} from "../mod/space-name.js";
 import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { finishedWork, finishInstructions } from "./finish.js";
 import {
-  bodyHash, ChangeRefusal, changeIssueLabels, checkIssueItems, editIssueBody, MissingItemRefusal, setIssueStatus, startIssue,
+  bodyHash,
+  ChangeRefusal,
+  changeIssueLabels,
+  checkIssueItems,
+  editIssueBody,
+  MissingItemRefusal,
+  setIssueStatus,
+  startIssue,
 } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, herdrSessionTab, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameSpace, renameTab, sessionTab,
+  clearCloseRequest,
+  clearComplete,
+  herdrSessionTab,
+  isUnnamed,
+  issueTabName,
+  labelCloseRequest,
+  labelComplete,
+  renameSpace,
+  renameTab,
+  sessionTab,
   uncompletedTabName,
 } from "./tab.js";
 
@@ -138,7 +168,10 @@ function issueText(issue) {
     ["Branch", issue.branch],
     ["Assignee", issue.assignee],
     ["Due", issue.due],
-    ["Pull requests", (issue.pullRequests ?? []).map((pullRequest) => `${pullRequest.url} (${pullRequest.status})`).join(", ")],
+    [
+      "Pull requests",
+      (issue.pullRequests ?? []).map((pullRequest) => `${pullRequest.url} (${pullRequest.status})`).join(", "),
+    ],
     ["URL", issue.url],
     ["Updated", issue.updated],
   ];
@@ -151,7 +184,9 @@ async function show(args) {
   const [id, ...rest] = args.filter((arg) => arg !== "--json");
   if (!id || rest.length || id.startsWith("-")) throw new UsageError("show needs one issue ID");
   const issue = await foundIssue(id);
-  console.log(args.includes("--json") ? JSON.stringify({ ...issue, bodyHash: bodyHash(issue.body) }) : issueText(issue));
+  console.log(
+    args.includes("--json") ? JSON.stringify({ ...issue, bodyHash: bodyHash(issue.body) }) : issueText(issue),
+  );
 }
 
 // The trackers list only an issue's unfinished blockers, so any blocker left holds the work back.
@@ -166,7 +201,10 @@ async function branch(args) {
   const [id] = args.filter((arg) => !arg.startsWith("--"));
   if (!id) throw new Error("branch needs an issue ID");
   const issue = await issueToWork(id);
-  if (args.includes("--json")) console.log(JSON.stringify({ id: issue.id, branch: issue.branch, new: needsNewBranch(issue), blockedBy: issue.blockedBy }));
+  if (args.includes("--json"))
+    console.log(
+      JSON.stringify({ id: issue.id, branch: issue.branch, new: needsNewBranch(issue), blockedBy: issue.blockedBy }),
+    );
   else console.log(issue.branch);
 }
 
@@ -176,13 +214,24 @@ async function spaceName([id]) {
 }
 
 const SETTINGS = {
-  approval: approvalSettings, onApproval: approvalSettings, waitForChecks: approvalSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
-  workModel: workSettings, workEffort: workSettings, workPrompt: workSettings,
+  approval: approvalSettings,
+  onApproval: approvalSettings,
+  waitForChecks: approvalSettings,
+  close: closeSettings,
+  name: nameSettings,
+  pollSeconds: pollSettings,
+  updateCheckHours: updateSettings,
+  workModel: workSettings,
+  workEffort: workSettings,
+  workPrompt: workSettings,
 };
 
 async function setting([key]) {
   const settings = SETTINGS[key];
-  if (!settings) throw new UsageError(`setting ${key ? `has no key ${key}` : "needs a key"}; it knows ${Object.keys(SETTINGS).join(", ")}`);
+  if (!settings)
+    throw new UsageError(
+      `setting ${key ? `has no key ${key}` : "needs a key"}; it knows ${Object.keys(SETTINGS).join(", ")}`,
+    );
   const value = (await settings(await currentProject()))[key];
   if (value !== "") console.log(value);
 }
@@ -210,7 +259,8 @@ async function renameSessionTab([issueId, ...words]) {
 }
 
 async function mark([state, issueId, ...rest]) {
-  if (!SPACE_MARKS[state] || !issueId || rest.length) throw new UsageError(`mark needs a state (${Object.keys(SPACE_MARKS).join(", ")}) and one issue ID`);
+  if (!SPACE_MARKS[state] || !issueId || rest.length)
+    throw new UsageError(`mark needs a state (${Object.keys(SPACE_MARKS).join(", ")}) and one issue ID`);
   const tab = await herdrSessionTab();
   if (!tab) return;
   const issueSpace = await issueSpaceName(await currentProject(), issueId);
@@ -261,7 +311,9 @@ async function close(args) {
     return;
   }
   await labelCloseRequest(tab, issueId);
-  console.log("Asked the issues panel to close the space once this session is idle; if it stays open, press cmd+shift+w");
+  console.log(
+    "Asked the issues panel to close the space once this session is idle; if it stays open, press cmd+shift+w",
+  );
 }
 
 function finishOptions(args) {
@@ -282,7 +334,12 @@ async function finish(args) {
   const { approval, onApproval, waitForChecks } = await approvalSettings(project);
   const work = await finishedWork({ id, cwd: process.cwd(), onApproval, waitForChecks, canceled, checksRecorded });
   if (work.outstanding.length) {
-    throw new Refusal([`${id} isn't finished, so nothing was changed. Outstanding:`, ...work.outstanding.map((item) => `  - ${item}`)].join("\n"));
+    throw new Refusal(
+      [
+        `${id} isn't finished, so nothing was changed. Outstanding:`,
+        ...work.outstanding.map((item) => `  - ${item}`),
+      ].join("\n"),
+    );
   }
   const inHerdr = Boolean(await herdrSessionTab());
   const closeSetting = inHerdr ? (await closeSettings(project)).close : null;
@@ -292,7 +349,9 @@ async function finish(args) {
     await close([id]);
   }
   const onlyBlock = approval === "auto" && closeSetting === "auto";
-  console.log(`\n${finishInstructions({ id, result: work.result, close: closeSetting, onlyBlock, canceled, pullRequestOpen: work.pullRequestOpen })}`);
+  console.log(
+    `\n${finishInstructions({ id, result: work.result, close: closeSetting, onlyBlock, canceled, pullRequestOpen: work.pullRequestOpen })}`,
+  );
 }
 
 // Each tracker's check throws the SetupProblem it finds. Linear's client asks the API nothing until it's called.
@@ -313,7 +372,13 @@ async function auth([kind, ...rest]) {
 
 const MAX_SIMILAR_ISSUES = 10;
 const MIN_MATCHED_WORD_LENGTH = 4;
-const titleWords = (text) => new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((word) => word.length >= MIN_MATCHED_WORD_LENGTH));
+const titleWords = (text) =>
+  new Set(
+    text
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((word) => word.length >= MIN_MATCHED_WORD_LENGTH),
+  );
 
 function similarIssues(issues, searchWords) {
   const wanted = titleWords(searchWords.join(" "));
@@ -330,16 +395,19 @@ async function context(searchWords) {
   await AUTH_CHECKS[tracker.kind]();
   const [labels, issues] = await Promise.all([tracker.labels?.() ?? null, tracker.list()]);
   const { kind, name, team = null, repo = null } = tracker;
-  console.log(JSON.stringify({ tracker: { kind, name, team, repo }, labels, similarIssues: similarIssues(issues, searchWords) }));
+  console.log(
+    JSON.stringify({ tracker: { kind, name, team, repo }, labels, similarIssues: similarIssues(issues, searchWords) }),
+  );
 }
 
 // A tracker with one list has no scopes; it stands in for that list.
 const trackerScopes = (tracker) => tracker.scopes ?? [{ id: "default", label: tracker.name }];
 
-const scopeRows = (scopes) => scopes.flatMap((scope) => [
-  scope,
-  ...(scope.milestones ?? []).map((milestone) => ({ ...milestone, group: scope.label })),
-]);
+const scopeRows = (scopes) =>
+  scopes.flatMap((scope) => [
+    scope,
+    ...(scope.milestones ?? []).map((milestone) => ({ ...milestone, group: scope.label })),
+  ]);
 
 async function scopes(args) {
   const scopes = trackerScopes(await currentTracker());
@@ -370,7 +438,8 @@ async function list(args) {
 
 async function next(args) {
   const [count, scopeId, ...extra] = args.filter((arg) => !arg.startsWith("--"));
-  if (!/^[1-9]\d*$/.test(count ?? "") || extra.length) throw new UsageError("next needs a positive number of issues and at most one scope");
+  if (!/^[1-9]\d*$/.test(count ?? "") || extra.length)
+    throw new UsageError("next needs a positive number of issues and at most one scope");
   const tracker = await currentTracker();
   const issues = await nextIssues(tracker, Number(count), listedScopeId(tracker, scopeId));
   if (args.includes("--json")) console.log(JSON.stringify(issues));
@@ -392,7 +461,8 @@ function worktreeOptions(args) {
     else if (arg.startsWith("--") || options.id) throw new Error(`worktree: unexpected ${arg}`);
     else options.id = arg;
   }
-  if (Boolean(options.id) === Boolean(options.branch)) throw new Error("worktree needs an issue ID or --branch <branch>");
+  if (Boolean(options.id) === Boolean(options.branch))
+    throw new Error("worktree needs an issue ID or --branch <branch>");
   if (options.id && options.isNew) throw new Error("worktree: --new goes with --branch; an issue decides it itself");
   return options;
 }
@@ -413,14 +483,15 @@ async function worktree(args) {
   const issue = await issueToWork(id);
   console.log(`${issue.id} is on ${issue.branch}`);
   if (isUnstarted(issue)) await startBeforeOpening(issue);
-  const spaceName = newIssueSpaceName(name ?? await issueSpaceName(await currentProject(), issue.id));
+  const spaceName = newIssueSpaceName(name ?? (await issueSpaceName(await currentProject(), issue.id)));
   return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
 }
 
 async function merge(args) {
   const checkOnly = args[0] === "--check";
   const [id, ...rest] = checkOnly ? args.slice(1) : args;
-  if (!id || rest.length || id.startsWith("-")) throw new UsageError(checkOnly ? "merge --check needs one issue ID" : "merge needs one issue ID");
+  if (!id || rest.length || id.startsWith("-"))
+    throw new UsageError(checkOnly ? "merge --check needs one issue ID" : "merge needs one issue ID");
   const issue = await issueToWork(id);
   try {
     if (checkOnly) {
@@ -444,7 +515,8 @@ async function refusingChanges(change) {
 }
 
 async function status(args) {
-  if (args.length !== 2 || args.some((arg) => arg.startsWith("-"))) throw new UsageError("status needs an issue ID and a status");
+  if (args.length !== 2 || args.some((arg) => arg.startsWith("-")))
+    throw new UsageError("status needs an issue ID and a status");
   const [id, newStatus] = args;
   if (!STATUSES.includes(newStatus)) throw new UsageError(`status ${newStatus} isn't one of ${STATUSES.join(", ")}`);
   const issue = await refusingChanges(async () => setIssueStatus(await currentTracker(), id, newStatus));
@@ -470,7 +542,9 @@ function editOptions(args) {
   }
   if (!options.id || !options.bodyFile) throw new UsageError("edit needs an issue ID and --body-file <file>");
   if (!options.readBodyHash) {
-    throw new UsageError("edit needs --body-hash <hash>, the bodyHash issues show --json printed, so it can refuse when the body changed since it was read");
+    throw new UsageError(
+      "edit needs --body-hash <hash>, the bodyHash issues show --json printed, so it can refuse when the body changed since it was read",
+    );
   }
   return options;
 }
@@ -492,7 +566,8 @@ function checkOptions(args) {
     const arg = args[index];
     if (arg === "--except") {
       const number = Number(args[++index]);
-      if (!Number.isInteger(number) || number < 1) throw new UsageError("check: --except needs an item number, counting from 1");
+      if (!Number.isInteger(number) || number < 1)
+        throw new UsageError("check: --except needs an item number, counting from 1");
       options.keepUnchecked.push(number);
     } else if (arg.startsWith("-") || options.id) throw new UsageError(`check: unexpected ${arg}`);
     else options.id = arg;
@@ -515,7 +590,11 @@ async function check(args) {
     console.log(`${issue.id} has no unchecked items to check; its body is unchanged`);
     return;
   }
-  console.log([`Checked in ${issue.id}:`, ...list(checked), ...(left.length ? ["Left unchecked:", ...list(left)] : [])].join("\n"));
+  console.log(
+    [`Checked in ${issue.id}:`, ...list(checked), ...(left.length ? ["Left unchecked:", ...list(left)] : [])].join(
+      "\n",
+    ),
+  );
 }
 
 function labelOptions(args) {
@@ -537,12 +616,37 @@ function labelOptions(args) {
 
 async function label(args) {
   const { id, addLabels, removeLabels } = labelOptions(args);
-  const issue = await refusingChanges(async () => changeIssueLabels(await currentTracker(), id, { addLabels, removeLabels }));
+  const issue = await refusingChanges(async () =>
+    changeIssueLabels(await currentTracker(), id, { addLabels, removeLabels }),
+  );
   const changes = [...addLabels.map((name) => `added ${name}`), ...removeLabels.map((name) => `removed ${name}`)];
   console.log(`${issue.id}: ${changes.join(", ")}`);
 }
 
-const COMMANDS = { tracker, show, branch, "space-name": spaceName, setting, auth, context, scopes, list, next, tab, mark, complete, close, finish, worktree, merge, status, start, edit, check, label };
+const COMMANDS = {
+  tracker,
+  show,
+  branch,
+  "space-name": spaceName,
+  setting,
+  auth,
+  context,
+  scopes,
+  list,
+  next,
+  tab,
+  mark,
+  complete,
+  close,
+  finish,
+  worktree,
+  merge,
+  status,
+  start,
+  edit,
+  check,
+  label,
+};
 
 const HELP_FLAGS = ["-h", "--help"];
 

@@ -13,7 +13,9 @@ const gitFolder = dirname(spawnSync("sh", ["-c", "command -v git"], { encoding: 
 // Stub herdr-app and hc programs for a running app whose spaces are `spaces`: `herdr-app do` appends its action and
 // parameters to the calls file instead of changing any window.
 function stubApp(t, spaces) {
-  const folder = temporaryFolder(t), bin = join(folder, "bin"), calls = join(folder, "calls");
+  const folder = temporaryFolder(t),
+    bin = join(folder, "bin"),
+    calls = join(folder, "calls");
   mkdirSync(bin);
   writeFileSync(join(folder, "spaces.json"), JSON.stringify({ spaces }));
   writeFileSync(calls, "");
@@ -29,9 +31,16 @@ esac`,
     writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`);
     chmodSync(join(bin, name), 0o755);
   }
-  const spacesOpened = () => readFileSync(calls, "utf8").split("\n").filter(Boolean)
-    .map((line) => line.split("\t")).filter(([action]) => action === "space.new")
-    .map(([, params]) => { const { folder: opened, name } = JSON.parse(params); return { folder: opened, name }; });
+  const spacesOpened = () =>
+    readFileSync(calls, "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => line.split("\t"))
+      .filter(([action]) => action === "space.new")
+      .map(([, params]) => {
+        const { folder: opened, name } = JSON.parse(params);
+        return { folder: opened, name };
+      });
   return { bin, spacesOpened };
 }
 
@@ -93,9 +102,20 @@ const WORKING = "\u{F0131}";
 // A gh program whose GitHub Issues hold only issue #7, open, unassigned, unblocked and titled `title`.
 function stubGh(bin, title) {
   const issue = {
-    number: 7, title, url: "https://github.com/owner/name/issues/7", body: "", createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z", closedAt: null, state: "OPEN", stateReason: null, milestone: null,
-    labels: { nodes: [] }, assignees: { nodes: [] }, blockedBy: { nodes: [] }, closedByPullRequestsReferences: { nodes: [] },
+    number: 7,
+    title,
+    url: "https://github.com/owner/name/issues/7",
+    body: "",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    closedAt: null,
+    state: "OPEN",
+    stateReason: null,
+    milestone: null,
+    labels: { nodes: [] },
+    assignees: { nodes: [] },
+    blockedBy: { nodes: [] },
+    closedByPullRequestsReferences: { nodes: [] },
   };
   writeFileSync(join(bin, "issue.json"), JSON.stringify({ data: { repository: { issue } } }));
   writeFileSync(join(bin, "gh"), `#!/bin/sh\ncat '${join(bin, "issue.json")}'\n`);
@@ -127,10 +147,15 @@ test("issues worktree <id> selects a space already open on the branch without re
   const { bin, spacesOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
   stubGh(bin, "Keep it");
   runWorktree(root, bin, ["#7"]);
-  writeFileSync(join(bin, "..", "spaces.json"), JSON.stringify({ spaces: [
-    { id: "s1", name: "name", folder: root, tabs: [] },
-    { id: "s2", name: "#7", folder: worktreeFolder("7-keep-it"), tabs: [] },
-  ] }));
+  writeFileSync(
+    join(bin, "..", "spaces.json"),
+    JSON.stringify({
+      spaces: [
+        { id: "s1", name: "name", folder: root, tabs: [] },
+        { id: "s2", name: "#7", folder: worktreeFolder("7-keep-it"), tabs: [] },
+      ],
+    }),
+  );
 
   runWorktree(root, bin, ["#7"]);
 

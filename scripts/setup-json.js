@@ -49,7 +49,14 @@ const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
 const mainWeight = 2;
 const issuesWeightOfMain = 0.5;
 // The panel collapses to a 32px strip by resizing this column, so its min mustn't stop it there.
-const issuesColumn = { id: "issues-panel", type: "column", size: { weight: 1 }, min: 32, max: 900, children: [issuesBlock] };
+const issuesColumn = {
+  id: "issues-panel",
+  type: "column",
+  size: { weight: 1 },
+  min: 32,
+  max: 900,
+  children: [issuesBlock],
+};
 const earlierFixedIssuesSize = { px: 368 };
 // Bindings earlier versions of the mod's keys.json made, which setup replaces with the mod's current one.
 const supersededBindings = { global: { "cmd-shift-i": "layout.toggle:panel" } };
@@ -86,7 +93,9 @@ function mergeKeys(mine, mod) {
         merged[section] = isObject(merged[section]) ? merged[section] : {};
         merged[section][key] = action;
       } else if (!sameJson(bound, action)) {
-        kept.push(`setup: kept your ${key} in ${section} (${JSON.stringify(bound)}); the mod expects ${JSON.stringify(action)}`);
+        kept.push(
+          `setup: kept your ${key} in ${section} (${JSON.stringify(bound)}); the mod expects ${JSON.stringify(action)}`,
+        );
       }
     }
   }
@@ -101,14 +110,16 @@ function unmergeKeys(mine, mod) {
     for (const [key, action] of Object.entries(keys)) {
       if (sameJson(unmerged[section][key], action)) delete unmerged[section][key];
     }
-    if (isObject(mine[section]) && Object.keys(mine[section]).length && !Object.keys(unmerged[section]).length) delete unmerged[section];
+    if (isObject(mine[section]) && Object.keys(mine[section]).length && !Object.keys(unmerged[section]).length)
+      delete unmerged[section];
   }
   return unmerged;
 }
 
 const isIssuesBlock = (node) => node?.content?.mod === "issues";
 
-const holdsOnlyIssuesBlocks = (node) => Array.isArray(node?.children) && node.children.length > 0 && node.children.every(isIssuesBlock);
+const holdsOnlyIssuesBlocks = (node) =>
+  Array.isArray(node?.children) && node.children.length > 0 && node.children.every(isIssuesBlock);
 
 // Takes out every issues block and each node holding nothing else, answering whether there was one. A stack
 // showing a removed node shows its first remaining child instead.
@@ -126,7 +137,8 @@ function removePanel(layout) {
   return removed;
 }
 
-const holdsPanelBodyDirectly = (node) => Array.isArray(node?.children) && node.children.some((child) => child?.id === "panel-body");
+const holdsPanelBodyDirectly = (node) =>
+  Array.isArray(node?.children) && node.children.some((child) => child?.id === "panel-body");
 
 // Weighs the issues column among its siblings by main's weight, giving main one first when it has none.
 function weighIssuesColumn(siblings) {
@@ -277,7 +289,9 @@ const commands = {
     if (existsSync(settingsPath)) writeJson(settingsPath, withoutRepos(readJson(settingsPath), mainCheckouts));
   },
   "spaces-in": (...folders) => {
-    const ids = readStdinJson().spaces.filter((space) => folders.some((folder) => isInside(space.folder, folder))).map((space) => space.id);
+    const ids = readStdinJson()
+      .spaces.filter((space) => folders.some((folder) => isInside(space.folder, folder)))
+      .map((space) => space.id);
     if (ids.length) console.log(ids.join("\n"));
   },
 };

@@ -19,7 +19,11 @@ export async function lastList(key) {
   if (!lists.has(key)) {
     const text = await readTextFile(pathFor(key)).catch(() => null);
     let issues = null;
-    try { issues = text ? JSON.parse(text) : null; } catch { /* a damaged cache is no cache */ }
+    try {
+      issues = text ? JSON.parse(text) : null;
+    } catch {
+      /* a damaged cache is no cache */
+    }
     lists.set(key, { issues, text, fetchedAt: 0 });
   }
   return lists.get(key).issues;
@@ -30,7 +34,8 @@ export const rememberedList = (key) => lists.get(key)?.issues ?? null;
 
 // Writes only a list that changed, so polling an unchanged scope touches nothing on disk.
 export async function rememberList(key, issues) {
-  const text = JSON.stringify(issues), unchanged = lists.get(key)?.text === text;
+  const text = JSON.stringify(issues),
+    unchanged = lists.get(key)?.text === text;
   lists.set(key, { issues, text, fetchedAt: Date.now() });
   if (unchanged) return;
   await exec("mkdir", ["-p", folder()]);
@@ -49,6 +54,10 @@ export function fetchList(key, list, reuse) {
     return issues;
   });
   requests.set(key, request);
-  request.catch(() => {}).finally(() => { if (requests.get(key) === request) requests.delete(key); });
+  request
+    .catch(() => {})
+    .finally(() => {
+      if (requests.get(key) === request) requests.delete(key);
+    });
   return request;
 }

@@ -24,7 +24,11 @@ function installedCheckout(folder) {
 }
 
 const runInstall = (checkout, appHome) =>
-  spawnSync(join(checkout, "install"), { encoding: "utf8", input: "", env: { ...process.env, HERDR_APP_HOME: appHome } });
+  spawnSync(join(checkout, "install"), {
+    encoding: "utf8",
+    input: "",
+    env: { ...process.env, HERDR_APP_HOME: appHome },
+  });
 
 const pushToOrigin = (seed, origin, file) => {
   commitFile(seed, file, "new\n");

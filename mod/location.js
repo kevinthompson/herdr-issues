@@ -4,9 +4,11 @@ import { cachedLookup } from "./lookups.js";
 // Where the person is working: the focused pane's folder, else the active space's.
 // `on` is the machine that folder lives on (null for this computer).
 export function location() {
-  const space = spaces().find((s) => s.active), f = focused();
+  const space = spaces().find((s) => s.active),
+    f = focused();
   const pane = f?.pane ? panes().find((p) => p.pane === f.pane) : null;
-  const on = f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : space?.machine ?? null;
+  const on =
+    f?.pane === null ? (f.terminal?.includes("/") ? f.terminal.split("/")[0] : null) : (space?.machine ?? null);
   return { cwd: pane?.cwd || f?.cwd || space?.folder || null, on };
 }
 

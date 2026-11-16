@@ -20,20 +20,31 @@ const BRANCH_SLUG_LENGTH = 50;
 const UNFINISHED_STATUSES = "open,in_progress,blocked,deferred";
 const BD_INIT_TIMEOUT_MS = 120_000;
 
-const STATUS_FROM_BEADS = { open: "todo", in_progress: "in-progress", blocked: "todo", deferred: "backlog", closed: "done" };
+const STATUS_FROM_BEADS = {
+  open: "todo",
+  in_progress: "in-progress",
+  blocked: "todo",
+  deferred: "backlog",
+  closed: "done",
+};
 const STATUS_TO_BEADS = { backlog: "deferred", todo: "open", "in-progress": "in_progress", done: "closed" };
 const PRIORITY_FROM_BEADS = [1, 2, 3, 4, 0];
 const PRIORITY_TO_BEADS = [4, 0, 1, 2, 3];
 
 // The issue's ID, then its title as a slug, as github.js names a GitHub issue's branch.
 function suggestedBranch({ id, title }) {
-  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, BRANCH_SLUG_LENGTH).replace(/^-+|-+$/g, "");
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, BRANCH_SLUG_LENGTH)
+    .replace(/^-+|-+$/g, "");
   return slug ? `${id}-${slug}` : id;
 }
 
-const openBlockers = (dependencies = []) => dependencies
-  .filter((dependency) => dependency.dependency_type === "blocks" && dependency.status !== "closed")
-  .map((dependency) => dependency.id);
+const openBlockers = (dependencies = []) =>
+  dependencies
+    .filter((dependency) => dependency.dependency_type === "blocks" && dependency.status !== "closed")
+    .map((dependency) => dependency.id);
 
 // A record from `bd show` carries its body; one from `bd list` leaves it null until tracker.get loads it.
 function toIssue(record, blockedBy, { detailed = false } = {}) {
@@ -64,10 +75,11 @@ const bdIn = (root) => async (args) => {
 
 // Whether each main checkout can run `bd`, checked once while the mod runs and again after the setup view checks.
 const cachedInstalls = cachedLookup();
-const checkInstalled = (root) => cachedInstalls(root, async () => {
-  const result = await exec("bd", ["version"], { cwd: root }).catch(() => null);
-  if (!result || result.code === 127) throw await bdMissing();
-});
+const checkInstalled = (root) =>
+  cachedInstalls(root, async () => {
+    const result = await exec("bd", ["version"], { cwd: root }).catch(() => null);
+    if (!result || result.code === 127) throw await bdMissing();
+  });
 
 // Throws bdMissing when the main checkout `root` can't run `bd`, and beadsNotInitialized when it has no database.
 export async function checkBeads(root) {
@@ -100,7 +112,7 @@ export async function beadsTracker({ root: projectRoot, on }) {
   }
 
   async function get(id) {
-    const [detail] = await bd(["show", String(id)]).catch(() => []) ?? [];
+    const [detail] = (await bd(["show", String(id)]).catch(() => [])) ?? [];
     return detail ? toIssue(detail, openBlockers(detail.dependencies), { detailed: true }) : null;
   }
 
@@ -123,7 +135,9 @@ export async function beadsTracker({ root: projectRoot, on }) {
     async list(_scopeId, loads = new Set()) {
       const lists = await Promise.all([
         bd(["list", "--status", UNFINISHED_STATUSES, "--limit", "0"]),
-        loads.has("done") ? bd(["list", "--status", "closed", "--sort", "closed", "--limit", String(RECENTLY_CLOSED)]) : [],
+        loads.has("done")
+          ? bd(["list", "--status", "closed", "--sort", "closed", "--limit", String(RECENTLY_CLOSED)])
+          : [],
       ]);
       return withBlockers(lists.flatMap((list) => list ?? []));
     },

@@ -29,25 +29,56 @@ import { CLEAR_CHOICE, checksChoiceId, settingsFields, waitForChecksOf } from ".
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
-  AGENT_DEFAULTS, DEFAULT_APPROVAL, DEFAULT_CLOSE, DEFAULT_POLL_SECONDS, DEFAULT_WAIT_FOR_CHECKS, REPOSITORY_KEYS,
-  agentSettings, approvalSources, nameSettings, parsePollSeconds, repositorySettings,
-  saveAgentSettings, saveCloseSetting, saveApprovalSettings, saveNameSetting, saveRepositorySettings, saveTrackerChoice,
-  saveWorkPrompt, workPromptSettings,
+  AGENT_DEFAULTS,
+  DEFAULT_APPROVAL,
+  DEFAULT_CLOSE,
+  DEFAULT_POLL_SECONDS,
+  DEFAULT_WAIT_FOR_CHECKS,
+  REPOSITORY_KEYS,
+  agentSettings,
+  approvalSources,
+  nameSettings,
+  parsePollSeconds,
+  repositorySettings,
+  saveAgentSettings,
+  saveCloseSetting,
+  saveApprovalSettings,
+  saveNameSetting,
+  saveRepositorySettings,
+  saveTrackerChoice,
+  saveWorkPrompt,
+  workPromptSettings,
 } from "./trackers/setting.js";
 
 const TEAM_PICKS = "issues.settingsTeams";
 
 const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
 
-const NAME_SENTENCE = "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
+const NAME_SENTENCE =
+  "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
 
 const REPOSITORY_QUESTIONS = [
-  { key: "worktreeSetup", title: "Worktree setup command", sentence: "A shell command run in each new issue worktree, such as npm install. Leave it empty to run nothing." },
-  { key: "spaceName", title: "Issue space name", sentence: "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to use the global name, or the issue's ID without one." },
-  { key: "pollSeconds", title: "Poll interval", sentence: "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the global interval or the default." },
+  {
+    key: "worktreeSetup",
+    title: "Worktree setup command",
+    sentence: "A shell command run in each new issue worktree, such as npm install. Leave it empty to run nothing.",
+  },
+  {
+    key: "spaceName",
+    title: "Issue space name",
+    sentence:
+      "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to use the global name, or the issue's ID without one.",
+  },
+  {
+    key: "pollSeconds",
+    title: "Poll interval",
+    sentence:
+      "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the global interval or the default.",
+  },
 ];
 
-const WORK_PROMPT_SENTENCE = "Instructions appended after the global prompt, if any, to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use only the global prompt.";
+const WORK_PROMPT_SENTENCE =
+  "Instructions appended after the global prompt, if any, to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use only the global prompt.";
 
 // Where the listed issues come from now, such as "Linear team WEB".
 function currentTrackerLabel({ kind, team, repo }) {
@@ -61,38 +92,60 @@ export class RepositorySettings extends SettingsForm {
   // { kind, team?, repo? }.
   constructor(project, main, current, { onSaved }) {
     super({ onSaved });
-    this.project = project; this.main = main; this.current = current;
+    this.project = project;
+    this.main = main;
+    this.current = current;
     this.trackerReady = false;
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
       // Both run before the tracker's check settles or within a render, so the save waits for the next tick.
-      onReady: (_none, cx) => { this.trackerReady = true; this.autosave.schedule(cx, 0); cx.notify(); },
+      onReady: (_none, cx) => {
+        this.trackerReady = true;
+        this.autosave.schedule(cx, 0);
+        cx.notify();
+      },
       onTeam: (cx) => this.autosave.schedule(cx, 0),
     });
     // The entry's own approval, onApproval, waitForChecks and close, as their selects' ids, and the chosen ones.
-    this.approvalSettings = null; this.savedApproval = null; this.chosenApproval = {};
-    this.savedName = null; this.nameInput = null;
-    this.savedRepository = null; this.repositoryInputs = null;
+    this.approvalSettings = null;
+    this.savedApproval = null;
+    this.chosenApproval = {};
+    this.savedName = null;
+    this.nameInput = null;
+    this.savedRepository = null;
+    this.repositoryInputs = null;
     this.agentSources = null;
-    this.savedWorkPrompt = null; this.workPromptInput = null;
+    this.savedWorkPrompt = null;
+    this.workPromptInput = null;
     this.selects = null;
   }
 
   load(cx) {
     this.selects = {
       tracker: new SelectMenu("settings-tracker", "Issue tracker", cx),
-      ...Object.fromEntries(Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`settings-${key}`, title, cx)])),
+      ...Object.fromEntries(
+        Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [
+          key,
+          new SelectMenu(`settings-${key}`, title, cx),
+        ]),
+      ),
       close: new SelectMenu("settings-close", "How are worktrees closed?", cx),
       ...this.agentSelects("settings", cx),
     };
     cx.spawn(async (cx) => {
       try {
         const [approvalSettings, name, repository, agent, workPrompt] = await Promise.all([
-          approvalSources(this.project), nameSettings(this.project),
-          repositorySettings(this.project), agentSettings(this.project), workPromptSettings(this.project),
+          approvalSources(this.project),
+          nameSettings(this.project),
+          repositorySettings(this.project),
+          agentSettings(this.project),
+          workPromptSettings(this.project),
         ]);
         this.approvalSettings = approvalSettings;
-        this.savedApproval = { ...approvalSettings.entry, waitForChecks: checksChoiceId(approvalSettings.entry.waitForChecks) };
+        this.savedApproval = {
+          ...approvalSettings.entry,
+          waitForChecks: checksChoiceId(approvalSettings.entry.waitForChecks),
+        };
         this.chosenApproval = { ...this.savedApproval };
         this.savedName = name.entry;
         this.nameInput = InputState.new({ placeholder: name.defaultName, value: name.entry ?? "" });
@@ -103,11 +156,19 @@ export class RepositorySettings extends SettingsForm {
         this.agentSources = agent;
         this.openAgent(Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry])));
         this.savedWorkPrompt = workPrompt.entry;
-        this.workPromptInput = TextareaState.new({ placeholder: "No prompt for this repository", value: workPrompt.entry ?? "", rows: WORK_PROMPT_ROWS });
+        this.workPromptInput = TextareaState.new({
+          placeholder: "No prompt for this repository",
+          value: workPrompt.entry ?? "",
+          rows: WORK_PROMPT_ROWS,
+        });
         this.workPromptInput.set_soft_wrap(true);
         this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
-      } catch (e) { this.error = String(e.message ?? e); }
-      finally { this.loading = false; cx.notify(); }
+      } catch (e) {
+        this.error = String(e.message ?? e);
+      } finally {
+        this.loading = false;
+        cx.notify();
+      }
     });
   }
 
@@ -115,22 +176,34 @@ export class RepositorySettings extends SettingsForm {
   // without it as the placeholder.
   newRepositoryInputs(repository) {
     const placeholders = {
-      pollSeconds: repository.topLevelPollSeconds != null ? `Global (${repository.topLevelPollSeconds})` : String(DEFAULT_POLL_SECONDS),
+      pollSeconds:
+        repository.topLevelPollSeconds != null
+          ? `Global (${repository.topLevelPollSeconds})`
+          : String(DEFAULT_POLL_SECONDS),
       spaceName: repository.topLevelSpaceName != null ? `Global (${repository.topLevelSpaceName})` : "<issueId>",
       worktreeSetup: "No command",
     };
-    return Object.fromEntries(REPOSITORY_KEYS.map((key) => {
-      const input = InputState.new({ placeholder: placeholders[key], value: repository[key] == null ? "" : String(repository[key]) });
-      input.on("change", (_e, cx) => this.edited(cx));
-      input.on("submit", (_e, cx) => this.saveNow(cx));
-      return [key, input];
-    }));
+    return Object.fromEntries(
+      REPOSITORY_KEYS.map((key) => {
+        const input = InputState.new({
+          placeholder: placeholders[key],
+          value: repository[key] == null ? "" : String(repository[key]),
+        });
+        input.on("change", (_e, cx) => this.edited(cx));
+        input.on("submit", (_e, cx) => this.saveNow(cx));
+        return [key, input];
+      }),
+    );
   }
 
   // Choosing the current GitHub or Beads tracker again undoes a change; Linear's is checked again to change its team.
   chooseTracker(choice, cx) {
     Object.assign(this, { trackerReady: false, error: null });
-    if (choice === this.current.kind && choice !== "linear") { this.tracker.reset(); cx.notify(); return; }
+    if (choice === this.current.kind && choice !== "linear") {
+      this.tracker.reset();
+      cx.notify();
+      return;
+    }
     this.tracker.choose(choice, cx);
     if (choice === this.current.kind) this.tracker.team = this.current.team;
   }
@@ -143,7 +216,8 @@ export class RepositorySettings extends SettingsForm {
   trackerChange() {
     const { choice, team } = this.tracker;
     if (!choice || !this.trackerReady) return null;
-    if (choice === "linear") return team && (this.current.kind !== "linear" || team !== this.current.team) ? { tracker: choice, team } : null;
+    if (choice === "linear")
+      return team && (this.current.kind !== "linear" || team !== this.current.team) ? { tracker: choice, team } : null;
     return choice === this.current.kind ? null : { tracker: choice };
   }
 
@@ -165,7 +239,11 @@ export class RepositorySettings extends SettingsForm {
     return {
       approval: fallback("approval", APPROVAL_QUESTIONS.approval.choices, DEFAULT_APPROVAL),
       onApproval: fallback("onApproval", APPROVAL_QUESTIONS.onApproval.choices, defaultOnApproval),
-      waitForChecks: fallback("waitForChecks", APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS)),
+      waitForChecks: fallback(
+        "waitForChecks",
+        APPROVAL_QUESTIONS.waitForChecks.choices,
+        checksChoiceId(DEFAULT_WAIT_FOR_CHECKS),
+      ),
       close: fallback("close", CLOSE_CHOICES, DEFAULT_CLOSE),
     };
   }
@@ -198,8 +276,11 @@ export class RepositorySettings extends SettingsForm {
 
   // The typed poll interval, or null when it's empty; undefined with the problem when it can't be saved.
   typedPollSeconds() {
-    try { return { pollSeconds: parsePollSeconds(this.repositoryInputs.pollSeconds.value()) }; }
-    catch (e) { return { problem: String(e.message ?? e) }; }
+    try {
+      return { pollSeconds: parsePollSeconds(this.repositoryInputs.pollSeconds.value()) };
+    } catch (e) {
+      return { problem: String(e.message ?? e) };
+    }
   }
 
   // Each of pollSeconds, spaceName and worktreeSetup whose field differs from the entry, as its value or null.
@@ -210,13 +291,15 @@ export class RepositorySettings extends SettingsForm {
       spaceName: this.repositoryInputs.spaceName.value().trim() || null,
       worktreeSetup: this.repositoryInputs.worktreeSetup.value().trim() || null,
     };
-    return Object.fromEntries(REPOSITORY_KEYS
-      .filter((key) => typed[key] !== undefined && typed[key] !== this.savedRepository[key])
-      .map((key) => [key, typed[key]]));
+    return Object.fromEntries(
+      REPOSITORY_KEYS.filter((key) => typed[key] !== undefined && typed[key] !== this.savedRepository[key]).map(
+        (key) => [key, typed[key]],
+      ),
+    );
   }
 
   pollSecondsProblem() {
-    return this.repositoryInputs ? this.typedPollSeconds().problem ?? null : null;
+    return this.repositoryInputs ? (this.typedPollSeconds().problem ?? null) : null;
   }
 
   // The typed prompt, trimmed, or null when the textarea is empty, so only the global prompt applies.
@@ -233,17 +316,36 @@ export class RepositorySettings extends SettingsForm {
   saveRequest() {
     if (!this.approvalSettings) return null;
     const trackerChoice = this.trackerChange();
-    const approvalSettings = this.approvalToSave(), approvalChanged = this.approvalChanged();
-    const closeChanged = this.closeChanged(), close = this.chosenApproval.close;
-    const nameChanged = this.nameChanged(), name = this.typedName();
-    const repositoryChanges = this.repositoryChanges(), agentChanges = this.agentChanges();
-    const workPromptChanged = this.workPromptChanged(), workPrompt = this.typedWorkPrompt();
-    const hasRepositoryChanges = Object.keys(repositoryChanges).length > 0, hasAgentChanges = Object.keys(agentChanges).length > 0;
-    if (!trackerChoice && !approvalChanged && !closeChanged && !nameChanged && !hasRepositoryChanges && !hasAgentChanges && !workPromptChanged) return null;
+    const approvalSettings = this.approvalToSave(),
+      approvalChanged = this.approvalChanged();
+    const closeChanged = this.closeChanged(),
+      close = this.chosenApproval.close;
+    const nameChanged = this.nameChanged(),
+      name = this.typedName();
+    const repositoryChanges = this.repositoryChanges(),
+      agentChanges = this.agentChanges();
+    const workPromptChanged = this.workPromptChanged(),
+      workPrompt = this.typedWorkPrompt();
+    const hasRepositoryChanges = Object.keys(repositoryChanges).length > 0,
+      hasAgentChanges = Object.keys(agentChanges).length > 0;
+    if (
+      !trackerChoice &&
+      !approvalChanged &&
+      !closeChanged &&
+      !nameChanged &&
+      !hasRepositoryChanges &&
+      !hasAgentChanges &&
+      !workPromptChanged
+    )
+      return null;
     return {
       write: async () => {
         if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
-        if (approvalChanged) await saveApprovalSettings(this.main, { ...approvalSettings, waitForChecks: waitForChecksOf(approvalSettings.waitForChecks) });
+        if (approvalChanged)
+          await saveApprovalSettings(this.main, {
+            ...approvalSettings,
+            waitForChecks: waitForChecksOf(approvalSettings.waitForChecks),
+          });
         if (closeChanged) await saveCloseSetting(this.main, close);
         if (nameChanged) await saveNameSetting(this.main, name);
         if (hasRepositoryChanges) await saveRepositorySettings(this.main, repositoryChanges);
@@ -251,7 +353,12 @@ export class RepositorySettings extends SettingsForm {
         if (workPromptChanged) await saveWorkPrompt(this.main, workPrompt);
       },
       written: () => {
-        if (trackerChoice) this.current = { kind: trackerChoice.tracker, team: trackerChoice.team, repo: trackerChoice.tracker === this.current.kind ? this.current.repo : undefined };
+        if (trackerChoice)
+          this.current = {
+            kind: trackerChoice.tracker,
+            team: trackerChoice.team,
+            repo: trackerChoice.tracker === this.current.kind ? this.current.repo : undefined,
+          };
         if (approvalChanged) this.savedApproval = { ...this.savedApproval, ...approvalSettings };
         if (closeChanged) this.savedApproval = { ...this.savedApproval, close };
         if (nameChanged) this.savedName = name;
@@ -264,23 +371,44 @@ export class RepositorySettings extends SettingsForm {
 
   fields() {
     return settingsFields({
-      trackerChoice: this.tracker.choice, trackerReady: this.trackerReady, onApproval: this.chosenApproval.onApproval,
-      fallbackOnApproval: this.approvalSettings ? this.approvalFallbacks().onApproval.value : null, workModel: this.agentValues.workModel, otherWorkModelPicked: this.otherWorkModelPicked,
+      trackerChoice: this.tracker.choice,
+      trackerReady: this.trackerReady,
+      onApproval: this.chosenApproval.onApproval,
+      fallbackOnApproval: this.approvalSettings ? this.approvalFallbacks().onApproval.value : null,
+      workModel: this.agentValues.workModel,
+      otherWorkModelPicked: this.otherWorkModelPicked,
     });
   }
 
   form(content, t) {
     const fields = this.fields();
     return this.errorLine(content, t)
-      .when(Boolean(this.nameInput), (e) => e.child(this.question("Repository name", NAME_SENTENCE, t,
-        (controls) => controls.child(this.textField(this.nameInput, t)))))
+      .when(Boolean(this.nameInput), (e) =>
+        e.child(
+          this.question("Repository name", NAME_SENTENCE, t, (controls) =>
+            controls.child(this.textField(this.nameInput, t)),
+          ),
+        ),
+      )
       .child(this.trackerSection(fields, t))
       .when(Boolean(this.approvalSettings), (e) => this.approvalQuestions(e, fields, t))
-      .when(Boolean(this.repositoryInputs), (e) => e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))))
-      .when(Boolean(this.agentSources), (e) => e.children(AGENT_QUESTIONS.map((question) =>
-        this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t))))
-      .when(Boolean(this.workPromptInput), (e) => e.child(this.question("Work prompt", WORK_PROMPT_SENTENCE, t,
-        (controls) => controls.child(this.textareaField(this.workPromptInput, t)))));
+      .when(Boolean(this.repositoryInputs), (e) =>
+        e.children(REPOSITORY_QUESTIONS.map((question) => this.repositoryQuestion(question, t))),
+      )
+      .when(Boolean(this.agentSources), (e) =>
+        e.children(
+          AGENT_QUESTIONS.map((question) =>
+            this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t),
+          ),
+        ),
+      )
+      .when(Boolean(this.workPromptInput), (e) =>
+        e.child(
+          this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
+            controls.child(this.textareaField(this.workPromptInput, t)),
+          ),
+        ),
+      );
   }
 
   // The approval, onApproval, waitForChecks and close selects, waitForChecks only when the onApproval that applies
@@ -302,9 +430,15 @@ export class RepositorySettings extends SettingsForm {
   // and opening on the entry's value or that choice.
   approvalSelect(key, title, sentence, choices, fallbacks, t) {
     const options = [{ id: CLEAR_CHOICE, label: fallbacks[key].label }, ...choices];
-    return this.question(title, sentence, t, (controls) => controls
-      .child(this.selects[key].render(t, { options, value: this.chosenApproval[key] ?? CLEAR_CHOICE,
-        onChoose: (id, cx) => this.chooseApproval(key, id === CLEAR_CHOICE ? null : id, cx) })));
+    return this.question(title, sentence, t, (controls) =>
+      controls.child(
+        this.selects[key].render(t, {
+          options,
+          value: this.chosenApproval[key] ?? CLEAR_CHOICE,
+          onChoose: (id, cx) => this.chooseApproval(key, id === CLEAR_CHOICE ? null : id, cx),
+        }),
+      ),
+    );
   }
 
   // What applies without the entry's model or effort.
@@ -316,18 +450,41 @@ export class RepositorySettings extends SettingsForm {
   // The tracker in use, the chosen one's check, and Linear's team once Linear is checked.
   trackerSection(fields, t) {
     const { choice, checking } = this.tracker;
-    return this.question("Where do this repository's issues live?", `The panel lists issues from ${currentTrackerLabel(this.current)}.`, t, (controls) =>
-      this.tracker.withCheckStatus(controls
-        .child(this.selects.tracker.render(t, { options: TRACKERS, value: choice ?? this.current.kind, onChoose: (id, cx) => this.chooseTracker(id, cx), enabled: !checking })),
-      "settings-tracker-problem", t)
-        .when(fields.teamSelect, (e) => e.child(this.tracker.teamDropdown("settings-team", t))));
+    return this.question(
+      "Where do this repository's issues live?",
+      `The panel lists issues from ${currentTrackerLabel(this.current)}.`,
+      t,
+      (controls) =>
+        this.tracker
+          .withCheckStatus(
+            controls.child(
+              this.selects.tracker.render(t, {
+                options: TRACKERS,
+                value: choice ?? this.current.kind,
+                onChoose: (id, cx) => this.chooseTracker(id, cx),
+                enabled: !checking,
+              }),
+            ),
+            "settings-tracker-problem",
+            t,
+          )
+          .when(fields.teamSelect, (e) => e.child(this.tracker.teamDropdown("settings-team", t))),
+    );
   }
 
   // A typed setting; the poll interval says below its field why it can't be saved.
   repositoryQuestion({ key, title, sentence }, t) {
     const problem = key === "pollSeconds" ? this.pollSecondsProblem() : null;
-    return this.question(title, sentence, t, (controls) => controls
-      .child(this.textField(this.repositoryInputs[key], t))
-      .when(Boolean(problem), (e) => e.child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(problem ?? ""))));
+    return this.question(title, sentence, t, (controls) =>
+      controls.child(this.textField(this.repositoryInputs[key], t)).when(Boolean(problem), (e) =>
+        e.child(
+          div()
+            .whitespace_normal()
+            .text_size(12)
+            .text_color(t.ansi1)
+            .child(problem ?? ""),
+        ),
+      ),
+    );
   }
 }

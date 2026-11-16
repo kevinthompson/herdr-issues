@@ -30,5 +30,8 @@ const RANKINGS = {
 // when fewer qualify.
 export async function nextIssues(tracker, count, scopeId) {
   const [issues, { qualifies, order }] = await Promise.all([tracker.list(scopeId), RANKINGS[tracker.kind](tracker)]);
-  return issues.filter((issue) => isReady(issue) && qualifies(issue)).sort(order).slice(0, count);
+  return issues
+    .filter((issue) => isReady(issue) && qualifies(issue))
+    .sort(order)
+    .slice(0, count);
 }

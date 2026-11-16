@@ -15,7 +15,10 @@ const vimString = (text) => `'${text.replaceAll("'", "''")}'`;
 // The space's terminals running Neovim, the focused tab's first.
 function neovimTerminals(space, tab) {
   return terminals()
-    .filter((terminal) => terminal.state === "live" && terminal.program?.key === "nvim" && terminal.labels?.["herdr.space"] === space)
+    .filter(
+      (terminal) =>
+        terminal.state === "live" && terminal.program?.key === "nvim" && terminal.labels?.["herdr.space"] === space,
+    )
     .sort((a, b) => Number(b.labels["herdr.tab"] === tab) - Number(a.labels["herdr.tab"] === tab));
 }
 

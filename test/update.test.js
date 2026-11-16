@@ -3,7 +3,16 @@ import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "nod
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { commitFile, createClonedRepository, git, temporaryFolder } from "./support/repository.js";
-import { availableUpdate, dismissUpdate, finishedUpdate, installTab, modCheckout, modLinkPath, offeredUpdate, updateStatePath } from "../mod/update.js";
+import {
+  availableUpdate,
+  dismissUpdate,
+  finishedUpdate,
+  installTab,
+  modCheckout,
+  modLinkPath,
+  offeredUpdate,
+  updateStatePath,
+} from "../mod/update.js";
 
 // A checkout cloned from a bare origin, with the mod linked to its mod folder as setup links it.
 function installedCheckout(t) {
@@ -12,7 +21,10 @@ function installedCheckout(t) {
   mkdirSync(join(clone, "mod"));
   mkdirSync(dirname(modLinkPath()), { recursive: true });
   symlinkSync(join(clone, "mod"), modLinkPath());
-  t.after(() => { rmSync(modLinkPath(), { force: true }); rmSync(updateStatePath(), { force: true }); });
+  t.after(() => {
+    rmSync(modLinkPath(), { force: true });
+    rmSync(updateStatePath(), { force: true });
+  });
   return { folder, origin, checkout: clone };
 }
 

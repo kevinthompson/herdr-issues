@@ -5,7 +5,13 @@ import { appHome, exec } from "herdr";
 import { fileKey } from "./file-key.js";
 
 const FOLDER = "data/issues/avatars";
-const EXTENSIONS = { "image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp", "image/svg+xml": "svg" };
+const EXTENSIONS = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/svg+xml": "svg",
+};
 
 // key → the image's path from the app folder, or null while it downloads or after it failed.
 const avatars = new Map();
@@ -13,16 +19,23 @@ let cached = null;
 
 // The files already downloaded, read once.
 function cachedFiles() {
-  cached ??= exec("ls", ["-1", `${appHome()}/${FOLDER}`]).then((listing) => (listing.code === 0 ? listing.stdout.split("\n").filter(Boolean) : []), () => []);
+  cached ??= exec("ls", ["-1", `${appHome()}/${FOLDER}`]).then(
+    (listing) => (listing.code === 0 ? listing.stdout.split("\n").filter(Boolean) : []),
+    () => [],
+  );
   return cached;
 }
 
 async function download(url, key) {
-  const folder = `${appHome()}/${FOLDER}`, partial = `${folder}/${key}.part`;
+  const folder = `${appHome()}/${FOLDER}`,
+    partial = `${folder}/${key}.part`;
   await exec("mkdir", ["-p", folder]);
   const fetched = await exec("curl", ["-fsSL", "--max-time", "20", "-o", partial, "-w", "%{content_type}", url]);
   const extension = fetched.code === 0 && EXTENSIONS[fetched.stdout.split(";")[0].trim().toLowerCase()];
-  if (!extension) { await exec("rm", ["-f", partial]); return null; }
+  if (!extension) {
+    await exec("rm", ["-f", partial]);
+    return null;
+  }
   const moved = await exec("mv", [partial, `${folder}/${key}.${extension}`]);
   return moved.code === 0 ? `${FOLDER}/${key}.${extension}` : null;
 }

@@ -25,7 +25,13 @@ const tilde = (path, userHome) => {
 const slug = (branch) => branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 const ago = (s) => {
   const d = Date.now() / 1000 - s;
-  return d < 3600 ? `${Math.max(1, Math.round(d / 60))}m` : d < 86400 ? `${Math.round(d / 3600)}h` : d < 86400 * 60 ? `${Math.round(d / 86400)}d` : `${Math.round(d / 86400 / 30)}mo`;
+  return d < 3600
+    ? `${Math.max(1, Math.round(d / 60))}m`
+    : d < 86400
+      ? `${Math.round(d / 3600)}h`
+      : d < 86400 * 60
+        ? `${Math.round(d / 86400)}d`
+        : `${Math.round(d / 86400 / 30)}mo`;
 };
 
 // Every checkout of a repo (`git worktree list`), the main one first, then
@@ -33,14 +39,27 @@ const ago = (s) => {
 async function checkouts(repo, on) {
   const list = await git(repo.main, ["worktree", "list", "--porcelain"], on);
   if (!list.ok) return [];
-  const refs = await git(repo.main, ["for-each-ref", "--format=%(refname:short)%09%(committerdate:unix)", "refs/heads"], on);
-  const when = new Map(refs.out.split("\n").map((l) => l.split("\t")).map(([b, at]) => [b, Number(at) || 0]));
+  const refs = await git(
+    repo.main,
+    ["for-each-ref", "--format=%(refname:short)%09%(committerdate:unix)", "refs/heads"],
+    on,
+  );
+  const when = new Map(
+    refs.out
+      .split("\n")
+      .map((l) => l.split("\t"))
+      .map(([b, at]) => [b, Number(at) || 0]),
+  );
   const out = [];
   for (const block of list.out.split(/\n\n+/)) {
     const lines = block.split("\n");
     const path = lines.find((l) => l.startsWith("worktree "))?.slice(9);
     if (!path || lines.some((l) => l === "bare" || l.startsWith("prunable"))) continue;
-    const branch = lines.find((l) => l.startsWith("branch "))?.slice(7).replace(/^refs\/heads\//, "") ?? null;
+    const branch =
+      lines
+        .find((l) => l.startsWith("branch "))
+        ?.slice(7)
+        .replace(/^refs\/heads\//, "") ?? null;
     out.push({ path, branch, main: out.length === 0, at: branch ? (when.get(branch) ?? 0) : 0 });
   }
   return out.sort((a, b) => b.main - a.main || b.at - a.at);
@@ -49,11 +68,15 @@ async function checkouts(repo, on) {
 // The space showing a checkout: its first terminal is in it (the deepest checkout wins).
 function spaceOf(path, all, on, spaceList, paneList) {
   const inside = (p, dir) => p === dir || p.startsWith(dir + "/");
-  return spaceList.find((s) => (s.machine ?? null) === (on ?? null) && (() => {
-    const at = place(s, paneList)?.replace(/\\/g, "/");
-    if (!at || !inside(at, path)) return false;
-    return !all.some((c) => c.path !== path && c.path.length > path.length && inside(at, c.path));
-  })());
+  return spaceList.find(
+    (s) =>
+      (s.machine ?? null) === (on ?? null) &&
+      (() => {
+        const at = place(s, paneList)?.replace(/\\/g, "/");
+        if (!at || !inside(at, path)) return false;
+        return !all.some((c) => c.path !== path && c.path.length > path.length && inside(at, c.path));
+      })(),
+  );
 }
 
 // Fetches the branch from origin, where work started elsewhere (another computer, a cloud
@@ -85,11 +108,22 @@ export class WorktreeDialog {
     this.list = undefined; // open: the checkouts, once read
     this.at = 0;
     this.input = InputState.new({ value: this.text, placeholder: this.opening ? "filter worktrees" : "branch name" });
-    this.input.on("change", (_e, cx) => { this.text = this.input.value(); this.error = ""; this.at = 0; cx.notify(); });
+    this.input.on("change", (_e, cx) => {
+      this.text = this.input.value();
+      this.error = "";
+      this.at = 0;
+      cx.notify();
+    });
     this.input.on("submit", (_e, cx) => this.go(cx));
     this.inputFocused = true;
-    this.input.on("focus", (_e, cx) => { this.inputFocused = true; cx.notify(); });
-    this.input.on("blur", (_e, cx) => { this.inputFocused = false; cx.notify(); });
+    this.input.on("focus", (_e, cx) => {
+      this.inputFocused = true;
+      cx.notify();
+    });
+    this.input.on("blur", (_e, cx) => {
+      this.inputFocused = false;
+      cx.notify();
+    });
     if (props()?.action !== "remove") {
       this.input.focus();
       cx.timer.after(600, () => this.input.focus());
@@ -104,18 +138,26 @@ export class WorktreeDialog {
       try {
         if (this.on) {
           let result;
-          try { result = await exec("sh", ["-c", 'printf %s "$HOME"'], { on: this.on }); } catch {}
-          if (!result || result.code !== 0 || !result.stdout.trim()) result = await exec("powershell.exe", ["-NoProfile", "-Command", "[Console]::Write($HOME)"], { on: this.on });
+          try {
+            result = await exec("sh", ["-c", 'printf %s "$HOME"'], { on: this.on });
+          } catch {}
+          if (!result || result.code !== 0 || !result.stdout.trim())
+            result = await exec("powershell.exe", ["-NoProfile", "-Command", "[Console]::Write($HOME)"], {
+              on: this.on,
+            });
           if (result.code !== 0 || !result.stdout.trim()) throw new Error("Could not find the remote home folder.");
           this.userHome = result.stdout.trim().replace(/\\/g, "/");
         }
         this.folder = props()?.folder || place(this.space()) || this.userHome;
         const inFlight = props().action === "remove" ? removalInFlight(props().space) : undefined;
-        const repo = inFlight?.repo ?? await repoOf(this.folder, this.on);
+        const repo = inFlight?.repo ?? (await repoOf(this.folder, this.on));
         if (repo && this.opening) {
           [this.list, this.mainName] = await Promise.all([
             checkouts(repo, this.on),
-            nameSettings({ root: repo.main, on: this.on }).then(({ name }) => name, () => null),
+            nameSettings({ root: repo.main, on: this.on }).then(
+              ({ name }) => name,
+              () => null,
+            ),
           ]);
         }
         this.repo = repo;
@@ -126,7 +168,11 @@ export class WorktreeDialog {
           if (this.removal.removesWithoutAsking({ ask: props().ask, warning: props().warning })) await this.work(cx);
         }
         if (props().branch) await this.work(cx);
-      } catch (error) { this.repo = null; this.error = String(error); cx.notify(); }
+      } catch (error) {
+        this.repo = null;
+        this.error = String(error);
+        cx.notify();
+      }
     });
   }
 
@@ -146,7 +192,10 @@ export class WorktreeDialog {
 
   space() {
     const p = props() ?? {};
-    return spaces().find((s) => s.id === p.space) ?? (p.folder ? { folder: p.folder, machine: p.machine ?? null, name: "" } : undefined);
+    return (
+      spaces().find((s) => s.id === p.space) ??
+      (p.folder ? { folder: p.folder, machine: p.machine ?? null, name: "" } : undefined)
+    );
   }
 
   close() {
@@ -164,8 +213,11 @@ export class WorktreeDialog {
     this.busy = true;
     this.error = "";
     cx.notify();
-    try { this.error = props().action === "remove" ? await this.remove() : await this.create(); }
-    catch (error) { this.error = String(error); }
+    try {
+      this.error = props().action === "remove" ? await this.remove() : await this.create();
+    } catch (error) {
+      this.error = String(error);
+    }
     this.busy = false;
     if (!this.error) this.close();
     cx.notify();
@@ -180,15 +232,25 @@ export class WorktreeDialog {
     if (remote.error) return remote.error;
     const fresh = exists || remote.found ? null : await freshStart(this.repo.main, this.on);
     if (fresh?.error) return fresh.error;
-    const add = exists ? ["worktree", "add", path, branch]
-      : remote.found ? ["worktree", "add", "--track", "-b", branch, path, `origin/${branch}`]
+    const add = exists
+      ? ["worktree", "add", path, branch]
+      : remote.found
+        ? ["worktree", "add", "--track", "-b", branch, path, `origin/${branch}`]
         : ["worktree", "add", "--no-track", "-b", branch, path, fresh.start];
     const r = await git(this.repo.top, add, this.on);
     if (!r.ok) return r.err || "git worktree add failed.";
     const p = props();
     // Unnamed spaces follow the checkout folder; nesting under the repo comes from the checkout either way.
     const behind = p.behind ? openBehindArgs(updates().app.version) : {};
-    run("space.new", { name: p.name, folder: path, machine: this.on, tab: p.tab, argv: p.argv, task: p.task, ...behind });
+    run("space.new", {
+      name: p.name,
+      folder: path,
+      machine: this.on,
+      tab: p.tab,
+      argv: p.argv,
+      task: p.task,
+      ...behind,
+    });
     return "";
   }
 
@@ -202,7 +264,8 @@ export class WorktreeDialog {
     this.close();
     const s = spaceOf(c.path, this.list, this.on, spaces(), panes());
     if (s) run("space.select", { id: s.id });
-    else run("space.new", { folder: c.path, machine: this.on, ...(c.main && this.mainName && { name: this.mainName }) });
+    else
+      run("space.new", { folder: c.path, machine: this.on, ...(c.main && this.mainName && { name: this.mainName }) });
   }
 
   async remove() {
@@ -246,12 +309,27 @@ export class WorktreeDialog {
           h_flex()
             .gap(8)
             .items_center()
-            .child(div().flex_1().min_w(0).truncate().text_color(t.foreground).child(c.branch ?? "detached"))
+            .child(
+              div()
+                .flex_1()
+                .min_w(0)
+                .truncate()
+                .text_color(t.foreground)
+                .child(c.branch ?? "detached"),
+            )
             .when(c.main, (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child("main checkout")))
             .when(Boolean(there), (el) => el.child(div().flex_none().text_size(11).text_color(t.accent).child("open")))
-            .when(!there && c.at > 0, (el) => el.child(div().flex_none().text_size(11).text_color(t.dim).child(ago(c.at)))),
+            .when(!there && c.at > 0, (el) =>
+              el.child(div().flex_none().text_size(11).text_color(t.dim).child(ago(c.at))),
+            ),
         )
-        .child(div().truncate().text_size(11.5).text_color(t.dim).child(tilde(c.path, this.userHome ?? "")));
+        .child(
+          div()
+            .truncate()
+            .text_size(11.5)
+            .text_color(t.dim)
+            .child(tilde(c.path, this.userHome ?? "")),
+        );
     };
     const count = rows.length === all.length ? `${all.length} checkouts` : `${rows.length}/${all.length} checkouts`;
     return v_flex()
@@ -263,12 +341,47 @@ export class WorktreeDialog {
       .gap(10)
       .bg(t.popover)
       .text_size(13)
-      .child(h_flex().child(div().flex_1().font_semibold().text_color(t.foreground).child(`Open worktree${r ? ` of ${r.name}` : ""}`)).child(div().text_size(11).text_color(t.dim).child(r ? count : "")))
-      .when(r === undefined || (r && this.list === undefined), (el) => el.child(div().text_color(t.muted).child("\u2026")))
-      .when(r === null, (el) => el.child(div().text_color(t.muted).child(`${this.folder ? tilde(this.folder, this.userHome ?? "") : "This folder"} is not in a git repository.`)))
+      .child(
+        h_flex()
+          .child(
+            div()
+              .flex_1()
+              .font_semibold()
+              .text_color(t.foreground)
+              .child(`Open worktree${r ? ` of ${r.name}` : ""}`),
+          )
+          .child(
+            div()
+              .text_size(11)
+              .text_color(t.dim)
+              .child(r ? count : ""),
+          ),
+      )
+      .when(r === undefined || (r && this.list === undefined), (el) =>
+        el.child(div().text_color(t.muted).child("\u2026")),
+      )
+      .when(r === null, (el) =>
+        el.child(
+          div()
+            .text_color(t.muted)
+            .child(
+              `${this.folder ? tilde(this.folder, this.userHome ?? "") : "This folder"} is not in a git repository.`,
+            ),
+        ),
+      )
       .when(Boolean(r && this.list), (el) =>
         el
-          .child(Input.new(this.input).h(32).px(10).items_center().rounded(6).border(1).border_color(this.inputFocused ? t.accent : t.input).bg(t.surface).text_color(t.foreground))
+          .child(
+            Input.new(this.input)
+              .h(32)
+              .px(10)
+              .items_center()
+              .rounded(6)
+              .border(1)
+              .border_color(this.inputFocused ? t.accent : t.input)
+              .bg(t.surface)
+              .text_color(t.foreground),
+          )
           .child(
             div()
               .relative()
@@ -280,27 +393,52 @@ export class WorktreeDialog {
                   .size_full()
                   .overflow_y_scroll()
                   .children(rows.map(row))
-                  .when(rows.length === 0, (el) => el.child(div().p(10).text_color(t.dim).child("No matching worktrees."))),
+                  .when(rows.length === 0, (el) =>
+                    el.child(div().p(10).text_color(t.dim).child("No matching worktrees.")),
+                  ),
               )
               .child(Scrollbar.vertical("wt-list").absolute().inset_0()),
           ),
       )
-      .child(h_flex().justify_end().text_size(11).text_color(t.dim).child("\u2191\u2193 choose \u00b7 \u21b5 open \u00b7 esc close"));
+      .child(
+        h_flex()
+          .justify_end()
+          .text_size(11)
+          .text_color(t.dim)
+          .child("\u2191\u2193 choose \u00b7 \u21b5 open \u00b7 esc close"),
+      );
   }
 
   // Each check's finding as it arrives, then, once all have answered, the verdict on removing the checkout.
   renderChecks(t) {
     const findings = removalFindings({ ...this.removal?.checks, warning: props()?.warning });
-    const row = ({ result, text }) => h_flex().gap(6).items_start()
-      .child(div().flex_none().text_color(result === PASS ? t.ansi2 : result === LOSS ? t.blocked : t.working).child(result === PASS ? "✓" : "✗"))
-      .child(div().flex_1().min_w(0).text_color(t.foreground).child(text));
+    const row = ({ result, text }) =>
+      h_flex()
+        .gap(6)
+        .items_start()
+        .child(
+          div()
+            .flex_none()
+            .text_color(result === PASS ? t.ansi2 : result === LOSS ? t.blocked : t.working)
+            .child(result === PASS ? "✓" : "✗"),
+        )
+        .child(div().flex_1().min_w(0).text_color(t.foreground).child(text));
     const verdict = this.checking() ? null : removalVerdict(findings);
     const nested = this.removal?.nestedSpaces?.length ?? 0;
-    return v_flex().gap(4)
+    return v_flex()
+      .gap(4)
       .children(findings.map(row))
-      .when(nested > 0, (el) => el.child(div().text_color(t.working).child(`Closing this space also closes ${nested === 1 ? "1 space" : `${nested} spaces`} nested under it.`)))
+      .when(nested > 0, (el) =>
+        el.child(
+          div()
+            .text_color(t.working)
+            .child(`Closing this space also closes ${nested === 1 ? "1 space" : `${nested} spaces`} nested under it.`),
+        ),
+      )
       .when(this.checking(), (el) => el.child(div().text_color(t.dim).child("Checking the worktree's state…")))
-      .when(Boolean(verdict), (el) => el.child(div().pt(4).font_semibold().text_color(t.foreground).child(`${verdict.mark} ${verdict.text}`)));
+      .when(Boolean(verdict), (el) =>
+        el.child(div().pt(4).font_semibold().text_color(t.foreground).child(`${verdict.mark} ${verdict.text}`)),
+      );
   }
 
   render(cx) {
@@ -352,7 +490,17 @@ export class WorktreeDialog {
           .justify_end()
           .text_size(11)
           .text_color(t.dim)
-          .child(this.busy ? "working…" : blocked ? "esc close" : this.checking() ? "checking… · esc cancel" : remove ? "↵ remove · esc cancel" : "↵ create · esc cancel"),
+          .child(
+            this.busy
+              ? "working…"
+              : blocked
+                ? "esc close"
+                : this.checking()
+                  ? "checking… · esc cancel"
+                  : remove
+                    ? "↵ remove · esc cancel"
+                    : "↵ create · esc cancel",
+          ),
       );
   }
 }

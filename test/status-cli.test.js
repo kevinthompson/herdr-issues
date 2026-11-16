@@ -13,7 +13,14 @@ const startingFolder = process.cwd();
 beforeEach(() => forgetLookups());
 afterEach(() => process.chdir(startingFolder));
 
-const record = { id: "notes-a1b", title: "Something", status: "open", priority: 2, created_at: "2026-01-01T00:00:00Z", dependencies: [] };
+const record = {
+  id: "notes-a1b",
+  title: "Something",
+  status: "open",
+  priority: 2,
+  created_at: "2026-01-01T00:00:00Z",
+  dependencies: [],
+};
 
 // A repository tracked in Beads holding only the issue `record`, whose stubbed `bd` records each update; the
 // panel announcements are counted.
@@ -27,11 +34,15 @@ function beadsRepository(t) {
   const counts = { announcements: 0 };
   const ok = (value) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
   stubHerdr(t, {
-    setShared: () => { counts.announcements++; return null; },
+    setShared: () => {
+      counts.announcements++;
+      return null;
+    },
     exec: async (command, args, options) => {
       if (command !== "bd") return defaults.exec(command, args, options);
       if (args[0] === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
-      if (args[0] === "show") return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
+      if (args[0] === "show")
+        return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
       if (args[0] === "update") updates.push(args.slice(1, -1));
       return ok(null);
     },
@@ -41,7 +52,8 @@ function beadsRepository(t) {
 }
 
 async function run(t, args) {
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(args);
@@ -82,7 +94,10 @@ test("status refuses a status the tracker can't set and exits 1", async (t) => {
   assert.deepEqual(updates, []);
 });
 
-for (const args of [["status", "notes-zzz", "done"], ["start", "notes-zzz"]]) {
+for (const args of [
+  ["status", "notes-zzz", "done"],
+  ["start", "notes-zzz"],
+]) {
   test(`${args[0]} exits 1 for an unknown issue, changing nothing`, async (t) => {
     const { updates, counts } = beadsRepository(t);
     const result = await run(t, args);

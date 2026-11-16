@@ -22,7 +22,8 @@ afterEach(() => process.chdir(startingFolder));
 // Runs `issues setting <key>` in `repository`, returning its exit code and what it printed.
 async function setting(t, repository, key) {
   process.chdir(repository);
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(["setting", key]);
@@ -35,7 +36,10 @@ const retired = { createModel: "haiku", createEffort: "extreme" };
 
 test("an issues.json with the retired createModel and createEffort still loads, ignoring them", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ ...retired, repos: { [repository]: { tracker: "github", repo: "owner/name", ...retired, workModel: "opus" } } });
+  writeSettings({
+    ...retired,
+    repos: { [repository]: { tracker: "github", repo: "owner/name", ...retired, workModel: "opus" } },
+  });
 
   const result = await setting(t, repository, "workModel");
 
@@ -49,7 +53,10 @@ test("saving a work setting leaves the retired keys in the file", async (t) => {
 
   await saveAgentSettings(repository, { workEffort: "high" });
 
-  assert.deepEqual(readSettings(), { ...retired, repos: { [repository]: { tracker: "beads", ...retired, workEffort: "high" } } });
+  assert.deepEqual(readSettings(), {
+    ...retired,
+    repos: { [repository]: { tracker: "beads", ...retired, workEffort: "high" } },
+  });
 });
 
 test("issues setting refuses createModel and createEffort as unknown keys", async (t) => {

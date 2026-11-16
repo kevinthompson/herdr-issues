@@ -50,14 +50,23 @@ function statusOf(node, pullRequests) {
 
 // The branch GitHub's "Create a branch" names for an issue: its number, then its title as a slug.
 function suggestedBranch(node) {
-  const slug = node.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, BRANCH_SLUG_LENGTH).replace(/^-+|-+$/g, "");
+  const slug = node.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .slice(0, BRANCH_SLUG_LENGTH)
+    .replace(/^-+|-+$/g, "");
   return slug ? `${node.number}-${slug}` : String(node.number);
 }
 
 // Closed blockers are only listed once Done or Canceled is expanded, so only the open ones may block.
 function openBlockers(node, repo) {
-  return node.blockedBy.nodes.filter((blocker) => blocker.state === "OPEN").map((blocker) =>
-    blocker.repository.nameWithOwner === repo ? `#${blocker.number}` : `${blocker.repository.nameWithOwner}#${blocker.number}`);
+  return node.blockedBy.nodes
+    .filter((blocker) => blocker.state === "OPEN")
+    .map((blocker) =>
+      blocker.repository.nameWithOwner === repo
+        ? `#${blocker.number}`
+        : `${blocker.repository.nameWithOwner}#${blocker.number}`,
+    );
 }
 
 function toIssue(node, repo) {
@@ -70,7 +79,9 @@ function toIssue(node, repo) {
     status: pullRequestStatus(pullRequest),
     branch: pullRequest.headRefName,
   }));
-  const open = pullRequests.find((pullRequest) => pullRequest.fullRepo === repo && ["open", "draft"].includes(pullRequest.status));
+  const open = pullRequests.find(
+    (pullRequest) => pullRequest.fullRepo === repo && ["open", "draft"].includes(pullRequest.status),
+  );
   const [assignee] = node.assignees.nodes;
   const labels = node.labels.nodes;
   return {
@@ -106,7 +117,9 @@ const originRepositories = new Map();
 
 function originRepository(root, gh) {
   if (!originRepositories.has(root)) {
-    const lookup = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).then((stdout) => stdout.trim());
+    const lookup = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).then((stdout) =>
+      stdout.trim(),
+    );
     lookup.catch(() => originRepositories.delete(root));
     originRepositories.set(root, lookup);
   }
@@ -167,9 +180,16 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
   }
 
   const rest = (method, path, fields) =>
-    gh(["api", "-X", method, `repos/${repo}/${path}`, ...Object.entries(fields).flatMap(([key, value]) => ["-f", `${key}=${value}`])]);
+    gh([
+      "api",
+      "-X",
+      method,
+      `repos/${repo}/${path}`,
+      ...Object.entries(fields).flatMap(([key, value]) => ["-f", `${key}=${value}`]),
+    ]);
   const editIssue = (issue, fields) => rest("PATCH", `issues/${issue.number}`, fields);
-  const assignees = (issue, method, login) => rest(method, `issues/${issue.number}/assignees`, { "assignees[]": login });
+  const assignees = (issue, method, login) =>
+    rest(method, `issues/${issue.number}/assignees`, { "assignees[]": login });
 
   async function get(id) {
     const number = issueNumber(id);
@@ -180,13 +200,22 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
   }
 
   async function labels() {
-    return JSON.parse(await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)])).map((label) => label.name);
+    return JSON.parse(await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)])).map(
+      (label) => label.name,
+    );
   }
 
   async function changeLabels(issue, addLabels, removeLabels) {
     refuseUnknownLabels([...addLabels, ...removeLabels], await labels(), repo);
-    await gh(["issue", "edit", String(issue.number), "--repo", repo,
-      ...addLabels.flatMap((name) => ["--add-label", name]), ...removeLabels.flatMap((name) => ["--remove-label", name])]);
+    await gh([
+      "issue",
+      "edit",
+      String(issue.number),
+      "--repo",
+      repo,
+      ...addLabels.flatMap((name) => ["--add-label", name]),
+      ...removeLabels.flatMap((name) => ["--remove-label", name]),
+    ]);
   }
 
   async function setStatus(issue, status) {
@@ -194,7 +223,8 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     if (status === "done") return editIssue(issue, { state: "closed", state_reason: "completed" });
     if (status === "canceled") return editIssue(issue, { state: "closed", state_reason: "not_planned" });
     if (issue.status === "done" || issue.status === "canceled") await editIssue(issue, { state: "open" });
-    const login = await viewer(), current = await get(issue.id);
+    const login = await viewer(),
+      current = await get(issue.id);
     if (!current) throw new Error(`${issue.id} no longer exists`);
     if (status === "in-progress" && !current.assigneeLogins.length) await assignees(issue, "POST", login);
     if (status === "todo" && current.assigneeLogins.includes(login)) await assignees(issue, "DELETE", login);
@@ -212,7 +242,8 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
       const lists = await Promise.all([
         issuePages(ISSUES("OPEN", "CREATED_AT"), { pages: MAX_PAGES, size: PAGE_SIZE }),
         loads.has("done") || loads.has("canceled")
-          ? issuePages(ISSUES("CLOSED", "UPDATED_AT"), { pages: 1, size: RECENTLY_CLOSED }) : [],
+          ? issuePages(ISSUES("CLOSED", "UPDATED_AT"), { pages: 1, size: RECENTLY_CLOSED })
+          : [],
       ]);
       return lists.flat().map((node) => toIssue(node, repo));
     },

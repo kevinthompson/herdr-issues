@@ -64,7 +64,10 @@ function installedHome(folder, { checkout } = {}) {
   symlinkSync(join(checkout, "mod"), join(appHome, "mods/issues"));
   mkdirSync(join(home, ".local/bin"), { recursive: true });
   symlinkSync(join(checkout, "bin/issues"), join(home, ".local/bin/issues"));
-  writeJson(join(appHome, "keys.json"), { global: { "cmd-k": "palette", ...modKeys.global }, "mod:issues": modKeys["mod:issues"] });
+  writeJson(join(appHome, "keys.json"), {
+    global: { "cmd-k": "palette", ...modKeys.global },
+    "mod:issues": modKeys["mod:issues"],
+  });
   writeJson(join(appHome, "issues.json"), { repos: {} });
   writeJson(join(appHome, "linear.json"), { apiKey: "key" });
   saveKeychainPassword("herdr-issues", "linear", "key", home);
@@ -76,7 +79,10 @@ function installedHome(folder, { checkout } = {}) {
 }
 
 // The stand-in for security comes before /usr/bin, so uninstall never reaches the person's Keychain.
-const toolFolders = [fakeSecurityFolder, ...new Set(["node", "git"].map((tool) => dirname(execFileSync("which", [tool], { encoding: "utf8" }).trim())))];
+const toolFolders = [
+  fakeSecurityFolder,
+  ...new Set(["node", "git"].map((tool) => dirname(execFileSync("which", [tool], { encoding: "utf8" }).trim()))),
+];
 const linearKeychainKey = (home) => keychainPassword("herdr-issues", "linear", home);
 
 const runUninstall = (checkout, { home, appHome, bin }) =>
@@ -118,7 +124,10 @@ const runUninstallInTerminal = (checkout, { home, appHome, bin }, answers) =>
   });
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
-const layoutWith = (...extra) => ({ id: "root", children: [{ id: "main" }, { id: "panel", children: [{ id: "panel-body" }] }, ...extra] });
+const layoutWith = (...extra) => ({
+  id: "root",
+  children: [{ id: "main" }, { id: "panel", children: [{ id: "panel-body" }] }, ...extra],
+});
 
 test("uninstall removes the links into the checkout, the mod's keys and the plugin", (t) => {
   const installed = installedHome(temporaryFolder(t));
@@ -129,7 +138,10 @@ test("uninstall removes the links into the checkout, the mod's keys and the plug
   assert.equal(isLink(join(installed.appHome, "mods/issues")), false);
   assert.equal(isLink(join(installed.home, ".local/bin/issues")), false);
   assert.deepEqual(readJson(join(installed.appHome, "keys.json")), { global: { "cmd-k": "palette" } });
-  assert.match(readFileSync(installed.log, "utf8"), /plugin uninstall issues@herdr-issues\nplugin marketplace list --json\nplugin marketplace remove herdr-issues/);
+  assert.match(
+    readFileSync(installed.log, "utf8"),
+    /plugin uninstall issues@herdr-issues\nplugin marketplace list --json\nplugin marketplace remove herdr-issues/,
+  );
   assert.equal(existsSync(installed.checkout), true);
 });
 
@@ -158,33 +170,52 @@ test("uninstall keeps the layouts, settings, Keychain key and cached data withou
 
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(readJson(join(installed.appHome, "layouts/mine.json")), layout);
-  for (const kept of ["issues.json", "linear.json", "data/issues"]) assert.equal(existsSync(join(installed.appHome, kept)), true);
+  for (const kept of ["issues.json", "linear.json", "data/issues"])
+    assert.equal(existsSync(join(installed.appHome, kept)), true);
   assert.equal(linearKeychainKey(installed.home), "key");
-  assert.match(result.stdout, /Kept:\n- the Issues panel in .*mine\.json.*\n- the settings in .*; delete them with: rm .*issues\.json .*linear\.json\n/);
-  assert.match(result.stdout, /\n- the Linear API key in the macOS Keychain; delete it with: security delete-generic-password -s herdr-issues -a linear\n- the cached lists and avatars in .*; delete them with: rm -r .*data\/issues/);
+  assert.match(
+    result.stdout,
+    /Kept:\n- the Issues panel in .*mine\.json.*\n- the settings in .*; delete them with: rm .*issues\.json .*linear\.json\n/,
+  );
+  assert.match(
+    result.stdout,
+    /\n- the Linear API key in the macOS Keychain; delete it with: security delete-generic-password -s herdr-issues -a linear\n- the cached lists and avatars in .*; delete them with: rm -r .*data\/issues/,
+  );
 });
 
-test("uninstall answered yes removes the panel from layouts, leaving their other nodes, and deletes settings, the Keychain key and data", { skip: !python && "needs python3 for a pseudo-terminal" }, (t) => {
-  const installed = installedHome(temporaryFolder(t));
-  writeJson(join(installed.appHome, "layouts/mine.json"), layoutWith({ id: "issues-panel", type: "column", children: [issuesBlock] }));
+test(
+  "uninstall answered yes removes the panel from layouts, leaving their other nodes, and deletes settings, the Keychain key and data",
+  { skip: !python && "needs python3 for a pseudo-terminal" },
+  (t) => {
+    const installed = installedHome(temporaryFolder(t));
+    writeJson(
+      join(installed.appHome, "layouts/mine.json"),
+      layoutWith({ id: "issues-panel", type: "column", children: [issuesBlock] }),
+    );
 
-  const result = runUninstallInTerminal(installed.checkout, installed, ["y", "y", "y", "y"]);
+    const result = runUninstallInTerminal(installed.checkout, installed, ["y", "y", "y", "y"]);
 
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.deepEqual(readJson(join(installed.appHome, "layouts/mine.json")), layoutWith());
-  for (const deleted of ["issues.json", "linear.json", "data/issues"]) assert.equal(existsSync(join(installed.appHome, deleted)), false);
-  assert.equal(linearKeychainKey(installed.home), null);
-});
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.deepEqual(readJson(join(installed.appHome, "layouts/mine.json")), layoutWith());
+    for (const deleted of ["issues.json", "linear.json", "data/issues"])
+      assert.equal(existsSync(join(installed.appHome, deleted)), false);
+    assert.equal(linearKeychainKey(installed.home), null);
+  },
+);
 
-test("uninstall answered no keeps the Keychain key", { skip: !python && "needs python3 for a pseudo-terminal" }, (t) => {
-  const installed = installedHome(temporaryFolder(t));
+test(
+  "uninstall answered no keeps the Keychain key",
+  { skip: !python && "needs python3 for a pseudo-terminal" },
+  (t) => {
+    const installed = installedHome(temporaryFolder(t));
 
-  const result = runUninstallInTerminal(installed.checkout, installed, ["y", "n", "y"]);
+    const result = runUninstallInTerminal(installed.checkout, installed, ["y", "n", "y"]);
 
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.equal(linearKeychainKey(installed.home), "key");
-  assert.match(result.stdout, /Delete the Linear API key from the macOS Keychain\? \[y\/N\]/);
-});
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(linearKeychainKey(installed.home), "key");
+    assert.match(result.stdout, /Delete the Linear API key from the macOS Keychain\? \[y\/N\]/);
+  },
+);
 
 test("uninstall never asks about a layout Herdr ships", (t) => {
   const installed = installedHome(temporaryFolder(t));

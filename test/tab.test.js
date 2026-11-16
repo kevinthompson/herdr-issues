@@ -11,7 +11,11 @@ import { main } from "../cli/main.js";
 const listing = (tabName, spaceName = "#72") => ({
   spaces: [
     { id: "space-other", name: "elsewhere", tabs: [{ id: "tab-other", name: "1", terminals: [{ terminal: "t9" }] }] },
-    { id: "space-session", name: spaceName, tabs: [{ id: "tab-session", name: tabName, terminals: [{ terminal: "t1" }, { terminal: "t2" }] }] },
+    {
+      id: "space-session",
+      name: spaceName,
+      tabs: [{ id: "tab-session", name: tabName, terminals: [{ terminal: "t1" }, { terminal: "t2" }] }],
+    },
   ],
 });
 
@@ -28,7 +32,7 @@ function stubApp(t, layout) {
       if (command !== "herdr-app") return defaults.exec(command, args, options);
       if (args[0] === "ls") return { code: 0, stdout: JSON.stringify(layout), stderr: "" };
       calls.push(args);
-      return { code: 0, stdout: "{\"ok\":true}", stderr: "" };
+      return { code: 0, stdout: '{"ok":true}', stderr: "" };
     },
   });
   return calls;
@@ -37,7 +41,9 @@ function stubApp(t, layout) {
 async function run(t, args, { terminal = "t2" } = {}) {
   const previous = process.env.HC_TERMINAL_ID;
   process.env.HC_TERMINAL_ID = terminal;
-  t.after(() => { process.env.HC_TERMINAL_ID = previous ?? ""; });
+  t.after(() => {
+    process.env.HC_TERMINAL_ID = previous ?? "";
+  });
   const out = [];
   const err = [];
   t.mock.method(console, "log", (line) => out.push(line));
@@ -84,8 +90,12 @@ for (const args of [["tab"], ["tab", "--json"]]) {
 }
 
 const SESSION_COMMANDS = [
-  ["tab", "rename", "#72", "Tab names"], ["mark", "working", "#72"], ["complete", "#72"], ["complete", "--cancel", "#72"],
-  ["close", "#72"], ["close", "--cancel", "#72"],
+  ["tab", "rename", "#72", "Tab names"],
+  ["mark", "working", "#72"],
+  ["complete", "#72"],
+  ["complete", "--cancel", "#72"],
+  ["close", "#72"],
+  ["close", "--cancel", "#72"],
 ];
 
 // Stubs exec as it behaves when herdr-app and hc aren't on the PATH, recording each attempt to run them.
@@ -156,7 +166,10 @@ test("tab rename compares the space with the name the repository's spaceName tem
   assert.deepEqual(calls, [["do", "tab.rename", "--id", "tab-session", "--name", "Tab names"]]);
 });
 
-for (const [template, space] of [[undefined, "󰄱 #72"], ["<repo> <issueId>", "󰄱 name #72"]]) {
+for (const [template, space] of [
+  [undefined, "󰄱 #72"],
+  ["<repo> <issueId>", "󰄱 name #72"],
+]) {
   test(`tab rename leaves out the ID in a space named ${space}, which ends with the issue's space name`, async (t) => {
     inRepository(t, template);
     const calls = stubApp(t, listing("Claude", space));
@@ -278,7 +291,11 @@ test("complete --cancel on a tab without ✅ only removes the complete label", a
   assert.deepEqual(calls, [["hc", "label", "t2", "issues.complete="]]);
 });
 
-for (const args of [["complete", "--cancel"], ["complete", "--cancel", "--all"], ["complete", "--cancel", "#72", "#73"]]) {
+for (const args of [
+  ["complete", "--cancel"],
+  ["complete", "--cancel", "--all"],
+  ["complete", "--cancel", "#72", "#73"],
+]) {
   test(`${args.join(" ")} fails with a usage error`, async (t) => {
     const calls = stubApp(t, listing("✅ Review"));
     const { code, err } = await run(t, args);
@@ -312,7 +329,11 @@ test("close --cancel removes the close request label from the session's terminal
   assert.equal(out, "Withdrew the request to close #72's space; the worktree stays open");
 });
 
-for (const args of [["close", "--cancel"], ["close", "--cancel", "--all"], ["close", "--cancel", "#72", "#73"]]) {
+for (const args of [
+  ["close", "--cancel"],
+  ["close", "--cancel", "--all"],
+  ["close", "--cancel", "#72", "#73"],
+]) {
   test(`${args.join(" ")} fails with a usage error`, async (t) => {
     const calls = stubApp(t, listing("Claude"));
     const { code, err } = await run(t, args);
@@ -322,7 +343,10 @@ for (const args of [["close", "--cancel"], ["close", "--cancel", "--all"], ["clo
   });
 }
 
-for (const args of [["close", "--keep", "#72"], ["close", "#72", "#73"]]) {
+for (const args of [
+  ["close", "--keep", "#72"],
+  ["close", "#72", "#73"],
+]) {
   test(`${args.join(" ")} fails with a usage error`, async (t) => {
     const calls = stubApp(t, listing("Claude"));
     const { code, err } = await run(t, args);

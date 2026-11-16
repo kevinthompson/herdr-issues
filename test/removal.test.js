@@ -1,8 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { CAUTION, PASS, checksAnswered, removalFindings, removalVerdict, removesWithoutAsking, runChecks } from "../mod/removal.js";
+import {
+  CAUTION,
+  PASS,
+  checksAnswered,
+  removalFindings,
+  removalVerdict,
+  removesWithoutAsking,
+  runChecks,
+} from "../mod/removal.js";
 
-const mergedBranch = { branch: "feature", bases: ["main", "origin/main"], mergedInto: "main", unpushed: 0, pullRequest: null };
+const mergedBranch = {
+  branch: "feature",
+  bases: ["main", "origin/main"],
+  mergedInto: "main",
+  unpushed: 0,
+  pullRequest: null,
+};
 const cleanChecks = { dirty: false, submodules: [], branch: mergedBranch };
 const verdictOf = (checks) => removalVerdict(removalFindings(checks)).mark;
 
@@ -19,17 +33,23 @@ describe("checksAnswered", () => {
 describe("removalFindings", () => {
   test("lists the answered checks in a fixed order", () => {
     const findings = removalFindings({ ...cleanChecks, warning: "Its issue is still open." });
-    assert.deepEqual(findings.map((finding) => finding.text), [
-      "It has no uncommitted changes.",
-      "Its submodules have no commits that aren't pushed.",
-      "Worktree branch has nothing that isn't on main.",
-      "Worktree branch is pushed to origin.",
-      "Its issue is still open.",
-    ]);
+    assert.deepEqual(
+      findings.map((finding) => finding.text),
+      [
+        "It has no uncommitted changes.",
+        "Its submodules have no commits that aren't pushed.",
+        "Worktree branch has nothing that isn't on main.",
+        "Worktree branch is pushed to origin.",
+        "Its issue is still open.",
+      ],
+    );
   });
 
   test("leaves out checks still running", () => {
-    assert.deepEqual(removalFindings({ submodules: [] }).map((finding) => finding.result), [PASS]);
+    assert.deepEqual(
+      removalFindings({ submodules: [] }).map((finding) => finding.result),
+      [PASS],
+    );
   });
 
   test("passes the push of a merged branch with commits never pushed", () => {
@@ -38,7 +58,9 @@ describe("removalFindings", () => {
   });
 
   test("reports a branch check that failed rather than a detached HEAD", () => {
-    assert.deepEqual(removalFindings({ branch: { error: "fetch failed" } }), [{ result: CAUTION, text: "Couldn't check the branch: fetch failed" }]);
+    assert.deepEqual(removalFindings({ branch: { error: "fetch failed" } }), [
+      { result: CAUTION, text: "Couldn't check the branch: fetch failed" },
+    ]);
   });
 });
 
@@ -48,7 +70,10 @@ describe("removesWithoutAsking", () => {
   });
 
   test("is true for a pushed branch with an open pull request", () => {
-    assert.equal(removesWithoutAsking({ ...cleanChecks, branch: { ...mergedBranch, mergedInto: null, pullRequest: "#7" } }, 0), true);
+    assert.equal(
+      removesWithoutAsking({ ...cleanChecks, branch: { ...mergedBranch, mergedInto: null, pullRequest: "#7" } }, 0),
+      true,
+    );
   });
 
   test("is false while a check runs, the branch check included", () => {
@@ -126,9 +151,21 @@ describe("runChecks", () => {
   const run = async (lookups = {}) => {
     const answers = {};
     const looked = [];
-    const lookup = (name, result) => async () => { looked.push(name); return result; };
-    await runChecks({ dirty: lookup("dirty", false), submodules: lookup("submodules", []), branch: lookup("branch", mergedBranch), ...lookups },
-      (name, result) => { answers[name] = result; });
+    const lookup = (name, result) => async () => {
+      looked.push(name);
+      return result;
+    };
+    await runChecks(
+      {
+        dirty: lookup("dirty", false),
+        submodules: lookup("submodules", []),
+        branch: lookup("branch", mergedBranch),
+        ...lookups,
+      },
+      (name, result) => {
+        answers[name] = result;
+      },
+    );
     return { answers, looked };
   };
 
@@ -139,7 +176,11 @@ describe("runChecks", () => {
   });
 
   test("answers a lookup that fails with its error", async () => {
-    const { answers } = await run({ dirty: () => { throw new Error("no git"); } });
+    const { answers } = await run({
+      dirty: () => {
+        throw new Error("no git");
+      },
+    });
     assert.deepEqual(answers.dirty, { error: "no git" });
   });
 });

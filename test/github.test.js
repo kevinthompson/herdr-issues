@@ -6,15 +6,34 @@ import { githubTracker } from "../mod/trackers/github.js";
 const REPO = "owner/name";
 const VIEWER = "me";
 
-const issueNode = (number, { state = "OPEN", stateReason = null, labels = [], assignees = [], pullRequests = [] } = {}) => ({
-  number, title: `Issue ${number}`, url: `https://github.com/${REPO}/issues/${number}`, body: "",
-  createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", closedAt: null, state, stateReason, milestone: null,
+const issueNode = (
+  number,
+  { state = "OPEN", stateReason = null, labels = [], assignees = [], pullRequests = [] } = {},
+) => ({
+  number,
+  title: `Issue ${number}`,
+  url: `https://github.com/${REPO}/issues/${number}`,
+  body: "",
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  closedAt: null,
+  state,
+  stateReason,
+  milestone: null,
   labels: { nodes: labels.map((name) => ({ name, color: "ededed" })) },
   assignees: { nodes: assignees.map((login) => ({ login, name: login, avatarUrl: null })) },
   blockedBy: { nodes: [] },
-  closedByPullRequestsReferences: { nodes: pullRequests.map((pullRequestState) => ({
-    number: 100, title: "Fix", url: `https://github.com/${REPO}/pull/100`, state: pullRequestState, isDraft: false,
-    headRefName: `${number}-fix`, repository: { nameWithOwner: REPO } })) },
+  closedByPullRequestsReferences: {
+    nodes: pullRequests.map((pullRequestState) => ({
+      number: 100,
+      title: "Fix",
+      url: `https://github.com/${REPO}/pull/100`,
+      state: pullRequestState,
+      isDraft: false,
+      headRefName: `${number}-fix`,
+      repository: { nameWithOwner: REPO },
+    })),
+  },
 });
 
 const REPOSITORY_LABELS = ["bug", "enhancement", "needs review"];
@@ -22,7 +41,8 @@ const REPOSITORY_LABELS = ["bug", "enhancement", "needs review"];
 // A tracker whose `gh` answers every issue query with `nodes` and lists REPOSITORY_LABELS, recording each REST
 // request and `gh issue edit` it makes.
 async function trackerWith(t, nodes) {
-  const restRequests = [], issueEdits = [];
+  const restRequests = [],
+    issueEdits = [];
   const ok = (stdout) => ({ code: 0, stdout, stderr: "" });
   stubHerdr(t, {
     exec: async (command, args) => {
@@ -30,13 +50,22 @@ async function trackerWith(t, nodes) {
       if (args[1] === "graphql") {
         const number = args.find((arg) => arg.startsWith("number="))?.split("=")[1];
         const matching = number ? nodes.find((node) => node.number === Number(number)) : null;
-        return ok(JSON.stringify({ data: { repository: number
-          ? { issue: matching }
-          : { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } } } }));
+        return ok(
+          JSON.stringify({
+            data: {
+              repository: number
+                ? { issue: matching }
+                : { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+            },
+          }),
+        );
       }
       if (args[1] === "user") return ok(`${VIEWER}\n`);
       if (args[0] === "label") return ok(JSON.stringify(REPOSITORY_LABELS.map((name) => ({ name }))));
-      if (args[0] === "issue") { issueEdits.push(args.slice(1)); return ok(""); }
+      if (args[0] === "issue") {
+        issueEdits.push(args.slice(1));
+        return ok("");
+      }
       restRequests.push(args.slice(2, 4).join(" "));
       return ok("{}");
     },
@@ -60,8 +89,14 @@ describe("GitHub tracker statuses", () => {
       issueNode(8, { state: "CLOSED", stateReason: "NOT_PLANNED" }),
     ]);
     assert.deepEqual(statusesOf(await tracker.list()), {
-      "#1": "todo", "#2": "todo", "#3": "todo", "#4": "in-progress",
-      "#5": "in-review", "#6": "todo", "#7": "done", "#8": "canceled",
+      "#1": "todo",
+      "#2": "todo",
+      "#3": "todo",
+      "#4": "in-progress",
+      "#5": "in-review",
+      "#6": "todo",
+      "#7": "done",
+      "#8": "canceled",
     });
   });
 
@@ -97,15 +132,30 @@ describe("GitHub tracker labels", () => {
     const { tracker, issueEdits, restRequests } = await trackerWith(t, [issueNode(1, { labels: ["bug"] })]);
     const [issue] = await tracker.list();
     await tracker.update(issue, { addLabels: ["enhancement", "needs review"], removeLabels: ["bug"] });
-    assert.deepEqual(issueEdits, [["edit", "1", "--repo", REPO,
-      "--add-label", "enhancement", "--add-label", "needs review", "--remove-label", "bug"]]);
+    assert.deepEqual(issueEdits, [
+      [
+        "edit",
+        "1",
+        "--repo",
+        REPO,
+        "--add-label",
+        "enhancement",
+        "--add-label",
+        "needs review",
+        "--remove-label",
+        "bug",
+      ],
+    ]);
     assert.deepEqual(restRequests, []);
   });
 
   test("refuses a label the repository doesn't have, naming it and changing nothing", async (t) => {
     const { tracker, issueEdits } = await trackerWith(t, [issueNode(1)]);
     const [issue] = await tracker.list();
-    await assert.rejects(tracker.update(issue, { addLabels: ["bug", "wontfix"] }), /owner\/name has no label named wontfix/);
+    await assert.rejects(
+      tracker.update(issue, { addLabels: ["bug", "wontfix"] }),
+      /owner\/name has no label named wontfix/,
+    );
     await assert.rejects(tracker.update(issue, { removeLabels: ["gone"] }), /has no label named gone/);
     assert.deepEqual(issueEdits, []);
   });

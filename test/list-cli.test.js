@@ -27,7 +27,10 @@ const ISSUES_BY_SCOPE = {
 function stubbedTracker(t, { scopes = SCOPES } = {}) {
   const calls = [];
   useTracker(t, {
-    kind: "linear", name: "Linear", team: "CORE", scopes: scopes ?? undefined,
+    kind: "linear",
+    name: "Linear",
+    team: "CORE",
+    scopes: scopes ?? undefined,
     async list(scopeId, loads) {
       calls.push([scopeId, [...loads]]);
       return ISSUES_BY_SCOPE[scopeId ?? "mine"];
@@ -38,7 +41,8 @@ function stubbedTracker(t, { scopes = SCOPES } = {}) {
 }
 
 async function run(t, ...args) {
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(args);
@@ -49,12 +53,12 @@ test("scopes prints each scope's ID, label and group, default first, milestones 
   stubbedTracker(t);
   const result = await run(t, "scopes");
   assert.equal(result.code, 0, result.err);
-  assert.equal(result.out, [
-    "mine\tMy issues",
-    "team\tIssues\tCore",
-    "project:p1\tPanel\tCore Projects",
-    "project:p1:m1\tBeta\tPanel",
-  ].join("\n"));
+  assert.equal(
+    result.out,
+    ["mine\tMy issues", "team\tIssues\tCore", "project:p1\tPanel\tCore Projects", "project:p1:m1\tBeta\tPanel"].join(
+      "\n",
+    ),
+  );
 });
 
 test("scopes --json prints the tracker's scopes", async (t) => {

@@ -16,16 +16,47 @@ const changedStamp = (appHome) => join(appHome, "data/issues/changed");
 test("the changed hook leaves the stamp alone after a gh command that changes no issue", (t) => {
   const appHome = join(temporaryFolder(t), "herdr-app");
 
-  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh issue list" } }, { HERDR_APP_HOME: appHome });
-  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh pr view 3" } }, { HERDR_APP_HOME: appHome });
-  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "bd -C /repo show notes-a1b --json" } }, { HERDR_APP_HOME: appHome });
-  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh api repos/o/r/issues/12 --jq .id" } }, { HERDR_APP_HOME: appHome });
-  runHook("herdr-issues-changed.mjs", { tool_name: "Bash", tool_input: { command: "gh api repos/o/r/issues/12/dependencies/blocked_by" } }, { HERDR_APP_HOME: appHome });
+  runHook(
+    "herdr-issues-changed.mjs",
+    { tool_name: "Bash", tool_input: { command: "gh issue list" } },
+    { HERDR_APP_HOME: appHome },
+  );
+  runHook(
+    "herdr-issues-changed.mjs",
+    { tool_name: "Bash", tool_input: { command: "gh pr view 3" } },
+    { HERDR_APP_HOME: appHome },
+  );
+  runHook(
+    "herdr-issues-changed.mjs",
+    { tool_name: "Bash", tool_input: { command: "bd -C /repo show notes-a1b --json" } },
+    { HERDR_APP_HOME: appHome },
+  );
+  runHook(
+    "herdr-issues-changed.mjs",
+    { tool_name: "Bash", tool_input: { command: "gh api repos/o/r/issues/12 --jq .id" } },
+    { HERDR_APP_HOME: appHome },
+  );
+  runHook(
+    "herdr-issues-changed.mjs",
+    { tool_name: "Bash", tool_input: { command: "gh api repos/o/r/issues/12/dependencies/blocked_by" } },
+    { HERDR_APP_HOME: appHome },
+  );
 
   assert.equal(existsSync(changedStamp(appHome)), false);
 });
 
-for (const command of ["gh issue create --title x", "gh issue close 12 --reason completed", "gh issue edit 12 --body-file b.md", "gh pr merge 3", "gh api -X POST repos/o/r/issues/12/dependencies/blocked_by -F issue_id=345", "gh api -X DELETE repos/o/r/issues/12/dependencies/blocked_by/345", "bd -C \"/Users/me/My Notes\" update notes-a1b --status in_progress", "bd create --title x --json", "bd -C /repo close notes-a1b", "bd -C /repo dep add notes-b2c notes-a1b"]) {
+for (const command of [
+  "gh issue create --title x",
+  "gh issue close 12 --reason completed",
+  "gh issue edit 12 --body-file b.md",
+  "gh pr merge 3",
+  "gh api -X POST repos/o/r/issues/12/dependencies/blocked_by -F issue_id=345",
+  "gh api -X DELETE repos/o/r/issues/12/dependencies/blocked_by/345",
+  'bd -C "/Users/me/My Notes" update notes-a1b --status in_progress',
+  "bd create --title x --json",
+  "bd -C /repo close notes-a1b",
+  "bd -C /repo dep add notes-b2c notes-a1b",
+]) {
   test(`the changed hook touches the stamp after \`${command}\``, (t) => {
     const appHome = join(temporaryFolder(t), "herdr-app");
 
@@ -35,11 +66,18 @@ for (const command of ["gh issue create --title x", "gh issue close 12 --reason 
   });
 }
 
-for (const [change, tool_input] of [["creates", { title: "x" }], ["updates", { id: "ABC-1", state: "Done" }]]) {
+for (const [change, tool_input] of [
+  ["creates", { title: "x" }],
+  ["updates", { id: "ABC-1", state: "Done" }],
+]) {
   test(`the changed hook touches the stamp after save_issue ${change} a Linear issue`, (t) => {
     const appHome = join(temporaryFolder(t), "herdr-app");
 
-    runHook("herdr-issues-changed.mjs", { tool_name: "mcp__linear__save_issue", tool_input }, { HERDR_APP_HOME: appHome });
+    runHook(
+      "herdr-issues-changed.mjs",
+      { tool_name: "mcp__linear__save_issue", tool_input },
+      { HERDR_APP_HOME: appHome },
+    );
 
     assert.equal(existsSync(changedStamp(appHome)), true);
   });
@@ -53,7 +91,12 @@ test("the scope hook announces the listed scope and the open issue once, and whe
   mkdirSync(join(appHome, "data/issues/scope"), { recursive: true });
   writeFileSync(
     join(appHome, "data/issues/scope/a.json"),
-    JSON.stringify({ repo: repository, tracker: "linear", team: "CAL", scope: { id: "project:p1", kind: "project", project: { name: "Launch", url: "https://l/p" } } }),
+    JSON.stringify({
+      repo: repository,
+      tracker: "linear",
+      team: "CAL",
+      scope: { id: "project:p1", kind: "project", project: { name: "Launch", url: "https://l/p" } },
+    }),
   );
   writeFileSync(
     join(appHome, "data/issues/open.json"),
@@ -85,11 +128,17 @@ test("the scope hook names `issues scopes` for a scope published without its ID"
   const appHome = join(folder, "herdr-app");
   const env = { HERDR_APP_HOME: appHome, HC_TERMINAL_ID: "terminal-1", TMPDIR: join(folder, "tmp") };
   mkdirSync(join(appHome, "data/issues/scope"), { recursive: true });
-  writeFileSync(join(appHome, "data/issues/scope/a.json"), JSON.stringify({ repo: repository, tracker: "linear", team: "CAL", scope: { kind: "team" } }));
+  writeFileSync(
+    join(appHome, "data/issues/scope/a.json"),
+    JSON.stringify({ repo: repository, tracker: "linear", team: "CAL", scope: { kind: "team" } }),
+  );
 
   const { stdout } = runHook("herdr-issues-scope.mjs", { session_id: "session-1", cwd: repository }, env);
 
-  assert.match(stdout, /`issues scopes` names the panel's lists and `issues list <scope>` prints one's open issues, exactly as the panel lists them\./);
+  assert.match(
+    stdout,
+    /`issues scopes` names the panel's lists and `issues list <scope>` prints one's open issues, exactly as the panel lists them\./,
+  );
 });
 
 test("the scope hook stays quiet outside a Herdr terminal", (t) => {

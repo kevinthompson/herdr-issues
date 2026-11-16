@@ -17,4 +17,5 @@ export function saveKeychainPassword(service, account, password, home = process.
   writeFileSync(itemPath(service, account, home), password);
 }
 
-export const clearKeychain = (home = process.env.HOME) => rmSync(keychainFolder(home), { recursive: true, force: true });
+export const clearKeychain = (home = process.env.HOME) =>
+  rmSync(keychainFolder(home), { recursive: true, force: true });

@@ -10,7 +10,14 @@ import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
 import { STATUSES, STATUS_LABELS, priorityRank } from "../issue.js";
 import { refuseUnknownLabels } from "./labels.js";
-import { KEYCHAIN, linearKeyMissing, linearKeyUnreadable, linearKeyUnsaved, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
+import {
+  KEYCHAIN,
+  linearKeyMissing,
+  linearKeyUnreadable,
+  linearKeyUnsaved,
+  linearKeyInvalid,
+  LINEAR_KEY_PROBLEM,
+} from "./problems.js";
 
 const API_URL = "https://api.linear.app/graphql";
 // Linear refuses a query costing over 10,000, roughly each page's size times its nested lists.
@@ -35,8 +42,10 @@ const PAGE = `pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} }`;
 const MERGED_STATE = { type: { eq: "started" }, name: { containsIgnoreCase: "merged" } };
 const TRIAGE_STATE = { type: { eq: "triage" } };
 // Open states, leaving out the state types named too, such as backlog until its group is expanded.
-const openState = (...without) =>
-  ({ type: { nin: ["completed", "canceled", "duplicate", ...without] }, name: { notContainsIgnoreCase: "merged" } });
+const openState = (...without) => ({
+  type: { nin: ["completed", "canceled", "duplicate", ...without] },
+  name: { notContainsIgnoreCase: "merged" },
+});
 const FINISHED_STATES = [{ type: { eq: "completed" } }, MERGED_STATE];
 const CANCELED_STATE = { type: { in: ["canceled", "duplicate"] } };
 
@@ -69,7 +78,15 @@ const labelName = (label) => (label.parent ? `${label.parent.name} > ${label.nam
 
 // Linear's workflow state types, as the panel's statuses. Started states split in three: one named for
 // review is In review, one named Merged is Done, and the rest are In progress.
-const STATUS_TYPES = { triage: ["triage"], backlog: ["backlog"], todo: ["unstarted"], "in-progress": ["started"], "in-review": ["started"], done: ["completed"], canceled: ["canceled", "duplicate"] };
+const STATUS_TYPES = {
+  triage: ["triage"],
+  backlog: ["backlog"],
+  todo: ["unstarted"],
+  "in-progress": ["started"],
+  "in-review": ["started"],
+  done: ["completed"],
+  canceled: ["canceled", "duplicate"],
+};
 const isReviewState = (state) => /review/i.test(state.name);
 const isMergedState = (state) => /merged/i.test(state.name);
 function statusOf(state) {
@@ -96,7 +113,14 @@ function pullRequestsOf(attachments) {
 
 // A view's URL ends in its name and its ID, which the API takes in place of the view's UUID:
 // …/view/checkout-bugs-a8875271fcf5 is a8875271fcf5.
-const viewId = (url) => url.replace(/[?#].*$/, "").replace(/\/+$/, "").split("/").pop().split("-").pop();
+const viewId = (url) =>
+  url
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "")
+    .split("/")
+    .pop()
+    .split("-")
+    .pop();
 
 function repoConfig(root, { team, views = {} }) {
   return { teamKey: team, path: root, views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
@@ -139,7 +163,9 @@ async function readKeyFile() {
   try {
     const fields = JSON.parse(text ?? "{}");
     return { text, fields: fields && typeof fields === "object" && !Array.isArray(fields) ? fields : {}, valid: true };
-  } catch { return { text, fields: {}, valid: false }; }
+  } catch {
+    return { text, fields: {}, valid: false };
+  }
 }
 
 // Takes the key out of the key file, deleting the file when the key is all it holds.
@@ -155,21 +181,23 @@ async function saveInKeyFile(apiKey, { text, fields }) {
   await exec("mkdir", ["-p", appHome()]);
   await writeTextFile(path, `${JSON.stringify({ ...fields, apiKey }, null, 2)}\n`, text);
   const restricted = await exec("chmod", ["600", path]);
-  if (restricted.code !== 0) throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
+  if (restricted.code !== 0)
+    throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
 }
 
 // The key from the Keychain, after moving a key the key file still holds there, or from the key file where
 // there's no Keychain: { apiKey, store }, where store names where it's kept.
 const cachedApiKey = cachedLookup();
-const readApiKey = () => cachedApiKey("apiKey", async () => {
-  const keyFile = await readKeyFile();
-  const { apiKey: fileKey } = keyFile.fields;
-  if (fileKey && await saveInKeychain(fileKey)) await removeKeyFromFile(keyFile);
-  const apiKey = await keychainKey();
-  if (apiKey !== undefined) return { apiKey, store: KEYCHAIN };
-  if (!keyFile.valid) throw linearKeyUnreadable("it isn't valid JSON", KEY_FILE_NAME);
-  return { apiKey: fileKey ?? null, store: KEY_FILE_NAME };
-});
+const readApiKey = () =>
+  cachedApiKey("apiKey", async () => {
+    const keyFile = await readKeyFile();
+    const { apiKey: fileKey } = keyFile.fields;
+    if (fileKey && (await saveInKeychain(fileKey))) await removeKeyFromFile(keyFile);
+    const apiKey = await keychainKey();
+    if (apiKey !== undefined) return { apiKey, store: KEYCHAIN };
+    if (!keyFile.valid) throw linearKeyUnreadable("it isn't valid JSON", KEY_FILE_NAME);
+    return { apiKey: fileKey ?? null, store: KEY_FILE_NAME };
+  });
 
 // A function that asks Linear's API a query with the person's API key: (query, variables) → its data.
 export async function linearClient() {
@@ -181,8 +209,11 @@ export async function linearClient() {
 // Saves the API key in the Keychain once Linear accepts it, taking any key out of the key file so it can't
 // replace this one, or in the key file where there's no Keychain. A key Linear refuses rejects and saves nothing.
 export async function saveLinearKey(apiKey) {
-  try { await request(apiKey, VIEWER, {}); }
-  catch (e) { throw e.code === LINEAR_KEY_PROBLEM ? new Error("Linear refused this API key, so it wasn't saved.") : e; }
+  try {
+    await request(apiKey, VIEWER, {});
+  } catch (e) {
+    throw e.code === LINEAR_KEY_PROBLEM ? new Error("Linear refused this API key, so it wasn't saved.") : e;
+  }
   const keyFile = await readKeyFile();
   if (await saveInKeychain(apiKey)) await removeKeyFromFile(keyFile);
   else await saveInKeyFile(apiKey, keyFile);
@@ -202,12 +233,23 @@ const statusRank = (project) => {
 // projects, grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
 export function scopesFor({ views }, { name: teamName, projects }) {
   const mine = { id: "mine", label: "My issues" };
-  const teamScopes = [{ id: "triage", label: "Triage" }, { id: "team", label: "Issues" },
-    ...views.map((view) => ({ id: `view:${view.id}`, label: view.name }))].map((scope) => ({ ...scope, team: teamName, group: teamName }));
-  const byStatusAndPriority = [...projects].sort((a, b) => statusRank(a) - statusRank(b) || priorityRank(a) - priorityRank(b));
+  const teamScopes = [
+    { id: "triage", label: "Triage" },
+    { id: "team", label: "Issues" },
+    ...views.map((view) => ({ id: `view:${view.id}`, label: view.name })),
+  ].map((scope) => ({ ...scope, team: teamName, group: teamName }));
+  const byStatusAndPriority = [...projects].sort(
+    (a, b) => statusRank(a) - statusRank(b) || priorityRank(a) - priorityRank(b),
+  );
   const projectScopes = byStatusAndPriority.map((project) => ({
-    id: `project:${project.id}`, label: project.name, team: teamName, group: `${teamName} Projects`, subgroup: project.status?.name, url: project.url,
-    milestones: [...project.projectMilestones.nodes].sort((a, b) => a.sortOrder - b.sortOrder)
+    id: `project:${project.id}`,
+    label: project.name,
+    team: teamName,
+    group: `${teamName} Projects`,
+    subgroup: project.status?.name,
+    url: project.url,
+    milestones: [...project.projectMilestones.nodes]
+      .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((milestone) => ({ id: `project:${project.id}:${milestone.id}`, label: milestone.name })),
   }));
   return [mine, ...teamScopes, ...projectScopes];
@@ -241,8 +283,10 @@ async function request(apiKey, query, variables, store = KEYCHAIN) {
 // The branch work on the issue continues on: its open pull request's in this repository, where the work
 // may sit on a branch other than the one Linear suggests, else Linear's.
 function workBranch(node, pullRequests, repoName) {
-  const open = pullRequests.find((pullRequest) => pullRequest.repo === repoName && pullRequest.branch
-    && !["merged", "closed"].includes(pullRequest.status));
+  const open = pullRequests.find(
+    (pullRequest) =>
+      pullRequest.repo === repoName && pullRequest.branch && !["merged", "closed"].includes(pullRequest.status),
+  );
   return open?.branch ?? (node.branchName || null);
 }
 
@@ -279,7 +323,9 @@ function toIssue(node, repoName) {
     assignee: node.assignee?.name ?? "Unassigned",
     assigneeAvatar: node.assignee?.avatarUrl ?? null,
     due: node.dueDate ?? null,
-    sla: node.slaBreachesAt ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt } : null,
+    sla: node.slaBreachesAt
+      ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt }
+      : null,
     created: node.createdAt,
     completed: node.completedAt ?? null,
     body: node.description === undefined ? null : (node.description ?? "").trim(),
@@ -362,8 +408,14 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
   // Every issue the view holds in the states listed: open ones, and finished ones whose group is expanded.
   async function viewIssues(viewId, open, loads) {
     const filter = await viewFilter(viewId);
-    const states = [open, ...(loads.has("done") ? FINISHED_STATES : []), ...(loads.has("canceled") ? [CANCELED_STATE] : [])];
-    const lists = await Promise.all(states.map((state) => allPages(FILTERED_ISSUES_IN_STATE, { filter, state }, (data) => data.issues)));
+    const states = [
+      open,
+      ...(loads.has("done") ? FINISHED_STATES : []),
+      ...(loads.has("canceled") ? [CANCELED_STATE] : []),
+    ];
+    const lists = await Promise.all(
+      states.map((state) => allPages(FILTERED_ISSUES_IN_STATE, { filter, state }, (data) => data.issues)),
+    );
     return lists.flat();
   }
 
@@ -377,19 +429,27 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     const open = openState(...(scopeId === "team" ? ["triage"] : []), ...(loads.has("backlog") ? [] : ["backlog"]));
     const [kind, projectId, milestoneId] = scopeId.split(":");
     if (kind === "project") {
-      const filter = milestoneId ? { projectMilestone: { id: { eq: milestoneId } } } : { project: { id: { eq: projectId } } };
+      const filter = milestoneId
+        ? { projectMilestone: { id: { eq: milestoneId } } }
+        : { project: { id: { eq: projectId } } };
       return openAndRecentlyFinished(FILTERED_ISSUES_IN_STATE, { filter }, (data) => data.issues, open, loads);
     }
-    if (scopeId === "triage") return allPages(TEAM_ISSUES, { team: repo.teamKey, state: TRIAGE_STATE }, (data) => data.issues);
+    if (scopeId === "triage")
+      return allPages(TEAM_ISSUES, { team: repo.teamKey, state: TRIAGE_STATE }, (data) => data.issues);
     // The team's Issues list leaves out triage, which has a list of its own.
-    if (scopeId === "team") return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues, open, loads);
+    if (scopeId === "team")
+      return openAndRecentlyFinished(TEAM_ISSUES, { team: repo.teamKey }, (data) => data.issues, open, loads);
     if (scopeId.startsWith("view:")) return viewIssues(scopeId.slice(5), open, loads);
     return openAndRecentlyFinished(MY_ISSUES, {}, (data) => data.viewer.assignedIssues, open, loads);
   }
 
   const teamStates = new Map();
   function statesOf(teamId) {
-    if (!teamStates.has(teamId)) teamStates.set(teamId, linear(TEAM_STATES, { id: teamId }).then((data) => data.team.states.nodes));
+    if (!teamStates.has(teamId))
+      teamStates.set(
+        teamId,
+        linear(TEAM_STATES, { id: teamId }).then((data) => data.team.states.nodes),
+      );
     return teamStates.get(teamId);
   }
 
@@ -399,7 +459,8 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     const candidates = (await statesOf(issue.teamId))
       .filter((state) => STATUS_TYPES[status]?.includes(state.type) && statusOf(state) === status)
       .sort((a, b) => a.position - b.position);
-    const state = candidates.find((each) => each.name.toLowerCase() === STATUS_LABELS[status]?.toLowerCase()) ?? candidates[0];
+    const state =
+      candidates.find((each) => each.name.toLowerCase() === STATUS_LABELS[status]?.toLowerCase()) ?? candidates[0];
     if (!state) throw new Error(`${issue.id}'s team has no ${STATUS_LABELS[status] ?? status} state`);
     return state.id;
   }
@@ -413,8 +474,9 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
   const labelsByTeam = new Map();
   function labelsOf(team) {
     if (!labelsByTeam.has(team)) {
-      const labels = allPages(TEAM_LABELS, { team }, (data) => data.team.labels)
-        .then((nodes) => nodes.filter((label) => !label.isGroup).map((label) => ({ id: label.id, name: labelName(label) })));
+      const labels = allPages(TEAM_LABELS, { team }, (data) => data.team.labels).then((nodes) =>
+        nodes.filter((label) => !label.isGroup).map((label) => ({ id: label.id, name: labelName(label) })),
+      );
       labels.catch(() => labelsByTeam.delete(team));
       labelsByTeam.set(team, labels);
     }
@@ -424,7 +486,11 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
   // Adds and removes labels one at a time, which leaves the issue's other labels alone, once every name is known.
   async function changeLabels(issue, addLabels, removeLabels) {
     const labels = await labelsOf(issue.teamId);
-    refuseUnknownLabels([...addLabels, ...removeLabels], labels.map((label) => label.name), `${issue.id}'s team`);
+    refuseUnknownLabels(
+      [...addLabels, ...removeLabels],
+      labels.map((label) => label.name),
+      `${issue.id}'s team`,
+    );
     const labelId = (name) => labels.find((label) => label.name === name).id;
     for (const name of addLabels) await linear(ADD_LABEL, { id: issue.linearId, labelId: labelId(name) });
     for (const name of removeLabels) await linear(REMOVE_LABEL, { id: issue.linearId, labelId: labelId(name) });
@@ -454,7 +520,8 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     // A new body only saves over the description `issue` was read with, so edits made in Linear
     // meanwhile are never overwritten.
     async update(issue, fields) {
-      const { status, priority, order, body, addLabels = [], removeLabels = [] } = fields, input = {};
+      const { status, priority, order, body, addLabels = [], removeLabels = [] } = fields,
+        input = {};
       if (addLabels.length || removeLabels.length) await changeLabels(issue, addLabels, removeLabels);
       if (status !== undefined) input.stateId = await stateFor(issue, status);
       if (priority !== undefined) input.priority = priority;

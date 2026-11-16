@@ -28,7 +28,10 @@ test("saving a work prompt writes it trimmed and keeps every other key and repos
     repos: { "/elsewhere": other, [repository]: { ...entry, workPrompt: "Run the tests.\nCommit often." } },
   });
   forgetLookups();
-  assert.deepEqual(await workPromptSettings({ root: repository }), { entry: "Run the tests.\nCommit often.", topLevel: "Top level" });
+  assert.deepEqual(await workPromptSettings({ root: repository }), {
+    entry: "Run the tests.\nCommit often.",
+    topLevel: "Top level",
+  });
 });
 
 test("saving a different work prompt replaces the entry's", async (t) => {
@@ -42,7 +45,10 @@ test("saving a different work prompt replaces the entry's", async (t) => {
 
 test("saving an empty work prompt removes it, so the top level's applies", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workPrompt: "Top level", repos: { [repository]: { tracker: "beads", workEffort: "low", workPrompt: "Old" } } });
+  writeSettings({
+    workPrompt: "Top level",
+    repos: { [repository]: { tracker: "beads", workEffort: "low", workPrompt: "Old" } },
+  });
 
   await saveWorkPrompt(repository, " \n ");
 

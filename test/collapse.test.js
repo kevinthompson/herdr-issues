@@ -2,18 +2,30 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
 import {
-  COLLAPSED_PX, collapseState, collapsibleNodeId, isCollapsed, noticeWidth, remembersWidth, toggleCollapsed,
+  COLLAPSED_PX,
+  collapseState,
+  collapsibleNodeId,
+  isCollapsed,
+  noticeWidth,
+  remembersWidth,
+  toggleCollapsed,
 } from "../mod/collapse.js";
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
 const workBody = (children) => ({
-  id: "root", type: "row", children: [{ id: "work", type: "column", children: [{ id: "work-body", type: "row", children }] }],
+  id: "root",
+  type: "row",
+  children: [{ id: "work", type: "column", children: [{ id: "work-body", type: "row", children }] }],
 });
 
 test("collapsibleNodeId finds the column holding the panel beside the side panel", () => {
   const layout = workBody([
     { id: "main", type: "block" },
-    { id: "panel", type: "column", children: [{ id: "panel-body", type: "stack", children: [{ id: "files", type: "block" }] }] },
+    {
+      id: "panel",
+      type: "column",
+      children: [{ id: "panel-body", type: "stack", children: [{ id: "files", type: "block" }] }],
+    },
     { id: "issues-panel", type: "column", children: [issuesBlock] },
   ]);
 
@@ -53,14 +65,24 @@ function fakeHerdr(t, { size = { weight: 1 }, rowPx = 1100, zoom = 1.2, inset = 
   const app = {
     resizes,
     measuredWidth,
-    drag(weight) { node.size = { weight }; noticeWidth(measuredWidth()); },
-    resizeWindow(px) { row = px; noticeWidth(measuredWidth()); },
-    toggle() { toggleCollapsed(measuredWidth()); },
+    drag(weight) {
+      node.size = { weight };
+      noticeWidth(measuredWidth());
+    },
+    resizeWindow(px) {
+      row = px;
+      noticeWidth(measuredWidth());
+    },
+    toggle() {
+      toggleCollapsed(measuredWidth());
+    },
   };
   stubHerdr(t, {
     layout: () => root,
     shared: (key) => values[key],
-    setShared: (key, value) => { values[key] = value; },
+    setShared: (key, value) => {
+      values[key] = value;
+    },
     run: (command, { id, ...resized }) => {
       assert.equal(command, "layout.resize");
       assert.equal(id, "issues-panel");
@@ -73,7 +95,8 @@ function fakeHerdr(t, { size = { weight: 1 }, rowPx = 1100, zoom = 1.2, inset = 
 }
 
 test("collapsing and expanding returns the panel to the weight it had, however often it's toggled", (t) => {
-  const app = fakeHerdr(t, { size: { weight: 0.8 } }), width = app.measuredWidth();
+  const app = fakeHerdr(t, { size: { weight: 0.8 } }),
+    width = app.measuredWidth();
   for (let cycle = 0; cycle < 5; cycle++) {
     app.toggle();
     assert.deepEqual(app.resizes.at(-1), { px: COLLAPSED_PX });
@@ -132,7 +155,9 @@ test("expanding beside unsized siblings takes half their default weight", (t) =>
   const resizes = [];
   stubHerdr(t, {
     layout: () => workBody([{ id: "main", type: "block" }, { id: "side", type: "column", size: { px: 368 } }, node]),
-    run: (command, args) => { resizes.push(args); },
+    run: (command, args) => {
+      resizes.push(args);
+    },
   });
   toggleCollapsed(COLLAPSED_PX);
   assert.deepEqual(resizes, [{ id: "issues-panel", weight: 0.5 }]);
@@ -141,7 +166,9 @@ test("expanding beside unsized siblings takes half their default weight", (t) =>
 // Herdr applies a resize later, so the panel measures the new width only after the toggle returns.
 function panelBesideTerminals(t, { sized = true } = {}) {
   const node = { id: "issues-panel", type: "column", size: { weight: 1 }, children: [issuesBlock] };
-  const root = sized ? workBody([{ id: "main", type: "block", size: { weight: 2 } }, node]) : { id: "root", type: "column", children: [issuesBlock] };
+  const root = sized
+    ? workBody([{ id: "main", type: "block", size: { weight: 2 } }, node])
+    : { id: "root", type: "column", children: [issuesBlock] };
   stubHerdr(t, { layout: () => root, shared: () => undefined, setShared: () => {}, run: () => {} });
   return collapseState();
 }

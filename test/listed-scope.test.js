@@ -4,7 +4,11 @@ import { listedScopeName, headerTitlePieces } from "../mod/listed-scope.js";
 import { scopesFor } from "../mod/trackers/linear.js";
 
 const project = {
-  id: "p1", name: "Checkout redesign", url: "https://linear.app/project/p1", priority: 0, status: { name: "In Progress", type: "started" },
+  id: "p1",
+  name: "Checkout redesign",
+  url: "https://linear.app/project/p1",
+  priority: 0,
+  status: { name: "In Progress", type: "started" },
   projectMilestones: { nodes: [{ id: "m1", name: "Milestone 1", sortOrder: 1 }] },
 };
 const linear = {
@@ -46,7 +50,10 @@ test("before a tracker is known, the name falls back to plain text", () => {
 });
 
 test("the header titles each tracker by the repository's name, then the tracker's name, without the owner", () => {
-  assert.deepEqual(headerTitlePieces({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, "herdr-issues"), ["herdr-issues", "GitHub"]);
+  assert.deepEqual(headerTitlePieces({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, "herdr-issues"), [
+    "herdr-issues",
+    "GitHub",
+  ]);
   assert.deepEqual(headerTitlePieces({ name: "Linear", scopes: [] }, "calendar"), ["calendar", "Linear"]);
   assert.deepEqual(headerTitlePieces({ name: "Beads" }, "notes"), ["notes", "Beads"]);
 });

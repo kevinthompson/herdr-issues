@@ -11,12 +11,25 @@ import { trackerFor } from "../mod/trackers/index.js";
 import { settingsPath } from "../mod/trackers/setting.js";
 
 const record = (id, { status = "open", priority = 2, labels, description, dependencies, closedAt } = {}) => ({
-  id, title: `Issue ${id}`, status, priority, created_at: "2026-01-01T00:00:00Z", updated_at: "2026-01-01T00:00:00Z",
-  ...(labels && { labels }), ...(description !== undefined && { description }), ...(closedAt && { closed_at: closedAt }),
+  id,
+  title: `Issue ${id}`,
+  status,
+  priority,
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z",
+  ...(labels && { labels }),
+  ...(description !== undefined && { description }),
+  ...(closedAt && { closed_at: closedAt }),
   ...(dependencies && { dependencies, dependency_count: dependencies.length }),
 });
 
-const blocking = (id, status = "open") => ({ id, title: `Issue ${id}`, status, priority: 2, dependency_type: "blocks" });
+const blocking = (id, status = "open") => ({
+  id,
+  title: `Issue ${id}`,
+  status,
+  priority: 2,
+  dependency_type: "blocks",
+});
 
 // A main checkout, with a Beads database unless `initialized` is false.
 function checkout({ initialized = true } = {}) {
@@ -42,11 +55,17 @@ async function trackerWith(t, records, { installed = true, initialized = true } 
       if (subcommand === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
       if (subcommand === "list") {
         const statuses = rest[rest.indexOf("--status") + 1].split(",");
-        return ok(records.filter((each) => statuses.includes(each.status)).map(({ description, dependencies, ...listed }) => listed));
+        return ok(
+          records
+            .filter((each) => statuses.includes(each.status))
+            .map(({ description, dependencies, ...listed }) => listed),
+        );
       }
       if (subcommand === "show") {
         const found = records.filter((each) => rest.includes(each.id));
-        return found.length ? ok(found) : { code: 1, stdout: "", stderr: "Error: no issues found matching the provided IDs\n" };
+        return found.length
+          ? ok(found)
+          : { code: 1, stdout: "", stderr: "Error: no issues found matching the provided IDs\n" };
       }
       return ok({});
     },
@@ -62,12 +81,20 @@ const updates = (commands) => commands.filter(({ args }) => args[0] === "update"
 describe("Beads tracker", () => {
   test("maps each Beads status onto the panel's", async (t) => {
     const { tracker } = await trackerWith(t, [
-      record("bd-1"), record("bd-2", { status: "in_progress" }), record("bd-3", { status: "blocked" }),
-      record("bd-4", { status: "deferred" }), record("bd-5", { status: "closed", closedAt: "2026-02-01T00:00:00Z" }),
+      record("bd-1"),
+      record("bd-2", { status: "in_progress" }),
+      record("bd-3", { status: "blocked" }),
+      record("bd-4", { status: "deferred" }),
+      record("bd-5", { status: "closed", closedAt: "2026-02-01T00:00:00Z" }),
     ]);
     const issues = byId(await tracker.list(null, new Set(["done"])));
-    assert.deepEqual(Object.fromEntries(Object.entries(issues).map(([id, issue]) => [id, issue.status])),
-      { "bd-1": "todo", "bd-2": "in-progress", "bd-3": "todo", "bd-4": "backlog", "bd-5": "done" });
+    assert.deepEqual(Object.fromEntries(Object.entries(issues).map(([id, issue]) => [id, issue.status])), {
+      "bd-1": "todo",
+      "bd-2": "in-progress",
+      "bd-3": "todo",
+      "bd-4": "backlog",
+      "bd-5": "done",
+    });
   });
 
   test("sets each status it offers as the matching Beads status", async (t) => {
@@ -75,7 +102,10 @@ describe("Beads tracker", () => {
     const [issue] = await tracker.list();
     assert.deepEqual(tracker.statuses, ["backlog", "todo", "in-progress", "done"]);
     for (const status of tracker.statuses) await tracker.update(issue, { status });
-    assert.deepEqual(updates(commands), ["deferred", "open", "in_progress", "closed"].map((status) => ["bd-1", "--status", status]));
+    assert.deepEqual(
+      updates(commands),
+      ["deferred", "open", "in_progress", "closed"].map((status) => ["bd-1", "--status", status]),
+    );
     await assert.rejects(tracker.update(issue, { status: "canceled" }), /can't be set to canceled/);
   });
 
@@ -84,16 +114,28 @@ describe("Beads tracker", () => {
     const { tracker, commands } = await trackerWith(t, records);
     const issues = await tracker.list();
     assert.equal(tracker.prioritized, true);
-    assert.deepEqual(issues.map((issue) => issue.priority), [1, 2, 3, 4, 0]);
+    assert.deepEqual(
+      issues.map((issue) => issue.priority),
+      [1, 2, 3, 4, 0],
+    );
     for (const issue of issues) await tracker.update(issue, { priority: issue.priority });
-    assert.deepEqual(updates(commands).map((args) => args[2]), ["0", "1", "2", "3", "4"]);
+    assert.deepEqual(
+      updates(commands).map((args) => args[2]),
+      ["0", "1", "2", "3", "4"],
+    );
   });
 
   test("lists the most recently closed issues only once Done is expanded", async (t) => {
     const { tracker, commands } = await trackerWith(t, [record("bd-1"), record("bd-2", { status: "closed" })]);
     assert.deepEqual(tracker.deferred(), ["done"]);
-    assert.deepEqual((await tracker.list()).map((issue) => issue.id), ["bd-1"]);
-    assert.deepEqual((await tracker.list(null, new Set(["done"]))).map((issue) => issue.id), ["bd-1", "bd-2"]);
+    assert.deepEqual(
+      (await tracker.list()).map((issue) => issue.id),
+      ["bd-1"],
+    );
+    assert.deepEqual(
+      (await tracker.list(null, new Set(["done"]))).map((issue) => issue.id),
+      ["bd-1", "bd-2"],
+    );
     const closedList = commands.find(({ args }) => args.includes("closed"));
     assert.deepEqual(closedList.args, ["list", "--status", "closed", "--sort", "closed", "--limit", "20", "--json"]);
   });
@@ -106,8 +148,15 @@ describe("Beads tracker", () => {
 
   test("lists labels and the open issues that block an issue", async (t) => {
     const { tracker } = await trackerWith(t, [
-      record("bd-1", { status: "blocked", labels: ["ui"], dependencies: [blocking("bd-2"), blocking("bd-3", "closed"),
-        { ...blocking("bd-4"), dependency_type: "parent-child" }] }),
+      record("bd-1", {
+        status: "blocked",
+        labels: ["ui"],
+        dependencies: [
+          blocking("bd-2"),
+          blocking("bd-3", "closed"),
+          { ...blocking("bd-4"), dependency_type: "parent-child" },
+        ],
+      }),
       record("bd-2"),
     ]);
     const issues = byId(await tracker.list());
@@ -142,7 +191,9 @@ describe("Beads tracker", () => {
   });
 
   test("is the tracker for a beads entry, from a linked worktree too, and runs bd in the main checkout", async (t) => {
-    const folder = temporaryFolder(t), main = createRepository(folder), worktree = join(folder, "worktree");
+    const folder = temporaryFolder(t),
+      main = createRepository(folder),
+      worktree = join(folder, "worktree");
     git(main, "worktree", "add", "-q", "-b", "feature", worktree);
     mkdirSync(join(main, ".beads"));
     writeFileSync(join(main, ".beads/metadata.json"), "{}");
@@ -167,11 +218,17 @@ describe("Beads tracker", () => {
   });
 
   test("asks for bd to be installed when it can't run", async (t) => {
-    await assert.rejects(trackerWith(t, [], { installed: false }), (e) => /isn't installed/.test(e.message) && /Beads' README/.test(e.fix));
+    await assert.rejects(
+      trackerWith(t, [], { installed: false }),
+      (e) => /isn't installed/.test(e.message) && /Beads' README/.test(e.fix),
+    );
   });
 
   test("asks for bd init when the main checkout has no Beads database", async (t) => {
-    await assert.rejects(trackerWith(t, [], { initialized: false }), (e) => /no Beads database/.test(e.message) && /bd init/.test(e.fix));
+    await assert.rejects(
+      trackerWith(t, [], { initialized: false }),
+      (e) => /no Beads database/.test(e.message) && /bd init/.test(e.fix),
+    );
   });
 });
 
@@ -196,12 +253,18 @@ describe("Beads tracker labels", () => {
   test("adds and removes labels with bd label add and remove", async (t) => {
     const { tracker, labelCommands } = await labelTracker(t, ["ui", "bug"]);
     await tracker.update({ id: "bd-1", labels: ["bug"] }, { addLabels: ["ui"], removeLabels: ["bug"] });
-    assert.deepEqual(labelCommands(), [["label", "add", "bd-1", "ui"], ["label", "remove", "bd-1", "bug"]]);
+    assert.deepEqual(labelCommands(), [
+      ["label", "add", "bd-1", "ui"],
+      ["label", "remove", "bd-1", "bug"],
+    ]);
   });
 
   test("refuses a label no issue has, naming it and changing nothing", async (t) => {
     const { tracker, labelCommands } = await labelTracker(t, ["ui"]);
-    await assert.rejects(tracker.update({ id: "bd-1", labels: [] }, { addLabels: ["ui", "urgent"] }), /Beads has no label named urgent/);
+    await assert.rejects(
+      tracker.update({ id: "bd-1", labels: [] }, { addLabels: ["ui", "urgent"] }),
+      /Beads has no label named urgent/,
+    );
     assert.deepEqual(labelCommands(), []);
   });
 

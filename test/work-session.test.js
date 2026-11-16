@@ -34,15 +34,28 @@ describe("Start's worktree session", () => {
 
   test("passes --claude to issues worktree when claude runs", async (t) => {
     stubClaude(t, { installed: true });
-    assert.deepEqual(await issuesWorktreeArgs(issue, { spaceName: "#7 Fix", isNew: true }),
-      ["worktree", "--branch", "7-fix-the-list", "--new", "--name", "#7 Fix", "--claude", "/issues:work #7"]);
+    assert.deepEqual(await issuesWorktreeArgs(issue, { spaceName: "#7 Fix", isNew: true }), [
+      "worktree",
+      "--branch",
+      "7-fix-the-list",
+      "--new",
+      "--name",
+      "#7 Fix",
+      "--claude",
+      "/issues:work #7",
+    ]);
     assert.deepEqual(await workIssueSession(issue, null), { tab: "Claude", argv: ["claude"], task: "/issues:work #7" });
   });
 
   test("leaves out --claude and the Claude tab when claude doesn't run", async (t) => {
     stubClaude(t, { installed: false });
-    assert.deepEqual(await issuesWorktreeArgs(issue, { spaceName: "#7 Fix", isNew: false }),
-      ["worktree", "--branch", "7-fix-the-list", "--name", "#7 Fix"]);
+    assert.deepEqual(await issuesWorktreeArgs(issue, { spaceName: "#7 Fix", isNew: false }), [
+      "worktree",
+      "--branch",
+      "7-fix-the-list",
+      "--name",
+      "#7 Fix",
+    ]);
     assert.deepEqual(await workIssueSession(issue, null), {});
   });
 
@@ -69,10 +82,17 @@ describe("the Claude session's model and effort", () => {
   test("passes the repository's workModel and workEffort to claude", async (t) => {
     stubClaude(t, { installed: true });
     const repository = createRepository(temporaryFolder(t));
-    writeSettings({ workEffort: "low", repos: { [repository]: { tracker: "github", repo: "owner/name", workModel: "sonnet", workEffort: "high" } } });
+    writeSettings({
+      workEffort: "low",
+      repos: { [repository]: { tracker: "github", repo: "owner/name", workModel: "sonnet", workEffort: "high" } },
+    });
     const project = { root: repository, on: null };
     assert.deepEqual(await workSessionArgv(project), ["claude", "--model", "sonnet", "--effort", "high"]);
-    assert.deepEqual(await workIssueSession(issue, project), { tab: "Claude", argv: ["claude", "--model", "sonnet", "--effort", "high"], task: "/issues:work #7" });
+    assert.deepEqual(await workIssueSession(issue, project), {
+      tab: "Claude",
+      argv: ["claude", "--model", "sonnet", "--effort", "high"],
+      task: "/issues:work #7",
+    });
   });
 
   test("passes only the setting that isn't its default", async (t) => {
@@ -90,7 +110,10 @@ describe("the Claude session's work prompt", () => {
     stubClaude(t, { installed: true });
     const repository = createRepository(temporaryFolder(t));
     const workPrompt = `Run "npm test" before each commit.\nDon't use 'git stash'.`;
-    writeSettings({ workPrompt: "Top level", repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt } } });
+    writeSettings({
+      workPrompt: "Top level",
+      repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt } },
+    });
     const project = { root: repository, on: null };
     const appended = `Top level\n\n${workPrompt}`;
     assert.deepEqual(await workSessionArgv(project), ["claude", "--append-system-prompt", appended]);
@@ -100,8 +123,15 @@ describe("the Claude session's work prompt", () => {
   test("uses the top level's workPrompt without the repository's", async (t) => {
     stubClaude(t, { installed: true });
     const repository = createRepository(temporaryFolder(t));
-    writeSettings({ workPrompt: "Top level", repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt: "  " } } });
-    assert.deepEqual(await workSessionArgv({ root: repository, on: null }), ["claude", "--append-system-prompt", "Top level"]);
+    writeSettings({
+      workPrompt: "Top level",
+      repos: { [repository]: { tracker: "github", repo: "owner/name", workPrompt: "  " } },
+    });
+    assert.deepEqual(await workSessionArgv({ root: repository, on: null }), [
+      "claude",
+      "--append-system-prompt",
+      "Top level",
+    ]);
   });
 
   test("adds nothing for a blank or missing workPrompt", async (t) => {

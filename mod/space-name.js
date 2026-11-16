@@ -35,7 +35,9 @@ export const markedSpaceName = (name, state) => `${SPACE_MARKS[state]}${MARK_GAP
 async function spaceTemplate(project) {
   const template = await spaceNameTemplate(project);
   if (!template) return { template: null, repo: "" };
-  const repo = template.includes("<repo>") ? await repositoryName(await mainCheckout(project.root, project.on), await trackerSetting(project)) : "";
+  const repo = template.includes("<repo>")
+    ? await repositoryName(await mainCheckout(project.root, project.on), await trackerSetting(project))
+    : "";
   return { template, repo };
 }
 

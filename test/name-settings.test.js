@@ -38,7 +38,11 @@ test("a repository's name is printed when set", async (t) => {
   const repository = repositoryNamed(t, "checkout");
   writeSettings({ repos: { [repository]: githubEntry({ name: "My App" }) } });
   assert.equal(await nameSetting(t, repository), "My App");
-  assert.deepEqual(await nameSettings({ root: repository, on: null }), { name: "My App", entry: "My App", defaultName: "name" });
+  assert.deepEqual(await nameSettings({ root: repository, on: null }), {
+    name: "My App",
+    entry: "My App",
+    defaultName: "name",
+  });
 });
 
 test("a GitHub repository without a name uses its repo's name, without the owner", async (t) => {
@@ -50,16 +54,21 @@ test("a GitHub repository without a name uses its repo's name, without the owner
 test("a blank name counts as unset", async (t) => {
   const repository = repositoryNamed(t, "checkout");
   writeSettings({ repos: { [repository]: githubEntry({ name: "  " }) } });
-  assert.deepEqual(await nameSettings({ root: repository, on: null }), { name: "name", entry: null, defaultName: "name" });
+  assert.deepEqual(await nameSettings({ root: repository, on: null }), {
+    name: "name",
+    entry: null,
+    defaultName: "name",
+  });
 });
 
 test("a GitHub repository without repo uses origin's repository's name", async (t) => {
   const repository = repositoryNamed(t, "checkout");
   writeSettings({ repos: { [repository]: { tracker: "github" } } });
   stubHerdr(t, {
-    exec: async (command, args, options) => command === "gh"
-      ? { code: 0, stdout: "someone/from-origin\n", stderr: "" }
-      : defaults.exec(command, args, options),
+    exec: async (command, args, options) =>
+      command === "gh"
+        ? { code: 0, stdout: "someone/from-origin\n", stderr: "" }
+        : defaults.exec(command, args, options),
   });
   assert.equal((await nameSettings({ root: repository, on: null })).name, "from-origin");
 });
@@ -78,12 +87,16 @@ test("a repository without an entry uses its main checkout's folder's name", asy
 
 test("saving a name keeps the entry's other keys and every other repository's entry", async (t) => {
   const repository = repositoryNamed(t, "checkout");
-  const entry = githubEntry({ merge: "auto" }), other = { tracker: "beads", name: "Other" };
+  const entry = githubEntry({ merge: "auto" }),
+    other = { tracker: "beads", name: "Other" };
   writeSettings({ pollSeconds: 30, repos: { "/elsewhere": other, [repository]: entry } });
 
   await saveNameSetting(repository, "  Saved  ");
 
-  assert.deepEqual(readSettings(), { pollSeconds: 30, repos: { "/elsewhere": other, [repository]: { ...entry, name: "Saved" } } });
+  assert.deepEqual(readSettings(), {
+    pollSeconds: 30,
+    repos: { "/elsewhere": other, [repository]: { ...entry, name: "Saved" } },
+  });
   assert.equal(await nameSetting(t, repository), "Saved");
 });
 

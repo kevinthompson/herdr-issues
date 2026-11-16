@@ -11,12 +11,14 @@ Work the issue named in `$ARGUMENTS` or the conversation until it is done, or un
 **Outside the issue's worktree.** When the Herdr app is installed (`command -v herdr-app`) and the session isn't already in a linked worktree on the issue's branch, invoke `/issues:start <issue ID>` with the Skill tool as your first action, without loading the tracker's tools or reading the issue first, and stop once it reports.
 
 **Read only the parts that apply.** Read a file in this skill's base directory only when its case comes up:
+
 - `beads.md` when the tracker is `beads` (IDs like `notes-a1b`); it replaces the Beads parts of every step below;
 - `without-herdr.md` in step 4 when the Herdr app isn't installed;
 - `approval.md` in step 10 when `issues setting approval` prints `ask`;
 - `merge-pull-request.md` in step 10 when `issues setting onApproval` prints `pull-request`, and in step 5 when the branch already has a pull request with review or failing checks.
 
 **Gather context in one batch.** When the session starts in a linked worktree (its folder isn't the first path `git worktree list` prints), make every read steps 1 to 5 need in your first response, as parallel tool calls:
+
 - the issue: `issues show <id> --json`, and its comments: `list_comments` (Linear) or `gh issue view <number> --repo <repo> --json comments` (GitHub);
 - one shell command for the branch: `git worktree list | head -1`, `git log --oneline origin/main..HEAD`, `git diff --stat origin/main...HEAD`, and `git status --porcelain` unless the worktree's folder is under five minutes old (`[ -n "$(find . -maxdepth 0 -mmin -5)" ]`);
 - for a Linear issue, the current branch's pull request: `gh pr view --json number,state,url,isDraft,reviewDecision,headRefName` and `gh pr checks`, which fail harmlessly when it has none.
@@ -50,4 +52,5 @@ Then name the session's tab as step 3 says, and summarize as step 5 says. Read t
     - When it succeeds, follow what it prints exactly: when it says the final message is only the block, write nothing above it; otherwise a summary may come before the block. Write nothing after the block except the question it prints, asked with AskUserQuestion, and the reply to its answer.
 
     Apart from that question, do not ask follow-up questions or offer further work in the final message.
+
 12. **Reopen a finished session for more changes.** When the person asks for changes after `issues complete` ran in this session, including while it waits for their approval, first run `issues complete --cancel <issue ID>` and `issues mark working <issue ID>`, and `issues close --cancel <issue ID>` too if this session ran `issues close` or `issues finish`. Then read the issue with `issues show <issue ID> --json`, and when its `status` isn't `in-progress`, run `issues status <issue ID> in-progress`. Work the change, then finish through steps 10 and 11 again. A question or thanks isn't a change request and reopens nothing.

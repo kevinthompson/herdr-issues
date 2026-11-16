@@ -1,9 +1,25 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupCountText, groupIssues, holdingBlockers, holdsNoIssues, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
+import {
+  canStartWork,
+  groupCountText,
+  groupIssues,
+  holdingBlockers,
+  holdsNoIssues,
+  statusIcon,
+  stripBadges,
+  waitingIssues,
+} from "../mod/issue.js";
 
-const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
-  ({ id, status, priority, blockedBy, labels: [], order: null, sla: null });
+const issue = (id, status, { priority = 0, blockedBy = [] } = {}) => ({
+  id,
+  status,
+  priority,
+  blockedBy,
+  labels: [],
+  order: null,
+  sla: null,
+});
 const groupIds = (groups) => Object.fromEntries(groups.map((group) => [group.id, group.issues.map((each) => each.id)]));
 
 describe("groupIssues", () => {
@@ -19,7 +35,10 @@ describe("groupIssues", () => {
 
   test("sorts by priority, with no priority last, then by ID in number order", () => {
     const issues = [
-      issue("#10", "todo", { priority: 2 }), issue("#3", "todo"), issue("#2", "todo", { priority: 2 }), issue("#4", "todo", { priority: 1 }),
+      issue("#10", "todo", { priority: 2 }),
+      issue("#3", "todo"),
+      issue("#2", "todo", { priority: 2 }),
+      issue("#4", "todo", { priority: 1 }),
     ];
     assert.deepEqual(groupIds(groupIssues(issues)).todo, ["#4", "#2", "#10", "#3"]);
   });
@@ -136,16 +155,28 @@ describe("stripBadges", () => {
 
   test("keeps an empty Todo with 0", () => {
     const groups = groupIssues([issue("#1", "in-progress")]);
-    assert.deepEqual(stripBadges(groups).map(({ id, text }) => [id, text]), [["in-progress", "1"], ["todo", "0"]]);
+    assert.deepEqual(
+      stripBadges(groups).map(({ id, text }) => [id, text]),
+      [
+        ["in-progress", "1"],
+        ["todo", "0"],
+      ],
+    );
   });
 
   test("includes Blocked, Backlog, Unknown status, Done and Canceled", () => {
     const groups = groupIssues([
-      issue("#1", "in-progress"), issue("#2", "todo", { blockedBy: ["#1"] }), issue("#3", "backlog"),
-      issue("#4", "started"), issue("#5", "done"), issue("#6", "canceled"),
+      issue("#1", "in-progress"),
+      issue("#2", "todo", { blockedBy: ["#1"] }),
+      issue("#3", "backlog"),
+      issue("#4", "started"),
+      issue("#5", "done"),
+      issue("#6", "canceled"),
     ]);
-    assert.deepEqual(stripBadges(groups).map((badge) => badge.id),
-      ["in-progress", "todo", "blocked", "backlog", "unknown", "done", "canceled"]);
+    assert.deepEqual(
+      stripBadges(groups).map((badge) => badge.id),
+      ["in-progress", "todo", "blocked", "backlog", "unknown", "done", "canceled"],
+    );
   });
 
   test("marks a section whose issues weren't listed so the strip draws the refresh icon", () => {
@@ -154,8 +185,13 @@ describe("stripBadges", () => {
   });
 
   test("shows a capped Done or Canceled as the cap and +", () => {
-    const groups = groupIssues([...issues("done", 2), ...issues("canceled", 1)], new Set(), null, { recentlyClosed: 3 });
-    assert.deepEqual(stripBadges(groups).map((badge) => badge.text), ["0", "3+", "3+"]);
+    const groups = groupIssues([...issues("done", 2), ...issues("canceled", 1)], new Set(), null, {
+      recentlyClosed: 3,
+    });
+    assert.deepEqual(
+      stripBadges(groups).map((badge) => badge.text),
+      ["0", "3+", "3+"],
+    );
   });
 
   test("shows 99 issues as 99 and 100 or more as 99+", () => {
