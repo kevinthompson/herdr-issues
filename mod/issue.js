@@ -113,7 +113,7 @@ export function groupIssues(issues, unloaded = new Set(), label = null, { recent
           cap: capOf(group),
           issues: shown.filter((issue) => group.has(issue, done)).sort(group.sort ?? byPosition),
         },
-  ).filter((group) => group.unloaded || group.issues.length || group.alwaysShown);
+  ).filter((/** @type {any} */ group) => group.unloaded || group.issues.length || group.alwaysShown);
 }
 
 // Whether no group the list shows holds an issue, so it points the person at creating one.
@@ -244,7 +244,8 @@ export function dueStatus(issue, now = new Date()) {
   if (!issue.due || FINISHED.includes(issue.status)) return null;
   const [year, month, day] = issue.due.split("-").map(Number);
   const daysLeft = Math.round(
-    (new Date(year, month - 1, day) - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / DAY_MS,
+    (new Date(year, month - 1, day).getTime() - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) /
+      DAY_MS,
   );
   const urgency = daysLeft < 0 ? "overdue" : daysLeft <= DUE_SOON_DAYS ? "soon" : "later";
   const date = `${MONTHS[month - 1]} ${day}${year === now.getFullYear() ? "" : `, ${year}`}`;

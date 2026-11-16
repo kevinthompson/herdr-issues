@@ -226,6 +226,7 @@ export default class Issues extends View {
     this.listScroll = ScrollHandle.new();
     this.revealing = null;
     this.rowLimit = ROW_LIMIT;
+    this.untrackedFolder = null;
     this.shownByContext = new Map();
     this.editing = null;
     this.saving = false;
@@ -346,7 +347,7 @@ export default class Issues extends View {
         if (leaving) this.holdOpenIssue(leaving, tracker, cx);
         publishScope(scopeKey, tracker, scope).catch(() => {});
         this.scanRepository(project, generation, cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         if (generation !== this.generation) return;
         if (e.fix && scopeKey) this.showSetup(scopeKey, e, cx);
         else this.error = String(e.message ?? e);
@@ -401,7 +402,7 @@ export default class Issues extends View {
       try {
         await initializeRepository(folder);
         this.refresh(cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.initializeError = e.message;
       } finally {
         this.initializing = false;
@@ -532,7 +533,7 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try {
         run("tab.new", { space, ...(await installTab(update)) });
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.detailError = `Could not start the update: ${e.message ?? e}`;
       }
       cx.notify();
@@ -656,7 +657,7 @@ export default class Issues extends View {
         soft_wrap: true,
         line_numbers: false,
         folding: false,
-        font_family: settings().font_family,
+        font_family: /** @type {string} */ (settings().font_family),
         font_size: 12,
         syntax: {
           keyword: t.ansi5,
@@ -749,7 +750,7 @@ export default class Issues extends View {
         const full = await tracker.get(issue.id);
         if (!full) throw new Error(`${issue.id} was not found`);
         Object.assign(issue, { body: full.body, updated: full.updated, bodyStale: false });
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`;
       }
       this.loadingBody = null;
@@ -783,7 +784,7 @@ export default class Issues extends View {
         await tracker.update(editing.issue, { body: editing.state.value() });
         if (this.editing === editing) this.stopEditing();
         this.refresh(cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         if (this.editing === editing) {
           this.saving = false;
           this.detailError = `Could not save: ${e.message ?? e}`;
@@ -846,7 +847,7 @@ export default class Issues extends View {
     const before = { ...issue };
     try {
       issue.body = toggleTask(issue.body, line);
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
       this.detailError = String(e.message ?? e);
       cx.notify();
       return;
@@ -858,7 +859,7 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try {
         await saved;
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.detailError = `Could not save the checkbox: ${e.message ?? e}`;
         this.refresh(cx);
       }
@@ -913,7 +914,7 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       try {
         openIssueLabelsMenu(issue, this.project, await names);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         if (this.labelChoices?.names === names) this.labelChoices = null;
         this.detailError = `Could not list the labels: ${e.message ?? e}`;
       }
@@ -948,7 +949,7 @@ export default class Issues extends View {
         await tracker.update(issue, trackerFields(edit));
         forgetEdits([id]);
         announceIssueChange();
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         markEditFailed(id, `Could not change the ${edit.field} of ${edit.issueId}: ${e.message ?? e}`);
       }
       cx.notify();
@@ -969,7 +970,7 @@ export default class Issues extends View {
         if (tracker !== this.tracker) return;
         if (this.heldIssue?.id === current.id) this.heldIssue = current;
         this.issues = this.issues.map((each) => (each.id === current.id ? current : each));
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.detailError = `Could not load ${issue.id}: ${e.message ?? e}`;
       } finally {
         if (this.refreshingIssue === issue.id) this.refreshingIssue = null;
@@ -1128,7 +1129,7 @@ export default class Issues extends View {
           closeWorktreeSpace(space.id, { sleep: (ms) => cx.sleep(ms) }).catch((error) =>
             notify({ title: "Could not remove the worktree", body: String(error) }),
           );
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.detailError = e instanceof MergeRefusal ? e.message : `Could not merge: ${e.message ?? e}`;
       }
       this.opening = null;
@@ -1165,7 +1166,7 @@ export default class Issues extends View {
             });
           else await this.openWorktreeDialog(issue, spaceName);
         }
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.detailError = `Could not continue: ${e.message ?? e}`;
       }
       this.opening = null;
@@ -1740,7 +1741,7 @@ export default class Issues extends View {
 
   render(cx) {
     if (this.menu) return this.menu.render();
-    if (this.worktreeDialog) return this.worktreeDialog.render(cx);
+    if (this.worktreeDialog) return this.worktreeDialog.render();
     this.keepListCurrent(cx);
     this.noticeSpaceSwitch();
     if (this.collapse.collapsed) return this.strip(theme());

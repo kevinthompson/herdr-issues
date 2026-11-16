@@ -106,6 +106,7 @@ export class WorktreeDialog {
     this.opening = props()?.action === "open";
     this.text = props()?.branch ?? "";
     this.list = undefined; // open: the checkouts, once read
+    this.mainName = null; // open: the repository's configured name, once read
     this.at = 0;
     this.input = InputState.new({ value: this.text, placeholder: this.opening ? "filter worktrees" : "branch name" });
     this.input.on("change", (_e, cx) => {
@@ -444,7 +445,7 @@ export class WorktreeDialog {
   }
 
   render() {
-    const t = theme();
+    const t = /** @type {Record<string, `#${string}`>} */ (theme());
     if (this.opening) return this.renderOpen(t);
     const remove = props()?.action === "remove";
     const r = this.repo;

@@ -46,7 +46,8 @@ const expandedSizeKey = () => `issues.expandedSize:${shared("layout") ?? "main"}
 // padding, and a size in px wouldn't keep the panel's share as the window resizes.
 function rememberExpandedWeight({ node }) {
   const weight = weightOf(node);
-  if (weight != null && shared(expandedSizeKey())?.weight !== weight) setShared(expandedSizeKey(), { weight });
+  if (weight != null && /** @type {any} */ (shared(expandedSizeKey()))?.weight !== weight)
+    setShared(expandedSizeKey(), { weight });
 }
 
 function defaultExpandedWeight({ node, row }) {
@@ -70,7 +71,7 @@ export function toggleCollapsed(width) {
   if (!sized || width == null) return null;
   const { id } = sized.node;
   if (isCollapsed(width)) {
-    const remembered = shared(expandedSizeKey())?.weight;
+    const remembered = /** @type {any} */ (shared(expandedSizeKey()))?.weight;
     run("layout.resize", { id, weight: isWeight(remembered) ? remembered : defaultExpandedWeight(sized) });
     return "expand";
   }

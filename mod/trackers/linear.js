@@ -209,7 +209,7 @@ export async function linearClient() {
 export async function saveLinearKey(apiKey) {
   try {
     await request(apiKey, VIEWER, {});
-  } catch (e) {
+  } catch (/** @type {any} */ e) {
     throw e.code === LINEAR_KEY_PROBLEM ? new Error("Linear refused this API key, so it wasn't saved.") : e;
   }
   const keyFile = await readKeyFile();

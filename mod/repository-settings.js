@@ -163,7 +163,7 @@ export class RepositorySettings extends SettingsForm {
         });
         this.workPromptInput.set_soft_wrap(true);
         this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.error = String(e.message ?? e);
       } finally {
         this.loading = false;
@@ -278,7 +278,7 @@ export class RepositorySettings extends SettingsForm {
   typedPollSeconds() {
     try {
       return { pollSeconds: parsePollSeconds(this.repositoryInputs.pollSeconds.value()) };
-    } catch (e) {
+    } catch (/** @type {any} */ e) {
       return { problem: String(e.message ?? e) };
     }
   }

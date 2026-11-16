@@ -119,7 +119,7 @@ function collapseHint(t) {
     .bg(t.raised)
     .text_color(t.foreground)
     .text_size(11)
-    .font_family(settings().font_family)
+    .font_family(/** @type {string} */ (settings().font_family))
     .child("CMD + Shift + I");
   return h_flex()
     .flex_wrap()
@@ -262,7 +262,7 @@ export class TrackerSetup {
         await saveSetupChoices(this.main, setting);
         this.forgetAnswers();
         this.onSaved(cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.saveProblem = e;
       } finally {
         this.saving = false;
@@ -383,7 +383,7 @@ export class TrackerSetup {
       );
   }
 
-  options(kind, choices, { chosen, proposed, onChoose, enabled = true }, t) {
+  options(kind, choices, { chosen, proposed = null, onChoose, enabled = true }, t) {
     return v_flex()
       .flex_none()
       .gap(12)

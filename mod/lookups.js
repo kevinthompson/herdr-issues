@@ -5,6 +5,7 @@ const caches = [];
 
 // A function (key, lookup) that runs lookup once per key and answers its promise from then on. A lookup that
 // fails, or whose answer `keep` refuses, is forgotten so the next call asks again.
+/** @param {(answer: any) => boolean} [keep] */
 export function cachedLookup(keep = () => true) {
   const answers = new Map();
   caches.push(answers);

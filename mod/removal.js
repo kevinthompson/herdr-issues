@@ -26,12 +26,14 @@ export function runChecks(lookups, answered) {
   );
 }
 
+/** @param {{ dirty?: any, submodules?: any, branch?: any }} checks */
 export function checksAnswered({ dirty, submodules, branch }) {
   return dirty !== undefined && submodules !== undefined && branch !== undefined;
 }
 
 // The answered checks' findings, { result, text }, in a fixed order: uncommitted changes, submodule
 // commits, whether the branch is on main or in review, whether it is pushed, and the warning.
+/** @param {{ dirty?: any, submodules?: any, branch?: any, warning?: any }} checks */
 export function removalFindings({ dirty, submodules, branch, warning }) {
   const findings = [];
   if (dirty?.error) findings.push({ result: CAUTION, text: `Couldn't check for uncommitted changes: ${dirty.error}` });
@@ -80,6 +82,7 @@ function branchFindings({ bases, mergedInto, unpushed, pullRequest }) {
 // Whether the dialog removes the checkout without asking: every check answered and passed, and no other space nests
 // under this one, since closing a space closes the spaces nested under it. `ask`: whoever opened it wants the person
 // to confirm whatever the checks find.
+/** @param {{ dirty?: any, submodules?: any, branch?: any, warning?: any }} checks */
 export function removesWithoutAsking(checks, nestedSpaceCount, { ask = false } = {}) {
   if (ask || !checksAnswered(checks) || nestedSpaceCount > 0) return false;
   return removalFindings(checks).every((finding) => finding.result === PASS);

@@ -53,7 +53,10 @@ export class SettingsForm {
   // onSaved(cx) runs after each save is written; onSettled(cx), which the view sets, once none is running.
   constructor({ onSaved }) {
     this.onSaved = onSaved;
+    /** @type {(cx?: any) => void} */
     this.onSettled = () => {};
+    /** @type {Record<string, any>} */
+    this.selects = null;
     this.savedAgent = null;
     this.agentValues = {};
     this.otherWorkModelPicked = false;
@@ -93,6 +96,11 @@ export class SettingsForm {
     this.error = null;
     this.autosave.schedule(cx);
     cx.notify();
+  }
+
+  // Each form overrides this with what it writes; a form that writes nothing has nothing to save.
+  saveRequest() {
+    return null;
   }
 
   // A choice was picked or Enter pressed: saves at once, with any typing still waiting.

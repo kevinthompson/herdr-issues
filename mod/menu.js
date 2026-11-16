@@ -24,7 +24,12 @@ const ROW = 28,
   CHECK_GAP = 9;
 // The theme's text color at this opacity, so the band follows light and dark themes.
 const HEADING_TINT_ALPHA = "0a";
-const headingTint = (t) => (/^#[0-9a-f]{6}$/i.test(t.foreground) ? t.foreground + HEADING_TINT_ALPHA : "transparent");
+/**
+ * @param {Record<string, `#${string}`>} t
+ * @returns {`#${string}`}
+ */
+const headingTint = (t) =>
+  /^#[0-9a-f]{6}$/i.test(t.foreground) ? `${t.foreground}${HEADING_TINT_ALPHA}` : "#00000000";
 
 const OPTIONS = {
   status: STATUSES.map((value) => ({ value, label: STATUS_LABELS[value], icon: statusIcon(value) })),
@@ -51,7 +56,7 @@ export function openMenu(field, issue, project, statuses) {
 }
 
 function optionList(options, isChecked, onPick) {
-  const t = theme();
+  const t = /** @type {Record<string, `#${string}`>} */ (theme());
   return v_flex()
     .id("issue-field-menu")
     .size_full()

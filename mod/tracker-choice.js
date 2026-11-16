@@ -90,7 +90,7 @@ export class TrackerChoice {
         if (this.choice !== choice) return;
         this.teams = teams ?? null;
         this.onReady(alongside, cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         if (this.choice === choice) this.problem = e;
       } finally {
         if (this.choice === choice) this.checking = false;
@@ -108,7 +108,7 @@ export class TrackerChoice {
       try {
         await initializeBeads(this.main);
         if (this.choice === choice) this.check(cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         if (this.choice === choice) Object.assign(this, { problem: e, checking: false });
         cx.notify();
       }
@@ -127,7 +127,7 @@ export class TrackerChoice {
         this.keyInput.set_value("");
         this.keyText = "";
         this.onKeySaved?.(cx);
-      } catch (e) {
+      } catch (/** @type {any} */ e) {
         this.keyError = String(e.message ?? e);
       } finally {
         this.savingKey = false;
@@ -235,7 +235,7 @@ export class TrackerChoice {
 
   // Takes the team picked in the dropdown, which hands it over through shared state.
   takePickedTeam(cx) {
-    const picks = shared(this.picks) ?? {},
+    const picks = /** @type {Record<string, any>} */ (shared(this.picks) ?? {}),
       team = picks[this.main];
     if (!team) return;
     const others = { ...picks };

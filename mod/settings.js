@@ -48,7 +48,7 @@ export class SettingsView {
   // refuses cx.notify() there and shows the view's last render with an error instead.
   takePicks(cx) {
     this.forms.repository.takePickedTeam(cx);
-    const picks = shared(SCOPE_PICKS) ?? {},
+    const picks = /** @type {Record<string, any>} */ (shared(SCOPE_PICKS) ?? {}),
       scope = picks[this.main];
     if (!scope) return;
     const others = { ...picks };
