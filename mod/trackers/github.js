@@ -29,7 +29,7 @@ import { refuseUnknownLabels } from "./labels.js";
  */
 
 /**
- * An issue as the GraphQL queries below return it; `body` only comes with ISSUE.
+ * An issue as the GraphQL queries below return it; `body` and `comments` only come with ISSUE.
  * @typedef {object} GitHubIssueNode
  * @property {number} number
  * @property {string} title
@@ -45,6 +45,7 @@ import { refuseUnknownLabels } from "./labels.js";
  * @property {{ nodes: { number: number, state: string, repository: { nameWithOwner: string } }[] }} blockedBy
  * @property {{ nodes: GitHubPullRequestNode[] }} closedByPullRequestsReferences
  * @property {string | null} [body]
+ * @property {{ nodes: { author: { login: string } | null, createdAt: string, body: string }[] }} [comments]
  */
 
 /** @typedef {(args: string[]) => Promise<string>} Gh */
@@ -58,6 +59,7 @@ const RECENTLY_CLOSED = 20;
 const BLOCKERS = 20;
 const BRANCH_SLUG_LENGTH = 50;
 const MAX_LABELS = 200;
+const COMMENTS = 100;
 
 const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateReason milestone { dueOn }
   labels(first: 20) { nodes { name color } }
@@ -74,7 +76,8 @@ const ISSUES = (state, orderBy) => `query($owner: String!, $name: String!, $firs
     orderBy: { field: ${orderBy}, direction: DESC }) {
     pageInfo { hasNextPage endCursor } nodes { ${ISSUE_FIELDS} } } } }`;
 const ISSUE = `query($owner: String!, $name: String!, $number: Int!) {
-  repository(owner: $owner, name: $name) { issue(number: $number) { ${ISSUE_FIELDS} body } } }`;
+  repository(owner: $owner, name: $name) { issue(number: $number) { ${ISSUE_FIELDS} body
+    comments(first: ${COMMENTS}) { nodes { author { login } createdAt body } } } } }`;
 
 // The statuses a person can pick. In review follows from a linked pull request, so it can't be set.
 const SETTABLE_STATUSES = ["todo", "in-progress", "done", "canceled"];
@@ -163,6 +166,12 @@ function toIssue(node, repo) {
     created: node.createdAt,
     completed: node.state === "CLOSED" ? node.closedAt : null,
     body: node.body === undefined ? null : (node.body ?? "").trim(),
+    comments:
+      node.comments?.nodes.map((comment) => ({
+        author: comment.author?.login ?? "ghost",
+        created: comment.createdAt,
+        body: comment.body.trim(),
+      })) ?? null,
     pullRequests,
     updated: node.updatedAt,
     url: node.url,

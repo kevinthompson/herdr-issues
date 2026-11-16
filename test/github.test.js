@@ -8,8 +8,9 @@ const VIEWER = "me";
 
 const issueNode = (
   number,
-  { state = "OPEN", stateReason = null, labels = [], assignees = [], pullRequests = [] } = {},
+  { state = "OPEN", stateReason = null, labels = [], assignees = [], pullRequests = [], comments = [] } = {},
 ) => ({
+  comments: { nodes: comments },
   number,
   title: `Issue ${number}`,
   url: `https://github.com/${REPO}/issues/${number}`,
@@ -38,8 +39,8 @@ const issueNode = (
 
 const REPOSITORY_LABELS = ["bug", "enhancement", "needs review"];
 
-// A tracker whose `gh` answers every issue query with `nodes` and lists REPOSITORY_LABELS, recording each REST
-// request and `gh issue edit` it makes.
+// A tracker whose `gh` answers every issue query with `nodes`, leaving out their comments when the query doesn't
+// select them, and lists REPOSITORY_LABELS, recording each REST request and `gh issue edit` it makes.
 async function trackerWith(t, nodes) {
   const restRequests = [],
     issueEdits = [];
@@ -49,13 +50,15 @@ async function trackerWith(t, nodes) {
       if (command === "git") return { code: 1, stdout: "", stderr: "" };
       if (args[1] === "graphql") {
         const number = args.find((arg) => arg.startsWith("number="))?.split("=")[1];
-        const matching = number ? nodes.find((node) => node.number === Number(number)) : null;
+        const selectsComments = args.find((arg) => arg.startsWith("query=")).includes("comments(");
+        const answered = nodes.map(({ comments, ...node }) => (selectsComments ? { ...node, comments } : node));
+        const matching = number ? answered.find((node) => node.number === Number(number)) : null;
         return ok(
           JSON.stringify({
             data: {
               repository: number
                 ? { issue: matching }
-                : { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes } },
+                : { issues: { pageInfo: { hasNextPage: false, endCursor: null }, nodes: answered } },
             },
           }),
         );
@@ -163,5 +166,36 @@ describe("GitHub tracker labels", () => {
   test("lists the repository's labels", async (t) => {
     const { tracker } = await trackerWith(t, []);
     assert.deepEqual(await tracker.labels(), REPOSITORY_LABELS);
+  });
+});
+
+describe("GitHub tracker comments", () => {
+  const comment = (login, createdAt, body) => ({ author: login && { login }, createdAt, body });
+
+  test("get loads an issue's comments with its body, in GitHub's oldest-first order", async (t) => {
+    const { tracker } = await trackerWith(t, [
+      issueNode(1, {
+        comments: [
+          comment("someone", "2026-01-02T00:00:00Z", "First\n"),
+          comment(null, "2026-01-03T00:00:00Z", "From a deleted account"),
+        ],
+      }),
+    ]);
+    assert.deepEqual((await tracker.get("#1")).comments, [
+      { author: "someone", created: "2026-01-02T00:00:00Z", body: "First" },
+      { author: "ghost", created: "2026-01-03T00:00:00Z", body: "From a deleted account" },
+    ]);
+  });
+
+  test("get gives an issue without comments an empty list", async (t) => {
+    const { tracker } = await trackerWith(t, [issueNode(1)]);
+    assert.deepEqual((await tracker.get("#1")).comments, []);
+  });
+
+  test("list leaves comments unloaded", async (t) => {
+    const { tracker } = await trackerWith(t, [
+      issueNode(1, { comments: [comment("someone", "2026-01-02T00:00:00Z", "First")] }),
+    ]);
+    assert.equal((await tracker.list())[0].comments, null);
   });
 });
