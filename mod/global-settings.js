@@ -8,8 +8,9 @@
 // for its own update, updateCheckHours, each a whole number before it can be saved; the issue sessions' model and
 // effort, workModel and workEffort; and the prompt appended to their system prompt, workPrompt, before any
 // repository's own. Each opens on the top level's value. Each select leads with a Default choice and each field
-// shows the default as placeholder, and either removes the key, so the default applies. Save writes only the
-// changed keys with saveTopLevelSettings (setting.js).
+// shows the default as placeholder, and either removes the key, so the default applies. Each change saves as it's
+// made (settings-form.js), writing only the changed keys with saveTopLevelSettings (setting.js); a field holding a
+// value that can't be saved writes nothing until it's fixed.
 import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { LANDING_QUESTIONS } from "./setup.js";
@@ -64,14 +65,14 @@ export class GlobalSettings extends SettingsForm {
         this.chosen = { ...Object.fromEntries(SELECT_KEYS.map((key) => [key, this.saved[key]])), waitForChecks: checksChoiceId(this.saved.waitForChecks) };
         this.typedInputs = Object.fromEntries(TYPED_QUESTIONS.map(({ key, placeholder }) => {
           const input = InputState.new({ placeholder, value: this.saved[key] == null ? "" : String(this.saved[key]) });
-          input.on("change", (_e, cx) => { this.error = null; cx.notify(); });
-          input.on("submit", (_e, cx) => this.save(cx));
+          input.on("change", (_e, cx) => this.edited(cx));
+          input.on("submit", (_e, cx) => this.saveNow(cx));
           return [key, input];
         }));
         this.openAgent(Object.fromEntries(Object.keys(AGENT_DEFAULTS).map((key) => [key, value(key)])));
         this.workPromptInput = TextareaState.new({ placeholder: "No prompt", value: this.saved.workPrompt ?? "", rows: WORK_PROMPT_ROWS });
         this.workPromptInput.set_soft_wrap(true);
-        this.workPromptInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
+        this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
       } catch (e) { this.error = String(e.message ?? e); }
       finally { this.loading = false; cx.notify(); }
     });
@@ -80,8 +81,7 @@ export class GlobalSettings extends SettingsForm {
   // `value` for approval, onApproval, waitForChecks or close, or null to remove it.
   choose(key, value, cx) {
     this.chosen = { ...this.chosen, [key]: value };
-    this.error = null;
-    cx.notify();
+    this.saveNow(cx);
   }
 
   fields() {
@@ -123,24 +123,26 @@ export class GlobalSettings extends SettingsForm {
     return landingChanged ? { ...changed, ...landing } : changed;
   }
 
-  changed() {
-    return Object.keys(this.changes()).length > 0;
-  }
-
-  canSave() {
-    return !this.saving && Object.keys(this.typed().problems).length === 0 && this.changed();
-  }
-
-  save(cx) {
-    if (!this.canSave()) return;
+  // The changed keys, written together, after which they're the saved values, or null when nothing changed. A typed
+  // value that can't be saved isn't a change yet.
+  saveRequest() {
     const changes = this.changes();
-    this.runSave(cx, () => saveTopLevelSettings(changes));
+    if (Object.keys(changes).length === 0) return null;
+    return {
+      write: () => saveTopLevelSettings(changes),
+      written: () => {
+        const agent = Object.entries(changes).filter(([key]) => key in AGENT_DEFAULTS);
+        const others = Object.entries(changes).filter(([key]) => !(key in AGENT_DEFAULTS));
+        this.savedAgent = { ...this.savedAgent, ...Object.fromEntries(agent) };
+        this.saved = { ...this.saved, ...Object.fromEntries(others) };
+      },
+    };
   }
 
   form(content, t) {
     const fields = this.fields();
     const { problems } = this.typed();
-    return this.saveRow(content
+    return this.errorLine(content, t)
       .child(this.landingQuestion("approval", { id: CLEAR_CHOICE, label: `Default (${choiceLabel(LANDING_QUESTIONS.approval.choices, DEFAULT_APPROVAL)})` }, t))
       .child(this.landingQuestion("onApproval", DEFAULT_ON_APPROVAL_CHOICE, t))
       .when(fields.waitForChecksSelect, (e) => e.child(this.landingQuestion("waitForChecks",
@@ -153,7 +155,7 @@ export class GlobalSettings extends SettingsForm {
       .when(Boolean(this.savedAgent), (e) => e.children(AGENT_QUESTIONS.map((question) =>
         this.agentQuestion(question, `Default (${AGENT_DEFAULTS[question.key]})`, fields.workModelInput, t))))
       .when(Boolean(this.workPromptInput), (e) => e.child(this.question("Work prompt", WORK_PROMPT_SENTENCE, t,
-        (controls) => controls.child(this.textareaField(this.workPromptInput, t))))), "global-save", t);
+        (controls) => controls.child(this.textareaField(this.workPromptInput, t)))));
   }
 
   // The select of approval, onApproval or waitForChecks, led by `defaultChoice`.
@@ -165,7 +167,7 @@ export class GlobalSettings extends SettingsForm {
   // A select of approval, onApproval, waitForChecks or close, opening on the top level's value or Default.
   selectQuestion(key, title, sentence, options, t) {
     return this.question(title, sentence, t, (controls) => controls
-      .child(this.selects[key].render(t, { options, value: this.chosen[key] ?? CLEAR_CHOICE, enabled: !this.saving,
+      .child(this.selects[key].render(t, { options, value: this.chosen[key] ?? CLEAR_CHOICE,
         onChoose: (id, cx) => this.choose(key, id === CLEAR_CHOICE ? null : id, cx) })));
   }
 }

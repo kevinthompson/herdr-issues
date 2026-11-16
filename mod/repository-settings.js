@@ -17,10 +17,10 @@
 // entry. Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what applies without it as
 // the placeholder, naming the global value where one is set. It opens on the entry's own settings, with each
 // select the entry doesn't set on its choice that removes it; an entry's retired merge and complete show as the
-// approval, onApproval and waitForChecks they mean. Save
-// waits for a different tracker's check to pass and, for Linear, a team, and writes only the changed keys
-// (saveTrackerChoice, saveLandingSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
-// saveAgentSettings and saveWorkPrompt in setting.js).
+// approval, onApproval and waitForChecks they mean. Each change saves as it's made (settings-form.js), writing only
+// the changed keys (saveTrackerChoice, saveLandingSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
+// saveAgentSettings and saveWorkPrompt in setting.js); a different tracker saves once its check passes and, for
+// Linear, once a team is picked, and a poll interval that can't be saved is written once it's fixed.
 import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { LANDING_QUESTIONS } from "./setup.js";
@@ -65,8 +65,9 @@ export class RepositorySettings extends SettingsForm {
     this.trackerReady = false;
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
-      onReady: (_none, cx) => { this.trackerReady = true; cx.notify(); },
-      onTeam: () => {},
+      // Both run before the tracker's check settles or within a render, so the save waits for the next tick.
+      onReady: (_none, cx) => { this.trackerReady = true; this.autosave.schedule(cx, 0); cx.notify(); },
+      onTeam: (cx) => this.autosave.schedule(cx, 0),
     });
     // The entry's own approval, onApproval, waitForChecks and close, as their selects' ids, and the chosen ones.
     this.landing = null; this.savedLanding = null; this.chosenLanding = {};
@@ -95,8 +96,8 @@ export class RepositorySettings extends SettingsForm {
         this.chosenLanding = { ...this.savedLanding };
         this.savedName = name.entry;
         this.nameInput = InputState.new({ placeholder: name.defaultName, value: name.entry ?? "" });
-        this.nameInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
-        this.nameInput.on("submit", (_e, cx) => this.save(cx));
+        this.nameInput.on("change", (_e, cx) => this.edited(cx));
+        this.nameInput.on("submit", (_e, cx) => this.saveNow(cx));
         this.savedRepository = repository;
         this.repositoryInputs = this.newRepositoryInputs(repository);
         this.agentSources = agent;
@@ -104,7 +105,7 @@ export class RepositorySettings extends SettingsForm {
         this.savedWorkPrompt = workPrompt.entry;
         this.workPromptInput = TextareaState.new({ placeholder: "No prompt for this repository", value: workPrompt.entry ?? "", rows: WORK_PROMPT_ROWS });
         this.workPromptInput.set_soft_wrap(true);
-        this.workPromptInput.on("change", (_e, cx) => { this.error = null; cx.notify(); });
+        this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
       } catch (e) { this.error = String(e.message ?? e); }
       finally { this.loading = false; cx.notify(); }
     });
@@ -120,8 +121,8 @@ export class RepositorySettings extends SettingsForm {
     };
     return Object.fromEntries(REPOSITORY_KEYS.map((key) => {
       const input = InputState.new({ placeholder: placeholders[key], value: repository[key] == null ? "" : String(repository[key]) });
-      input.on("change", (_e, cx) => { this.error = null; cx.notify(); });
-      input.on("submit", (_e, cx) => this.save(cx));
+      input.on("change", (_e, cx) => this.edited(cx));
+      input.on("submit", (_e, cx) => this.saveNow(cx));
       return [key, input];
     }));
   }
@@ -146,17 +147,10 @@ export class RepositorySettings extends SettingsForm {
     return choice === this.current.kind ? null : { tracker: choice };
   }
 
-  // A tracker that is chosen but not yet checked, or Linear without a team, holds back Save.
-  trackerPending() {
-    const { choice, team, checking } = this.tracker;
-    return Boolean(choice) && (checking || !this.trackerReady || (choice === "linear" && !team));
-  }
-
   // `value` for approval, onApproval, waitForChecks or close, or null to remove it from the entry.
   chooseLanding(key, value, cx) {
     this.chosenLanding = { ...this.chosenLanding, [key]: value };
-    this.error = null;
-    cx.notify();
+    this.saveNow(cx);
   }
 
   // The approval, onApproval, waitForChecks and close that apply without the entry's own, each { value, label },
@@ -234,34 +228,38 @@ export class RepositorySettings extends SettingsForm {
     return Boolean(this.workPromptInput) && this.typedWorkPrompt() !== this.savedWorkPrompt;
   }
 
-  changed() {
-    return Boolean(this.trackerChange()) || this.landingChanged() || this.closeChanged() || this.nameChanged()
-      || Object.keys(this.repositoryChanges()).length > 0 || Object.keys(this.agentChanges()).length > 0
-      || this.workPromptChanged();
-  }
-
-  canSave() {
-    return !this.saving && !this.trackerPending() && !this.pollSecondsProblem() && this.changed();
-  }
-
-  save(cx) {
-    if (!this.canSave()) return;
+  // The changed keys, after which they're the saved values, or null when nothing changed. A tracker not yet checked
+  // or without its team, and a poll interval that can't be saved, aren't changes yet.
+  saveRequest() {
+    if (!this.landing) return null;
     const trackerChoice = this.trackerChange();
-    const landing = this.landingToSave();
-    const landingChoice = this.landingChanged() ? { ...landing, waitForChecks: waitForChecksOf(landing.waitForChecks) } : null;
+    const landing = this.landingToSave(), landingChanged = this.landingChanged();
     const closeChanged = this.closeChanged(), close = this.chosenLanding.close;
     const nameChanged = this.nameChanged(), name = this.typedName();
     const repositoryChanges = this.repositoryChanges(), agentChanges = this.agentChanges();
     const workPromptChanged = this.workPromptChanged(), workPrompt = this.typedWorkPrompt();
-    this.runSave(cx, async () => {
-      if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
-      if (landingChoice) await saveLandingSettings(this.main, landingChoice);
-      if (closeChanged) await saveCloseSetting(this.main, close);
-      if (nameChanged) await saveNameSetting(this.main, name);
-      if (Object.keys(repositoryChanges).length > 0) await saveRepositorySettings(this.main, repositoryChanges);
-      if (Object.keys(agentChanges).length > 0) await saveAgentSettings(this.main, agentChanges);
-      if (workPromptChanged) await saveWorkPrompt(this.main, workPrompt);
-    });
+    const hasRepositoryChanges = Object.keys(repositoryChanges).length > 0, hasAgentChanges = Object.keys(agentChanges).length > 0;
+    if (!trackerChoice && !landingChanged && !closeChanged && !nameChanged && !hasRepositoryChanges && !hasAgentChanges && !workPromptChanged) return null;
+    return {
+      write: async () => {
+        if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
+        if (landingChanged) await saveLandingSettings(this.main, { ...landing, waitForChecks: waitForChecksOf(landing.waitForChecks) });
+        if (closeChanged) await saveCloseSetting(this.main, close);
+        if (nameChanged) await saveNameSetting(this.main, name);
+        if (hasRepositoryChanges) await saveRepositorySettings(this.main, repositoryChanges);
+        if (hasAgentChanges) await saveAgentSettings(this.main, agentChanges);
+        if (workPromptChanged) await saveWorkPrompt(this.main, workPrompt);
+      },
+      written: () => {
+        if (trackerChoice) this.current = { kind: trackerChoice.tracker, team: trackerChoice.team, repo: trackerChoice.tracker === this.current.kind ? this.current.repo : undefined };
+        if (landingChanged) this.savedLanding = { ...this.savedLanding, ...landing };
+        if (closeChanged) this.savedLanding = { ...this.savedLanding, close };
+        if (nameChanged) this.savedName = name;
+        this.savedRepository = { ...this.savedRepository, ...repositoryChanges };
+        this.savedAgent = { ...this.savedAgent, ...agentChanges };
+        if (workPromptChanged) this.savedWorkPrompt = workPrompt;
+      },
+    };
   }
 
   fields() {
@@ -273,7 +271,7 @@ export class RepositorySettings extends SettingsForm {
 
   form(content, t) {
     const fields = this.fields();
-    return this.saveRow(content
+    return this.errorLine(content, t)
       .when(Boolean(this.nameInput), (e) => e.child(this.question("Repository name", NAME_SENTENCE, t,
         (controls) => controls.child(this.textField(this.nameInput, t)))))
       .child(this.trackerSection(fields, t))
@@ -282,7 +280,7 @@ export class RepositorySettings extends SettingsForm {
       .when(Boolean(this.agentSources), (e) => e.children(AGENT_QUESTIONS.map((question) =>
         this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t))))
       .when(Boolean(this.workPromptInput), (e) => e.child(this.question("Work prompt", WORK_PROMPT_SENTENCE, t,
-        (controls) => controls.child(this.textareaField(this.workPromptInput, t))))), "settings-save", t);
+        (controls) => controls.child(this.textareaField(this.workPromptInput, t)))));
   }
 
   // The approval, onApproval, waitForChecks and close selects, waitForChecks only when the onApproval that applies
@@ -305,7 +303,7 @@ export class RepositorySettings extends SettingsForm {
   landingSelect(key, title, sentence, choices, fallbacks, t) {
     const options = [{ id: CLEAR_CHOICE, label: fallbacks[key].label }, ...choices];
     return this.question(title, sentence, t, (controls) => controls
-      .child(this.selects[key].render(t, { options, value: this.chosenLanding[key] ?? CLEAR_CHOICE, enabled: !this.saving,
+      .child(this.selects[key].render(t, { options, value: this.chosenLanding[key] ?? CLEAR_CHOICE,
         onChoose: (id, cx) => this.chooseLanding(key, id === CLEAR_CHOICE ? null : id, cx) })));
   }
 
@@ -320,7 +318,7 @@ export class RepositorySettings extends SettingsForm {
     const { choice, checking } = this.tracker;
     return this.question("Where do this repository's issues live?", `The panel lists issues from ${currentTrackerLabel(this.current)}.`, t, (controls) =>
       this.tracker.withCheckStatus(controls
-        .child(this.selects.tracker.render(t, { options: TRACKERS, value: choice ?? this.current.kind, onChoose: (id, cx) => this.chooseTracker(id, cx), enabled: !this.saving && !checking })),
+        .child(this.selects.tracker.render(t, { options: TRACKERS, value: choice ?? this.current.kind, onChoose: (id, cx) => this.chooseTracker(id, cx), enabled: !checking })),
       "settings-tracker-problem", t)
         .when(fields.teamSelect, (e) => e.child(this.tracker.teamDropdown("settings-team", t))));
   }
