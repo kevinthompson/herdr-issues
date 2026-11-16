@@ -49,7 +49,8 @@ test("a value or pair the top level couldn't hold, or a repository-only key, wri
   writeSettings({ merge: "pull-request", complete: "pull-request-open", repos });
   const before = readFileSync(settingsPath(), "utf8");
   const refusals = [
-    [{ close: "always" }, /issues\.json needs a close of manual, ask, auto/],
+    [{ close: "always" }, /close must be one of ask, auto/],
+    [{ close: "manual" }, /close must be one of ask, auto/],
     [{ approval: "sometimes" }, /issues\.json needs an approval of ask, auto/],
     [{ waitForChecks: "yes" }, /issues\.json needs a waitForChecks of true or false/],
     [{ merge: "auto" }, /merge isn't a setting for every repository/],

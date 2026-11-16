@@ -38,7 +38,7 @@ test("a repository without close asks", async (t) => {
   assert.equal((await closeSetting(t, repository)).out, "ask");
 });
 
-for (const close of ["manual", "ask", "auto"]) {
+for (const close of ["ask", "auto"]) {
   test(`a repository's close of ${close} is printed`, async (t) => {
     const repository = createRepository(temporaryFolder(t));
     writeSettings({ repos: { [repository]: githubEntry({ close }) } });
@@ -46,12 +46,26 @@ for (const close of ["manual", "ask", "auto"]) {
   });
 }
 
+test("a repository's retired close of manual is read as ask", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ close: "auto", repos: { [repository]: githubEntry({ close: "manual" }) } });
+  const result = await closeSetting(t, repository);
+  assert.equal(result.code, 0);
+  assert.equal(result.out, "ask");
+});
+
+test("a top-level retired close of manual is read as ask", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ close: "manual", repos: { [repository]: githubEntry() } });
+  assert.equal((await closeSetting(t, repository)).out, "ask");
+});
+
 test("a repository's close that isn't one of the choices is refused", async (t) => {
   const repository = createRepository(temporaryFolder(t));
   writeSettings({ repos: { [repository]: githubEntry({ close: "always" }) } });
   const result = await closeSetting(t, repository);
   assert.equal(result.code, 1);
-  assert.match(result.err, new RegExp(`issues.json's ${repository} needs a close of manual, ask, auto`));
+  assert.match(result.err, new RegExp(`issues.json's ${repository} needs a close of ask, auto`));
 });
 
 test("saving close keeps the entry's other keys and every other repository's entry", async (t) => {
@@ -71,7 +85,16 @@ test("an invalid close is not written", async (t) => {
   writeSettings({ repos: { [repository]: githubEntry() } });
   const before = readFileSync(settingsPath(), "utf8");
 
-  await assert.rejects(saveCloseSetting(repository, "always"), /close must be one of manual, ask, auto/);
+  await assert.rejects(saveCloseSetting(repository, "always"), /close must be one of ask, auto/);
+  assert.equal(readFileSync(settingsPath(), "utf8"), before);
+});
+
+test("the retired close of manual is not written", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  writeSettings({ repos: { [repository]: githubEntry() } });
+  const before = readFileSync(settingsPath(), "utf8");
+
+  await assert.rejects(saveCloseSetting(repository, "manual"), /close must be one of ask, auto/);
   assert.equal(readFileSync(settingsPath(), "utf8"), before);
 });
 
@@ -86,10 +109,10 @@ test("a repository without an entry gets none from saving close", async (t) => {
 
 test("a null close removes it from the entry, so the global value applies", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ close: "manual", repos: { [repository]: githubEntry({ close: "auto" }) } });
+  writeSettings({ close: "ask", repos: { [repository]: githubEntry({ close: "auto" }) } });
 
   await saveCloseSetting(repository, null);
 
   assert.deepEqual(readSettings().repos[repository], githubEntry());
-  assert.equal((await closeSetting(t, repository)).out, "manual");
+  assert.equal((await closeSetting(t, repository)).out, "ask");
 });

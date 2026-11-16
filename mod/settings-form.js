@@ -11,9 +11,8 @@ import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, workModelChoice } fro
 import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
 
 export const CLOSE_CHOICES = [
-  { id: "ask", label: "Ask me", detail: "The session asks whether to close its worktree, and closes it if you say yes." },
-  { id: "auto", label: "Close it", detail: "The session closes its worktree without asking." },
-  { id: "manual", label: "I'll close it", detail: "The session tells you to close the worktree with cmd+shift+w." },
+  { id: "auto", label: "Automatically", detail: "The session closes its worktree without asking." },
+  { id: "ask", label: "Ask when work is approved", detail: "The session asks whether to close its worktree, and closes it if you say yes." },
 ];
 export const CLOSE_SENTENCE = "What a finished session does about its worktree. A worktree that might lose work, or that has other spaces nested under it, always shows the removal dialog first.";
 

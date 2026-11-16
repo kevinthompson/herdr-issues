@@ -2,7 +2,7 @@
 // are keyed by their main checkout's path, ~ for the home folder, so worktrees share their repository's choice:
 // { "pollSeconds": 120,                                             how often every panel polls its tracker
 //   "updateCheckHours": 6,                                          how often the panel checks for its own update
-//   "approval": "auto", "close": "manual",                          what every repository without its own uses
+//   "approval": "auto", "close": "auto",                            what every repository without its own uses
 //   "repos": {
 //     "~/Code/web":      { "tracker": "linear", "team": "WEB",      a Linear team, with saved views as extra lists
 //                          "views": { "<name>": "https://linear.app/…/view/…" } },
@@ -27,8 +27,9 @@
 // values false. Saving any of the three removes merge and complete there; landingSettings resolves them all.
 // worktreeSetup is a shell command `issues
 // worktree` runs in each new checkout (cli/worktree.js). close is what a finished /issues:work session does about
-// its worktree: manual tells the person to close it with cmd+shift+w, ask asks whether to close it now, and auto
-// closes it, the last two with `issues close`; closeSettings resolves it, ask without it.
+// its worktree: ask asks whether to close it now, mentioning cmd+shift+w, and auto closes it, both with `issues
+// close`; closeSettings resolves it, ask without it. The retired manual, which only told the person to press
+// cmd+shift+w, still loads and reads as ask, but isn't saved.
 // name, also optional in any entry, names the space `issues worktree` and the worktree dialog open on the main
 // checkout, which the sidebar nests worktree spaces under; nameSettings resolves it, the repository's name without
 // its owner without it or when it's blank.
@@ -63,8 +64,10 @@ export const ON_APPROVALS = ["merge", "pull-request"];
 export const DEFAULT_WAIT_FOR_CHECKS = false;
 const RETIRED_MERGES = ["auto", "review", "pull-request"];
 const RETIRED_COMPLETES = ["merged", "pull-request-open", "pull-request-passing"];
-export const CLOSES = ["manual", "ask", "auto"];
+export const CLOSES = ["ask", "auto"];
 export const DEFAULT_CLOSE = "ask";
+const RETIRED_CLOSE = "manual";
+export const closeChoice = (close) => (close === RETIRED_CLOSE ? "ask" : close ?? null);
 export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
 export const DEFAULT_UPDATE_CHECK_HOURS = 6;
@@ -124,7 +127,7 @@ function checkSharedSettings(settings, where) {
   checkPollSeconds(settings?.pollSeconds, where);
   checkWorkSettings(settings, where);
   if (settings?.spaceName != null && typeof settings.spaceName !== "string") throw badSetting(`${where} has a spaceName that isn't text`);
-  checkChoice(settings?.close, "close", CLOSES, where);
+  checkChoice(closeChoice(settings?.close), "close", CLOSES, where);
   checkLanding(settings ?? {}, where);
 }
 
@@ -249,7 +252,7 @@ const defaultOnApproval = async (main) => (await hasGitHubOrigin(main) ? "pull-r
 // What a finished issue session does about its worktree: the entry's close, else the top level's, else ask.
 export async function closeSettings(project) {
   const setting = await trackerSetting(project), settings = await topLevelSettings();
-  return { close: setting?.close ?? settings.close ?? DEFAULT_CLOSE };
+  return { close: closeChoice(setting?.close) ?? closeChoice(settings.close) ?? DEFAULT_CLOSE };
 }
 
 export const LANDING_KEYS = ["approval", "onApproval", "waitForChecks"];
@@ -260,7 +263,7 @@ const RETIRED_LANDING_KEYS = ["merge", "complete"];
 // onApproval that applies without either.
 export async function landingSources(project) {
   const setting = await trackerSetting(project), settings = await topLevelSettings();
-  const own = (source) => ({ ...ownLanding(source), close: source?.close ?? null });
+  const own = (source) => ({ ...ownLanding(source), close: closeChoice(source?.close) });
   const main = await mainCheckout(project.root, project.on);
   return { entry: own(setting), topLevel: own(settings), defaultOnApproval: await defaultOnApproval(main) };
 }
@@ -491,6 +494,7 @@ export const TOP_LEVEL_KEYS = [...LANDING_KEYS, "close", "spaceName", "pollSecon
 export async function saveTopLevelSettings(changes) {
   const unknown = Object.keys(changes).find((key) => !TOP_LEVEL_KEYS.includes(key));
   if (unknown) throw badSetting(`${unknown} isn't a setting for every repository`);
+  if (changes.close != null && !CLOSES.includes(changes.close)) throw badSetting(`close must be one of ${CLOSES.join(", ")}`);
   const cleaned = Object.entries(changes).map(([key, value]) => [key, typeof value === "string" ? value.trim() || null : value ?? null]);
   if (Object.keys(changes).some((key) => LANDING_KEYS.includes(key))) cleaned.push(...RETIRED_LANDING_KEYS.map((key) => [key, null]));
   const previous = await readTextFile(settingsPath()).catch(() => null);
