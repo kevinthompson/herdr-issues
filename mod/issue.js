@@ -81,15 +81,17 @@ export function groupCountText(group) {
 const ICON_IDS = ["triage", "in-review", "in-progress", "todo", "blocked", "backlog", "done", "canceled"];
 export const statusIcon = (id) => (ICON_IDS.includes(id) ? `mods/issues/icons/${id}.png` : null);
 
-// The collapsed strip counts only the groups a tracker always lists, so their counts are never unknown.
-const STRIP_GROUP_IDS = ["triage", "in-review", "in-progress", "todo"];
 const MAX_STRIP_COUNT = 99;
 
-// One badge for each of those groups that holds issues, in the list's order, from `groupIssues`.
+// One badge for each group `groupIssues` returns, in the list's order, with its header's count, shortened to
+// 99+ above 99. An unloaded group's badge has no text, so the strip draws the refresh icon in its place.
 export function stripBadges(groups) {
-  return groups.filter((group) => STRIP_GROUP_IDS.includes(group.id) && group.issues.length)
-    .map(({ id, label, issues: { length: count } }) =>
-      ({ id, label, count, text: count > MAX_STRIP_COUNT ? `${MAX_STRIP_COUNT}+` : String(count) }));
+  return groups.map((group) => {
+    const { id, label, unloaded = false, issues: { length: count } } = group;
+    const tooLong = !unloaded && !group.cap && count > MAX_STRIP_COUNT;
+    const text = tooLong ? `${MAX_STRIP_COUNT}+` : groupCountText(group);
+    return { id, label, count, text, unloaded };
+  });
 }
 
 // Which issues are done or still open, and which issues each one blocks, read once per list: every row
