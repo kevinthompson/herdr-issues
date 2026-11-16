@@ -642,8 +642,9 @@ function body(view, t) {
 export const detailHeader = (view, t) =>
   headerBar(
     {
+      icon: "issues",
       title: "Issues",
-      secondary: "Issue Detail",
+      secondary: "Detail",
       trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
     },
     t,
