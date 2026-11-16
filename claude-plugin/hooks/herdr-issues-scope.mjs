@@ -81,10 +81,12 @@ function openIssueText(openPath, checkout) {
 // Prints the text when it differs from what this session was last told under the name, and remembers it.
 function announce(stateFolder, session, name, text, closedText = "") {
   const stateFile = join(stateFolder, `${session}.${name}`);
-  let previous = null;
+  let previous;
   try {
     previous = readFileSync(stateFile, "utf8");
-  } catch {}
+  } catch {
+    previous = null;
+  }
   if (previous === text) return;
   if (text) console.log(text);
   else if (previous && closedText) console.log(closedText);

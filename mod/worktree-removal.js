@@ -232,10 +232,12 @@ export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
   if (!space) return;
   const lookingUp = {};
   removalsBySpace.set(spaceId, lookingUp);
-  let repo = null;
+  let repo;
   try {
     repo = await repoOf(place(space), space.machine);
-  } catch {}
+  } catch {
+    repo = null;
+  }
   forgetRemoval(spaceId, lookingUp);
   if (!repo?.linked) return openRemovalDialog(spaceId, { ask });
 

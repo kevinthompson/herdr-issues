@@ -4,9 +4,13 @@
   "scripts": {
     "test": "node --test --import ./test/support/register.js \"test/**/*.test.js\"",
     "format": "prettier --write . bin/issues",
-    "format:check": "prettier --check . bin/issues"
+    "format:check": "prettier --check . bin/issues",
+    "lint": "eslint ."
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
     "prettier": "3.9.10"
   }
 }

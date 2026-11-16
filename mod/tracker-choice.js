@@ -238,7 +238,8 @@ export class TrackerChoice {
     const picks = shared(this.picks) ?? {},
       team = picks[this.main];
     if (!team) return;
-    const { [this.main]: _taken, ...others } = picks;
+    const others = { ...picks };
+    delete others[this.main];
     setShared(this.picks, others);
     this.team = team;
     this.onTeam(cx);
