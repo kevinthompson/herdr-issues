@@ -28,7 +28,7 @@ import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName, headerTitlePieces } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
 import { filterRow } from "./filter-row.js";
-import { groupIssues, groupCountText, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
+import { groupIssues, groupCountText, holdsNoIssues, stripBadges, statusIcon, loadsFor, holdingBlockers, canStartWork, canFinishWork, needsNewBranch, blockedIssues, waitingIssues, slaStatus, dueStatus, PRIORITIES } from "./issue.js";
 import { issueDetail, issueLinks, workButton, labelChips, collapseButton, button } from "./detail.js";
 import { FieldMenu, ScopeMenu, LabelMenu, openMenu, openScopeMenu, openLabelMenu, openIssueLabelsMenu, selectedScope, selectedLabel } from "./menu.js";
 import { worktreeFor, repositoryState, deleteMergedBranches, worktreeSpace, isLinkedWorktree } from "./worktree.js";
@@ -956,8 +956,9 @@ export default class Issues extends View {
     });
   }
 
-  emptyText() {
-    return this.loaded ? "No issues yet" : "Loading…";
+  emptyText(groups) {
+    if (!this.loaded) return "Loading…";
+    return holdsNoIssues(groups) ? "Use /issues:create to create an issue" : null;
   }
 
   // The scope listed now: { scope, project, milestone }, a milestone's under its project.
@@ -1028,7 +1029,7 @@ export default class Issues extends View {
     }
     if (this.settingsView) return this.settingsView.render(t, { onCollapse: () => this.toggleCollapsed() });
     const labels = this.listedLabels(), label = this.shownLabel(labels);
-    const groups = this.groups(label), error = this.error ?? this.detailError;
+    const groups = this.groups(label), error = this.error ?? this.detailError, emptyText = this.emptyText(groups);
     const shown = this.shownCounts(groups), idColumnWidth = this.idColumnWidth(groups);
     this.revealGroup(groups);
     return v_flex().size_full().min_h(0)
@@ -1037,7 +1038,7 @@ export default class Issues extends View {
       .when(Boolean(error), (e) => e.child(div().flex_none().px(14).py(6).text_size(11).text_color(t.ansi1).whitespace_normal().child(error ?? "")))
       .child(v_flex().id("issues-list").track_scroll(this.listScroll).on_size_change((_size, cx) => this.noticeListLaidOut(cx)).flex_1().min_h(0).overflow_y_scrollbar().p(6).gap(1)
         .children(groups.map((group, index) => this.group(group, shown[index], idColumnWidth, t)))
-        .when(!groups.length && !error, (e) => e.child(div().p(8).text_color(t.dim).child(this.emptyText()))));
+        .when(Boolean(emptyText) && !error, (e) => e.child(div().p(8).text_color(t.dim).child(emptyText ?? ""))));
   }
 
   frame(t) {

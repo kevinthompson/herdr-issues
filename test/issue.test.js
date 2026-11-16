@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { canStartWork, groupCountText, groupIssues, holdingBlockers, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
+import { canStartWork, groupCountText, groupIssues, holdingBlockers, holdsNoIssues, statusIcon, stripBadges, waitingIssues } from "../mod/issue.js";
 
 const issue = (id, status, { priority = 0, blockedBy = [] } = {}) =>
   ({ id, status, priority, blockedBy, labels: [], order: null, sla: null });
@@ -63,6 +63,16 @@ describe("groupIssues", () => {
     const labeled = { ...issue("#2", "todo"), labels: ["bug"] };
     const groups = groupIssues([issue("#1", "in-progress"), labeled], new Set(), "bug");
     assert.deepEqual(groupIds(groups), { todo: ["#2"] });
+  });
+});
+
+describe("holdsNoIssues", () => {
+  test("is true while no group holds an issue, including unloaded ones", () => {
+    assert.equal(holdsNoIssues(groupIssues([], new Set(["done"]))), true);
+  });
+
+  test("is false once any group holds an issue", () => {
+    assert.equal(holdsNoIssues(groupIssues([issue("#1", "done")])), false);
   });
 });
 

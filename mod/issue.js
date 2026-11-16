@@ -71,6 +71,9 @@ export function groupIssues(issues, unloaded = new Set(), label = null, { recent
     .filter((group) => group.unloaded || group.issues.length || group.alwaysShown);
 }
 
+// Whether no group the list shows holds an issue, so it points the person at creating one.
+export const holdsNoIssues = (groups) => groups.every((group) => !group.issues.length);
+
 // The count beside a group's title: "20+" for a group capped at 20, or null when its issues weren't listed.
 export function groupCountText(group) {
   if (group.unloaded) return null;
