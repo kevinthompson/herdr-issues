@@ -12,6 +12,7 @@ import { DUE_COLORS, fieldBar, isLightTheme, labelTint } from "./colors.js";
 import { collapseButton, headerBar } from "./header.js";
 import { rowBeneathHeader } from "./filter-row.js";
 import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
+import { SPIN_MS } from "./action-button-state.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -411,14 +412,14 @@ const outlinedInLightTheme = (element, t) => element.when(isLightTheme(t), (e) =
  * @param {string | ((color: Color) => NativeElement)} label
  * @param {(cx: Context) => void} onClick
  * @param {Theme} t
- * @param {{ primary?: boolean, enabled?: boolean, tooltip?: string | null, primaryOnHover?: boolean }} [options]
+ * @param {{ primary?: boolean, enabled?: boolean, tooltip?: string | null, primaryOnHover?: boolean, width?: number | null }} [options]
  */
 export function button(
   id,
   label,
   onClick,
   t,
-  { primary = false, enabled = true, tooltip = null, primaryOnHover = false } = {},
+  { primary = false, enabled = true, tooltip = null, primaryOnHover = false, width = null } = {},
 ) {
   const solidOnHover = primaryOnHover && !primary;
   /** @type {(style: NativeElement) => NativeElement} */
@@ -432,7 +433,8 @@ export function button(
     .id(id)
     .flex_none()
     .h(26)
-    .px(10)
+    .when(width === null, (e) => e.px(10))
+    .when(width !== null, (e) => e.w(width).justify_center())
     .flex()
     .items_center()
     .rounded(7)
@@ -459,6 +461,9 @@ export function button(
     .child(typeof label === "function" ? label(textColor) : label);
 }
 
+// The list's compact work button keeps this width through its branch icon, spinner and go-to-space arrow.
+export const COMPACT_BUTTON_WIDTH_PX = 32;
+
 /**
  * Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
  * whose worktree a space already shows switches to that space instead, and the button stands out to say so,
@@ -475,25 +480,28 @@ export function workButton(
   t,
   { primary = true, compact = false } = {},
 ) {
+  const width = compact ? COMPACT_BUTTON_WIDTH_PX : null;
   if (inSpace) {
     const tooltip = inActiveSpace ? "Already in this issue's space" : "Switch to this issue's worktree space";
     return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, {
       primary: true,
       enabled: !opening && !inActiveSpace,
       tooltip,
+      width,
     });
   }
-  const style = { primary, primaryOnHover: compact, enabled: !opening };
+  const style = { primary, primaryOnHover: compact, enabled: !opening, width };
+  const branchIcon = icon("git-branch-plus");
   /** @param {Color} color */
-  const branchIcon = (color) => svg("mods/issues/icons/git-branch-plus.svg").size(14).text_color(color);
+  const spinner = (color) => icon("rotate-cw")(color).spin(SPIN_MS);
   if (finishable) {
-    const label = loading ? (compact ? "…" : "Opening…") : compact ? branchIcon : "Continue";
+    const label = loading ? (compact ? spinner : "Opening…") : compact ? branchIcon : "Continue";
     return button(`${key}-continue`, label, onContinue, t, {
       ...style,
       tooltip: compact ? (loading ? "Opening this issue's worktree…" : "Continue work") : null,
     });
   }
-  const label = loading ? (compact ? "…" : "Starting…") : compact ? branchIcon : "Start";
+  const label = loading ? (compact ? spinner : "Starting…") : compact ? branchIcon : "Start";
   return button(`${key}-start`, label, onStart, t, {
     ...style,
     enabled: startable && !opening,
