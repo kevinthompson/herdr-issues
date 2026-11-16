@@ -39,17 +39,27 @@ test("saving model and effort settings writes only those keys and keeps every ot
   await saveAgentSettings(repository, { workModel: "claude-opus-5-5", workEffort: "max" });
 
   assert.deepEqual(readSettings(), {
-    pollSeconds: 30, workEffort: "high",
+    pollSeconds: 30,
+    workEffort: "high",
     repos: { "/elsewhere": other, [repository]: { ...entry, workModel: "claude-opus-5-5", workEffort: "max" } },
   });
   assert.equal(await setting(t, repository, "workModel"), "claude-opus-5-5");
   assert.equal(await setting(t, repository, "workEffort"), "max");
-  assert.deepEqual(await workSessionArgv({ root: repository }), ["claude", "--model", "claude-opus-5-5", "--effort", "max"]);
+  assert.deepEqual(await workSessionArgv({ root: repository }), [
+    "claude",
+    "--model",
+    "claude-opus-5-5",
+    "--effort",
+    "max",
+  ]);
 });
 
 test("clearing a setting removes it, so the top level's value or the default applies", async (t) => {
   const repository = createRepository(temporaryFolder(t));
-  writeSettings({ workEffort: "high", repos: { [repository]: { tracker: "beads", workModel: "opus", workEffort: "low" } } });
+  writeSettings({
+    workEffort: "high",
+    repos: { [repository]: { tracker: "beads", workModel: "opus", workEffort: "low" } },
+  });
 
   await saveAgentSettings(repository, { workEffort: null });
 

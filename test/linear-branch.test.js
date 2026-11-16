@@ -8,14 +8,29 @@ import { createRepository, git, temporaryFolder } from "./support/repository.js"
 // An issue whose open pull request, in the repository `prRepo`, works on `prBranch`.
 function issueWithPullRequest(prRepo, prBranch) {
   return {
-    id: "uuid-1", identifier: "WEB-1", title: "Fix the header", team: { id: "team-1" },
-    state: { type: "started", name: "In Progress" }, priority: 2, sortOrder: 1,
-    labels: { nodes: [] }, inverseRelations: { nodes: [] }, branchName: "web-1-fix-the-header",
-    createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", description: "",
-    attachments: { nodes: [{
-      sourceType: "github", url: `https://github.com/acme/${prRepo}/pull/7`, title: "Fix the header",
-      metadata: { repoName: prRepo, number: 7, status: "open", branch: prBranch },
-    }] },
+    id: "uuid-1",
+    identifier: "WEB-1",
+    title: "Fix the header",
+    team: { id: "team-1" },
+    state: { type: "started", name: "In Progress" },
+    priority: 2,
+    sortOrder: 1,
+    labels: { nodes: [] },
+    inverseRelations: { nodes: [] },
+    branchName: "web-1-fix-the-header",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    description: "",
+    attachments: {
+      nodes: [
+        {
+          sourceType: "github",
+          url: `https://github.com/acme/${prRepo}/pull/7`,
+          title: "Fix the header",
+          metadata: { repoName: prRepo, number: 7, status: "open", branch: prBranch },
+        },
+      ],
+    },
   };
 }
 

@@ -38,12 +38,14 @@ export function claimEdit(id) {
 export function showFieldEdit(issue, edit) {
   if (edit.field === "labels") {
     const [add, remove] = edit.failed ? [edit.remove, edit.add] : [edit.add, edit.remove];
-    issue.labels = [...issue.labels.filter((label) => !remove.includes(label)), ...add.filter((label) => !issue.labels.includes(label))];
+    issue.labels = [
+      ...issue.labels.filter((label) => !remove.includes(label)),
+      ...add.filter((label) => !issue.labels.includes(label)),
+    ];
   } else if (!edit.failed) issue[edit.field] = edit.value;
   else if (issue[edit.field] === edit.value) issue[edit.field] = edit.previous;
 }
 
 // The fields tracker.update saves for the edit.
-export const trackerFields = (edit) => (edit.field === "labels"
-  ? { addLabels: edit.add, removeLabels: edit.remove }
-  : { [edit.field]: edit.value });
+export const trackerFields = (edit) =>
+  edit.field === "labels" ? { addLabels: edit.add, removeLabels: edit.remove } : { [edit.field]: edit.value };

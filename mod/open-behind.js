@@ -5,7 +5,10 @@
 const LAST_VERSION_WITHOUT_FOCUS = [0, 1, 15];
 
 function takesFocus(appVersion) {
-  const parts = /^(\d+)\.(\d+)\.(\d+)/.exec(appVersion ?? "")?.slice(1).map(Number);
+  const parts = /^(\d+)\.(\d+)\.(\d+)/
+    .exec(appVersion ?? "")
+    ?.slice(1)
+    .map(Number);
   if (!parts) return false;
   const difference = parts.map((part, index) => part - LAST_VERSION_WITHOUT_FOCUS[index]).find((d) => d !== 0);
   return difference > 0;

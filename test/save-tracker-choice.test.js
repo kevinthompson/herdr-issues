@@ -15,15 +15,37 @@ const readSettings = () => JSON.parse(readFileSync(settingsPath(), "utf8"));
 
 beforeEach(() => forgetLookups());
 
-const keptKeys = { views: { Mine: "https://example.com" }, spaceName: "<repo><issueId>", worktreeSetup: "npm install", workModel: "opus", merge: "pull-request", complete: "merged" };
+const keptKeys = {
+  views: { Mine: "https://example.com" },
+  spaceName: "<repo><issueId>",
+  worktreeSetup: "npm install",
+  workModel: "opus",
+  merge: "pull-request",
+  complete: "merged",
+};
 const other = { tracker: "beads", merge: "review" };
 
 for (const [name, from, choice, expected] of [
   ["Linear to Beads drops the team", { tracker: "linear", team: "WEB" }, { tracker: "beads" }, { tracker: "beads" }],
   ["Linear to GitHub drops the team", { tracker: "linear", team: "WEB" }, { tracker: "github" }, { tracker: "github" }],
-  ["GitHub to Linear drops the repo", { tracker: "github", repo: "owner/name" }, { tracker: "linear", team: "APP" }, { tracker: "linear", team: "APP" }],
-  ["Beads to GitHub keeps a repo it's given", { tracker: "beads" }, { tracker: "github", repo: "owner/other" }, { tracker: "github", repo: "owner/other" }],
-  ["Linear to another Linear team", { tracker: "linear", team: "WEB" }, { tracker: "linear", team: "APP" }, { tracker: "linear", team: "APP" }],
+  [
+    "GitHub to Linear drops the repo",
+    { tracker: "github", repo: "owner/name" },
+    { tracker: "linear", team: "APP" },
+    { tracker: "linear", team: "APP" },
+  ],
+  [
+    "Beads to GitHub keeps a repo it's given",
+    { tracker: "beads" },
+    { tracker: "github", repo: "owner/other" },
+    { tracker: "github", repo: "owner/other" },
+  ],
+  [
+    "Linear to another Linear team",
+    { tracker: "linear", team: "WEB" },
+    { tracker: "linear", team: "APP" },
+    { tracker: "linear", team: "APP" },
+  ],
 ]) {
   test(`saving a tracker from ${name}, keeping the entry's other keys and other repositories' entries`, async (t) => {
     const repository = createRepository(temporaryFolder(t));
@@ -31,7 +53,10 @@ for (const [name, from, choice, expected] of [
 
     await saveTrackerChoice(repository, choice);
 
-    assert.deepEqual(readSettings(), { pollSeconds: 30, repos: { "/elsewhere": other, [repository]: { ...expected, ...keptKeys } } });
+    assert.deepEqual(readSettings(), {
+      pollSeconds: 30,
+      repos: { "/elsewhere": other, [repository]: { ...expected, ...keptKeys } },
+    });
     assert.deepEqual(await trackerSetting({ root: repository, on: null }), { ...expected, ...keptKeys });
   });
 }

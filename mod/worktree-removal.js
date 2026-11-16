@@ -14,7 +14,13 @@ const removalsBySpace = new Map();
 
 // Opens the dialog that removes the space's worktree and closes the space.
 export function openRemovalDialog(spaceId, { ask = false } = {}) {
-  openOverlay({ mod: "issues", kind: "dialog", width: 440, height: 320, props: { space: spaceId, action: "remove", ask } });
+  openOverlay({
+    mod: "issues",
+    kind: "dialog",
+    width: 440,
+    height: 320,
+    props: { space: spaceId, action: "remove", ask },
+  });
 }
 
 // Where a space is now: its first terminal's live folder, else where it was made.
@@ -26,7 +32,11 @@ export function place(space, paneList = panes()) {
 
 export async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on });
-  return { ok: result.code === 0, out: (result.stdout ?? "").trim(), err: (result.stderr ?? result.stdout ?? "").trim() };
+  return {
+    ok: result.code === 0,
+    out: (result.stdout ?? "").trim(),
+    err: (result.stderr ?? result.stdout ?? "").trim(),
+  };
 }
 
 // The repo a folder belongs to: its main checkout and name, and whether
@@ -43,7 +53,11 @@ export async function repoOf(folder, on) {
 // or not): { name, dir, pinned }. `config` is the args that read its
 // .gitmodules; `pinned` is the commit its parent records ("" if none).
 async function modules(gitDir, config, on, out = [], parent = "") {
-  const keys = await git(gitDir, ["--git-dir", gitDir, "config", ...config, "-z", "--get-regexp", "^submodule\\..*\\.path$"], on);
+  const keys = await git(
+    gitDir,
+    ["--git-dir", gitDir, "config", ...config, "-z", "--get-regexp", "^submodule\\..*\\.path$"],
+    on,
+  );
   if (!keys.ok) return out; // no .gitmodules, or no submodules in it
   // -z: "key\nvalue" records ended by NUL, so names and paths may hold spaces.
   for (const record of keys.out.split("\0").filter(Boolean)) {
@@ -54,7 +68,8 @@ async function modules(gitDir, config, on, out = [], parent = "") {
     const pinned = await git(gitDir, ["--git-dir", gitDir, "rev-parse", `HEAD:${record.slice(at + 1)}`], on);
     // Names are only unique within their parent: nested ones carry its name.
     out.push({ name: parent + name, dir, pinned: pinned.ok ? pinned.out : "" });
-    if ((await git(gitDir, ["--git-dir", dir, "cat-file", "-e", "HEAD:.gitmodules"], on)).ok) await modules(dir, ["--blob", "HEAD:.gitmodules"], on, out, `${parent + name}/`);
+    if ((await git(gitDir, ["--git-dir", dir, "cat-file", "-e", "HEAD:.gitmodules"], on)).ok)
+      await modules(dir, ["--blob", "HEAD:.gitmodules"], on, out, `${parent + name}/`);
   }
   return out;
 }
@@ -75,7 +90,11 @@ async function submodules(top, on) {
   const mods = await modules(gitDir.out, ["--file", `${top}/.gitmodules`], on);
   const unpushed = [];
   for (const m of mods) {
-    const local = await git(gitDir.out, ["--git-dir", m.dir, "rev-list", "-n1", "--all", "--not", "--remotes", ...(m.pinned ? [m.pinned] : [])], on);
+    const local = await git(
+      gitDir.out,
+      ["--git-dir", m.dir, "rev-list", "-n1", "--all", "--not", "--remotes", ...(m.pinned ? [m.pinned] : [])],
+      on,
+    );
     if (!local.ok) throw new Error(local.err || `Couldn't check submodule ${m.name}.`);
     if (local.out) unpushed.push(m.name);
   }
@@ -91,7 +110,9 @@ async function nestedWorktreeSpaces(space, repo, on) {
   const inLinked = (folder) => linked.some((checkout) => inside(folder, checkout.path));
   const inMain = (folder) => Boolean(main) && inside(folder, main.path) && !inLinked(folder);
   if (!inMain(place(space, paneList)) && !inMain(space.folder)) return [];
-  return spaces().filter((other) => other.id !== space.id && (other.machine ?? null) === (on ?? null) && inLinked(place(other, paneList)));
+  return spaces().filter(
+    (other) => other.id !== space.id && (other.machine ?? null) === (on ?? null) && inLinked(place(other, paneList)),
+  );
 }
 
 // One space's removal: the checks removal.js reads, each filled in as it answers, and the spaces nested under it.
@@ -104,12 +125,23 @@ export class WorktreeRemoval {
     this.nestedSpaces = null;
     this.listeners = new Set();
     this.finished = Promise.all([
-      runChecks({
-        dirty: () => uncommitted(repo.top, this.on),
-        submodules: async () => (await submodules(repo.top, this.on)).unpushed,
-        branch: () => branchState(repo, this.on),
-      }, (name, result) => { this.checks[name] = result; this.changed(); }),
-      nestedWorktreeSpaces(space, repo, this.on).catch(() => []).then((nested) => { this.nestedSpaces = nested; this.changed(); }),
+      runChecks(
+        {
+          dirty: () => uncommitted(repo.top, this.on),
+          submodules: async () => (await submodules(repo.top, this.on)).unpushed,
+          branch: () => branchState(repo, this.on),
+        },
+        (name, result) => {
+          this.checks[name] = result;
+          this.changed();
+        },
+      ),
+      nestedWorktreeSpaces(space, repo, this.on)
+        .catch(() => [])
+        .then((nested) => {
+          this.nestedSpaces = nested;
+          this.changed();
+        }),
     ]).then(() => {});
   }
 
@@ -157,7 +189,11 @@ export class WorktreeRemoval {
     // sibling instead (instant, same volume), let git forget it, and delete
     // it in the background. Submodules keep git's remove, which guards their history.
     if (mods.length === 0) {
-      const aside = await exec("sh", ["-c", 'to="$(dirname "$1")/.$(basename "$1").removing-$$" && mv "$1" "$to" && echo "$to"', "sh", repo.top], { on });
+      const aside = await exec(
+        "sh",
+        ["-c", 'to="$(dirname "$1")/.$(basename "$1").removing-$$" && mv "$1" "$to" && echo "$to"', "sh", repo.top],
+        { on },
+      );
       if (aside.code === 0) {
         await git(repo.main, ["worktree", "prune"], on);
         exec("sh", ["-c", 'nohup rm -rf "$1" >/dev/null 2>&1 &', "sh", aside.stdout.trim()], { on });
@@ -197,7 +233,9 @@ export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
   const lookingUp = {};
   removalsBySpace.set(spaceId, lookingUp);
   let repo = null;
-  try { repo = await repoOf(place(space), space.machine); } catch {}
+  try {
+    repo = await repoOf(place(space), space.machine);
+  } catch {}
   forgetRemoval(spaceId, lookingUp);
   if (!repo?.linked) return openRemovalDialog(spaceId, { ask });
 
@@ -209,7 +247,9 @@ export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
     openRemovalDialog(spaceId, { ask });
   };
   if (ask) openDialog();
-  const stopWatching = removal.onChange(() => { if (removal.foundProblem()) openDialog(); });
+  const stopWatching = removal.onChange(() => {
+    if (removal.foundProblem()) openDialog();
+  });
   await Promise.race([removal.finished, sleep(DIALOG_DELAY_MS)]);
   if (!removal.answered()) openDialog();
   await removal.finished;
@@ -218,8 +258,11 @@ export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
   if (dialogOpen) return;
   if (!removal.removesWithoutAsking()) return openDialog();
   let error;
-  try { error = await removal.remove(); }
-  catch (thrown) { error = String(thrown?.message ?? thrown); }
+  try {
+    error = await removal.remove();
+  } catch (thrown) {
+    error = String(thrown?.message ?? thrown);
+  }
   if (error && spaces().some((candidate) => candidate.id === spaceId)) return openDialog();
   forgetRemoval(spaceId, removal);
   if (error) throw new Error(error);

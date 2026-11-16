@@ -17,5 +17,7 @@ export const trackerFor = async () => current;
 
 export function useTracker(t, tracker) {
   current = tracker;
-  t.after(() => { current = null; });
+  t.after(() => {
+    current = null;
+  });
 }

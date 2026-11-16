@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
@@ -27,7 +36,8 @@ function createCheckout(path) {
 function binWithoutClaude(folder) {
   const bin = join(folder, "bin");
   mkdirSync(bin, { recursive: true });
-  for (const tool of ["node", "git"]) symlinkSync(execFileSync("which", [tool], { encoding: "utf8" }).trim(), join(bin, tool));
+  for (const tool of ["node", "git"])
+    symlinkSync(execFileSync("which", [tool], { encoding: "utf8" }).trim(), join(bin, tool));
   writeFileSync(join(bin, "herdr-app"), "#!/bin/sh\necho herdr-app 1.0.0\n", { mode: 0o755 });
   return bin;
 }
@@ -49,9 +59,15 @@ test("setup installs the mod, the CLI and the keys without claude, and warns tha
   assert.equal(result.status, 0, result.stderr);
   assert.equal(readlinkSync(join(appHome, "mods/issues")), join(checkout, "mod"));
   assert.equal(lstatSync(join(home, ".local/bin/issues")).isSymbolicLink(), true);
-  assert.deepEqual(JSON.parse(readFileSync(join(appHome, "keys.json"), "utf8")).global, { "cmd-k": "palette", ...modKeys.global });
+  assert.deepEqual(JSON.parse(readFileSync(join(appHome, "keys.json"), "utf8")).global, {
+    "cmd-k": "palette",
+    ...modKeys.global,
+  });
   assert.match(result.stdout, /To show the Issues panel/);
-  assert.match(result.stderr, /claude is not installed, so the Claude plugin .* was skipped; install Claude Code and run setup again/);
+  assert.match(
+    result.stderr,
+    /claude is not installed, so the Claude plugin .* was skipped; install Claude Code and run setup again/,
+  );
 });
 
 test("setup adds the marketplace and installs the plugin when claude is installed", (t) => {
@@ -61,7 +77,9 @@ test("setup adds the marketplace and installs the plugin when claude is installe
   const appHome = join(home, ".config/herdr-app");
   const bin = binWithoutClaude(folder);
   const log = join(folder, "claude.log");
-  writeFileSync(join(bin, "claude"), `#!/bin/sh\necho "$*" >>"${log}"\ncase "$*" in *--json) echo '[]' ;; esac\n`, { mode: 0o755 });
+  writeFileSync(join(bin, "claude"), `#!/bin/sh\necho "$*" >>"${log}"\ncase "$*" in *--json) echo '[]' ;; esac\n`, {
+    mode: 0o755,
+  });
 
   const result = spawnSync(join(checkout, "setup"), {
     encoding: "utf8",
@@ -70,7 +88,10 @@ test("setup adds the marketplace and installs the plugin when claude is installe
   });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(readFileSync(log, "utf8"), new RegExp(`plugin marketplace add ${checkout}\\n(.*\\n)*plugin install issues@herdr-issues\\n`));
+  assert.match(
+    readFileSync(log, "utf8"),
+    new RegExp(`plugin marketplace add ${checkout}\\n(.*\\n)*plugin install issues@herdr-issues\\n`),
+  );
   assert.doesNotMatch(result.stderr, /Claude plugin .* was skipped/);
 });
 
@@ -85,13 +106,17 @@ function runSetupWithInstalledPlugin(t, { enabled }) {
   const log = join(folder, "claude.log");
   const marketplaces = JSON.stringify([{ name: "herdr-issues", path: checkout }]);
   const plugins = JSON.stringify([{ id: "issues@herdr-issues", scope: "user", enabled }]);
-  writeFileSync(join(bin, "claude"), `#!/bin/sh
+  writeFileSync(
+    join(bin, "claude"),
+    `#!/bin/sh
 echo "$*" >>"${log}"
 case "$*" in
   "plugin marketplace list --json") echo '${marketplaces}' ;;
   "plugin list --json") echo '${plugins}' ;;
 esac
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
 
   const result = spawnSync(join(checkout, "setup"), {
     encoding: "utf8",
@@ -149,7 +174,11 @@ const nodeStub = (version) => `#!/bin/sh\necho ${version}\n`;
 // stubs that log each command. `brew` and `devbox` add package manager stubs that log each command and install a
 // node reporting v24.1.0: brew's into the folder already on PATH, and devbox's into its global profile, which only
 // `devbox global shellenv` puts on PATH. `answers` runs setup on a pseudo-terminal, answering its questions.
-function runSetupWithNode(folder, nodeVersion, { inWorktree = false, brew = false, devbox = false, answers = null, profile = null } = {}) {
+function runSetupWithNode(
+  folder,
+  nodeVersion,
+  { inWorktree = false, brew = false, devbox = false, answers = null, profile = null } = {},
+) {
   const checkout = createCheckout(join(folder, "clone"));
   const worktree = join(folder, "worktree");
   if (inWorktree) git(checkout, "worktree", "add", "-q", "-b", "feature", worktree);
@@ -168,21 +197,34 @@ function runSetupWithNode(folder, nodeVersion, { inWorktree = false, brew = fals
     writeFileSync(join(bin, command), `#!/bin/sh\necho "${command} $*" >>"${log}"\n`, { mode: 0o755 });
   }
   if (nodeVersion) writeFileSync(join(bin, "node"), nodeStub(nodeVersion), { mode: 0o755 });
-  const installedNode = (folder) => `printf '${nodeStub("v24.1.0").replaceAll("\n", "\\n")}' >"${folder}/node"; chmod +x "${folder}/node"`;
+  const installedNode = (folder) =>
+    `printf '${nodeStub("v24.1.0").replaceAll("\n", "\\n")}' >"${folder}/node"; chmod +x "${folder}/node"`;
   if (brew) {
-    writeFileSync(join(bin, "brew"), `#!/bin/sh\necho "brew $*" >>"${log}"\n[ "$*" = "install node" ] && ${installedNode(bin)}\nexit 0\n`, { mode: 0o755 });
+    writeFileSync(
+      join(bin, "brew"),
+      `#!/bin/sh\necho "brew $*" >>"${log}"\n[ "$*" = "install node" ] && ${installedNode(bin)}\nexit 0\n`,
+      { mode: 0o755 },
+    );
   }
   if (devbox) {
-    writeFileSync(join(bin, "devbox"), `#!/bin/sh
+    writeFileSync(
+      join(bin, "devbox"),
+      `#!/bin/sh
 case "$*" in
   "global list") echo "* git@latest - 2.55.0" ;;
   "global shellenv") echo 'export PATH="${devboxProfileBin}:$PATH"' ;;
   "global add nodejs") echo "devbox $*" >>"${log}"; ${installedNode(devboxProfileBin)} ;;
 esac
-`, { mode: 0o755 });
+`,
+      { mode: 0o755 },
+    );
   }
   const setup = join(inWorktree ? worktree : checkout, "setup");
-  const env = { HOME: home, HERDR_APP_HOME: join(home, ".config/herdr-app"), PATH: [bin, "/usr/bin", "/bin"].join(":") };
+  const env = {
+    HOME: home,
+    HERDR_APP_HOME: join(home, ".config/herdr-app"),
+    PATH: [bin, "/usr/bin", "/bin"].join(":"),
+  };
   const result = answers
     ? spawnSync("python3", ["-c", answerInTerminal, setup, ...answers], { encoding: "utf8", env })
     : spawnSync(setup, { encoding: "utf8", input: "", env });
@@ -217,7 +259,11 @@ for (const nodeVersion of ["v22.15.0", "v23.0.0", "v24.1.0"]) {
 const terminalTest = (name, fn) => test(name, { skip: !python && "needs python3 for a pseudo-terminal" }, fn);
 
 terminalTest("setup installs node with Homebrew when the person agrees, then carries on", (t) => {
-  const { result, commands, output } = runSetupWithNode(temporaryFolder(t), "v20.19.1", { inWorktree: true, brew: true, answers: ["y"] });
+  const { result, commands, output } = runSetupWithNode(temporaryFolder(t), "v20.19.1", {
+    inWorktree: true,
+    brew: true,
+    answers: ["y"],
+  });
 
   assert.match(output, /node 20\.19\.1 is too old/);
   assert.match(output, /Install it with brew \(brew install node\)\?/);
@@ -226,16 +272,23 @@ terminalTest("setup installs node with Homebrew when the person agrees, then car
   assert.equal(result.status, 1);
 });
 
-terminalTest("setup installs a missing node with devbox, finds it without a new shell and warns about the profile", (t) => {
-  const { result, commands, output } = runSetupWithNode(temporaryFolder(t), null, { inWorktree: true, devbox: true, answers: ["y"] });
+terminalTest(
+  "setup installs a missing node with devbox, finds it without a new shell and warns about the profile",
+  (t) => {
+    const { result, commands, output } = runSetupWithNode(temporaryFolder(t), null, {
+      inWorktree: true,
+      devbox: true,
+      answers: ["y"],
+    });
 
-  assert.match(output, /node is not installed/);
-  assert.match(output, /Install it with devbox \(devbox global add nodejs\)\?/);
-  assert.equal(commands, "devbox global add nodejs\n");
-  assert.match(output, /your shell profile doesn't evaluate devbox global shellenv/);
-  assert.match(output, /is a linked worktree/);
-  assert.equal(result.status, 1);
-});
+    assert.match(output, /node is not installed/);
+    assert.match(output, /Install it with devbox \(devbox global add nodejs\)\?/);
+    assert.equal(commands, "devbox global add nodejs\n");
+    assert.match(output, /your shell profile doesn't evaluate devbox global shellenv/);
+    assert.match(output, /is a linked worktree/);
+    assert.equal(result.status, 1);
+  },
+);
 
 terminalTest("setup doesn't warn about the profile when it evaluates devbox global shellenv", (t) => {
   const { commands, output } = runSetupWithNode(temporaryFolder(t), null, {
@@ -250,7 +303,11 @@ terminalTest("setup doesn't warn about the profile when it evaluates devbox glob
   assert.match(output, /is a linked worktree/);
 });
 
-for (const [answer, expected] of [["1", "devbox global add nodejs\n"], ["2", "brew install node\n"], ["3", ""]]) {
+for (const [answer, expected] of [
+  ["1", "devbox global add nodejs\n"],
+  ["2", "brew install node\n"],
+  ["3", ""],
+]) {
   terminalTest(`setup asks which package manager installs node when both apply, choosing ${answer}`, (t) => {
     const { result, commands, output } = runSetupWithNode(temporaryFolder(t), "v18.20.4", {
       inWorktree: true,
@@ -269,7 +326,10 @@ for (const [answer, expected] of [["1", "devbox global add nodejs\n"], ["2", "br
 }
 
 terminalTest("setup installs nothing when the person declines", (t) => {
-  const { result, commands, home, output } = runSetupWithNode(temporaryFolder(t), "v22.14.0", { brew: true, answers: ["n"] });
+  const { result, commands, home, output } = runSetupWithNode(temporaryFolder(t), "v22.14.0", {
+    brew: true,
+    answers: ["n"],
+  });
 
   assert.equal(result.status, 1);
   assert.equal(commands, "");
@@ -300,7 +360,16 @@ const sidePanelLayout = (withIssues = false) => ({
   children: [
     { id: "main" },
     { id: "panel", children: [{ id: "panel-body", children: [{ id: "files" }] }] },
-    ...(withIssues ? [{ id: "issues-panel", type: "column", size: { weight: 1 }, children: [{ id: "issues", type: "block", content: { mod: "issues" } }] }] : []),
+    ...(withIssues
+      ? [
+          {
+            id: "issues-panel",
+            type: "column",
+            size: { weight: 1 },
+            children: [{ id: "issues", type: "block", content: { mod: "issues" } }],
+          },
+        ]
+      : []),
   ],
 });
 
@@ -329,10 +398,16 @@ function runSetupWithLayouts(t, { layouts, shown, answers = null }) {
 }
 
 test("setup says how to switch when the Issues panel is in a layout Herdr doesn't show", (t) => {
-  const { result, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, development: true }, shown: "main" });
+  const { result, readAppJson } = runSetupWithLayouts(t, {
+    layouts: { main: false, development: true },
+    shown: "main",
+  });
 
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /The Issues panel is in the development layout, but Herdr shows the main layout; switch to it with: herdr-app do layout\.switch '\{"name":"development"\}'/);
+  assert.match(
+    result.stderr,
+    /The Issues panel is in the development layout, but Herdr shows the main layout; switch to it with: herdr-app do layout\.switch '\{"name":"development"\}'/,
+  );
   assert.equal(readAppJson("shared.json").layout, "main");
 });
 
@@ -343,27 +418,45 @@ test("setup says nothing about switching when Herdr shows the layout with the Is
   assert.doesNotMatch(result.stderr, /switch to it/);
 });
 
-terminalTest("setup switches to the layout with the Issues panel when the person agrees, keeping Herdr's shared state", (t) => {
-  const { output, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, development: true }, shown: "main", answers: ["y"] });
+terminalTest(
+  "setup switches to the layout with the Issues panel when the person agrees, keeping Herdr's shared state",
+  (t) => {
+    const { output, readAppJson } = runSetupWithLayouts(t, {
+      layouts: { main: false, development: true },
+      shown: "main",
+      answers: ["y"],
+    });
 
-  assert.match(output, /Herdr shows the main layout, which has no Issues panel\. Switch to development/);
-  assert.match(output, /Herdr now shows the development layout/);
-  assert.deepEqual(readAppJson("shared.json"), { layout: "development", "sidebar.width": 268 });
-});
+    assert.match(output, /Herdr shows the main layout, which has no Issues panel\. Switch to development/);
+    assert.match(output, /Herdr now shows the development layout/);
+    assert.deepEqual(readAppJson("shared.json"), { layout: "development", "sidebar.width": 268 });
+  },
+);
 
-terminalTest("setup lists the layout Herdr shows first and doesn't offer to switch after adding the panel to it", (t) => {
-  const { output, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, alpha: false, work: false }, shown: "work", answers: ["1"] });
+terminalTest(
+  "setup lists the layout Herdr shows first and doesn't offer to switch after adding the panel to it",
+  (t) => {
+    const { output, readAppJson } = runSetupWithLayouts(t, {
+      layouts: { main: false, alpha: false, work: false },
+      shown: "work",
+      answers: ["1"],
+    });
 
-  assert.match(output, /Herdr shows the work layout\. Which layout should show the Issues panel\?/);
-  assert.match(output, /1\) work \(shown now\)/);
-  assert.match(output, /2\) alpha/);
-  assert.match(output, /Added the Issues panel to the work layout/);
-  assert.doesNotMatch(output, /\[y\/N\]/);
-  assert.equal(readAppJson("shared.json").layout, "work");
-});
+    assert.match(output, /Herdr shows the work layout\. Which layout should show the Issues panel\?/);
+    assert.match(output, /1\) work \(shown now\)/);
+    assert.match(output, /2\) alpha/);
+    assert.match(output, /Added the Issues panel to the work layout/);
+    assert.doesNotMatch(output, /\[y\/N\]/);
+    assert.equal(readAppJson("shared.json").layout, "work");
+  },
+);
 
 terminalTest("setup offers to switch to the layout it added the panel to when Herdr shows another", (t) => {
-  const { output, readAppJson } = runSetupWithLayouts(t, { layouts: { main: false, work: false }, shown: "main", answers: ["1", "y"] });
+  const { output, readAppJson } = runSetupWithLayouts(t, {
+    layouts: { main: false, work: false },
+    shown: "main",
+    answers: ["1", "y"],
+  });
 
   assert.match(output, /Added the Issues panel to the work layout/);
   assert.match(output, /Switch to work, which has it, and open with it from now on\? \[y\/N\]/);

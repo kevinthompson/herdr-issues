@@ -9,13 +9,16 @@ const DEVBOX_GLOBALS = "* git@latest - 2.55.0\n";
 // A computer with devbox's global profile listing `devboxGlobals` (null: devbox isn't installed), and Homebrew
 // when `brew` is true.
 function computerWith(t, { devboxGlobals = null, brew = false } = {}) {
-  const missing = () => { throw Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }); };
+  const missing = () => {
+    throw Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+  };
   stubHerdr(t, {
     exec: async (command, args) => {
       if (command === "devbox" && devboxGlobals !== null && args.join(" ") === "global list") {
         return { code: 0, stdout: devboxGlobals, stderr: "" };
       }
-      if (command === "brew" && brew && args[0] === "--version") return { code: 0, stdout: "Homebrew 5.0.0\n", stderr: "" };
+      if (command === "brew" && brew && args[0] === "--version")
+        return { code: 0, stdout: "Homebrew 5.0.0\n", stderr: "" };
       return missing();
     },
   });
@@ -63,13 +66,25 @@ describe("the fix for a missing tool", () => {
 
   test("names both commands when both apply", async (t) => {
     computerWith(t, { devboxGlobals: DEVBOX_GLOBALS, brew: true });
-    assert.equal((await ghMissing()).fix, "Install it with `devbox global add gh` or `brew install gh`, then check again.");
-    assert.equal((await bdMissing()).fix, "Install it with `devbox global add beads` or `brew install beads`, then check again.");
+    assert.equal(
+      (await ghMissing()).fix,
+      "Install it with `devbox global add gh` or `brew install gh`, then check again.",
+    );
+    assert.equal(
+      (await bdMissing()).fix,
+      "Install it with `devbox global add beads` or `brew install beads`, then check again.",
+    );
   });
 
   test("links to the install instructions without a package manager", async (t) => {
     computerWith(t);
-    assert.equal((await ghMissing()).fix, "Install it from [cli.github.com](https://cli.github.com), then check again.");
-    assert.equal((await bdMissing()).fix, "Install it as [Beads' README](https://github.com/steveyegge/beads) says, then check again.");
+    assert.equal(
+      (await ghMissing()).fix,
+      "Install it from [cli.github.com](https://cli.github.com), then check again.",
+    );
+    assert.equal(
+      (await bdMissing()).fix,
+      "Install it as [Beads' README](https://github.com/steveyegge/beads) says, then check again.",
+    );
   });
 });

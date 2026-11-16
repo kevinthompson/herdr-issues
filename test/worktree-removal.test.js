@@ -24,7 +24,9 @@ function worktreeSpace(t, { spaceId, nested = false, unmerged = false }) {
   const worktree = join(folder, "feature");
   git(repository, "worktree", "add", "-q", "-b", "feature", worktree);
   if (unmerged) commitFile(worktree, "work.txt", "unmerged\n");
-  const spaceList = [{ id: spaceId, machine: null, folder: nested ? repository : worktree, tabs: [{ id: `${spaceId}-tab` }] }];
+  const spaceList = [
+    { id: spaceId, machine: null, folder: nested ? repository : worktree, tabs: [{ id: `${spaceId}-tab` }] },
+  ];
   const paneList = [{ pane: `${spaceId}-pane`, terminal: `${spaceId}-terminal`, tab: `${spaceId}-tab`, cwd: worktree }];
   if (nested) {
     const otherWorktree = join(folder, "other");
@@ -38,8 +40,12 @@ function worktreeSpace(t, { spaceId, nested = false, unmerged = false }) {
     spaces: () => spaceList,
     panes: () => paneList,
     terminals: () => [{ address: `${spaceId}-terminal`, labels: { "issues.complete": "#1" } }],
-    run: (command, args) => { calls.commands.push([command, args]); },
-    openOverlay: (overlay) => { calls.overlays.push(overlay); },
+    run: (command, args) => {
+      calls.commands.push([command, args]);
+    },
+    openOverlay: (overlay) => {
+      calls.overlays.push(overlay);
+    },
     exec: async (command, args, options) => {
       if (command === "git") {
         calls.git.push(args);
@@ -51,7 +57,12 @@ function worktreeSpace(t, { spaceId, nested = false, unmerged = false }) {
   t.after(() => forgetRemoval(spaceId, removalInFlight(spaceId)));
   const holdGit = (arg) => {
     let release;
-    holds.set(arg, new Promise((resolve) => { release = resolve; }));
+    holds.set(
+      arg,
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
     return release;
   };
   const closes = () => calls.commands.filter(([command]) => command === "space.close");
@@ -126,7 +137,10 @@ describe("closeWorktreeSpace", () => {
     const closing = closeWorktreeSpace("nested", { sleep: never });
     await waitFor(() => calls.overlays.length === 1);
     const removal = removalInFlight("nested");
-    assert.deepEqual(removal.nestedSpaces.map((space) => space.id), ["nested-other"]);
+    assert.deepEqual(
+      removal.nestedSpaces.map((space) => space.id),
+      ["nested-other"],
+    );
     assert.equal(removal.checks.dirty, undefined);
     release();
     await closing;

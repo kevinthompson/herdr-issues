@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import { labelGroups } from "../mod/label-order.js";
 
 test("applied labels come first and the rest follow, each listed once", () => {
-  assert.deepEqual(labelGroups(["bug", "docs", "enhancement"], ["enhancement"]), { applied: ["enhancement"], others: ["bug", "docs"] });
+  assert.deepEqual(labelGroups(["bug", "docs", "enhancement"], ["enhancement"]), {
+    applied: ["enhancement"],
+    others: ["bug", "docs"],
+  });
 });
 
 test("both groups are in case-insensitive alphabetical order", () => {

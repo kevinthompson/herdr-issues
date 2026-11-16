@@ -49,10 +49,13 @@ describe("isMergedInto", () => {
 
 describe("branchState", () => {
   // gh can't answer for these repositories, as for a repository whose origin isn't on GitHub.
-  const withoutGitHub = (t) => stubHerdr(t, {
-    exec: (command, args, options) => command === "gh" ? Promise.resolve({ code: 1, stdout: "", stderr: "not a GitHub repository" })
-      : defaults.exec(command, args, options),
-  });
+  const withoutGitHub = (t) =>
+    stubHerdr(t, {
+      exec: (command, args, options) =>
+        command === "gh"
+          ? Promise.resolve({ code: 1, stdout: "", stderr: "not a GitHub repository" })
+          : defaults.exec(command, args, options),
+    });
 
   function clone(t, options) {
     withoutGitHub(t);
@@ -67,7 +70,13 @@ describe("branchState", () => {
     commitFile(repo.top, "two.txt", "two\n");
     git(repo.top, "push", "-q", "origin", "feature~1:refs/heads/feature");
     const state = await branchState(repo, null);
-    assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: null, unpushed: 1, pullRequest: null });
+    assert.deepEqual(state, {
+      branch: "feature",
+      bases: ["main", "origin/main"],
+      mergedInto: null,
+      unpushed: 1,
+      pullRequest: null,
+    });
   });
 
   test("names the local default branch when it holds the branch", async (t) => {
@@ -118,7 +127,13 @@ describe("branchState", () => {
       const top = createRepository(folder, { name: base, branch: base });
       git(top, "switch", "-q", "-c", "feature");
       const state = await branchState({ top, main: top }, null);
-      assert.deepEqual(state, { branch: "feature", bases: [base], mergedInto: base, unpushed: null, pullRequest: null });
+      assert.deepEqual(state, {
+        branch: "feature",
+        bases: [base],
+        mergedInto: base,
+        unpushed: null,
+        pullRequest: null,
+      });
     }
   });
 
@@ -132,21 +147,31 @@ describe("branchState", () => {
       stubHerdr(t, {
         exec: (command, args, options) => {
           commands.push([command, ...args].join(" "));
-          return command === "gh" ? Promise.resolve({ code: 0, stdout: JSON.stringify({ state: "OPEN", url: PULL_REQUEST }), stderr: "" })
+          return command === "gh"
+            ? Promise.resolve({ code: 0, stdout: JSON.stringify({ state: "OPEN", url: PULL_REQUEST }), stderr: "" })
             : defaults.exec(command, args, options);
         },
       });
       const { clone: top } = createClonedRepository(temporaryFolder(t));
       mkdirSync(dirname(settingsPath()), { recursive: true });
-      writeFileSync(settingsPath(), JSON.stringify({ repos: { [top]: { tracker: "github", repo: "owner/name", merge: "pull-request", ...entry } } }));
+      writeFileSync(
+        settingsPath(),
+        JSON.stringify({
+          repos: { [top]: { tracker: "github", repo: "owner/name", merge: "pull-request", ...entry } },
+        }),
+      );
       forgetLookups();
-      t.after(() => { rmSync(settingsPath(), { force: true }); forgetLookups(); });
+      t.after(() => {
+        rmSync(settingsPath(), { force: true });
+        forgetLookups();
+      });
       git(top, "switch", "-q", "-c", "feature");
       commitFile(top, "feature.txt", "feature\n");
       return { repo: { top, main: top }, commands };
     }
 
-    const networkCommands = (commands) => commands.filter((command) => command.startsWith("git fetch") || command.startsWith("gh pr view"));
+    const networkCommands = (commands) =>
+      commands.filter((command) => command.startsWith("git fetch") || command.startsWith("gh pr view"));
 
     test("skips origin and the pull request when the local default branch holds the branch", async (t) => {
       const { repo, commands } = reviewedClone(t);
@@ -155,7 +180,13 @@ describe("branchState", () => {
       git(repo.top, "switch", "-q", "feature");
       const state = await branchState(repo, null);
       assert.deepEqual(networkCommands(commands), []);
-      assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: "main", unpushed: 1, pullRequest: null });
+      assert.deepEqual(state, {
+        branch: "feature",
+        bases: ["main", "origin/main"],
+        mergedInto: "main",
+        unpushed: 1,
+        pullRequest: null,
+      });
     });
 
     test("fetches origin and looks up the pull request when the local default branch lacks the branch", async (t) => {
@@ -163,13 +194,25 @@ describe("branchState", () => {
       git(repo.top, "push", "-q", "origin", "feature:main");
       const state = await branchState(repo, null);
       assert.deepEqual(networkCommands(commands), ["git fetch -q origin main", "gh pr view feature --json state,url"]);
-      assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: "origin/main", unpushed: 0, pullRequest: PULL_REQUEST });
+      assert.deepEqual(state, {
+        branch: "feature",
+        bases: ["main", "origin/main"],
+        mergedInto: "origin/main",
+        unpushed: 0,
+        pullRequest: PULL_REQUEST,
+      });
     });
 
     test("names the pull request when the branch is merged nowhere", async (t) => {
       const { repo } = reviewedClone(t);
       const state = await branchState(repo, null);
-      assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: null, unpushed: 1, pullRequest: PULL_REQUEST });
+      assert.deepEqual(state, {
+        branch: "feature",
+        bases: ["main", "origin/main"],
+        mergedInto: null,
+        unpushed: 1,
+        pullRequest: PULL_REQUEST,
+      });
     });
 
     test("names the pull request when the session waits for its checks", async (t) => {

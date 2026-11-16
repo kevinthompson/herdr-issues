@@ -38,7 +38,9 @@ export function prefetchEditor() {
   if (knownEditor) return;
   const editor = lookUpEditor();
   knownEditor = { editor, at: Date.now() };
-  editor.catch(() => { if (knownEditor?.editor === editor) knownEditor = null; });
+  editor.catch(() => {
+    if (knownEditor?.editor === editor) knownEditor = null;
+  });
 }
 
 // Answers with the editor already known, looking it up again in the background once it's stale, so a
@@ -48,8 +50,15 @@ function userEditor() {
   const { editor, at } = knownEditor;
   if (Date.now() - at >= EDITOR_REFRESH_MS && !refreshingEditor) {
     refreshingEditor = lookUpEditor()
-      .then((fresh) => { knownEditor = { editor: Promise.resolve(fresh), at: Date.now() }; }, () => {})
-      .finally(() => { refreshingEditor = null; });
+      .then(
+        (fresh) => {
+          knownEditor = { editor: Promise.resolve(fresh), at: Date.now() };
+        },
+        () => {},
+      )
+      .finally(() => {
+        refreshingEditor = null;
+      });
   }
   return editor;
 }
@@ -69,7 +78,8 @@ export async function openInEditor(file, folder) {
   const editor = await userEditor();
   if (!editor) return expectSuccess(await exec("open", ["-t", file]));
   if (!editor.command) throw new Error(`${editor.name}: command not found`);
-  if (isGuiEditor(editor.command)) return expectSuccess(await exec("sh", ["-c", START_EDITOR, "sh", editor.value, editor.path, file]));
+  if (isGuiEditor(editor.command))
+    return expectSuccess(await exec("sh", ["-c", START_EDITOR, "sh", editor.value, editor.path, file]));
   const argv = ["sh", "-c", RUN_EDITOR, "sh", editor.value, editor.path, file];
   if (editor.name === "nvim") return openInNeovim(file, folder, argv);
   const { space } = focused() ?? {};

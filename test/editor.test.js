@@ -15,7 +15,12 @@ function stubEditor(t, editor) {
       const [, , , value, , file] = args;
       if (args.length === 4) {
         calls.lookups += 1;
-        const described = [editor.value, editor.value, `/Applications/${editor.value}.app/Contents/bin/${editor.value}`, "/usr/bin"];
+        const described = [
+          editor.value,
+          editor.value,
+          `/Applications/${editor.value}.app/Contents/bin/${editor.value}`,
+          "/usr/bin",
+        ];
         return { code: 0, stdout: `${FIELD}${described.join(FIELD)}${FIELD}`, stderr: "" };
       }
       calls.started.push({ editor: value, file });

@@ -4,13 +4,28 @@ import { isLightTheme, statusTints, rowHover, fieldBar, mixColors } from "../mod
 
 // Colors from Herdr's graphite, paper and win98 presets.
 const graphite = {
-  background: "#17191d", surface: "#17191d", raised: "#2c2e31", chrome: "#101114", hover: "#ffffff0e", foreground: "#eeeeef",
+  background: "#17191d",
+  surface: "#17191d",
+  raised: "#2c2e31",
+  chrome: "#101114",
+  hover: "#ffffff0e",
+  foreground: "#eeeeef",
 };
 const paper = {
-  background: "#ffffff", surface: "#ffffff", raised: "#f6f6f6", chrome: "#f1f1ee", hover: "#0000000c", foreground: "#1b1b1e",
+  background: "#ffffff",
+  surface: "#ffffff",
+  raised: "#f6f6f6",
+  chrome: "#f1f1ee",
+  hover: "#0000000c",
+  foreground: "#1b1b1e",
 };
 const win98 = {
-  background: "#000000", surface: "#c0c0c0", raised: "#dfdfdf", chrome: "#f1f1ee", hover: "#dfdfdf", foreground: "#000000",
+  background: "#000000",
+  surface: "#c0c0c0",
+  raised: "#dfdfdf",
+  chrome: "#f1f1ee",
+  hover: "#dfdfdf",
+  foreground: "#000000",
 };
 
 test("isLightTheme tells a light theme by its dark text", () => {
@@ -50,4 +65,3 @@ test("fieldBar is a shade lighter than a dark panel, and the theme's bar color i
   assert.equal(fieldBar(graphite), mixColors(graphite.background, graphite.raised, 0.35));
   assert.equal(fieldBar(paper), paper.chrome);
 });
-

@@ -86,8 +86,12 @@ export function collapseState() {
   let collapsePending = false;
   let width;
   return {
-    get width() { return width; },
-    get collapsed() { return collapsePending || isCollapsed(width); },
+    get width() {
+      return width;
+    },
+    get collapsed() {
+      return collapsePending || isCollapsed(width);
+    },
     noticeWidth(measured) {
       width = measured;
       if (isCollapsed(measured)) collapsePending = false;

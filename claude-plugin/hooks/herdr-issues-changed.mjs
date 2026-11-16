@@ -15,7 +15,8 @@ import { join } from "node:path";
 
 const GITHUB_ISSUE_CHANGE = /\bgh\s+(issue\s+(create|close|reopen|edit|delete|transfer)|pr\s+merge)\b/;
 
-const BEADS_ISSUE_CHANGE = /\bbd\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(create|update|close|reopen|dep\s+(add|remove|rm))\b/;
+const BEADS_ISSUE_CHANGE =
+  /\bbd\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(create|update|close|reopen|dep\s+(add|remove|rm))\b/;
 
 const GITHUB_DEPENDENCY_CHANGE =
   /\bgh\s+api\b(?=[^|;&]*\/issues\/\d+\/dependencies\/)(?=[^|;&]*(?:-X|--method)[\s=]*["']?(?:POST|DELETE)\b)/i;

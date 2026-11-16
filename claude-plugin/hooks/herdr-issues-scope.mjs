@@ -31,13 +31,14 @@ function scopeText(published) {
   const project = scope.project
     ? `the project "${scope.project.name}"${scope.project.url ? ` (${scope.project.url})` : ""}`
     : null;
-  const what = {
-    milestone: () => `the milestone "${scope.milestone?.name}" of ${project}`,
-    project: () => project,
-    mine: () => "the open issues assigned to me, across every team",
-    team: () => `the ${team} team's open issues outside its Triage state`,
-    triage: () => `the ${team} team's issues in its Triage state`,
-  }[scope.kind]?.() ?? `the saved view "${scope.label}"`;
+  const what =
+    {
+      milestone: () => `the milestone "${scope.milestone?.name}" of ${project}`,
+      project: () => project,
+      mine: () => "the open issues assigned to me, across every team",
+      team: () => `the ${team} team's open issues outside its Triage state`,
+      triage: () => `the ${team} team's issues in its Triage state`,
+    }[scope.kind]?.() ?? `the saved view "${scope.label}"`;
   const trackerName = tracker ? tracker[0].toUpperCase() + tracker.slice(1) : "";
   const teamClause = team && scope.kind !== "mine" ? `, team ${team}` : "";
   // A scope published before the panel added its ID can't be named, so the list of scopes stands in.
@@ -55,7 +56,9 @@ function scopeText(published) {
 function publishedScope(scopeFolder, repo) {
   let files;
   try {
-    files = readdirSync(scopeFolder).filter((file) => file.endsWith(".json")).sort();
+    files = readdirSync(scopeFolder)
+      .filter((file) => file.endsWith(".json"))
+      .sort();
   } catch {
     return "";
   }

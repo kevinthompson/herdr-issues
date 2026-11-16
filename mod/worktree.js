@@ -13,22 +13,27 @@ async function git(cwd, args, on) {
 export async function checkouts(root, on) {
   const listing = await git(root, ["worktree", "list", "--porcelain"], on);
   if (!listing.ok) return [];
-  return listing.out.split(/\n\n+/).map((block) => ({
-    path: /^worktree (.*)$/m.exec(block)?.[1],
-    branch: /^branch refs\/heads\/(.*)$/m.exec(block)?.[1] ?? null,
-  })).filter((checkout) => checkout.path);
+  return listing.out
+    .split(/\n\n+/)
+    .map((block) => ({
+      path: /^worktree (.*)$/m.exec(block)?.[1],
+      branch: /^branch refs\/heads\/(.*)$/m.exec(block)?.[1] ?? null,
+    }))
+    .filter((checkout) => checkout.path);
 }
 
 const isInside = (folder, path) => folder === path || folder?.startsWith(`${path}/`);
 
 export function spaceShowing(path, on) {
   const paneList = panes();
-  return spaces().find((space) => {
-    if ((space.machine ?? null) !== (on ?? null)) return false;
-    const tabs = new Set(space.tabs.map((tab) => tab.id));
-    const folder = paneList.find((pane) => tabs.has(pane.tab) && pane.cwd)?.cwd ?? space.folder;
-    return isInside(folder, path);
-  }) ?? null;
+  return (
+    spaces().find((space) => {
+      if ((space.machine ?? null) !== (on ?? null)) return false;
+      const tabs = new Set(space.tabs.map((tab) => tab.id));
+      const folder = paneList.find((pane) => tabs.has(pane.tab) && pane.cwd)?.cwd ?? space.folder;
+      return isInside(folder, path);
+    }) ?? null
+  );
 }
 
 // The linked worktree checked out on `branch`: { path, branch, on, main: the main checkout, space }.
@@ -103,7 +108,9 @@ async function completingPullRequest(repo, branch, on) {
   try {
     const pullRequest = JSON.parse(view.stdout);
     return pullRequest.state === "OPEN" ? pullRequest.url : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 // What removing a checkout would leave unsaved on its branch: { branch, bases, mergedInto, unpushed, pullRequest },
@@ -129,13 +136,15 @@ export async function branchState(repo, on) {
     const merged = await Promise.all(bases.map((base) => isMergedInto(repo, base, on)));
     return bases.find((_base, index) => merged[index]) ?? null;
   };
-  const countUnpushed = async () => hasOrigin
-    ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0 : null;
+  const countUnpushed = async () =>
+    hasOrigin
+      ? Number((await git(repo.top, ["rev-list", "--count", "HEAD", "--not", "--remotes=origin"], on)).out) || 0
+      : null;
 
   const localBases = await existing(remoteBase ? [remoteBase.slice("origin/".length)] : MAIN_BRANCHES);
   const mergedLocally = await firstHolding(localBases);
   if (mergedLocally) {
-    const bases = [...localBases, ...await existing(remoteBase ? [remoteBase] : [])];
+    const bases = [...localBases, ...(await existing(remoteBase ? [remoteBase] : []))];
     return { branch, bases, mergedInto: mergedLocally, unpushed: await countUnpushed(), pullRequest: null };
   }
 
@@ -143,5 +152,11 @@ export async function branchState(repo, on) {
   if (remoteBase) await git(repo.top, ["fetch", "-q", "origin", remoteBase.slice("origin/".length)], on);
   const remoteBases = await existing(remoteBase ? [remoteBase] : []);
   const bases = [...localBases, ...remoteBases];
-  return { branch, bases, mergedInto: await firstHolding(remoteBases), unpushed: await countUnpushed(), pullRequest: await pullRequestLookup };
+  return {
+    branch,
+    bases,
+    mergedInto: await firstHolding(remoteBases),
+    unpushed: await countUnpushed(),
+    pullRequest: await pullRequestLookup,
+  };
 }

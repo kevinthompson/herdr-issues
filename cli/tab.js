@@ -11,7 +11,8 @@ import { spaceNameEndsWith } from "../mod/space-name.js";
 
 async function herdrApp(args) {
   const result = await exec("herdr-app", args);
-  if (result.code !== 0) throw new Error(`herdr-app ${args.join(" ")}: ${(result.stderr || result.stdout).trim().split("\n").pop()}`);
+  if (result.code !== 0)
+    throw new Error(`herdr-app ${args.join(" ")}: ${(result.stderr || result.stdout).trim().split("\n").pop()}`);
   return result.stdout;
 }
 

@@ -13,21 +13,35 @@ const writeJson = (path, value) => writeFileSync(path, JSON.stringify(value, nul
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 
 const issuesBlock = { id: "issues", type: "block", content: { mod: "issues" } };
-const issuesColumn = { id: "issues-panel", type: "column", size: { weight: 1 }, min: 32, max: 900, children: [issuesBlock] };
+const issuesColumn = {
+  id: "issues-panel",
+  type: "column",
+  size: { weight: 1 },
+  min: 32,
+  max: 900,
+  children: [issuesBlock],
+};
 const fixedIssuesColumn = { ...issuesColumn, size: { px: 368 } };
 
-const workBody = (children) => ({ id: "root", children: [{ id: "work", children: [{ id: "work-body", children }, { id: "status" }] }] });
-const mainLayout = () => workBody([
-  { id: "main" },
-  { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
-]);
+const workBody = (children) => ({
+  id: "root",
+  children: [{ id: "work", children: [{ id: "work-body", children }, { id: "status" }] }],
+});
+const mainLayout = () =>
+  workBody([
+    { id: "main" },
+    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+  ]);
 
 test("merge-keys adds unbound keys and keeps a key bound to something else", (t) => {
   const folder = temporaryFolder(t);
   const keys = join(folder, "keys.json");
   const modKeys = join(folder, "mod-keys.json");
   writeJson(keys, { global: { "cmd-shift-i": "other.action", "cmd-k": "palette" } });
-  writeJson(modKeys, { global: { "cmd-shift-i": "issues.toggle", "cmd-shift-u": "issues.next" }, panel: { r: "issues.refresh" } });
+  writeJson(modKeys, {
+    global: { "cmd-shift-i": "issues.toggle", "cmd-shift-u": "issues.next" },
+    panel: { r: "issues.refresh" },
+  });
 
   const result = run(["merge-keys", keys, modKeys]);
 
@@ -71,7 +85,10 @@ test("unmerge-keys removes the mod's keys and keeps a key the person rebound", (
   const folder = temporaryFolder(t);
   const keys = join(folder, "keys.json");
   const modKeys = join(folder, "mod-keys.json");
-  writeJson(keys, { global: { "cmd-shift-i": "other.action", "cmd-k": "palette" }, "mod:issues": { "cmd-s": "issues.save" } });
+  writeJson(keys, {
+    global: { "cmd-shift-i": "other.action", "cmd-k": "palette" },
+    "mod:issues": { "cmd-s": "issues.save" },
+  });
   writeJson(modKeys, { global: { "cmd-shift-i": "issues.toggle" }, "mod:issues": { "cmd-s": "issues.save" } });
 
   assert.equal(run(["unmerge-keys", keys, modKeys]).status, 0);
@@ -107,17 +124,23 @@ test("remove-panel removes the issues column and leaves the layout's other nodes
 test("remove-panel takes an issues block out of panel-body and shows its next child", (t) => {
   const folder = temporaryFolder(t);
   const layout = join(folder, "mine.json");
-  writeJson(layout, workBody([
-    { id: "main" },
-    { id: "panel", children: [{ id: "panel-body", active: "issues", children: [{ id: "files" }, issuesBlock] }] },
-  ]));
+  writeJson(
+    layout,
+    workBody([
+      { id: "main" },
+      { id: "panel", children: [{ id: "panel-body", active: "issues", children: [{ id: "files" }, issuesBlock] }] },
+    ]),
+  );
 
   assert.equal(run(["remove-panel", layout]).status, 0);
 
-  assert.deepEqual(readJson(layout), workBody([
-    { id: "main" },
-    { id: "panel", children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] },
-  ]));
+  assert.deepEqual(
+    readJson(layout),
+    workBody([
+      { id: "main" },
+      { id: "panel", children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] },
+    ]),
+  );
 });
 
 test("add-panel adds the issues block in a column of its own beside the panel", (t) => {
@@ -129,29 +152,46 @@ test("add-panel adds the issues block in a column of its own beside the panel", 
   assert.equal(run(["shows-mod", layout]).status, 1);
   assert.equal(run(["add-panel", layout]).status, 0);
 
-  assert.deepEqual(readJson(layout), workBody([
-    { id: "main", size: { weight: 2 } },
-    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
-    issuesColumn,
-  ]));
+  assert.deepEqual(
+    readJson(layout),
+    workBody([
+      { id: "main", size: { weight: 2 } },
+      { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+      issuesColumn,
+    ]),
+  );
   assert.equal(run(["shows-mod", layout]).status, 0);
 });
 
 test("move-panel moves an issues block out of panel-body into a column of its own", (t) => {
   const folder = temporaryFolder(t);
   const layout = join(folder, "mine.json");
-  writeJson(layout, workBody([
-    { id: "main", size: { weight: 5 } },
-    { id: "panel", size: { weight: 2 }, children: [{ id: "panel-body", active: "issues", children: [{ id: "files" }, issuesBlock] }] },
-  ]));
+  writeJson(
+    layout,
+    workBody([
+      { id: "main", size: { weight: 5 } },
+      {
+        id: "panel",
+        size: { weight: 2 },
+        children: [{ id: "panel-body", active: "issues", children: [{ id: "files" }, issuesBlock] }],
+      },
+    ]),
+  );
 
   assert.equal(run(["move-panel", layout]).status, 0);
 
-  assert.deepEqual(readJson(layout), workBody([
-    { id: "main", size: { weight: 5 } },
-    { id: "panel", size: { weight: 2 }, children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }] },
-    { ...issuesColumn, size: { weight: 2.5 } },
-  ]));
+  assert.deepEqual(
+    readJson(layout),
+    workBody([
+      { id: "main", size: { weight: 5 } },
+      {
+        id: "panel",
+        size: { weight: 2 },
+        children: [{ id: "panel-body", active: "files", children: [{ id: "files" }] }],
+      },
+      { ...issuesColumn, size: { weight: 2.5 } },
+    ]),
+  );
 });
 
 test("move-panel weighs the fixed issues column an earlier setup wrote, and leaves every other node alone", (t) => {
@@ -166,11 +206,14 @@ test("move-panel weighs the fixed issues column an earlier setup wrote, and leav
 
   assert.equal(run(["move-panel", layout]).status, 0);
 
-  assert.deepEqual(readJson(layout), workBody([
-    { id: "main", size: { weight: 2 } },
-    { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
-    issuesColumn,
-  ]));
+  assert.deepEqual(
+    readJson(layout),
+    workBody([
+      { id: "main", size: { weight: 2 } },
+      { id: "panel", size: { px: 368 }, children: [{ id: "panel-body", children: [{ id: "files" }] }] },
+      issuesColumn,
+    ]),
+  );
   const weighed = readFileSync(layout, "utf8");
   assert.equal(run(["move-panel", layout]).status, 10);
   assert.equal(readFileSync(layout, "utf8"), weighed);
@@ -240,11 +283,17 @@ test("shipped-layouts lists the layouts in installed.json, and nothing without i
 });
 
 test("marketplace-path, plugin-installed and plugin-enabled read Claude's JSON listings", () => {
-  const marketplaces = JSON.stringify([{ name: "other", path: "/x" }, { name: "herdr-issues", installLocation: "/repo" }]);
+  const marketplaces = JSON.stringify([
+    { name: "other", path: "/x" },
+    { name: "herdr-issues", installLocation: "/repo" },
+  ]);
   assert.equal(run(["marketplace-path", "herdr-issues"], marketplaces).stdout, "/repo\n");
   assert.equal(run(["marketplace-path", "missing"], marketplaces).stdout, "");
 
-  const plugins = JSON.stringify([{ id: "issues@herdr-issues", enabled: false }, { id: "other@herdr-issues", enabled: true }]);
+  const plugins = JSON.stringify([
+    { id: "issues@herdr-issues", enabled: false },
+    { id: "other@herdr-issues", enabled: true },
+  ]);
   assert.equal(run(["plugin-installed", "issues@herdr-issues"], plugins).status, 0);
   assert.equal(run(["plugin-installed", "missing@herdr-issues"], plugins).status, 1);
   assert.equal(run(["plugin-enabled", "issues@herdr-issues"], plugins).status, 1);
@@ -309,7 +358,9 @@ test("set-repo creates issues.json when there is none", (t) => {
 test("remove-repos removes the repositories' entries under either spelling of their paths", (t) => {
   const settings = join(temporaryFolder(t), "issues.json");
   const home = process.env.HOME;
-  writeJson(settings, { repos: { "~/Demo/blog": {}, [`${home}/Demo/recipe-app`]: {}, "~/Code/app": { tracker: "github" } } });
+  writeJson(settings, {
+    repos: { "~/Demo/blog": {}, [`${home}/Demo/recipe-app`]: {}, "~/Code/app": { tracker: "github" } },
+  });
 
   run(["remove-repos", settings, `${home}/Demo/blog`, `${home}/Demo/recipe-app`]);
 

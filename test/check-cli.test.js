@@ -29,18 +29,29 @@ const ok = (value) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
 const TRACKERS = {
   beads(t) {
     const record = {
-      id: "notes-a1b", title: "Something", status: "open", priority: 2, created_at: "2026-01-01T00:00:00Z",
-      dependencies: [], description: BODY,
+      id: "notes-a1b",
+      title: "Something",
+      status: "open",
+      priority: 2,
+      created_at: "2026-01-01T00:00:00Z",
+      dependencies: [],
+      description: BODY,
     };
-    const saved = [], counts = { announcements: 0 };
+    const saved = [],
+      counts = { announcements: 0 };
     stubHerdr(t, {
-      setShared: () => { counts.announcements++; return null; },
+      setShared: () => {
+        counts.announcements++;
+        return null;
+      },
       exec: async (command, args, options) => {
         if (command !== "bd") return defaults.exec(command, args, options);
         if (args[0] === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
-        if (args[0] === "show") return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
+        if (args[0] === "show")
+          return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
         const description = args.find((arg) => arg.startsWith("--description="));
-        if (args[0] === "update" && description) saved.push(record.description = description.slice("--description=".length));
+        if (args[0] === "update" && description)
+          saved.push((record.description = description.slice("--description=".length)));
         return ok(null);
       },
     });
@@ -53,18 +64,32 @@ const TRACKERS = {
   github(t) {
     const repo = "owner/name";
     const node = {
-      number: 7, title: "Something", url: `https://github.com/${repo}/issues/7`, body: BODY,
-      createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z", closedAt: null, state: "OPEN", stateReason: null,
-      milestone: null, labels: { nodes: [] }, assignees: { nodes: [] }, blockedBy: { nodes: [] },
+      number: 7,
+      title: "Something",
+      url: `https://github.com/${repo}/issues/7`,
+      body: BODY,
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-02T00:00:00Z",
+      closedAt: null,
+      state: "OPEN",
+      stateReason: null,
+      milestone: null,
+      labels: { nodes: [] },
+      assignees: { nodes: [] },
+      blockedBy: { nodes: [] },
       closedByPullRequestsReferences: { nodes: [] },
     };
-    const saved = [], counts = { announcements: 0 };
+    const saved = [],
+      counts = { announcements: 0 };
     stubHerdr(t, {
-      setShared: () => { counts.announcements++; return null; },
+      setShared: () => {
+        counts.announcements++;
+        return null;
+      },
       exec: async (command, args, options) => {
         if (command !== "gh") return defaults.exec(command, args, options);
         if (args.includes("PATCH")) {
-          saved.push(node.body = args.find((arg) => arg.startsWith("body=")).slice("body=".length));
+          saved.push((node.body = args.find((arg) => arg.startsWith("body=")).slice("body=".length)));
           return ok({});
         }
         return ok({ data: { repository: { issue: args.includes("number=7") ? node : null } } });
@@ -78,30 +103,50 @@ const TRACKERS = {
     clearKeychain();
     saveKeychainPassword("herdr-issues", "linear", "lin_api_test");
     const node = {
-      id: "uuid-1", identifier: "WEB-1", title: "Something", team: { id: "team-1" },
-      state: { type: "started", name: "In Progress" }, priority: 2, sortOrder: 1, branchName: "web-1-something",
-      labels: { nodes: [] }, inverseRelations: { nodes: [] }, attachments: { nodes: [] },
-      createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", description: BODY,
+      id: "uuid-1",
+      identifier: "WEB-1",
+      title: "Something",
+      team: { id: "team-1" },
+      state: { type: "started", name: "In Progress" },
+      priority: 2,
+      sortOrder: 1,
+      branchName: "web-1-something",
+      labels: { nodes: [] },
+      inverseRelations: { nodes: [] },
+      attachments: { nodes: [] },
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      description: BODY,
     };
-    const saved = [], counts = { announcements: 0 };
+    const saved = [],
+      counts = { announcements: 0 };
     t.mock.method(globalThis, "fetch", async (_url, options) => {
       const { query, variables } = JSON.parse(options.body);
       let data = {};
       if (query.startsWith("mutation")) {
-        if (variables.input?.description !== undefined) saved.push(node.description = variables.input.description);
+        if (variables.input?.description !== undefined) saved.push((node.description = variables.input.description));
       } else if (query.includes("issue(id")) data = { issue: variables.id === "WEB-1" ? node : null };
       else data = { team: { name: "Web", projects: { nodes: [] } } };
       return { status: 200, ok: true, text: async () => JSON.stringify({ data }) };
     });
-    stubHerdr(t, { setShared: () => { counts.announcements++; return null; } });
+    stubHerdr(t, {
+      setShared: () => {
+        counts.announcements++;
+        return null;
+      },
+    });
     trackedRepository(t, { tracker: "linear", team: "WEB" });
     return { id: "WEB-1", saved, counts };
   },
 };
 
 async function run(t, args) {
-  const out = [], err = [];
-  const consoleMocks = [t.mock.method(console, "log", (line) => out.push(line)), t.mock.method(console, "error", (line) => err.push(line))];
+  const out = [],
+    err = [];
+  const consoleMocks = [
+    t.mock.method(console, "log", (line) => out.push(line)),
+    t.mock.method(console, "error", (line) => err.push(line)),
+  ];
   const code = await main(args);
   for (const consoleMock of consoleMocks) consoleMock.mock.restore();
   return { code, out: out.join("\n"), err: err.join("\n") };
@@ -113,7 +158,9 @@ for (const [kind, issueIn] of Object.entries(TRACKERS)) {
     const result = await run(t, ["check", id]);
     assert.equal(result.code, 0, result.err);
     assert.equal(result.out, `Checked in ${id}:\n  - First\n  - Second\n  - Nested third`);
-    assert.deepEqual(saved, ["## Acceptance criteria\n\n- [x] First\n- [x] Already done\n- [x] Second\n  * [x] Nested third"]);
+    assert.deepEqual(saved, [
+      "## Acceptance criteria\n\n- [x] First\n- [x] Already done\n- [x] Second\n  * [x] Nested third",
+    ]);
     assert.equal(counts.announcements, 1);
   });
 
@@ -122,7 +169,9 @@ for (const [kind, issueIn] of Object.entries(TRACKERS)) {
     const result = await run(t, ["check", id, "--except", "2", "--except", "3"]);
     assert.equal(result.code, 0, result.err);
     assert.equal(result.out, `Checked in ${id}:\n  - First\nLeft unchecked:\n  - Second\n  - Nested third`);
-    assert.deepEqual(saved, ["## Acceptance criteria\n\n- [x] First\n- [x] Already done\n- [ ] Second\n  * [ ] Nested third"]);
+    assert.deepEqual(saved, [
+      "## Acceptance criteria\n\n- [x] First\n- [x] Already done\n- [ ] Second\n  * [ ] Nested third",
+    ]);
   });
 
   test(`check leaves a ${kind} issue with nothing to check unchanged, saying so`, async (t) => {
@@ -154,7 +203,13 @@ test("check exits 1 for an unknown issue, changing nothing", async (t) => {
   assert.equal(counts.announcements, 0);
 });
 
-for (const args of [[], ["notes-a1b", "--except"], ["notes-a1b", "--except", "0"], ["notes-a1b", "--except", "first"], ["notes-a1b", "--all"]]) {
+for (const args of [
+  [],
+  ["notes-a1b", "--except"],
+  ["notes-a1b", "--except", "0"],
+  ["notes-a1b", "--except", "first"],
+  ["notes-a1b", "--all"],
+]) {
   test(`check exits 2 for ${JSON.stringify(args)}`, async (t) => {
     const { saved } = TRACKERS.beads(t);
     const result = await run(t, ["check", ...args]);

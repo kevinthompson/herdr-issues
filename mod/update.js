@@ -28,10 +28,10 @@ export const modCheckout = () => output(modLinkPath(), ["rev-parse", "--show-top
 // What ./install would bring into `checkout`: { checkout, commit, count }, with origin/main's commit and how many
 // commits HEAD lacks, or null when it's up to date, ./install would refuse or the fetch fails.
 export async function availableUpdate(checkout) {
-  if (await output(checkout, ["symbolic-ref", "--quiet", "--short", "HEAD"]) !== "main") return null;
-  if (await output(checkout, ["status", "--porcelain"]) !== "") return null;
-  if (!await succeeds(checkout, ["fetch", "--quiet", "origin", "main"], { timeout: FETCH_TIMEOUT_MS })) return null;
-  if (!await succeeds(checkout, ["merge-base", "--is-ancestor", "HEAD", "origin/main"])) return null;
+  if ((await output(checkout, ["symbolic-ref", "--quiet", "--short", "HEAD"])) !== "main") return null;
+  if ((await output(checkout, ["status", "--porcelain"])) !== "") return null;
+  if (!(await succeeds(checkout, ["fetch", "--quiet", "origin", "main"], { timeout: FETCH_TIMEOUT_MS }))) return null;
+  if (!(await succeeds(checkout, ["merge-base", "--is-ancestor", "HEAD", "origin/main"]))) return null;
   const count = Number(await output(checkout, ["rev-list", "--count", "HEAD..origin/main"]));
   if (!count) return null;
   return { checkout, commit: await output(checkout, ["rev-parse", "origin/main"]), count };
@@ -39,7 +39,11 @@ export async function availableUpdate(checkout) {
 
 async function readState() {
   const text = await readTextFile(updateStatePath()).catch(() => null);
-  try { return { text, state: JSON.parse(text ?? "{}") ?? {} }; } catch { return { text, state: {} }; }
+  try {
+    return { text, state: JSON.parse(text ?? "{}") ?? {} };
+  } catch {
+    return { text, state: {} };
+  }
 }
 
 async function changeState(change) {
@@ -50,7 +54,7 @@ async function changeState(change) {
 // The update the panel offers for the mod's checkout: availableUpdate's, unless the person dismissed its commit.
 export async function offeredUpdate() {
   const checkout = await modCheckout();
-  const update = checkout && await availableUpdate(checkout);
+  const update = checkout && (await availableUpdate(checkout));
   if (!update) return null;
   const { state } = await readState();
   return state.dismissed === update.commit ? null : update;
@@ -66,7 +70,11 @@ const RUN_INSTALL = `"$1" && touch -h "$2"; exec "\${SHELL:-/bin/sh}" -l`;
 // The tab Update opens, as tab.new's { name, folder, argv }, after noting the commit it installs.
 export async function installTab(update) {
   await changeState({ updating: update.commit });
-  return { name: "Update issues", folder: update.checkout, argv: ["sh", "-c", RUN_INSTALL, "sh", `${update.checkout}/install`, modLinkPath()] };
+  return {
+    name: "Update issues",
+    folder: update.checkout,
+    argv: ["sh", "-c", RUN_INSTALL, "sh", `${update.checkout}/install`, modLinkPath()],
+  };
 }
 
 // Whether the update installTab started has reached the mod's checkout, answered true only once.
@@ -74,7 +82,7 @@ export async function finishedUpdate() {
   const { state } = await readState();
   if (!state.updating) return false;
   const checkout = await modCheckout();
-  if (!checkout || !await succeeds(checkout, ["merge-base", "--is-ancestor", state.updating, "HEAD"])) return false;
+  if (!checkout || !(await succeeds(checkout, ["merge-base", "--is-ancestor", state.updating, "HEAD"]))) return false;
   await changeState({ updating: null });
   return true;
 }

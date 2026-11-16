@@ -24,7 +24,14 @@ export function workModelChoice(workModel, otherPicked) {
 
 // onApproval is the repository's own, null on the choice that removes it, when fallbackOnApproval, the global
 // value or the default, applies instead.
-export function settingsFields({ trackerChoice, trackerReady, onApproval, fallbackOnApproval = null, workModel, otherWorkModelPicked }) {
+export function settingsFields({
+  trackerChoice,
+  trackerReady,
+  onApproval,
+  fallbackOnApproval = null,
+  workModel,
+  otherWorkModelPicked,
+}) {
   return {
     teamSelect: trackerChoice === "linear" && trackerReady,
     waitForChecksSelect: (onApproval ?? fallbackOnApproval) === "pull-request",

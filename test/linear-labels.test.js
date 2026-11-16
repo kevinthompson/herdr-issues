@@ -15,17 +15,32 @@ const TEAM_LABELS = [
 ];
 
 const issueNode = {
-  id: "uuid-1", identifier: "WEB-1", title: "Fix the header", team: { id: "team-1" },
-  state: { type: "started", name: "In Progress" }, priority: 2, sortOrder: 1, branchName: "web-1-fix-the-header",
-  labels: { nodes: [{ name: "Bug", color: "#eb5757", parent: null }, { name: "plan", color: "#4ea7fc", parent: { name: "cloud-agent" } }] },
-  inverseRelations: { nodes: [] }, attachments: { nodes: [] },
-  createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z", description: "",
+  id: "uuid-1",
+  identifier: "WEB-1",
+  title: "Fix the header",
+  team: { id: "team-1" },
+  state: { type: "started", name: "In Progress" },
+  priority: 2,
+  sortOrder: 1,
+  branchName: "web-1-fix-the-header",
+  labels: {
+    nodes: [
+      { name: "Bug", color: "#eb5757", parent: null },
+      { name: "plan", color: "#4ea7fc", parent: { name: "cloud-agent" } },
+    ],
+  },
+  inverseRelations: { nodes: [] },
+  attachments: { nodes: [] },
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  description: "",
 };
 
 // Answers Linear's API with the team, its labels and the issue, recording each mutation and the team each label
 // list was read for.
 async function trackerWith(t) {
-  const mutations = [], labelTeams = [];
+  const mutations = [],
+    labelTeams = [];
   t.mock.method(globalThis, "fetch", async (_url, options) => {
     const { query, variables } = JSON.parse(options.body);
     let data;
@@ -58,7 +73,12 @@ test("names a label in a group after its group", async (t) => {
 
 test("lists the team's labels, without the groups that hold them", async (t) => {
   const { tracker, labelTeams } = await trackerWith(t);
-  assert.deepEqual(await tracker.labels(), ["Bug", "cloud-agent > one-shot", "cloud-agent > plan", "experiments > one-shot"]);
+  assert.deepEqual(await tracker.labels(), [
+    "Bug",
+    "cloud-agent > one-shot",
+    "cloud-agent > plan",
+    "experiments > one-shot",
+  ]);
   assert.deepEqual(labelTeams, ["WEB"]);
 });
 
@@ -74,7 +94,10 @@ test("adds and removes labels one at a time by the IDs of the issue's team, keep
 
 test("refuses a name with no matching label, naming it and changing nothing", async (t) => {
   const { tracker, issue, mutations } = await trackerWith(t);
-  await assert.rejects(tracker.update(issue, { addLabels: ["Bug", "one-shot"] }), /WEB-1's team has no label named one-shot/);
+  await assert.rejects(
+    tracker.update(issue, { addLabels: ["Bug", "one-shot"] }),
+    /WEB-1's team has no label named one-shot/,
+  );
   await assert.rejects(tracker.update(issue, { addLabels: ["cloud-agent"] }), /has no label named cloud-agent/);
   assert.deepEqual(mutations, []);
 });

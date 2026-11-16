@@ -31,7 +31,7 @@ export async function canOfferMerge(branch, project) {
   const worktree = linked.find((checkout) => checkout.branch === branch);
   if (!main || !worktree || !MAIN_BRANCHES.includes(main.branch)) return false;
   if (await changedFiles(worktree.path, project.on, { untracked: true })) return false;
-  return await commitsMainLacks(main, branch, project.on) > 0;
+  return (await commitsMainLacks(main, branch, project.on)) > 0;
 }
 
 // Checks every reason not to merge before changing anything; returns the main checkout, { path, branch }.
@@ -53,10 +53,11 @@ async function mergeableMain(branch, project) {
     throw new MergeRefusal(`There is no local branch ${branch}.`);
   }
   const worktree = linked.find((checkout) => checkout.branch === branch);
-  if (worktree && await changedFiles(worktree.path, on, { untracked: true })) {
+  if (worktree && (await changedFiles(worktree.path, on, { untracked: true }))) {
     throw new MergeRefusal(`${branch}'s worktree (${worktree.path}) has uncommitted changes.`);
   }
-  if (await commitsMainLacks(main, branch, on) === 0) throw new MergeRefusal(`${branch} has no commits that ${main.branch} lacks.`);
+  if ((await commitsMainLacks(main, branch, on)) === 0)
+    throw new MergeRefusal(`${branch} has no commits that ${main.branch} lacks.`);
   return main;
 }
 
@@ -70,24 +71,38 @@ export async function checkMerge(issue, project) {
   const { branch } = issue;
   if (!branch) throw new MergeRefusal(`${issue.id} has no branch.`);
   const main = await mergeableMain(branch, project);
-  const trialMerge = await git(main.path, ["merge-tree", "--write-tree", "--name-only", "--no-messages", main.branch, branch], project.on);
-  if (!trialMerge.ok) throw uncleanMerge(branch, main, trialMerge.out.split("\n").slice(1).filter(Boolean), trialMerge.err);
+  const trialMerge = await git(
+    main.path,
+    ["merge-tree", "--write-tree", "--name-only", "--no-messages", main.branch, branch],
+    project.on,
+  );
+  if (!trialMerge.ok)
+    throw uncleanMerge(branch, main, trialMerge.out.split("\n").slice(1).filter(Boolean), trialMerge.err);
   return main;
 }
 
 // Merges the issue's branch into main with a merge commit, then marks the issue done and tells every panel.
 // A conflicting merge is aborted, leaving the main checkout as it was. Returns the main branch's name.
 export async function mergeIssue(issue, tracker, project) {
-  const { branch } = issue, { on } = project;
+  const { branch } = issue,
+    { on } = project;
   const main = await checkMerge(issue, project);
   const merged = await git(main.path, ["merge", "--no-ff", "--no-edit", "-m", `Merge branch '${branch}'`, branch], on);
   if (!merged.ok) {
-    const conflicts = (await git(main.path, ["diff", "--name-only", "--diff-filter=U"], on)).out.split("\n").filter(Boolean);
+    const conflicts = (await git(main.path, ["diff", "--name-only", "--diff-filter=U"], on)).out
+      .split("\n")
+      .filter(Boolean);
     await git(main.path, ["merge", "--abort"], on);
     throw uncleanMerge(branch, main, conflicts, merged.err);
   }
-  const marking = await tracker.update(issue, { status: "done" }).then(() => null, (error) => error);
+  const marking = await tracker.update(issue, { status: "done" }).then(
+    () => null,
+    (error) => error,
+  );
   await announceIssueChange();
-  if (marking) throw new Error(`Merged ${branch} into ${main.branch}, but could not mark ${issue.id} done: ${marking.message ?? marking}`);
+  if (marking)
+    throw new Error(
+      `Merged ${branch} into ${main.branch}, but could not mark ${issue.id} done: ${marking.message ?? marking}`,
+    );
   return main.branch;
 }

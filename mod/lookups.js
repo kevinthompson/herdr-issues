@@ -12,8 +12,14 @@ export function cachedLookup(keep = () => true) {
     if (!answers.has(key)) {
       const answer = lookup();
       answers.set(key, answer);
-      answer.then((value) => { if (!keep(value) && answers.get(key) === answer) answers.delete(key); },
-        () => { if (answers.get(key) === answer) answers.delete(key); });
+      answer.then(
+        (value) => {
+          if (!keep(value) && answers.get(key) === answer) answers.delete(key);
+        },
+        () => {
+          if (answers.get(key) === answer) answers.delete(key);
+        },
+      );
     }
     return answers.get(key);
   };

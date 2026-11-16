@@ -22,10 +22,16 @@ const isRelativePath = (text) => !/^[/~]/.test(text) && !SCHEME.test(text);
 // Applies `rewrite` to each line outside fenced code.
 function outsideFences(markdown, rewrite) {
   let inFence = false;
-  return markdown.split("\n").map((line) => {
-    if (FENCE.test(line)) { inFence = !inFence; return line; }
-    return inFence ? line : rewrite(line);
-  }).join("\n");
+  return markdown
+    .split("\n")
+    .map((line) => {
+      if (FENCE.test(line)) {
+        inFence = !inFence;
+        return line;
+      }
+      return inFence ? line : rewrite(line);
+    })
+    .join("\n");
 }
 
 export function codeSpanPaths(markdown) {
@@ -39,8 +45,11 @@ export function codeSpanPaths(markdown) {
 
 export function linkCodeSpanFiles(markdown, root, files) {
   if (!files.size) return markdown;
-  return outsideFences(markdown, (line) => line.replace(CODE_SPAN, (span, before, text) =>
-    files.has(text) ? `${before}[\`${text}\`](file://${encodeURI(`${root}/${text}`)})` : span));
+  return outsideFences(markdown, (line) =>
+    line.replace(CODE_SPAN, (span, before, text) =>
+      files.has(text) ? `${before}[\`${text}\`](file://${encodeURI(`${root}/${text}`)})` : span,
+    ),
+  );
 }
 
 export function linkTarget(url, root) {

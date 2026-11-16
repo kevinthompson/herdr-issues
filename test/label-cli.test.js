@@ -23,18 +23,28 @@ function beadsRepository(t) {
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
   writeFileSync(settingsPath(), JSON.stringify({ repos: { [repository]: { tracker: "beads" } } }));
   const record = {
-    id: "notes-a1b", title: "Something", status: "open", priority: 2, created_at: "2026-01-01T00:00:00Z",
-    dependencies: [], description: "", labels: ["ui"],
+    id: "notes-a1b",
+    title: "Something",
+    status: "open",
+    priority: 2,
+    created_at: "2026-01-01T00:00:00Z",
+    dependencies: [],
+    description: "",
+    labels: ["ui"],
   };
   const changes = [];
   const counts = { announcements: 0 };
   const ok = (value) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
   stubHerdr(t, {
-    setShared: () => { counts.announcements++; return null; },
+    setShared: () => {
+      counts.announcements++;
+      return null;
+    },
     exec: async (command, args, options) => {
       if (command !== "bd") return defaults.exec(command, args, options);
       if (args[0] === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
-      if (args[0] === "show") return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
+      if (args[0] === "show")
+        return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
       if (args[0] === "label" && args[1] === "list-all") return ok(["ui", "bug"].map((label) => ({ label, count: 1 })));
       if (args[0] === "label") {
         const [, action, , label] = args;
@@ -49,7 +59,8 @@ function beadsRepository(t) {
 }
 
 async function run(t, args) {
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(args);
@@ -66,7 +77,10 @@ test("label adds and removes labels, keeping the issue's others, and refreshes t
   const removed = await run(t, ["label", record.id, "--remove", "ui"]);
   assert.equal(removed.code, 0, removed.err);
   assert.match((await run(t, ["show", record.id])).out, /^Labels: bug$/m);
-  assert.deepEqual(changes, [["add", "bug"], ["remove", "ui"]]);
+  assert.deepEqual(changes, [
+    ["add", "bug"],
+    ["remove", "ui"],
+  ]);
   assert.equal(counts.announcements, 2);
 });
 
@@ -96,7 +110,10 @@ test("label exits 2 without a label to add or remove", async (t) => {
 
 test("changing labels refuses a tracker that can't save", async () => {
   const tracker = { name: "Read-only", writable: false, get: async () => assert.fail("read the issue") };
-  await assert.rejects(changeIssueLabels(tracker, "1", { addLabels: ["bug"], removeLabels: [] }), /Read-only issues can't be changed here/);
+  await assert.rejects(
+    changeIssueLabels(tracker, "1", { addLabels: ["bug"], removeLabels: [] }),
+    /Read-only issues can't be changed here/,
+  );
 });
 
 test("--help lists label", async (t) => {

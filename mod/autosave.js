@@ -11,7 +11,9 @@ export class AutosaveQueue {
   // onFailed(error, cx) when it throws, and onSettled(cx) once no write is running or queued.
   constructor({ request, onStart, onSaved, onFailed, onSettled }) {
     Object.assign(this, { request, onStart, onSaved, onFailed, onSettled });
-    this.timer = null; this.saving = false; this.again = false;
+    this.timer = null;
+    this.saving = false;
+    this.again = false;
   }
 
   get waiting() {
@@ -20,7 +22,10 @@ export class AutosaveQueue {
 
   schedule(cx, ms = SAVE_DEBOUNCE_MS) {
     this.timer?.cancel();
-    this.timer = cx.timer.after(ms, (cx) => { this.timer = null; this.now(cx); });
+    this.timer = cx.timer.after(ms, (cx) => {
+      this.timer = null;
+      this.now(cx);
+    });
   }
 
   flush(cx) {
@@ -28,8 +33,12 @@ export class AutosaveQueue {
   }
 
   now(cx) {
-    this.timer?.cancel(); this.timer = null;
-    if (this.saving) { this.again = true; return; }
+    this.timer?.cancel();
+    this.timer = null;
+    if (this.saving) {
+      this.again = true;
+      return;
+    }
     const pending = this.request();
     if (!pending) return;
     this.saving = true;
@@ -39,10 +48,14 @@ export class AutosaveQueue {
         await pending.write();
         pending.written();
         this.onSaved(cx);
-      } catch (e) { this.onFailed(e, cx); }
-      finally {
+      } catch (e) {
+        this.onFailed(e, cx);
+      } finally {
         this.saving = false;
-        if (this.again) { this.again = false; this.now(cx); }
+        if (this.again) {
+          this.again = false;
+          this.now(cx);
+        }
         if (!this.saving) this.onSettled(cx);
       }
     });

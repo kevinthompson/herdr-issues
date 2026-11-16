@@ -24,7 +24,8 @@ afterEach(() => process.chdir(startingFolder));
 async function closeSetting(t, repository) {
   process.chdir(repository);
   forgetLookups();
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(["setting", "close"]);
@@ -76,7 +77,10 @@ test("saving close keeps the entry's other keys and every other repository's ent
 
   await saveCloseSetting(repository, "auto");
 
-  assert.deepEqual(readSettings(), { pollSeconds: 30, repos: { "/elsewhere": other, [repository]: { ...entry, close: "auto" } } });
+  assert.deepEqual(readSettings(), {
+    pollSeconds: 30,
+    repos: { "/elsewhere": other, [repository]: { ...entry, close: "auto" } },
+  });
   assert.equal((await closeSetting(t, repository)).out, "auto");
 });
 

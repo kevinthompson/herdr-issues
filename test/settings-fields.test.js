@@ -1,10 +1,24 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  CLEAR_CHOICE, OTHER_WORK_MODEL, checksChoiceId, globalSettingsFields, settingsFields, waitForChecksOf, workModelChoice,
+  CLEAR_CHOICE,
+  OTHER_WORK_MODEL,
+  checksChoiceId,
+  globalSettingsFields,
+  settingsFields,
+  waitForChecksOf,
+  workModelChoice,
 } from "../mod/settings-fields.js";
 
-const fields = (choices) => settingsFields({ trackerChoice: null, trackerReady: false, onApproval: "merge", workModel: null, otherWorkModelPicked: false, ...choices });
+const fields = (choices) =>
+  settingsFields({
+    trackerChoice: null,
+    trackerReady: false,
+    onApproval: "merge",
+    workModel: null,
+    otherWorkModelPicked: false,
+    ...choices,
+  });
 
 test("Linear's team shows only once Linear is chosen and checked", () => {
   assert.equal(fields({ trackerChoice: "linear", trackerReady: true }).teamSelect, true);

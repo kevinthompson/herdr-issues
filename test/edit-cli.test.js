@@ -24,18 +24,27 @@ function beadsRepository(t) {
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
   writeFileSync(settingsPath(), JSON.stringify({ repos: { [repository]: { tracker: "beads" } } }));
   const record = {
-    id: "notes-a1b", title: "Something", status: "open", priority: 2, created_at: "2026-01-01T00:00:00Z",
-    dependencies: [], description: "- [ ] A criterion",
+    id: "notes-a1b",
+    title: "Something",
+    status: "open",
+    priority: 2,
+    created_at: "2026-01-01T00:00:00Z",
+    dependencies: [],
+    description: "- [ ] A criterion",
   };
   const updates = [];
   const counts = { announcements: 0 };
   const ok = (value) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
   stubHerdr(t, {
-    setShared: () => { counts.announcements++; return null; },
+    setShared: () => {
+      counts.announcements++;
+      return null;
+    },
     exec: async (command, args, options) => {
       if (command !== "bd") return defaults.exec(command, args, options);
       if (args[0] === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
-      if (args[0] === "show") return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
+      if (args[0] === "show")
+        return args[1] === record.id ? ok([record]) : { code: 1, stdout: "", stderr: "no issue found" };
       if (args[0] === "update") {
         updates.push(args.slice(1, -1));
         const description = args.find((arg) => arg.startsWith("--description="));
@@ -45,15 +54,21 @@ function beadsRepository(t) {
     },
   });
   process.chdir(repository);
-  return { record, updates, counts, bodyFile: (text) => {
-    const path = join(temporaryFolder(t), "body.md");
-    writeFileSync(path, text);
-    return path;
-  } };
+  return {
+    record,
+    updates,
+    counts,
+    bodyFile: (text) => {
+      const path = join(temporaryFolder(t), "body.md");
+      writeFileSync(path, text);
+      return path;
+    },
+  };
 }
 
 async function run(t, args) {
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(args);
@@ -145,7 +160,10 @@ for (const [name, bodyFileFor] of [
 
 test("editing a body refuses a tracker that can't save", async () => {
   const tracker = { name: "Read-only", writable: false, get: async () => assert.fail("read the issue") };
-  await assert.rejects(editIssueBody(tracker, "1", { body: "A body", readBodyHash: "abc" }), /Read-only issues can't be changed here/);
+  await assert.rejects(
+    editIssueBody(tracker, "1", { body: "A body", readBodyHash: "abc" }),
+    /Read-only issues can't be changed here/,
+  );
 });
 
 test("--help lists edit", async (t) => {

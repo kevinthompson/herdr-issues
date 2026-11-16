@@ -33,6 +33,7 @@ Each tracker needs:
   ```
 
   Then run `/mcp` in a Claude Code session, choose `linear` and sign in. A Linear connection on your Claude account at claude.ai works too.
+
 - **GitHub**: a signed-in GitHub CLI (`gh auth login`).
 - **Beads**: no credentials, but the `bd` CLI (`brew install beads`) and a database made with `bd init` in the repository's main checkout.
 

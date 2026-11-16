@@ -7,7 +7,12 @@ const COLLAPSED_BY_DEFAULT = ["backlog", "done", "canceled"];
 const group = (id) => ({ id, collapsed: COLLAPSED_BY_DEFAULT.includes(id) });
 
 function storedValues(t, values = {}) {
-  stubHerdr(t, { shared: (key) => values[key], setShared: (key, value) => { values[key] = value; } });
+  stubHerdr(t, {
+    shared: (key) => values[key],
+    setShared: (key, value) => {
+      values[key] = value;
+    },
+  });
   return values;
 }
 
@@ -39,7 +44,13 @@ test("each repository keeps its own sections", (t) => {
 test("setting a section to the state it has stores nothing new", (t) => {
   let writes = 0;
   const values = {};
-  stubHerdr(t, { shared: (key) => values[key], setShared: (key, value) => { writes++; values[key] = value; } });
+  stubHerdr(t, {
+    shared: (key) => values[key],
+    setShared: (key, value) => {
+      writes++;
+      values[key] = value;
+    },
+  });
   setSectionOpen("/code/app", "done", true);
   setSectionOpen("/code/app", "done", true);
   assert.equal(writes, 1);

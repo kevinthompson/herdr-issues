@@ -11,11 +11,12 @@ const issuesCli = fileURLToPath(new URL("../bin/issues", import.meta.url));
 const gitFolder = dirname(spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim());
 
 // Runs the issues CLI where herdr-app and hc can't be found, so no test opens a space in the person's window.
-const runIssues = (cwd, args) => spawnSync(process.execPath, [issuesCli, ...args], {
-  cwd,
-  encoding: "utf8",
-  env: { ...process.env, PATH: [dirname(process.execPath), gitFolder, "/usr/bin", "/bin"].join(":") },
-});
+const runIssues = (cwd, args) =>
+  spawnSync(process.execPath, [issuesCli, ...args], {
+    cwd,
+    encoding: "utf8",
+    env: { ...process.env, PATH: [dirname(process.execPath), gitFolder, "/usr/bin", "/bin"].join(":") },
+  });
 
 test("issues worktree opens an existing branch of a repository without origin", (t) => {
   const repository = createRepository(temporaryFolder(t));
@@ -46,28 +47,43 @@ function githubRepository(t, title, { pullRequests = [], refuseChanges = false }
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
   writeFileSync(settingsPath(), JSON.stringify({ repos: { [repository]: { tracker: "github", repo: "owner/name" } } }));
   const issue = {
-    number: 7, title, url: "https://github.com/owner/name/issues/7", body: "", createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z", closedAt: null, state: "OPEN", stateReason: null, milestone: null,
-    labels: { nodes: [] }, assignees: { nodes: [] }, blockedBy: { nodes: [] }, closedByPullRequestsReferences: { nodes: pullRequests },
+    number: 7,
+    title,
+    url: "https://github.com/owner/name/issues/7",
+    body: "",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    closedAt: null,
+    state: "OPEN",
+    stateReason: null,
+    milestone: null,
+    labels: { nodes: [] },
+    assignees: { nodes: [] },
+    blockedBy: { nodes: [] },
+    closedByPullRequestsReferences: { nodes: pullRequests },
   };
   const bin = join(temporaryFolder(t), "bin");
   mkdirSync(bin);
   writeFileSync(join(bin, "issue.json"), JSON.stringify({ data: { repository: { issue } } }));
   const changes = join(bin, "changes");
   writeFileSync(changes, "");
-  writeFileSync(join(bin, "gh"), `#!/bin/sh
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/bin/sh
 case "$2" in
   graphql) cat '${join(bin, "issue.json")}' ;;
   user) echo person ;;
   -X) echo "$3 $4" >> '${changes}'; ${refuseChanges ? "echo 'HTTP 403' >&2; exit 1" : "echo '{}'"} ;;
 esac
-`);
+`,
+  );
   chmodSync(join(bin, "gh"), 0o755);
-  const run = (args) => spawnSync(process.execPath, [issuesCli, ...args], {
-    cwd: repository,
-    encoding: "utf8",
-    env: { ...process.env, PATH: [bin, dirname(process.execPath), gitFolder, "/usr/bin", "/bin"].join(":") },
-  });
+  const run = (args) =>
+    spawnSync(process.execPath, [issuesCli, ...args], {
+      cwd: repository,
+      encoding: "utf8",
+      env: { ...process.env, PATH: [bin, dirname(process.execPath), gitFolder, "/usr/bin", "/bin"].join(":") },
+    });
   return { repository, run, changesMade: () => readFileSync(changes, "utf8").split("\n").filter(Boolean) };
 }
 
@@ -84,8 +100,13 @@ test("issues worktree <id> marks a todo issue in progress before opening its wor
 
 test("issues worktree <id> leaves an issue in review as it is", (t) => {
   const pullRequest = {
-    number: 8, title: "Review it", url: "https://github.com/owner/name/pull/8", state: "OPEN", isDraft: false,
-    headRefName: "7-reviewed", repository: { nameWithOwner: "owner/name" },
+    number: 8,
+    title: "Review it",
+    url: "https://github.com/owner/name/pull/8",
+    state: "OPEN",
+    isDraft: false,
+    headRefName: "7-reviewed",
+    repository: { nameWithOwner: "owner/name" },
   };
   const { repository, run, changesMade } = githubRepository(t, "Review it", { pullRequests: [pullRequest] });
   git(repository, "branch", "7-reviewed");
@@ -116,5 +137,8 @@ test("issues worktree copies the main checkout's local Claude settings into a ne
 
   assert.equal(result.status, 0, result.stderr);
   const worktree = join(process.env.HOME, ".herdr/worktrees/repo/local-settings");
-  assert.equal(readFileSync(join(worktree, ".claude/settings.local.json"), "utf8"), '{ "disableClaudeAiConnectors": true }\n');
+  assert.equal(
+    readFileSync(join(worktree, ".claude/settings.local.json"), "utf8"),
+    '{ "disableClaudeAiConnectors": true }\n',
+  );
 });

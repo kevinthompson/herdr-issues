@@ -12,8 +12,16 @@ afterEach(() => process.chdir(startingFolder));
 const VIEWER = "user-me";
 
 const issue = (id, fields = {}) => ({
-  id, title: `Title of ${id}`, status: "todo", priority: 0, order: null, labels: [], blockedBy: [],
-  created: "2026-01-01T00:00:00Z", assigneeId: null, ...fields,
+  id,
+  title: `Title of ${id}`,
+  status: "todo",
+  priority: 0,
+  order: null,
+  labels: [],
+  blockedBy: [],
+  created: "2026-01-01T00:00:00Z",
+  assigneeId: null,
+  ...fields,
 });
 
 // A tracker of `kind` listing `issues`; records each scope it's asked to list.
@@ -21,7 +29,10 @@ function stubTracker(kind, issues, extra = {}) {
   const listed = [];
   return {
     listed,
-    kind, name: kind, viewerId: async () => VIEWER, ...extra,
+    kind,
+    name: kind,
+    viewerId: async () => VIEWER,
+    ...extra,
     async list(scopeId) {
       listed.push(scopeId);
       return issues;
@@ -91,7 +102,8 @@ function useStubbedTracker(t, tracker) {
 }
 
 async function run(t, ...args) {
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(args);
@@ -115,7 +127,12 @@ test("next --json prints the issues", async (t) => {
 });
 
 test("next lists the scope it's given, and refuses one the tracker doesn't have", async (t) => {
-  const tracker = stubTracker("linear", [], { scopes: [{ id: "mine", label: "My issues" }, { id: "team", label: "Issues" }] });
+  const tracker = stubTracker("linear", [], {
+    scopes: [
+      { id: "mine", label: "My issues" },
+      { id: "team", label: "Issues" },
+    ],
+  });
   useStubbedTracker(t, tracker);
   assert.equal((await run(t, "next", "1", "team")).code, 0);
   assert.deepEqual(tracker.listed, ["team"]);

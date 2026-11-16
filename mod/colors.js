@@ -8,7 +8,13 @@ export function mixColors(from, to, amount) {
   const [a, b] = [HEX.exec(from), HEX.exec(to)];
   if (!a || !b) return null;
   const [start, end] = [channels(a[1]), channels(b[1])];
-  return `#${start.map((each, index) => Math.round(each + (end[index] - each) * amount).toString(16).padStart(2, "0")).join("")}`;
+  return `#${start
+    .map((each, index) =>
+      Math.round(each + (end[index] - each) * amount)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
 }
 
 // A light theme draws dark text. A theme whose text color isn't #rrggbb is taken as dark.
@@ -45,7 +51,7 @@ export function statusTints(status, t) {
   const color = STATUS_COLORS[status];
   if (!color) return null;
   const light = isLightTheme(t);
-  const base = light ? mixColors(color, t.foreground, LIGHT_STATUS_DARKENING) ?? color : color;
+  const base = light ? (mixColors(color, t.foreground, LIGHT_STATUS_DARKENING) ?? color) : color;
   const alphas = light ? LIGHT_STATUS_ALPHAS : DARK_STATUS_ALPHAS;
   return { fill: `${base}${alphas.fill}`, hover: `${base}${alphas.hover}`, border: `${base}${alphas.border}` };
 }
@@ -55,10 +61,13 @@ export function statusTints(status, t) {
 export function rowHover(t) {
   if (isLightTheme(t)) return t.hover;
   const translucent = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(t.hover);
-  if (translucent) return `#${translucent[1]}${Math.round(parseInt(translucent[2], 16) / 2).toString(16).padStart(2, "0")}`;
+  if (translucent)
+    return `#${translucent[1]}${Math.round(parseInt(translucent[2], 16) / 2)
+      .toString(16)
+      .padStart(2, "0")}`;
   return mixColors(t.surface, t.hover, 0.5) ?? t.hover;
 }
 
 // The issue view's bar of fields you can change, set apart from the issue's details: a shade lighter than a
 // dark panel, and the theme's color for bars in a light one, where a shade toward `raised` is too faint to see.
-export const fieldBar = (t) => (isLightTheme(t) ? t.chrome : mixColors(t.surface, t.raised, 0.35) ?? t.surface);
+export const fieldBar = (t) => (isLightTheme(t) ? t.chrome : (mixColors(t.surface, t.raised, 0.35) ?? t.surface));

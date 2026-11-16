@@ -32,15 +32,13 @@ async function auth(t, ...args) {
 function stubGh(t, { installed = true, loggedIn = true } = {}) {
   stubHerdr(t, {
     exec: async (command, args) => {
-      if (command === "brew")
-        return { code: 0, stdout: "Homebrew 4.4.0", stderr: "" };
+      if (command === "brew") return { code: 0, stdout: "Homebrew 4.4.0", stderr: "" };
       if (command === "devbox")
         throw Object.assign(new Error("spawn devbox ENOENT"), {
           code: "ENOENT",
         });
       assert.equal(command, "gh");
-      if (!installed)
-        throw Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" });
+      if (!installed) throw Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" });
       const code = args[0] === "auth" && !loggedIn ? 1 : 0;
       return { code, stdout: "", stderr: "" };
     },

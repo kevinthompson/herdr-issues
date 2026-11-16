@@ -13,7 +13,13 @@ import { markedSpaceName } from "../mod/space-name.js";
 const PULL_REQUEST_URL = "https://github.com/owner/name/pull/9";
 
 const listing = {
-  spaces: [{ id: "space-session", name: "󰄱   #72", tabs: [{ id: "tab-session", name: "Tab names", terminals: [{ terminal: "t1" }] }] }],
+  spaces: [
+    {
+      id: "space-session",
+      name: "󰄱   #72",
+      tabs: [{ id: "tab-session", name: "Tab names", terminals: [{ terminal: "t1" }] }],
+    },
+  ],
 };
 
 // Stubs herdr-app, hc and gh, recording each herdr-app do and hc call; git runs. `pullRequest` is what gh pr view
@@ -29,13 +35,19 @@ function stubTools(t, { pullRequest = null, checks = [] } = {}) {
       if (command === "herdr-app") {
         if (args[0] === "ls") return { code: 0, stdout: JSON.stringify(listing), stderr: "" };
         calls.push([command, ...args]);
-        return { code: 0, stdout: "{\"ok\":true}", stderr: "" };
+        return { code: 0, stdout: '{"ok":true}', stderr: "" };
       }
       if (command === "gh" && args[1] === "view") {
-        return pullRequest ? { code: 0, stdout: JSON.stringify(pullRequest), stderr: "" } : { code: 1, stdout: "", stderr: "no pull requests found" };
+        return pullRequest
+          ? { code: 0, stdout: JSON.stringify(pullRequest), stderr: "" }
+          : { code: 1, stdout: "", stderr: "no pull requests found" };
       }
       if (command === "gh" && args[1] === "checks") {
-        return { code: checks.some((check) => check.bucket !== "pass") ? 1 : 0, stdout: JSON.stringify(checks), stderr: "" };
+        return {
+          code: checks.some((check) => check.bucket !== "pass") ? 1 : 0,
+          stdout: JSON.stringify(checks),
+          stderr: "",
+        };
       }
       return defaults.exec(command, args, options);
     },
@@ -53,7 +65,10 @@ function inWorktree(t, settings = {}, { merged = true } = {}) {
   commitFile(worktree, "change", "work\n");
   if (merged) git(repository, "merge", "-q", "--ff-only", "feature");
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
-  writeFileSync(settingsPath(), JSON.stringify({ repos: { [repository]: { tracker: "github", repo: "owner/name", ...settings } } }));
+  writeFileSync(
+    settingsPath(),
+    JSON.stringify({ repos: { [repository]: { tracker: "github", repo: "owner/name", ...settings } } }),
+  );
   const previous = process.cwd();
   process.chdir(worktree);
   t.after(() => process.chdir(previous));
@@ -63,7 +78,9 @@ function inWorktree(t, settings = {}, { merged = true } = {}) {
 async function run(t, args, { terminal = "t1" } = {}) {
   const previous = process.env.HC_TERMINAL_ID;
   process.env.HC_TERMINAL_ID = terminal;
-  t.after(() => { process.env.HC_TERMINAL_ID = previous ?? ""; });
+  t.after(() => {
+    process.env.HC_TERMINAL_ID = previous ?? "";
+  });
   const out = [];
   const err = [];
   t.mock.method(console, "log", (line) => out.push(line));
@@ -74,11 +91,23 @@ async function run(t, args, { terminal = "t1" } = {}) {
 
 const HANDOFF_CALLS = [
   ["hc", "label", "t1", "issues.complete=#72"],
-  ["herdr-app", "do", "space.rename", "--id", "space-session", "--name", markedSpaceName(listing.spaces[0].name, "done")],
+  [
+    "herdr-app",
+    "do",
+    "space.rename",
+    "--id",
+    "space-session",
+    "--name",
+    markedSpaceName(listing.spaces[0].name, "done"),
+  ],
   ["hc", "label", "t1", "issues.close=#72"],
 ];
 
-const openPullRequest = (worktree) => ({ state: "OPEN", url: PULL_REQUEST_URL, headRefOid: git(worktree, "rev-parse", "HEAD") });
+const openPullRequest = (worktree) => ({
+  state: "OPEN",
+  url: PULL_REQUEST_URL,
+  headRefOid: git(worktree, "rev-parse", "HEAD"),
+});
 
 beforeEach(() => forgetLookups());
 
@@ -88,8 +117,14 @@ test("finish with close ask hands off, asks the panel to close and prints the bl
   const { code, out } = await run(t, ["finish", "#72"]);
   assert.equal(code, 0);
   assert.deepEqual(calls, HANDOFF_CALLS);
-  assert.match(out, /## ✅ Session finished: #72\n\nMerged into main; nothing is uncommitted\.\n\n\*\*This session is finished\. This worktree closes once you choose Close it\.\*\*/);
-  assert.match(out, /Question: This issue is complete and the work has been merged\. Would you like to close this worktree\?/);
+  assert.match(
+    out,
+    /## ✅ Session finished: #72\n\nMerged into main; nothing is uncommitted\.\n\n\*\*This session is finished\. This worktree closes once you choose Close it\.\*\*/,
+  );
+  assert.match(
+    out,
+    /Question: This issue is complete and the work has been merged\. Would you like to close this worktree\?/,
+  );
   assert.match(out, /Choices: Close it, Keep it open/);
   assert.match(out, /On Keep it open: run issues close --cancel #72/);
   assert.ok(out.includes(CLOSING_LINES.kept));
@@ -140,7 +175,10 @@ test("finish refuses uncommitted work, changing nothing", async (t) => {
   assert.equal(code, 1);
   assert.deepEqual(calls, []);
   assert.equal(out, "");
-  assert.match(err, /#72 isn't finished, so nothing was changed\. Outstanding:\n {2}- The worktree has uncommitted changes/);
+  assert.match(
+    err,
+    /#72 isn't finished, so nothing was changed\. Outstanding:\n {2}- The worktree has uncommitted changes/,
+  );
 });
 
 test("finish refuses a branch that isn't merged into main when the repository merges locally", async (t) => {
@@ -196,7 +234,13 @@ test("finish ignores the pull request's checks when waitForChecks is false", asy
 
 test("finish with waitForChecks refuses failing and running checks", async (t) => {
   const worktree = inWorktree(t, { onApproval: "pull-request", waitForChecks: true }, { merged: false });
-  stubTools(t, { pullRequest: openPullRequest(worktree), checks: [{ name: "test", bucket: "fail" }, { name: "lint", bucket: "pending" }] });
+  stubTools(t, {
+    pullRequest: openPullRequest(worktree),
+    checks: [
+      { name: "test", bucket: "fail" },
+      { name: "lint", bucket: "pending" },
+    ],
+  });
   const { code, err } = await run(t, ["finish", "#72"]);
   assert.equal(code, 1);
   assert.match(err, /checks are still running: lint\./);

@@ -22,7 +22,8 @@ afterEach(() => process.chdir(startingFolder));
 // Runs `issues setting updateCheckHours` in `repository`, returning its exit code and what it printed.
 async function updateCheckHours(t, repository) {
   process.chdir(repository);
-  const out = [], err = [];
+  const out = [],
+    err = [];
   t.mock.method(console, "log", (line) => out.push(line));
   t.mock.method(console, "error", (line) => err.push(line));
   const code = await main(["setting", "updateCheckHours"]);

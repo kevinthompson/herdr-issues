@@ -3,7 +3,12 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import { forgetLookups } from "../mod/lookups.js";
-import { parseUpdateCheckHours, saveTopLevelSettings, settingsPath, topLevelSettings } from "../mod/trackers/setting.js";
+import {
+  parseUpdateCheckHours,
+  saveTopLevelSettings,
+  settingsPath,
+  topLevelSettings,
+} from "../mod/trackers/setting.js";
 
 function writeSettings(settings) {
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
@@ -14,16 +19,31 @@ const readSettings = () => JSON.parse(readFileSync(settingsPath(), "utf8"));
 
 beforeEach(() => forgetLookups());
 
-const repos = { "~/Code/web": { tracker: "linear", team: "WEB", close: "manual", workPrompt: "Web rules" }, "/elsewhere": { tracker: "beads" } };
+const repos = {
+  "~/Code/web": { tracker: "linear", team: "WEB", close: "manual", workPrompt: "Web rules" },
+  "/elsewhere": { tracker: "beads" },
+};
 
 test("saving changes only the given top-level keys and keeps repos and every other key", async () => {
   writeSettings({ pollSeconds: 30, futureSetting: { kept: true }, close: "ask", repos });
 
-  await saveTopLevelSettings({ close: "auto", approval: "auto", onApproval: "pull-request", waitForChecks: true, workPrompt: "  House rules.\n" });
+  await saveTopLevelSettings({
+    close: "auto",
+    approval: "auto",
+    onApproval: "pull-request",
+    waitForChecks: true,
+    workPrompt: "  House rules.\n",
+  });
 
   assert.deepEqual(readSettings(), {
-    pollSeconds: 30, futureSetting: { kept: true }, close: "auto",
-    approval: "auto", onApproval: "pull-request", waitForChecks: true, workPrompt: "House rules.", repos,
+    pollSeconds: 30,
+    futureSetting: { kept: true },
+    close: "auto",
+    approval: "auto",
+    onApproval: "pull-request",
+    waitForChecks: true,
+    workPrompt: "House rules.",
+    repos,
   });
   assert.deepEqual(Object.keys(readSettings()).at(-1), "repos");
   assert.equal((await topLevelSettings()).close, "auto");
@@ -74,7 +94,13 @@ test("saving a approval setting removes the retired merge and complete, and othe
   assert.deepEqual(readSettings(), { merge: "pull-request", complete: "pull-request-passing", close: "auto", repos });
 
   await saveTopLevelSettings({ approval: "ask", onApproval: "pull-request", waitForChecks: false });
-  assert.deepEqual(readSettings(), { close: "auto", approval: "ask", onApproval: "pull-request", waitForChecks: false, repos });
+  assert.deepEqual(readSettings(), {
+    close: "auto",
+    approval: "ask",
+    onApproval: "pull-request",
+    waitForChecks: false,
+    repos,
+  });
 });
 
 test("a typed update check interval is a whole number of hours, 1 or more, or blank", () => {

@@ -26,7 +26,11 @@ const SPACES_LOCK = "issues-worktree-spaces.lock";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const lastLine = (text) => text.trim().split("\n").pop();
-const exists = (path) => access(path).then(() => true, () => false);
+const exists = (path) =>
+  access(path).then(
+    () => true,
+    () => false,
+  );
 const warn = (message) => console.error(`issues: ${message}`);
 
 async function git(cwd, args) {
@@ -50,13 +54,20 @@ async function isInstalled(command) {
 const branchFolderName = (branch) => branch.replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
 
 function timestamp(date) {
-  const parts = [date.getFullYear(), date.getMonth() + 1, date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds()];
+  const parts = [
+    date.getFullYear(),
+    date.getMonth() + 1,
+    date.getDate(),
+    date.getHours(),
+    date.getMinutes(),
+    date.getSeconds(),
+  ];
   return parts.map((part) => String(part).padStart(2, "0")).join("");
 }
 
 // A removed worktree's background setup can recreate its folder after the removal. No checkout lives there.
 async function trashLeftover(path) {
-  if (!(await exists(path)) || await exists(join(path, ".git"))) return;
+  if (!(await exists(path)) || (await exists(join(path, ".git")))) return;
   const trashed = join(home(), ".Trash", `${basename(path)}-${timestamp(new Date())}`);
   await rename(path, trashed);
   console.log(`moved ${path}, left over from a removed worktree, to ${trashed}`);
@@ -109,7 +120,7 @@ async function createWorktree({ branch, isNew, main, common, path }) {
   }
   let start = originDefault;
   const originHasDefault = await hasRef(main, `refs/remotes/${originDefault}`);
-  if ((isNew || !originHasDefault) && await hasRef(main, `refs/heads/${localDefault}`)) {
+  if ((isNew || !originHasDefault) && (await hasRef(main, `refs/heads/${localDefault}`))) {
     start = await newerDefault(main, localDefault, originDefault);
   }
   return gitOrFail(main, ["worktree", "add", "--no-track", "-b", branch, path, start]);
@@ -160,7 +171,9 @@ async function copyLocalClaudeSettings(path, main) {
 // A space's shell loads .envrc as soon as it opens. Content already allowed in the main checkout is trusted.
 async function allowEnvrc(path, main) {
   if (!(await exists(join(path, ".envrc"))) || !(await isInstalled("direnv"))) return;
-  const [worktreeEnvrc, mainEnvrc] = await Promise.all([path, main].map((folder) => readFile(join(folder, ".envrc")).catch(() => null)));
+  const [worktreeEnvrc, mainEnvrc] = await Promise.all(
+    [path, main].map((folder) => readFile(join(folder, ".envrc")).catch(() => null)),
+  );
   if (!mainEnvrc || !worktreeEnvrc.equals(mainEnvrc)) {
     console.log(`${path}/.envrc differs from the main checkout's; review it, then run \`direnv allow\` there`);
     return;
@@ -171,10 +184,24 @@ async function allowEnvrc(path, main) {
 }
 
 async function withLock(lock, work) {
-  while (!(await mkdir(lock).then(() => true, (error) => { if (error.code === "EEXIST") return false; throw error; }))) {
+  while (
+    !(await mkdir(lock).then(
+      () => true,
+      (error) => {
+        if (error.code === "EEXIST") return false;
+        throw error;
+      },
+    ))
+  ) {
     await sleep(LOCK_POLL_MS);
   }
-  const releaseOnExit = () => { try { rmdirSync(lock); } catch { /* already released */ } };
+  const releaseOnExit = () => {
+    try {
+      rmdirSync(lock);
+    } catch {
+      /* already released */
+    }
+  };
   const exitOnSignal = () => process.exit(1);
   process.on("exit", releaseOnExit).on("SIGINT", exitOnSignal).on("SIGTERM", exitOnSignal);
   try {
@@ -214,7 +241,9 @@ async function showInSpace({ branch, path, main, common, name, claudeMessage }) 
       await herdrDo("space.new", { folder: main, name: mainName, ...behind });
       console.log(`opened a space on ${main}`);
     }
-    const claudeTab = claudeMessage ? { tab: "Claude", argv: await workSessionArgv({ root: main, on: null }), task: claudeMessage } : {};
+    const claudeTab = claudeMessage
+      ? { tab: "Claude", argv: await workSessionArgv({ root: main, on: null }), task: claudeMessage }
+      : {};
     await herdrDo("space.new", { folder: path, name, ...claudeTab, ...behind });
     console.log(`opened ${branch} in a Herdr space${claudeMessage ? " with Claude" : ""}`);
   });
@@ -223,13 +252,15 @@ async function showInSpace({ branch, path, main, common, name, claudeMessage }) 
 export async function openWorktree({ cwd, branch, isNew = false, name = branch, claudeMessage = null }) {
   const commonDir = await git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   if (!commonDir.ok) throw new Error("not in a git repository");
-  const common = commonDir.out, main = dirname(common);
+  const common = commonDir.out,
+    main = dirname(common);
   const { path, created } = await checkoutFolder({ branch, isNew, main, common });
   if (created) {
     await copyLocalClaudeSettings(path, main);
     await runWorktreeSetup(path, main);
   }
   await allowEnvrc(path, main);
-  if (await isInstalled("herdr-app") && await isInstalled("hc")) await showInSpace({ branch, path, main, common, name, claudeMessage });
+  if ((await isInstalled("herdr-app")) && (await isInstalled("hc")))
+    await showInSpace({ branch, path, main, common, name, claudeMessage });
   console.log(`cd ${path}`);
 }

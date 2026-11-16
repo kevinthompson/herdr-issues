@@ -16,9 +16,14 @@ export const CAUTION = "caution";
 // Runs the checks side by side through `lookups`, { dirty, submodules, branch }, handing each answer to
 // `answered(name, result)` as it arrives.
 export function runChecks(lookups, answered) {
-  return Promise.all(["dirty", "submodules", "branch"].map((name) => Promise.resolve().then(lookups[name])
-    .catch((error) => ({ error: String(error?.message ?? error) }))
-    .then((result) => answered(name, result))));
+  return Promise.all(
+    ["dirty", "submodules", "branch"].map((name) =>
+      Promise.resolve()
+        .then(lookups[name])
+        .catch((error) => ({ error: String(error?.message ?? error) }))
+        .then((result) => answered(name, result)),
+    ),
+  );
 }
 
 export function checksAnswered({ dirty, submodules, branch }) {
@@ -33,7 +38,11 @@ export function removalFindings({ dirty, submodules, branch, warning }) {
   else if (dirty === true) findings.push({ result: LOSS, text: "It has uncommitted changes: they will be lost." });
   else if (dirty === false) findings.push({ result: PASS, text: "It has no uncommitted changes." });
   if (submodules?.error) findings.push({ result: CAUTION, text: `Couldn't check its submodules: ${submodules.error}` });
-  else if (submodules?.length) findings.push({ result: LOSS, text: `Submodule ${submodules.join(", ")} has commits that aren't pushed anywhere: they will be lost.` });
+  else if (submodules?.length)
+    findings.push({
+      result: LOSS,
+      text: `Submodule ${submodules.join(", ")} has commits that aren't pushed anywhere: they will be lost.`,
+    });
   else if (submodules) findings.push({ result: PASS, text: "Its submodules have no commits that aren't pushed." });
   if (branch?.error) findings.push({ result: CAUTION, text: `Couldn't check the branch: ${branch.error}` });
   else if (branch === null) findings.push({ result: CAUTION, text: "No branch is checked out." });
@@ -44,14 +53,27 @@ export function removalFindings({ dirty, submodules, branch, warning }) {
 
 function branchFindings({ bases, mergedInto, unpushed, pullRequest }) {
   return [
-    mergedInto ? { result: PASS, text: `Worktree branch has nothing that isn't on ${mergedInto}.` }
-      : pullRequest ? { result: PASS, text: `Worktree branch has an open pull request: ${pullRequest}` }
-        : { result: CAUTION, text: bases.length ? `Worktree branch has changes that aren't on ${bases.join(" or ")}.` : `Worktree branch has no main branch to compare with.` },
-    unpushed === 0 ? { result: PASS, text: "Worktree branch is pushed to origin." }
-      // Commits on no origin branch are lost with the checkout, unless main already has their changes.
-      : mergedInto ? { result: PASS, text: `Worktree branch needs no push: its changes are on ${mergedInto}.` }
-        : unpushed === null ? { result: LOSS, text: "Worktree branch has no origin to push to." }
-          : { result: LOSS, text: `Worktree branch has ${unpushed} ${unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.` },
+    mergedInto
+      ? { result: PASS, text: `Worktree branch has nothing that isn't on ${mergedInto}.` }
+      : pullRequest
+        ? { result: PASS, text: `Worktree branch has an open pull request: ${pullRequest}` }
+        : {
+            result: CAUTION,
+            text: bases.length
+              ? `Worktree branch has changes that aren't on ${bases.join(" or ")}.`
+              : `Worktree branch has no main branch to compare with.`,
+          },
+    unpushed === 0
+      ? { result: PASS, text: "Worktree branch is pushed to origin." }
+      : // Commits on no origin branch are lost with the checkout, unless main already has their changes.
+        mergedInto
+        ? { result: PASS, text: `Worktree branch needs no push: its changes are on ${mergedInto}.` }
+        : unpushed === null
+          ? { result: LOSS, text: "Worktree branch has no origin to push to." }
+          : {
+              result: LOSS,
+              text: `Worktree branch has ${unpushed} ${unpushed === 1 ? "commit" : "commits"} that aren't pushed to origin.`,
+            },
   ];
 }
 
@@ -65,7 +87,9 @@ export function removesWithoutAsking(checks, nestedSpaceCount, { ask = false } =
 
 // { mark, text }: ❌ when a finding loses work only this checkout holds, ⚠️ for any other failure, ✅ otherwise.
 export function removalVerdict(findings) {
-  if (findings.some((finding) => finding.result === LOSS)) return { mark: "❌", text: "Removing it loses work that exists only in this checkout." };
-  if (findings.some((finding) => finding.result === CAUTION)) return { mark: "⚠️", text: "Look over the list before removing it." };
+  if (findings.some((finding) => finding.result === LOSS))
+    return { mark: "❌", text: "Removing it loses work that exists only in this checkout." };
+  if (findings.some((finding) => finding.result === CAUTION))
+    return { mark: "⚠️", text: "Look over the list before removing it." };
   return { mark: "✅", text: "Safe to remove." };
 }

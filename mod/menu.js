@@ -14,7 +14,14 @@ import { requestFieldEdit } from "./edits.js";
 import { labelGroups } from "./label-order.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
 
-const ROW = 28, PADDING = 5, WIDTH = 170, TEXT_INSET = 9, DIVIDER_GAP = 4, ICON_PX = 16, ICON_GAP = 6, CHECK_GAP = 9;
+const ROW = 28,
+  PADDING = 5,
+  WIDTH = 170,
+  TEXT_INSET = 9,
+  DIVIDER_GAP = 4,
+  ICON_PX = 16,
+  ICON_GAP = 6,
+  CHECK_GAP = 9;
 // The theme's text color at this opacity, so the band follows light and dark themes.
 const HEADING_TINT_ALPHA = "0a";
 const headingTint = (t) => (/^#[0-9a-f]{6}$/i.test(t.foreground) ? t.foreground + HEADING_TINT_ALPHA : "transparent");
@@ -29,39 +36,93 @@ export function optionLabel(field, value) {
 }
 
 // The tracker's statuses, in the menu's order.
-const optionsFor = (field, statuses) => (field === "status" && statuses ? OPTIONS.status.filter((option) => statuses.includes(option.value)) : OPTIONS[field]);
+const optionsFor = (field, statuses) =>
+  field === "status" && statuses ? OPTIONS.status.filter((option) => statuses.includes(option.value)) : OPTIONS[field];
 
 export function openMenu(field, issue, project, statuses) {
   openOverlay({
-    mod: "issues", kind: "popup", at: "pointer", width: WIDTH, height: optionsFor(field, statuses).length * ROW + PADDING * 2,
+    mod: "issues",
+    kind: "popup",
+    at: "pointer",
+    width: WIDTH,
+    height: optionsFor(field, statuses).length * ROW + PADDING * 2,
     props: { menu: field, ...project, id: issue.id, current: issue[field], statuses },
   });
 }
 
 function optionList(options, isChecked, onPick) {
   const t = theme();
-  return v_flex().id("issue-field-menu").size_full().overflow_y_scroll().py(PADDING).bg(t.popover).text_color(t.foreground).text_size(12.5)
-    .children(options.map((option, index) => option.divider
-      ? div().id(`divider-${index}`).flex_none().my(DIVIDER_GAP).border_t(1).border_color(t.border)
-      : option.heading
-      ? div().id(`heading-${option.heading}`).h(ROW).px(PADDING + TEXT_INSET).flex_none().flex().items_center()
-        .mb(DIVIDER_GAP).bg(headingTint(t)).border_b(1).border_color(t.border)
-        .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1))
-        .text_size(10.5).font_semibold().text_color(t.muted).child(option.heading.toUpperCase())
-      : option.subheading
-      ? div().id(`subheading-${option.subheading}`).h(ROW).px(PADDING + TEXT_INSET).flex_none().flex().items_end().pb(4)
-        .text_size(11).text_color(t.dim).child(option.subheading)
-      : h_flex().id(`option-${option.value}`).h(ROW).mx(PADDING).px(TEXT_INSET).gap(ICON_GAP).flex_none().items_center()
-      .rounded(6).cursor_pointer().hover((s) => s.bg(t.selected)).on_click((_e, cx) => onPick(option, cx))
-      .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
-      .child(div().flex_1().truncate().child(option.label))
-      .child(div().flex_none().ml(CHECK_GAP - ICON_GAP).text_color(t.muted).child(isChecked(option.value) ? "✓" : ""))));
+  return v_flex()
+    .id("issue-field-menu")
+    .size_full()
+    .overflow_y_scroll()
+    .py(PADDING)
+    .bg(t.popover)
+    .text_color(t.foreground)
+    .text_size(12.5)
+    .children(
+      options.map((option, index) =>
+        option.divider
+          ? div().id(`divider-${index}`).flex_none().my(DIVIDER_GAP).border_t(1).border_color(t.border)
+          : option.heading
+            ? div()
+                .id(`heading-${option.heading}`)
+                .h(ROW)
+                .px(PADDING + TEXT_INSET)
+                .flex_none()
+                .flex()
+                .items_center()
+                .mb(DIVIDER_GAP)
+                .bg(headingTint(t))
+                .border_b(1)
+                .border_color(t.border)
+                .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1))
+                .text_size(10.5)
+                .font_semibold()
+                .text_color(t.muted)
+                .child(option.heading.toUpperCase())
+            : option.subheading
+              ? div()
+                  .id(`subheading-${option.subheading}`)
+                  .h(ROW)
+                  .px(PADDING + TEXT_INSET)
+                  .flex_none()
+                  .flex()
+                  .items_end()
+                  .pb(4)
+                  .text_size(11)
+                  .text_color(t.dim)
+                  .child(option.subheading)
+              : h_flex()
+                  .id(`option-${option.value}`)
+                  .h(ROW)
+                  .mx(PADDING)
+                  .px(TEXT_INSET)
+                  .gap(ICON_GAP)
+                  .flex_none()
+                  .items_center()
+                  .rounded(6)
+                  .cursor_pointer()
+                  .hover((s) => s.bg(t.selected))
+                  .on_click((_e, cx) => onPick(option, cx))
+                  .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
+                  .child(div().flex_1().truncate().child(option.label))
+                  .child(
+                    div()
+                      .flex_none()
+                      .ml(CHECK_GAP - ICON_GAP)
+                      .text_color(t.muted)
+                      .child(isChecked(option.value) ? "✓" : ""),
+                  ),
+      ),
+    );
 }
 
 // The scope each repository lists, and the label it narrows the list to, by its main checkout:
 // { "<path>": "<scope id or label>" }. Shared, so every copy of the panel lists the same issues and the
 // choice outlives a reload.
-const SCOPES = "issues.scopes", LABELS = "issues.labels";
+const SCOPES = "issues.scopes",
+  LABELS = "issues.labels";
 const selections = (store) => /** @type {Record<string, string>} */ (shared(store) ?? {});
 export const selectedScope = (key) => selections(SCOPES)[key];
 export const selectedLabel = (key) => selections(LABELS)[key] || null;
@@ -84,13 +145,20 @@ function scopeOptions(scopes) {
 }
 
 const DIVIDER_HEIGHT = DIVIDER_GAP * 2 + 1;
-const menuHeight = (options) => options.reduce((height, option, index) =>
-  height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0)), PADDING * 2);
+const menuHeight = (options) =>
+  options.reduce(
+    (height, option, index) =>
+      height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0)),
+    PADDING * 2,
+  );
 
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
   const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
   openOverlay({
-    mod: "issues", kind: "popup", at: "pointer", width: SCOPE_MENU_WIDTH,
+    mod: "issues",
+    kind: "popup",
+    at: "pointer",
+    width: SCOPE_MENU_WIDTH,
     height: Math.min(menuHeight(scopeOptions(listed)), SCOPE_MENU_MAX_HEIGHT),
     props: { menu: "scope", scopes: listed, current, key, store },
   });
@@ -106,23 +174,32 @@ export function openLabelMenu(labels, current, key) {
 export class ScopeMenu {
   render() {
     const { scopes, current, key, store, overlay } = props();
-    return optionList(scopeOptions(scopes), (value) => value === current, (option) => {
-      setShared(store, { ...selections(store), [key]: option.value });
-      closeOverlay(overlay);
-    });
+    return optionList(
+      scopeOptions(scopes),
+      (value) => value === current,
+      (option) => {
+        setShared(store, { ...selections(store), [key]: option.value });
+        closeOverlay(overlay);
+      },
+    );
   }
 }
 
 export class FieldMenu {
   pick(option) {
     const { menu: field, root, on, id, current, overlay } = props();
-    if (option.value !== current) requestFieldEdit({ root, on: on ?? null, issueId: id, field, value: option.value, previous: current });
+    if (option.value !== current)
+      requestFieldEdit({ root, on: on ?? null, issueId: id, field, value: option.value, previous: current });
     closeOverlay(overlay);
   }
 
   render() {
     const { menu: field, current, statuses } = props();
-    return optionList(optionsFor(field, statuses), (value) => value === current, (option) => this.pick(option));
+    return optionList(
+      optionsFor(field, statuses),
+      (value) => value === current,
+      (option) => this.pick(option),
+    );
   }
 }
 
@@ -132,14 +209,21 @@ const LABELS_MENU_MAX_HEIGHT = 360;
 // The issue's labels, checked, then a divider when both groups have labels, then the tracker's others.
 function issueLabelOptions({ applied, others }) {
   const toOption = (label) => ({ value: label, label });
-  return [...applied.map(toOption), ...(applied.length && others.length ? [{ divider: true }] : []), ...others.map(toOption)];
+  return [
+    ...applied.map(toOption),
+    ...(applied.length && others.length ? [{ divider: true }] : []),
+    ...others.map(toOption),
+  ];
 }
 
 // The tracker's labels are `names`.
 export function openIssueLabelsMenu(issue, project, names) {
   const groups = labelGroups(names, issue.labels);
   openOverlay({
-    mod: "issues", kind: "popup", at: "pointer", width: LABELS_MENU_WIDTH,
+    mod: "issues",
+    kind: "popup",
+    at: "pointer",
+    width: LABELS_MENU_WIDTH,
     height: Math.min(menuHeight(issueLabelOptions(groups)), LABELS_MENU_MAX_HEIGHT),
     props: { menu: "labels", ...project, id: issue.id, groups, current: issue.labels },
   });
@@ -149,10 +233,21 @@ export function openIssueLabelsMenu(issue, project, names) {
 export class LabelMenu {
   render() {
     const { groups, current, root, on, id, overlay } = props();
-    return optionList(issueLabelOptions(groups), (label) => current.includes(label), (option) => {
-      const checked = current.includes(option.value);
-      requestFieldEdit({ root, on: on ?? null, issueId: id, field: "labels", add: checked ? [] : [option.value], remove: checked ? [option.value] : [] });
-      closeOverlay(overlay);
-    });
+    return optionList(
+      issueLabelOptions(groups),
+      (label) => current.includes(label),
+      (option) => {
+        const checked = current.includes(option.value);
+        requestFieldEdit({
+          root,
+          on: on ?? null,
+          issueId: id,
+          field: "labels",
+          add: checked ? [] : [option.value],
+          remove: checked ? [option.value] : [],
+        });
+        closeOverlay(overlay);
+      },
+    );
   }
 }

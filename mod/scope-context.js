@@ -26,8 +26,13 @@ function describe(tracker, scopeId) {
 // Writes only a scope that changed. Repositories whose tracker has a single list publish nothing.
 export async function publishScope(repo, tracker, scopeId) {
   if (!tracker?.scopes) return;
-  const text = JSON.stringify({ repo, tracker: tracker.kind, team: tracker.team ?? null, scope: describe(tracker, scopeId) }, null, 2);
-  const path = `${folder()}/${fileKey(repo)}.json`, previous = await readTextFile(path).catch(() => null);
+  const text = JSON.stringify(
+    { repo, tracker: tracker.kind, team: tracker.team ?? null, scope: describe(tracker, scopeId) },
+    null,
+    2,
+  );
+  const path = `${folder()}/${fileKey(repo)}.json`,
+    previous = await readTextFile(path).catch(() => null);
   if (previous === text) return;
   await exec("mkdir", ["-p", folder()]);
   await writeTextFile(path, text, previous);
@@ -37,7 +42,9 @@ let publishedOpenIssue;
 
 // Publishes the issue the panel shows, or null when it shows the list. Writes only an issue that changed.
 export async function publishOpenIssue(root, issue) {
-  const text = JSON.stringify(root && issue ? { root, id: issue.id, title: issue.title, link: issue.url ?? null } : null);
+  const text = JSON.stringify(
+    root && issue ? { root, id: issue.id, title: issue.title, link: issue.url ?? null } : null,
+  );
   if (text === publishedOpenIssue) return;
   publishedOpenIssue = text;
   const path = `${appHome()}/data/issues/open.json`;
