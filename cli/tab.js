@@ -1,13 +1,14 @@
 // `issues tab`: the Herdr tab holding this session's terminal ($HC_TERMINAL_ID), and renaming it after the
 // issue the session works, as /issues:work does, prefixed with the issue's ID unless the space's name ends with the
 // issue's space name (space-name.js). A tab the person named keeps its name. `issues mark` renames the session's
-// space with one of space-name.js's marks for whether the session is working, waiting on the person or done. `issues complete` labels
+// space with one of space-name.js's marks for whether the session is working, waiting on the person or done, and
+// `issues status` marks an issue's space done, wherever it runs, once the issue is done or canceled. `issues complete` labels
 // the terminal once the session is done working and has handed off to the person, whether or not its branch has
 // been merged, which `issues complete --cancel` withdraws when the person asks for more changes, also clearing the ✅ that
 // earlier versions put before the tab's name, and `issues close` labels it to ask the panel to close the session's
 // space, which `issues close --cancel` withdraws.
 import { exec } from "herdr";
-import { spaceNameEndsWith } from "../mod/space-name.js";
+import { markedSpaceName, spaceNameEndsWith, unmarkedSpaceName } from "../mod/space-name.js";
 
 async function herdrApp(args) {
   const result = await exec("herdr-app", args);
@@ -76,3 +77,19 @@ export const labelCloseRequest = (tab, issueId) => labelTerminal(tab.terminal, `
 
 // hc removes a label set to an empty value.
 export const clearCloseRequest = (tab) => labelTerminal(tab.terminal, "issues.close=");
+
+// Marks each space named after the issue, whichever space the command runs in, and nothing when Herdr isn't
+// running; a space already carrying the mark isn't renamed again.
+export async function markIssueSpacesDone(issueSpace) {
+  let spaces;
+  try {
+    spaces = JSON.parse(await herdrApp(["ls"])).spaces;
+  } catch {
+    return;
+  }
+  for (const space of spaces) {
+    if (!spaceNameEndsWith(unmarkedSpaceName(space.name), issueSpace)) continue;
+    const newName = markedSpaceName(space.name, "done");
+    if (newName !== space.name) await renameSpace({ spaceId: space.id }, newName);
+  }
+}

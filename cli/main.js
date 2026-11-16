@@ -45,6 +45,7 @@ import {
   issueTabName,
   labelCloseRequest,
   labelComplete,
+  markIssueSpacesDone,
   renameSpace,
   renameTab,
   sessionTab,
@@ -110,7 +111,8 @@ Commands:
                            nothing: exit 0 when merge would go through, else print merge's refusal and exit 1
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
                            The statuses: ${STATUSES.join(", ")}. On GitHub, done closes the issue as completed,
-                           canceled closes it as not planned, and any other status reopens it
+                           canceled closes it as not planned, and any other status reopens it. done and canceled also
+                           mark the issue's space done, from any space, when Herdr is running
   start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
   edit <id> --body-file <file> --body-hash <hash>
                            Save the file, or standard input when <file> is -, as the issue's body and refresh the
@@ -533,6 +535,8 @@ async function status(args) {
   if (!STATUSES.includes(newStatus)) throw new UsageError(`status ${newStatus} isn't one of ${STATUSES.join(", ")}`);
   const issue = await refusingChanges(async () => setIssueStatus(await currentTracker(), id, newStatus));
   console.log(`Set ${issue.id} to ${newStatus}`);
+  if (newStatus === "done" || newStatus === "canceled")
+    await markIssueSpacesDone(await issueSpaceName(await currentProject(), issue.id));
 }
 
 async function start(args) {
