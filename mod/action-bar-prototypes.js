@@ -108,6 +108,52 @@ function restyledBar(variant, state, t) {
     );
 }
 
+const UNIFORM_BUTTON_HEIGHT_PX = 26;
+const UNIFORM_BUTTON_WIDTH_PX = 34;
+
+/**
+ * A button at today's start button size, whichever action it is. Only the primary action has a fill; the others
+ * show a background on hover alone.
+ * @param {string} icon @param {boolean} primary @param {string} state @param {Theme} t
+ */
+function uniformButton(icon, primary, state, t) {
+  const hover = state === "hover";
+  return div()
+    .flex_none()
+    .flex()
+    .items_center()
+    .justify_center()
+    .w(UNIFORM_BUTTON_WIDTH_PX)
+    .h(UNIFORM_BUTTON_HEIGHT_PX)
+    .rounded(4)
+    .when(primary, (e) =>
+      e
+        .bg(t.solid)
+        .text_color(t.solid_foreground)
+        .when(hover, (s) => s.opacity(0.85)),
+    )
+    .when(!primary, (e) => e.text_color(hover ? t.foreground : t.dim).when(hover, (s) => s.bg(t.hover)))
+    .when(state === "disabled", (e) => e.opacity(DISABLED_OPACITY))
+    .child(state === "busy" ? glyph("rotate-cw").spin(1000) : glyph(icon));
+}
+
+/** @param {string} state @param {Theme} t */
+const uniformBar = (state, t) =>
+  h_flex()
+    .h(HEADER_HEIGHT_PX)
+    .w_full()
+    .flex_none()
+    .px(10)
+    .gap(4)
+    .items_center()
+    .border_b(1)
+    .border_color(t.border)
+    .text_size(12)
+    .child(div().flex_1().min_w(0).truncate().font_medium().text_color(t.foreground).child("#190"))
+    .child(uniformButton("pencil", false, state, t))
+    .child(uniformButton("pull-request", false, state, t))
+    .child(uniformButton("git-branch-plus", true, state, t));
+
 /** @param {string} text @param {Theme} t */
 const caption = (text, t) => div().px(10).pt(8).pb(2).text_size(10).text_color(t.dim).child(text);
 
@@ -129,5 +175,6 @@ export function actionBarPrototypes(t) {
     .child(section("B: native icon buttons, filled start button, 30px", (state) => restyledBar("emphasis", state, t)))
     .child(
       section("B2: B with the start button at today's 26px size", (state) => restyledBar("large-emphasis", state, t)),
-    );
+    )
+    .child(section("C: every button 26x34, start filled, others background on hover", (state) => uniformBar(state, t)));
 }
