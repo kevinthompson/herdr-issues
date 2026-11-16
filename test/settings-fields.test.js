@@ -42,6 +42,22 @@ test("the Global form shows waiting for checks for a pull request or the default
   assert.equal(global("merge").waitForChecksSelect, false);
 });
 
+test("pushing after merging shows only when the onApproval that applies is a merge", () => {
+  assert.equal(fields({ onApproval: "merge" }).pushAfterMergeSelect, true);
+  assert.equal(fields({ onApproval: "pull-request" }).pushAfterMergeSelect, false);
+  assert.equal(fields({ onApproval: null }).pushAfterMergeSelect, false);
+  assert.equal(fields({ onApproval: null, fallbackOnApproval: "merge" }).pushAfterMergeSelect, true);
+  assert.equal(fields({ onApproval: null, fallbackOnApproval: "pull-request" }).pushAfterMergeSelect, false);
+  assert.equal(fields({ onApproval: "pull-request", fallbackOnApproval: "merge" }).pushAfterMergeSelect, false);
+});
+
+test("the Global form shows pushing after merging for a merge or the default onApproval", () => {
+  const global = (onApproval) => globalSettingsFields({ onApproval, workModel: null, otherWorkModelPicked: false });
+  assert.equal(global(null).pushAfterMergeSelect, true);
+  assert.equal(global("merge").pushAfterMergeSelect, true);
+  assert.equal(global("pull-request").pushAfterMergeSelect, false);
+});
+
 test("a yes-or-no setting converts to and from its select's ids", () => {
   assert.deepEqual([true, false, null].map(yesNoChoiceId), ["yes", "no", null]);
   assert.deepEqual(["yes", "no", null].map(yesNoValue), [true, false, null]);

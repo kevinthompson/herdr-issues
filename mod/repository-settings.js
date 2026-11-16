@@ -4,8 +4,9 @@
 // emptying the field removes it from the entry; and where its issues live, its tracker, which a different choice
 // checks as the setup view does (tracker-choice.js) before it can be saved, with Linear's team once Linear is
 // checked. Approval: whether a session asks for approval of its work, its approval; how the branch then gets into
-// main, its onApproval; and only when the onApproval that applies is a pull request, whether the session waits for
-// its checks, its waitForChecks. Worktrees: the command run in each new worktree, its worktreeSetup; the name of
+// main, its onApproval; only when the onApproval that applies is a pull request, whether the session waits for
+// its checks, its waitForChecks; and only when it is a merge, whether main is pushed after merging, its
+// pushAfterMerge. Worktrees: the command run in each new worktree, its worktreeSetup; the name of
 // each issue's space, its spaceName; and what a finished session does about its worktree, its close. The approval
 // selects and close each lead with a choice that removes it from the entry, labeled with what applies in its place,
 // such as "Global (Open a pull request)" or "Default (Ask me)", where the default onApproval is a pull request for
@@ -35,6 +36,7 @@ import {
   DEFAULT_CLOSE,
   DEFAULT_POLL_SECONDS,
   DEFAULT_WAIT_FOR_CHECKS,
+  DEFAULT_PUSH_AFTER_MERGE,
   REPOSITORY_KEYS,
   agentSettings,
   approvalSources,
@@ -184,6 +186,7 @@ export class RepositorySettings extends SettingsForm {
         this.savedApproval = {
           ...approvalSettings.entry,
           waitForChecks: yesNoChoiceId(approvalSettings.entry.waitForChecks),
+          pushAfterMerge: yesNoChoiceId(approvalSettings.entry.pushAfterMerge),
         };
         this.chosenApproval = { ...this.savedApproval };
         this.savedName = name.entry;
@@ -276,7 +279,7 @@ export class RepositorySettings extends SettingsForm {
     return choice === this.current.kind ? null : { tracker: choice };
   }
 
-  // `value` for approval, onApproval, waitForChecks or close, or null to remove it from the entry.
+  // `value` for approval, onApproval, waitForChecks, pushAfterMerge or close, or null to remove it from the entry.
   /**
    * @param {ApprovalChoiceKey} key
    * @param {string | null} value
@@ -287,8 +290,8 @@ export class RepositorySettings extends SettingsForm {
     this.saveNow(cx);
   }
 
-  // The approval, onApproval, waitForChecks and close that apply without the entry's own, each { value, label },
-  // where label names whether that's the global value or the default.
+  // The approval, onApproval, waitForChecks, pushAfterMerge and close that apply without the entry's own, each
+  // { value, label }, where label names whether that's the global value or the default.
   approvalFallbacks() {
     const { topLevel, defaultOnApproval } = this.approvalSettings;
     /**
@@ -297,7 +300,7 @@ export class RepositorySettings extends SettingsForm {
      * @param {string | null} defaultValue
      */
     const fallback = (key, choices, defaultValue) => {
-      const own = key === "waitForChecks" ? yesNoChoiceId(topLevel.waitForChecks) : topLevel[key];
+      const own = key === "waitForChecks" || key === "pushAfterMerge" ? yesNoChoiceId(topLevel[key]) : topLevel[key];
       const value = own ?? defaultValue;
       return { value, label: `${own != null ? "Global" : "Default"} (${choiceLabel(choices, value)})` };
     };
@@ -309,24 +312,38 @@ export class RepositorySettings extends SettingsForm {
         APPROVAL_QUESTIONS.waitForChecks.choices,
         yesNoChoiceId(DEFAULT_WAIT_FOR_CHECKS),
       ),
+      pushAfterMerge: fallback(
+        "pushAfterMerge",
+        APPROVAL_QUESTIONS.pushAfterMerge.choices,
+        yesNoChoiceId(DEFAULT_PUSH_AFTER_MERGE),
+      ),
       close: fallback("close", CLOSE_CHOICES, DEFAULT_CLOSE),
     };
   }
 
-  // The approval, onApproval and waitForChecks to save; only a pull request keeps waitForChecks.
+  // The approval, onApproval, waitForChecks and pushAfterMerge to save; only a pull request keeps waitForChecks,
+  // and only a merge keeps pushAfterMerge.
   approvalToSave() {
-    const { approval, onApproval, waitForChecks } = this.chosenApproval;
-    return { approval, onApproval, waitForChecks: this.fields().waitForChecksSelect ? waitForChecks : null };
+    const { approval, onApproval, waitForChecks, pushAfterMerge } = this.chosenApproval;
+    const { waitForChecksSelect, pushAfterMergeSelect } = this.fields();
+    return {
+      approval,
+      onApproval,
+      waitForChecks: waitForChecksSelect ? waitForChecks : null,
+      pushAfterMerge: pushAfterMergeSelect ? pushAfterMerge : null,
+    };
   }
 
-  // A hidden waitForChecks doesn't count as a change, though saving another change removes it.
+  // A hidden waitForChecks or pushAfterMerge doesn't count as a change, though saving another change removes it.
   approvalChanged() {
     if (!this.approvalSettings) return false;
+    const { waitForChecksSelect, pushAfterMergeSelect } = this.fields();
     /** @type {ApprovalKey[]} */
     const keys = [
       "approval",
       "onApproval",
-      ...(this.fields().waitForChecksSelect ? /** @type {ApprovalKey[]} */ (["waitForChecks"]) : []),
+      ...(waitForChecksSelect ? /** @type {ApprovalKey[]} */ (["waitForChecks"]) : []),
+      ...(pushAfterMergeSelect ? /** @type {ApprovalKey[]} */ (["pushAfterMerge"]) : []),
     ];
     return keys.some((key) => this.chosenApproval[key] !== this.savedApproval[key]);
   }
@@ -419,6 +436,7 @@ export class RepositorySettings extends SettingsForm {
           await saveApprovalSettings(this.main, {
             ...approvalSettings,
             waitForChecks: yesNoValue(approvalSettings.waitForChecks),
+            pushAfterMerge: yesNoValue(approvalSettings.pushAfterMerge),
           });
         if (closeChanged) await saveCloseSetting(this.main, close);
         if (nameChanged) await saveNameSetting(this.main, name);
@@ -463,7 +481,7 @@ export class RepositorySettings extends SettingsForm {
   }
 
   // The question for each setting's key, or null while it hasn't loaded or doesn't apply: waitForChecks only when
-  // the onApproval that applies is a pull request.
+  // the onApproval that applies is a pull request, and pushAfterMerge only when it is a merge.
   /**
    * @param {Theme} t
    * @returns {(key: string) => NativeElement | null}
@@ -487,6 +505,7 @@ export class RepositorySettings extends SettingsForm {
       approval: () => fallbacks && approvalQuestion("approval"),
       onApproval: () => fallbacks && approvalQuestion("onApproval"),
       waitForChecks: () => (fallbacks && fields.waitForChecksSelect ? approvalQuestion("waitForChecks") : null),
+      pushAfterMerge: () => (fallbacks && fields.pushAfterMergeSelect ? approvalQuestion("pushAfterMerge") : null),
       close: () =>
         fallbacks &&
         this.approvalSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t),
@@ -504,7 +523,7 @@ export class RepositorySettings extends SettingsForm {
     return (key) => questions[key]?.() ?? null;
   }
 
-  // A select of approval, onApproval, waitForChecks or close, leading with the choice that removes it from the entry
+  // A select of an approval question or close, leading with the choice that removes it from the entry
   // and opening on the entry's value or that choice.
   /**
    * @param {ApprovalChoiceKey} key
