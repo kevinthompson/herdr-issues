@@ -7,10 +7,11 @@
 // load when the view opens and save each change to their own scope as it's made, the header saying Saving… while
 // one writes; switching scope leaves the hidden form's waiting save to run. Back writes any save still waiting for
 // typing to pause, then returns to the list once every save is done, or stays on the form whose save failed to
-// show its error. Each form groups its settings in one scrolling column under section headings styled as the list's
-// status headings, in the order Tracker, Approval, Worktrees, Issue sessions and Panel, showing only the sections it
-// has (settings-fields.js); nothing is collapsed. Each setting is a select menu (select.js) whose open list says
-// what each option means, or a typed field, with its description below its controls.
+// show its error. Each form groups its settings in one scrolling column of sections, each a small capitalized heading
+// above a bordered card of rows, in the order Tracker, Approval, Worktrees, Issue sessions and Panel, showing only
+// the sections it has (settings-fields.js); nothing is collapsed. Each row (settings-form.js) puts a setting's label
+// and description beside its controls: a select menu (select.js) whose open list says what each option means, or a
+// typed field.
 import { div } from "gpui-kit";
 import { v_flex } from "gpui-base";
 import { shared, setShared } from "herdr";
@@ -124,7 +125,15 @@ export class SettingsView {
   render(t, { onCollapse }) {
     const form = this.shown();
     const shownLabel = SCOPES.find(({ id }) => id === this.scope)?.label ?? "";
-    const content = v_flex().id("issues-settings").flex_1().min_h(0).overflow_y_scrollbar().p(14).gap(12);
+    const content = v_flex()
+      .id("issues-settings")
+      .flex_1()
+      .min_h(0)
+      .overflow_y_scrollbar()
+      .px(24)
+      .pt(24)
+      .pb(40)
+      .gap(32);
     return v_flex()
       .size_full()
       .min_h(0)

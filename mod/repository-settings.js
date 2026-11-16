@@ -28,7 +28,15 @@ import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, REPOSITORY_SECTIONS, yesNoChoiceId, settingsFields, yesNoValue } from "./settings-fields.js";
-import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
+import {
+  AGENT_QUESTIONS,
+  CLOSE_CHOICES,
+  SETTING_LABELS,
+  SettingsForm,
+  WORK_PROMPT_ROWS,
+  spaceNameLabel,
+  workPromptLabel,
+} from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
   AGENT_DEFAULTS,
@@ -58,7 +66,7 @@ import {
 /** @import { Theme } from "./menu.js" */
 /** @import { SelectOption } from "./select.js" */
 /** @import { ApprovalKey } from "./setup.js" */
-/** @import { SaveRequest } from "./settings-form.js" */
+/** @import { SaveRequest, SettingLabel } from "./settings-form.js" */
 /** @import { Project } from "./trackers/index.js" */
 
 /** @typedef {{ kind: string, team?: string, repo?: string }} CurrentTracker */
@@ -76,29 +84,28 @@ const REPOSITORY_FIELDS = /** @type {RepositoryKey[]} */ (REPOSITORY_KEYS);
  */
 const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
 
-const NAME_SENTENCE =
-  "The name of the space opened on the main checkout, which issue worktree spaces nest under. Leave it empty to use the repository's name.";
+/** @type {SettingLabel} */
+const NAME_LABEL = {
+  title: "Repository name",
+  sentence: "Names the main checkout's space; issue spaces nest under it. Empty uses the repository's name.",
+};
 
-/** @type {Record<RepositoryKey, { title: string, sentence: string }>} */
-const REPOSITORY_QUESTIONS = {
+/** @type {Record<RepositoryKey, SettingLabel>} */
+const REPOSITORY_LABELS = {
   worktreeSetup: {
-    title: "Worktree setup command",
-    sentence: "A shell command run in each new issue worktree, such as npm install. Leave it empty to run nothing.",
+    title: "Setup command",
+    sentence: "Runs in each new issue worktree, such as npm install. Empty runs nothing.",
   },
-  spaceName: {
-    title: "Issue space name",
-    sentence:
-      "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to use the global name, or the issue's ID without one.",
-  },
+  spaceName: spaceNameLabel("Empty uses the global name, or the issue's ID if there isn't one."),
   pollSeconds: {
     title: "Poll interval",
-    sentence:
-      "How often, in whole seconds of 10 or more, the panel asks the tracker for this repository's issues. Leave it empty to use the global interval or the default.",
+    sentence: "Seconds between checks of the tracker, 10 or more. Empty uses the global interval or the default.",
   },
 };
 
-const WORK_PROMPT_SENTENCE =
-  "Instructions appended after the global prompt, if any, to the system prompt of every Claude session that works one of this repository's issues. Leave it empty to use only the global prompt.";
+const WORK_PROMPT_LABEL = workPromptLabel(
+  "Added after the global prompt to the system prompt of each session that works this repository's issues. Empty uses only the global prompt.",
+);
 
 // Where the listed issues come from now, such as "Linear team WEB".
 /**
@@ -163,14 +170,14 @@ export class RepositorySettings extends SettingsForm {
    */
   load(cx) {
     this.selects = {
-      tracker: new SelectMenu("settings-tracker", "Issue tracker", cx),
+      tracker: new SelectMenu("settings-tracker", "Issue source", cx),
       ...Object.fromEntries(
-        Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [
+        Object.keys(APPROVAL_QUESTIONS).map((key) => [
           key,
-          new SelectMenu(`settings-${key}`, title, cx),
+          new SelectMenu(`settings-${key}`, SETTING_LABELS[/** @type {ApprovalKey} */ (key)].title, cx),
         ]),
       ),
-      close: new SelectMenu("settings-close", "How are worktrees closed?", cx),
+      close: new SelectMenu("settings-close", SETTING_LABELS.close.title, cx),
       ...this.agentSelects("settings", cx),
     };
     cx.spawn(async (cx) => {
@@ -490,33 +497,23 @@ export class RepositorySettings extends SettingsForm {
     const fields = this.fields();
     const fallbacks = this.approvalSettings ? this.approvalFallbacks() : null;
     /** @param {ApprovalKey} key */
-    const approvalQuestion = (key) => {
-      const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
-      return this.approvalSelect(key, title, sentence, choices, fallbacks, t);
-    };
+    const approvalQuestion = (key) => this.approvalSelect(key, APPROVAL_QUESTIONS[key].choices, fallbacks, t);
     /** @type {Record<string, () => NativeElement | null>} */
     const questions = {
       name: () =>
-        this.nameInput &&
-        this.question("Repository name", NAME_SENTENCE, t, (controls) =>
-          controls.child(this.textField(this.nameInput, t)),
-        ),
+        this.nameInput && this.question(NAME_LABEL, t, (controls) => controls.child(this.textField(this.nameInput, t))),
       tracker: () => this.trackerSection(fields, t),
       approval: () => fallbacks && approvalQuestion("approval"),
       onApproval: () => fallbacks && approvalQuestion("onApproval"),
       waitForChecks: () => (fallbacks && fields.waitForChecksSelect ? approvalQuestion("waitForChecks") : null),
       pushAfterMerge: () => (fallbacks && fields.pushAfterMergeSelect ? approvalQuestion("pushAfterMerge") : null),
-      close: () =>
-        fallbacks &&
-        this.approvalSelect("close", "How are worktrees closed?", CLOSE_SENTENCE, CLOSE_CHOICES, fallbacks, t),
+      close: () => fallbacks && this.approvalSelect("close", CLOSE_CHOICES, fallbacks, t),
       workPrompt: () =>
         this.workPromptInput &&
-        this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
-          controls.child(this.textareaField(this.workPromptInput, t)),
-        ),
+        this.question(WORK_PROMPT_LABEL, t, (controls) => controls.child(this.textareaField(this.workPromptInput, t))),
     };
     for (const key of REPOSITORY_FIELDS)
-      questions[key] = () => this.repositoryInputs && this.repositoryQuestion(key, REPOSITORY_QUESTIONS[key], t);
+      questions[key] = () => this.repositoryInputs && this.repositoryQuestion(key, REPOSITORY_LABELS[key], t);
     for (const question of AGENT_QUESTIONS)
       questions[question.key] = () =>
         this.agentSources && this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t);
@@ -527,15 +524,13 @@ export class RepositorySettings extends SettingsForm {
   // and opening on the entry's value or that choice.
   /**
    * @param {ApprovalChoiceKey} key
-   * @param {string} title
-   * @param {string | null} sentence
    * @param {SelectOption[]} choices
    * @param {ReturnType<RepositorySettings["approvalFallbacks"]>} fallbacks
    * @param {Theme} t
    */
-  approvalSelect(key, title, sentence, choices, fallbacks, t) {
+  approvalSelect(key, choices, fallbacks, t) {
     const options = [{ id: CLEAR_CHOICE, label: fallbacks[key].label }, ...choices];
-    return this.question(title, sentence, t, (controls) =>
+    return this.question(SETTING_LABELS[key], t, (controls) =>
       controls.child(
         this.selects[key].render(t, {
           options,
@@ -563,8 +558,7 @@ export class RepositorySettings extends SettingsForm {
   trackerSection(fields, t) {
     const { choice, checking } = this.tracker;
     return this.question(
-      "Where do this repository's issues live?",
-      `The panel lists issues from ${currentTrackerLabel(this.current)}.`,
+      { title: "Issue source", sentence: `Lists issues from ${currentTrackerLabel(this.current)}.` },
       t,
       (controls) =>
         this.tracker
@@ -587,12 +581,12 @@ export class RepositorySettings extends SettingsForm {
   // A typed setting; the poll interval says below its field why it can't be saved.
   /**
    * @param {RepositoryKey} key
-   * @param {{ title: string, sentence: string }} question
+   * @param {SettingLabel} label
    * @param {Theme} t
    */
-  repositoryQuestion(key, { title, sentence }, t) {
+  repositoryQuestion(key, label, t) {
     const problem = key === "pollSeconds" ? this.pollSecondsProblem() : null;
-    return this.question(title, sentence, t, (controls) =>
+    return this.question(label, t, (controls) =>
       controls.child(this.textField(this.repositoryInputs[key], t)).when(Boolean(problem), (e) =>
         e.child(
           div()
