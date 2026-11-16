@@ -17,7 +17,23 @@ async function herdrApp(args) {
 
 export async function sessionTab(terminal = process.env.HC_TERMINAL_ID) {
   if (!terminal) throw new Error("HC_TERMINAL_ID is empty; run this in a Herdr terminal");
-  const { spaces } = JSON.parse(await herdrApp(["ls"]));
+  return tabHolding(terminal, JSON.parse(await herdrApp(["ls"])));
+}
+
+// The session's tab, or null outside Herdr: with $HC_TERMINAL_ID empty or no herdr-app to run.
+export async function herdrSessionTab(terminal = process.env.HC_TERMINAL_ID) {
+  if (!terminal) return null;
+  let listing;
+  try {
+    listing = await herdrApp(["ls"]);
+  } catch (error) {
+    if (error.code === "ENOENT") return null;
+    throw error;
+  }
+  return tabHolding(terminal, JSON.parse(listing));
+}
+
+function tabHolding(terminal, { spaces }) {
   for (const space of spaces) {
     const tab = space.tabs.find((tab) => tab.terminals.some((held) => held.terminal === terminal));
     if (tab) return { id: tab.id, name: tab.name, space: space.name, spaceId: space.id, terminal };

@@ -73,7 +73,7 @@ test("tab --json prints the session tab as an object", async (t) => {
   assert.deepEqual(JSON.parse(out), { id: "tab-session", name: "Claude", space: "#72" });
 });
 
-for (const args of [["tab"], ["tab", "--json"], ["tab", "rename", "#72", "Tab names"], ["complete", "#72"]]) {
+for (const args of [["tab"], ["tab", "--json"]]) {
   test(`${args.join(" ")} fails when HC_TERMINAL_ID is empty`, async (t) => {
     const calls = stubApp(t, listing("Claude"));
     const { code, err } = await run(t, args, { terminal: "" });
@@ -81,7 +81,45 @@ for (const args of [["tab"], ["tab", "--json"], ["tab", "rename", "#72", "Tab na
     assert.match(err, /HC_TERMINAL_ID is empty/);
     assert.deepEqual(calls, []);
   });
+}
 
+const SESSION_COMMANDS = [
+  ["tab", "rename", "#72", "Tab names"], ["mark", "working", "#72"], ["complete", "#72"], ["complete", "--cancel", "#72"],
+  ["close", "#72"], ["close", "--cancel", "#72"],
+];
+
+// Stubs exec as it behaves when herdr-app and hc aren't on the PATH, recording each attempt to run them.
+function stubWithoutHerdrApp(t) {
+  const attempts = [];
+  stubHerdr(t, {
+    exec: async (command, args, options) => {
+      if (command !== "herdr-app" && command !== "hc") return defaults.exec(command, args, options);
+      attempts.push([command, ...args]);
+      throw Object.assign(new Error(`spawn ${command} ENOENT`), { code: "ENOENT" });
+    },
+  });
+  return attempts;
+}
+
+for (const args of SESSION_COMMANDS) {
+  test(`${args.join(" ")} does nothing and prints nothing when HC_TERMINAL_ID is empty`, async (t) => {
+    inRepository(t);
+    const calls = stubApp(t, listing("Claude"));
+    const { code, out, err } = await run(t, args, { terminal: "" });
+    assert.deepEqual({ code, out, err }, { code: 0, out: "", err: "" });
+    assert.deepEqual(calls, []);
+  });
+
+  test(`${args.join(" ")} does nothing and prints nothing when herdr-app isn't installed`, async (t) => {
+    inRepository(t);
+    const attempts = stubWithoutHerdrApp(t);
+    const { code, out, err } = await run(t, args);
+    assert.deepEqual({ code, out, err }, { code: 0, out: "", err: "" });
+    assert.deepEqual(attempts, [["herdr-app", "ls"]]);
+  });
+}
+
+for (const args of [["tab"], ["tab", "--json"], ["tab", "rename", "#72", "Tab names"], ["complete", "#72"]]) {
   test(`${args.join(" ")} fails when no tab holds the terminal`, async (t) => {
     const calls = stubApp(t, listing("Claude"));
     const { code, err } = await run(t, args, { terminal: "t404" });

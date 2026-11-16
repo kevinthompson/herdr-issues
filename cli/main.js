@@ -16,7 +16,7 @@ import {
   bodyHash, ChangeRefusal, changeIssueLabels, checkIssueItems, editIssueBody, MissingItemRefusal, setIssueStatus, startIssue,
 } from "./change.js";
 import {
-  clearCloseRequest, clearComplete, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameSpace, renameTab, sessionTab,
+  clearCloseRequest, clearComplete, herdrSessionTab, isUnnamed, issueTabName, labelCloseRequest, labelComplete, renameSpace, renameTab, sessionTab,
   uncompletedTabName,
 } from "./tab.js";
 
@@ -54,6 +54,8 @@ Commands:
   close <id>               Ask the issues panel to close the session's space once $HC_TERMINAL_ID is idle: label it
                            issues.close=<id>; the panel removes the worktree without asking only when every check passes
   close --cancel <id>      Withdraw that request: remove the issues.close label from $HC_TERMINAL_ID
+                           Outside a Herdr terminal, with $HC_TERMINAL_ID empty or herdr-app not installed, tab rename,
+                           mark, complete and close, with or without --cancel, do nothing and print nothing
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a new Herdr space named after the issue and
                            marked working, as mark working does: 󰄱 <space name>. An issue in triage, backlog or todo
@@ -184,7 +186,8 @@ async function tab(args) {
 async function renameSessionTab([issueId, ...words]) {
   const name = words.join(" ");
   if (!issueId || !name) throw new UsageError("tab rename needs an issue ID and a name");
-  const tab = await sessionTab();
+  const tab = await herdrSessionTab();
+  if (!tab) return;
   if (!isUnnamed(tab.name)) {
     console.log(`The tab keeps its name: ${tab.name}`);
     return;
@@ -197,7 +200,8 @@ async function renameSessionTab([issueId, ...words]) {
 
 async function mark([state, issueId, ...rest]) {
   if (!SPACE_MARKS[state] || !issueId || rest.length) throw new UsageError(`mark needs a state (${Object.keys(SPACE_MARKS).join(", ")}) and one issue ID`);
-  const tab = await sessionTab();
+  const tab = await herdrSessionTab();
+  if (!tab) return;
   const issueSpace = await issueSpaceName(await currentProject(), issueId);
   if (!spaceNameEndsWith(unmarkedSpaceName(tab.space), issueSpace)) {
     console.log(`The space keeps its name, since it isn't named after ${issueId}: ${tab.space}`);
@@ -216,14 +220,16 @@ async function complete(args) {
   if (args[0] === "--cancel") return cancelComplete(args.slice(1));
   const [issueId] = args;
   if (!issueId) throw new UsageError("complete needs an issue ID");
-  const tab = await sessionTab();
+  const tab = await herdrSessionTab();
+  if (!tab) return;
   await labelComplete(tab, issueId);
   console.log(`Marked ${issueId} complete in the tab ${tab.name}`);
 }
 
 async function cancelComplete([issueId, ...rest]) {
   if (!issueId || rest.length || issueId.startsWith("-")) throw new UsageError("complete --cancel needs one issue ID");
-  const tab = await sessionTab();
+  const tab = await herdrSessionTab();
+  if (!tab) return;
   await clearComplete(tab);
   const newName = uncompletedTabName(tab.name);
   if (newName !== tab.name) await renameTab(tab, newName);
@@ -236,7 +242,8 @@ async function close(args) {
   if (!issueId || rest.length || issueId.startsWith("-")) {
     throw new UsageError(cancel ? "close --cancel needs one issue ID" : "close needs one issue ID");
   }
-  const tab = await sessionTab();
+  const tab = await herdrSessionTab();
+  if (!tab) return;
   if (cancel) {
     await clearCloseRequest(tab);
     console.log(`Withdrew the request to close ${issueId}'s space; the worktree stays open`);
