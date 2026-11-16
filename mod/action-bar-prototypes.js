@@ -29,7 +29,7 @@ function nativeIconButton(icon, state, t) {
     .when(hover, (e) => e.bg(t.hover))
     .when(state === "disabled", (e) => e.opacity(DISABLED_OPACITY))
     .text_color(hover ? t.foreground : t.dim)
-    .child(busy ? glyph("rotate-cw").spin(1) : glyph(icon));
+    .child(busy ? glyph("rotate-cw").spin(1000) : glyph(icon));
 }
 
 /**
@@ -49,7 +49,7 @@ function emphasizedStartButton(state, t) {
     .text_color(t.solid_foreground)
     .when(state === "hover", (e) => e.opacity(0.85))
     .when(state === "disabled", (e) => e.opacity(DISABLED_OPACITY))
-    .child(busy ? glyph("rotate-cw").spin(1) : glyph("git-branch-plus"));
+    .child(busy ? glyph("rotate-cw").spin(1000) : glyph("git-branch-plus"));
 }
 
 /** The bar today: a 38px bar, the ID in 11px accent, outlined 26px buttons. @param {string} state @param {Theme} t */
@@ -79,7 +79,7 @@ function currentBar(state, t) {
     .child(div().flex_1().pl(4).text_size(11).text_color(t.accent).child("#190"))
     .child(chip(glyph("pencil")))
     .child(chip(div().child(state === "busy" ? "Merging…" : "Merge")))
-    .child(chip(state === "busy" ? glyph("rotate-cw").spin(1) : glyph("git-branch-plus"), true));
+    .child(chip(state === "busy" ? glyph("rotate-cw").spin(1000) : glyph("git-branch-plus"), true));
 }
 
 /**
