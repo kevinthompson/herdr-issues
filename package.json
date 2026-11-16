@@ -2,6 +2,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test --import ./test/support/register.js \"test/**/*.test.js\""
+    "test": "node --test --import ./test/support/register.js \"test/**/*.test.js\"",
+    "format": "prettier --write . bin/issues",
+    "format:check": "prettier --check . bin/issues"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
   }
 }
