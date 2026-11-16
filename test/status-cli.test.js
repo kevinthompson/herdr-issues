@@ -24,13 +24,14 @@ const record = {
 
 // A repository tracked in Beads holding only the issue `record`, whose stubbed `bd` records each update; the
 // panel announcements are counted.
-function beadsRepository(t) {
+function beadsRepository(t, { app = null } = {}) {
   const repository = createRepository(temporaryFolder(t));
   mkdirSync(join(repository, ".beads"));
   writeFileSync(join(repository, ".beads/metadata.json"), "{}");
   mkdirSync(join(settingsPath(), ".."), { recursive: true });
   writeFileSync(settingsPath(), JSON.stringify({ repos: { [repository]: { tracker: "beads" } } }));
   const updates = [];
+  const renames = [];
   const counts = { announcements: 0 };
   const ok = (value) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
   stubHerdr(t, {
@@ -39,6 +40,13 @@ function beadsRepository(t) {
       return null;
     },
     exec: async (command, args, options) => {
+      if (command === "herdr-app") {
+        if (app === null) throw Object.assign(new Error("spawn herdr-app ENOENT"), { code: "ENOENT" });
+        if (app === "down") return { code: 1, stdout: "", stderr: "herdr-app isn't running" };
+        if (args[0] === "ls") return { code: 0, stdout: JSON.stringify({ spaces: app }), stderr: "" };
+        renames.push(args.slice(2));
+        return { code: 0, stdout: '{"ok":true}', stderr: "" };
+      }
       if (command !== "bd") return defaults.exec(command, args, options);
       if (args[0] === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
       if (args[0] === "show")
@@ -48,8 +56,12 @@ function beadsRepository(t) {
     },
   });
   process.chdir(repository);
-  return { updates, counts };
+  return { updates, counts, renames };
 }
+
+const DONE = "\u{F0132}   ";
+const WORKING = "\u{F0131}   ";
+const spaceLayout = (...names) => names.map((name, index) => ({ id: `space-${index}`, name, tabs: [] }));
 
 async function run(t, args) {
   const out = [],
@@ -67,6 +79,104 @@ test("status sets the issue's status through its tracker and refreshes the panel
   assert.equal(result.out, `Set ${record.id} to done`);
   assert.deepEqual(updates, [[record.id, "--status", "closed"]]);
   assert.equal(counts.announcements, 1);
+});
+
+test("status done marks the issue's space done from any space", async (t) => {
+  const { renames } = beadsRepository(t, {
+    app: spaceLayout("elsewhere", `${WORKING}${record.id}`, `${WORKING}notes-a1`),
+  });
+  const result = await run(t, ["status", record.id, "done"]);
+  assert.equal(result.code, 0, result.err);
+  assert.equal(result.out, `Set ${record.id} to done`);
+  assert.deepEqual(renames, [["--id", "space-1", "--name", `${DONE}${record.id}`]]);
+});
+
+test("status canceled marks the issue's space done", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  mkdirSync(join(settingsPath(), ".."), { recursive: true });
+  writeFileSync(settingsPath(), JSON.stringify({ repos: { [repository]: { tracker: "github", repo: "owner/name" } } }));
+  const renames = [];
+  const node = {
+    number: 7,
+    title: "Seven",
+    url: "https://github.com/owner/name/issues/7",
+    body: "",
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    closedAt: null,
+    state: "OPEN",
+    stateReason: null,
+    milestone: null,
+    labels: { nodes: [] },
+    assignees: { nodes: [] },
+    blockedBy: { nodes: [] },
+    closedByPullRequestsReferences: { nodes: [] },
+  };
+  const ok = (stdout) => ({ code: 0, stdout, stderr: "" });
+  stubHerdr(t, {
+    exec: async (command, args, options) => {
+      if (command === "herdr-app") {
+        if (args[0] === "ls") return ok(JSON.stringify({ spaces: spaceLayout(`${WORKING}#7`) }));
+        renames.push(args.slice(2));
+        return ok("{}");
+      }
+      if (command !== "gh") return defaults.exec(command, args, options);
+      if (args[1] === "graphql") return ok(JSON.stringify({ data: { repository: { issue: node } } }));
+      return ok("{}");
+    },
+  });
+  process.chdir(repository);
+  const result = await run(t, ["status", "#7", "canceled"]);
+  assert.equal(result.code, 0, result.err);
+  assert.deepEqual(renames, [["--id", "space-0", "--name", `${DONE}#7`]]);
+});
+
+test("status done changes the status quietly when no space is named after the issue", async (t) => {
+  const { updates, renames } = beadsRepository(t, { app: spaceLayout("elsewhere") });
+  const result = await run(t, ["status", record.id, "done"]);
+  assert.deepEqual(
+    { code: result.code, out: result.out, err: result.err },
+    {
+      code: 0,
+      out: `Set ${record.id} to done`,
+      err: "",
+    },
+  );
+  assert.equal(updates.length, 1);
+  assert.deepEqual(renames, []);
+});
+
+for (const [name, app] of [
+  ["herdr-app isn't installed", null],
+  ["Herdr isn't running", "down"],
+]) {
+  test(`status done changes the status quietly when ${name}`, async (t) => {
+    const { updates } = beadsRepository(t, { app });
+    const result = await run(t, ["status", record.id, "done"]);
+    assert.deepEqual(
+      { code: result.code, out: result.out, err: result.err },
+      {
+        code: 0,
+        out: `Set ${record.id} to done`,
+        err: "",
+      },
+    );
+    assert.equal(updates.length, 1);
+  });
+}
+
+test("status other than done or canceled leaves the space's mark alone", async (t) => {
+  const { renames } = beadsRepository(t, { app: spaceLayout(`${WORKING}${record.id}`) });
+  const result = await run(t, ["status", record.id, "todo"]);
+  assert.equal(result.code, 0, result.err);
+  assert.deepEqual(renames, []);
+});
+
+test("status done doesn't rename a space already marked done", async (t) => {
+  const { renames } = beadsRepository(t, { app: spaceLayout(`${DONE}${record.id}`) });
+  const result = await run(t, ["status", record.id, "done"]);
+  assert.equal(result.code, 0, result.err);
+  assert.deepEqual(renames, []);
 });
 
 test("start marks the issue in progress through its tracker and refreshes the panels", async (t) => {
