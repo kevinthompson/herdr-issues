@@ -103,6 +103,28 @@ import { openBehindArgs } from "./open-behind.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 
+/** @import { Context, AsyncContext, Color } from "gpui-kit" */
+/** @import { Issue, Tracker, Project } from "./trackers/index.js" */
+/** @import { ListedGroup as Group } from "./issue.js" */
+/** @import { Theme } from "./menu.js" */
+/** @typedef {ReturnType<typeof location>} Where */
+/** @typedef {Awaited<ReturnType<typeof repositoryState>>} Repository */
+/** @typedef {ReturnType<typeof fieldEdits>[string]} FieldEdit */
+/** @import { SetupProblem } from "./trackers/problems.js" */
+/**
+ * @typedef {object} Shown
+ * @property {Project} project
+ * @property {Tracker} tracker
+ * @property {string} scopeKey
+ * @property {string} listKey
+ * @property {Set<string>} unloaded
+ * @property {string | undefined} listedScope
+ * @property {Repository | null} repository
+ * @property {string | null} repositoryName
+ */
+
+// With strictNullChecks off, a bare `() => null` is typed any, so a caught call returns this, which is `never` to the checker.
+const NONE = /** @type {never} */ (null);
 const REFRESH_CHECK_MS = 10 * 1000;
 // Reading terminals' labels and statuses asks nothing of the machine, so close requests are checked often.
 const CLOSE_REQUEST_CHECK_MS = 1000;
@@ -115,12 +137,15 @@ const changedStampPath = () => `${appHome()}/data/issues/changed`;
 // Rows the list draws at first, and how many more each Show more adds: drawing every issue of a large
 // team at once is too slow.
 const ROW_LIMIT = 100;
+/** @type {Record<number, string>} */
 const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
+/** @type {Record<number, string>} */
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
 const PRIORITY_ICON_PX = 18;
 const AVATAR_PX = 14;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
+/** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
 // Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
 const ID_COLUMN_PX = 68;
@@ -128,10 +153,12 @@ const ID_COLUMN_PX = 68;
 const ID_CHARACTER_PX = 7;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = 32;
+/** @returns {string} */
 const contextKey = () => JSON.stringify(location());
 
 // Closes the focused space, removing the checkout with it when it shows a linked worktree once removal's checks
 // pass, and asking through the remove-worktree dialog when they don't.
+/** @param {Context} cx */
 async function closeFocusedSpace(cx) {
   const space = spaces().find((candidate) => candidate.id === focused()?.space);
   if (!space) return;
@@ -147,6 +174,7 @@ async function closeFocusedSpace(cx) {
 const closingTerminals = new Set();
 
 // Closes the space of each finished session that asked with `issues close` and is now idle, removing its worktree.
+/** @param {Context} cx */
 function closeFinishedSessions(cx) {
   for (const request of readyCloseRequests(terminals(), spaces(), panes())) {
     if (closingTerminals.has(request.terminal)) continue;
@@ -160,6 +188,11 @@ function closeFinishedSessions(cx) {
   }
 }
 // The new list, keeping each body already loaded for an issue that hasn't changed since.
+/**
+ * @param {Issue[]} issues
+ * @param {Issue[]} previous
+ * @returns {Issue[]}
+ */
 function withLoadedBodies(issues, previous) {
   const loaded = new Map(previous.filter((issue) => issue.body !== null).map((issue) => [issue.id, issue]));
   return issues.map((issue) => {
@@ -169,6 +202,10 @@ function withLoadedBodies(issues, previous) {
   });
 }
 
+/**
+ * @param {(cx: Context) => void} onClick
+ * @param {Theme} t
+ */
 function settingsButton(onClick, t) {
   return div()
     .id("issues-settings-open")
@@ -185,6 +222,10 @@ function settingsButton(onClick, t) {
     .child(svg("mods/issues/icons/settings.svg").size(15).text_color(t.foreground));
 }
 
+/**
+ * @param {number} count
+ * @param {Theme} t
+ */
 const pullRequestBadge = (count, t) =>
   h_flex()
     .flex_none()
@@ -207,35 +248,57 @@ const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on 
 // issues worktree sets up new checkouts, which can take minutes in a box app.
 const ISSUES_WORKTREE_TIMEOUT_MS = 10 * 60 * 1000;
 // issues worktree works on this computer's checkouts and needs the issue's branch.
+/**
+ * @param {Issue} issue
+ * @param {Project | null} project
+ */
 const opensWithIssuesWorktree = (issue, project) => Boolean(issue.branch && project && !project.on);
+/**
+ * @param {number} count
+ * @param {string} noun
+ * @param {string} [nouns]
+ */
 const plural = (count, noun, nouns = `${noun}s`) => `${count} ${count === 1 ? noun : nouns}`;
 
 export default class Issues extends View {
+  /**
+   * @param {import("gpui-shell").Props | undefined} _props
+   * @param {AsyncContext} cx
+   */
   init(_props, cx) {
     if (props()?.menu) {
-      this.menu = new ({ scope: ScopeMenu, labels: LabelMenu }[props().menu] ?? FieldMenu)();
+      /** @type {Record<string, typeof FieldMenu | typeof ScopeMenu | typeof LabelMenu>} */
+      const menus = { scope: ScopeMenu, labels: LabelMenu };
+      this.menu = new (menus[props().menu] ?? FieldMenu)();
       return;
     }
     if (props()?.action) {
       this.worktreeDialog = new WorktreeDialog(cx);
       return;
     }
+    /** @type {Issue[]} */
     this.issues = [];
+    /** @type {Set<string>} */
     this.unloaded = new Set();
     this.generation = 0;
     this.listScroll = ScrollHandle.new();
     this.revealing = null;
     this.rowLimit = ROW_LIMIT;
     this.untrackedFolder = null;
+    /** @type {Map<string, Shown>} */
     this.shownByContext = new Map();
     this.editing = null;
     this.saving = false;
     this.detailError = null;
-    this.links = { hasIssue: (id) => this.hasIssue(id), onOpen: (id, cx) => this.open(id, cx) };
+    this.links = {
+      hasIssue: (/** @type {string} */ id) => this.hasIssue(id),
+      onOpen: (/** @type {string} */ id, /** @type {Context} */ cx) => this.open(id, cx),
+    };
     this.noticeSpaceSwitch();
     this.refresh(cx, { reuse: true });
     this.collapse = collapseState();
-    this.update = null;
+    /** @type {Awaited<ReturnType<typeof offeredUpdate>> | null} */
+    this.availableUpdate = null;
     this.updated = false;
     this.updateCheckedAt = null;
     this.updateCheckMs = DEFAULT_UPDATE_CHECK_HOURS * HOUR_MS;
@@ -259,9 +322,14 @@ export default class Issues extends View {
 
   // With `reuse`, a remote list fetched moments ago, by this copy or another, is shown without asking again,
   // so switching between spaces of one repository or coming back to the panel doesn't repeat the request.
+  /**
+   * @param {Context} cx
+   * @param {{ reuse?: boolean }} [options]
+   */
   refresh(cx, { reuse = false } = {}) {
     const context = contextKey();
     if (context !== this.context) {
+      /** @type {string} */
       this.context = context;
       this.error = null;
       this.closeIssue();
@@ -273,6 +341,7 @@ export default class Issues extends View {
     this.seenChangeAt = issuesChangedAt();
     this.refreshing = true;
     cx.spawn(async (cx) => {
+      /** @type {string | null} */
       let scopeKey = null;
       try {
         const where = location();
@@ -293,12 +362,15 @@ export default class Issues extends View {
         }
         this.project = { root, on: where.on };
         this.resolvedContext = context;
+        /** @type {string | null} */
         this.scopeKey = scopeKey;
         this.untrackable = null;
         this.watchAppFiles(cx);
         const tracker = await trackerFor({ root, on: where.on });
         const { pollSeconds } = await pollSettings({ root, on: where.on });
-        const { name: repositoryName } = await nameSettings({ root, on: where.on }).catch(() => ({ name: null }));
+        const { name: repositoryName } = await nameSettings({ root, on: where.on }).catch(() => ({
+          name: /** @type {string | null} */ (null),
+        }));
         if (generation !== this.generation) return;
         this.pollMs = pollSeconds * 1000;
         this.repositoryName = repositoryName;
@@ -309,7 +381,9 @@ export default class Issues extends View {
         }
         // Collapsed groups that can wait aren't listed, so Linear isn't asked for issues nobody is looking at.
         const loads = loadsFor((group) => this.isExpanded(group));
-        const unloaded = new Set((tracker?.deferred?.(scope) ?? []).filter((each) => !loads.has(each)));
+        const unloaded = new Set(
+          (tracker?.deferred?.(scope) ?? []).filter((each) => !(/** @type {Set<string>} */ (loads).has(each))),
+        );
         const project = { root, on: where.on },
           listKey = `${scopeKey}\n${scope ?? ""}\n${[...loads].sort()}`;
         // A tracker is slow to list, so a scope not shown yet starts from its last list.
@@ -363,8 +437,16 @@ export default class Issues extends View {
 
   // The setup view in place of the list: choosing a tracker, or `failure`, the problem that stops the
   // configured one loading. It survives polls, so a choice in progress isn't lost.
+  /**
+   * @param {string} main
+   * @param {SetupProblem | null} failure
+   * @param {Context} cx
+   */
   showSetup(main, failure, cx) {
-    if (this.setup?.main !== main) this.setup = new TrackerSetup(main, (cx) => this.refresh(cx));
+    if (this.setup?.main !== main) {
+      /** @type {TrackerSetup | null} */
+      this.setup = new TrackerSetup(main, (/** @type {Context} */ cx) => this.refresh(cx));
+    }
     this.setup.showFailure(failure);
     Object.assign(this, {
       tracker: null,
@@ -379,6 +461,10 @@ export default class Issues extends View {
     cx.notify();
   }
 
+  /**
+   * @param {Where} where
+   * @param {string} context
+   */
   showUntrackable(where, context) {
     this.forgetList();
     this.closeIssue();
@@ -393,6 +479,7 @@ export default class Issues extends View {
   }
 
   // Runs git init in the folder outside a repository, then lists it, which leads into choosing a tracker.
+  /** @param {Context} cx */
   initializeUntrackedFolder(cx) {
     const folder = this.untrackedFolder;
     this.initializing = true;
@@ -412,6 +499,7 @@ export default class Issues extends View {
   }
 
   // A space shown before shows its last list at once, while the lookups that confirm it run again.
+  /** @param {string} context */
   restoreShown(context) {
     const shown = this.shownByContext.get(context),
       issues = shown && rememberedList(shown.listKey);
@@ -423,7 +511,9 @@ export default class Issues extends View {
     this.project = null;
     this.tracker = null;
     this.repositoryName = null;
+    /** @type {Issue[]} */
     this.issues = [];
+    /** @type {Set<string>} */
     this.unloaded = new Set();
     this.loaded = false;
     this.repository = null;
@@ -442,6 +532,7 @@ export default class Issues extends View {
   }
 
   // Each saved setting refreshes the list at once, so the panel acts on it without waiting for the next poll.
+  /** @param {Context} cx */
   openSettings(cx) {
     if (this.hasUnsavedEdits()) {
       this.detailError = "Save or cancel your edits first";
@@ -449,11 +540,11 @@ export default class Issues extends View {
       return;
     }
     const view = new SettingsView(this.project, this.scopeKey, this.tracker, {
-      onBack: (cx) => {
+      onBack: (/** @type {Context} */ cx) => {
         if (this.settingsView === view) this.settingsView = null;
         cx.notify();
       },
-      onSaved: (cx) => this.refresh(cx),
+      onSaved: (/** @type {Context} */ cx) => this.refresh(cx),
     });
     this.settingsView = view;
     view.load(cx);
@@ -462,10 +553,16 @@ export default class Issues extends View {
 
   // The open issue stays up after leaving the list, such as when it's done and the Done group isn't
   // listed, so its work can still be reviewed; it's read again for the change that moved it.
+  /**
+   * @param {Issue} issue
+   * @param {Tracker} tracker
+   * @param {Context} cx
+   */
   holdOpenIssue(issue, tracker, cx) {
+    /** @type {Issue | null} */
     this.heldIssue = issue;
     cx.spawn(async (cx) => {
-      const current = await tracker.get(issue.id).catch(() => null);
+      const current = await tracker.get(issue.id).catch(() => NONE);
       if (!current || this.heldIssue !== issue) return;
       this.heldIssue = current;
       cx.notify();
@@ -473,22 +570,33 @@ export default class Issues extends View {
   }
 
   // A listed issue, or the open one held after it left the list.
+  /**
+   * @param {string} id
+   * @returns {Issue | undefined}
+   */
   findIssue(id) {
     return this.issues.find((each) => each.id === id) ?? (this.heldIssue?.id === id ? this.heldIssue : undefined);
   }
 
   // Reads the repository's worktrees and branches for the issues just listed, after the list shows, and
   // deletes the branches of done issues that have been merged into main, so finished work leaves nothing behind.
+  /**
+   * @param {Project} project
+   * @param {number} generation
+   * @param {Context} cx
+   */
   scanRepository(project, generation, cx) {
     cx.spawn(async (cx) => {
-      const repository = await repositoryState(this.issues, project).catch(() => null);
+      const repository = await repositoryState(this.issues, project).catch(() => NONE);
       if (generation !== this.generation) return;
       this.repository = repository;
       const shown = this.shownByContext.get(this.resolvedContext);
       if (shown?.listKey === this.listKey) shown.repository = repository;
       cx.notify();
       if (!repository?.mergedFinished.length) return;
-      const deleted = await deleteMergedBranches(repository.mergedFinished, repository).catch(() => []);
+      const deleted = await deleteMergedBranches(repository.mergedFinished, repository).catch(
+        () => /** @type {string[]} */ ([]),
+      );
       if (deleted.length)
         notify({
           title: `Deleted ${plural(deleted.length, "merged branch", "merged branches")}`,
@@ -499,6 +607,7 @@ export default class Issues extends View {
 
   // A panel out of sight skips its polls, and refreshes once when it comes back instead. A collapsed panel
   // is still in sight, so its strip describes the focused repository.
+  /** @param {Context} cx */
   poll(cx) {
     this.noticeSpaceSwitch();
     if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
@@ -507,29 +616,31 @@ export default class Issues extends View {
 
   // Checks the mod's own checkout for an update when the panel loads and every updateCheckHours after, and
   // notices an update Update started having finished. Any failure is silent: the footer just shows nothing.
+  /** @param {Context} cx */
   checkForUpdate(cx) {
     if (this.checkingUpdate || Date.now() - (this.updateCheckedAt ?? -Infinity) < this.updateCheckMs) return;
     this.checkingUpdate = true;
     cx.spawn(async (cx) => {
-      const settings = await updateSettings().catch(() => null);
+      const settings = await updateSettings().catch(() => NONE);
       if (settings) this.updateCheckMs = settings.updateCheckHours * HOUR_MS;
       if (await finishedUpdate().catch(() => false)) this.updated = true;
-      this.update = await offeredUpdate().catch(() => null);
+      this.availableUpdate = await offeredUpdate().catch(() => NONE);
       this.updateCheckedAt = Date.now();
       this.checkingUpdate = false;
       cx.notify();
     });
   }
 
+  /** @param {Context} cx */
   startUpdate(cx) {
-    const update = this.update,
+    const update = this.availableUpdate,
       { space } = focused() ?? {};
     if (!space) {
       this.detailError = "Focus a space to run the update in";
       cx.notify();
       return;
     }
-    this.update = null;
+    this.availableUpdate = null;
     cx.spawn(async (cx) => {
       try {
         run("tab.new", { space, ...(await installTab(update)) });
@@ -540,9 +651,10 @@ export default class Issues extends View {
     });
   }
 
+  /** @param {Context} cx */
   dismissUpdate(cx) {
-    const update = this.update;
-    this.update = null;
+    const update = this.availableUpdate;
+    this.availableUpdate = null;
     dismissUpdate(update).catch(() => {});
     cx.notify();
   }
@@ -551,6 +663,7 @@ export default class Issues extends View {
     return Date.now() - this.refreshedAt >= (this.pollMs ?? DEFAULT_POLL_SECONDS * 1000);
   }
 
+  /** @param {Context} cx */
   refreshOnReturn(cx) {
     const visible = panelVisible(),
       returned = visible && this.visible === false;
@@ -561,12 +674,17 @@ export default class Issues extends View {
   }
 
   // Crossing the collapse threshold, by a toggle or a drag, redraws the panel as the strip or the list.
+  /**
+   * @param {number} width
+   * @param {Context} cx
+   */
   noticeWidth(width, cx) {
     const wasCollapsed = this.collapse.collapsed;
     this.collapse.noticeWidth(width);
     if (this.collapse.collapsed !== wasCollapsed) cx.notify();
   }
 
+  /** @param {Context} cx */
   toggleCollapsed(cx) {
     this.collapse.toggle();
     cx.notify();
@@ -574,6 +692,11 @@ export default class Issues extends View {
 
   // A badge in the strip expands the panel to the list, with the badge's group open and scrolled to the top,
   // listing the group's issues when they weren't, as opening it in the list does.
+  /**
+   * @param {string} groupId
+   * @param {Context} cx
+   * @param {{ unloaded?: boolean }} [options]
+   */
   expandToGroup(groupId, cx, { unloaded = false } = {}) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
     else {
@@ -590,6 +713,7 @@ export default class Issues extends View {
   // its bottom edge, so the list first scrolls to its end and, once that frame is laid out, back up to the
   // group. A render can run again before layout, so only the list's size report, which comes after layout,
   // moves on to the second scroll.
+  /** @param {Group[]} groups */
   revealGroup(groups) {
     const revealing = this.revealing;
     if (!revealing) return;
@@ -607,6 +731,7 @@ export default class Issues extends View {
     }
   }
 
+  /** @param {Context} cx */
   noticeListLaidOut(cx) {
     if (this.revealing?.step !== "laying-out") return;
     this.revealing.step = "group";
@@ -617,6 +742,7 @@ export default class Issues extends View {
   // Keychain, and the changed stamp says Claude just made or changed an issue, so a change to any of them refreshes
   // the panel at once rather than at the next poll, without the lookups kept from those files. The app's folder holds more than these files, so other
   // changes there are ignored.
+  /** @param {Context} cx */
   watchAppFiles(cx) {
     if (this.watchingAppFiles) return;
     this.watchingAppFiles = true;
@@ -646,8 +772,12 @@ export default class Issues extends View {
   }
 
   // Keeps the issue as it was read, so saving can tell whether it changed underneath the edit.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   edit(issue, cx) {
-    const t = theme();
+    const t = /** @type {Theme} */ (theme());
     this.detailError = null;
     this.editing = {
       issue,
@@ -694,6 +824,10 @@ export default class Issues extends View {
   }
 
   // Shows another issue, such as a blocker, unless that would throw away unsaved edits.
+  /**
+   * @param {string} id
+   * @param {Context} cx
+   */
   open(id, cx) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
     else {
@@ -708,12 +842,14 @@ export default class Issues extends View {
   noticeSpaceSwitch() {
     const space = spaces().find((each) => each.active);
     if (space?.id === this.activeSpaceId) return;
+    /** @type {string | undefined} */
     this.activeSpaceId = space?.id;
     this.spaceRequest = space?.named ? { space: space.id, name: space.name } : null;
   }
 
   // Opens the issue the space just switched to is named after, once the space's issues have loaded. An issue
   // the list leaves out, such as a done one, is read on its own.
+  /** @param {Context} cx */
   openSpaceIssue(cx) {
     const request = this.spaceRequest,
       project = this.project,
@@ -731,7 +867,7 @@ export default class Issues extends View {
     cx.spawn(async (cx) => {
       const id = await issueIdOfSpace(project, request.name);
       if (!id || !stillWanted()) return;
-      const issue = this.hasIssue(id) ? null : await tracker.get(id).catch(() => null);
+      const issue = this.hasIssue(id) ? null : await tracker.get(id).catch(() => NONE);
       if (!stillWanted() || (!issue && !this.hasIssue(id))) return;
       this.stopEditing();
       this.openId = issue?.id ?? id;
@@ -741,9 +877,14 @@ export default class Issues extends View {
   }
 
   // Fetches the open issue's body when its list left it out.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   loadBody(issue, cx) {
     const tracker = this.tracker;
     if ((issue.body !== null && !issue.bodyStale) || this.loadingBody === issue.id || !tracker) return;
+    /** @type {string | null} */
     this.loadingBody = issue.id;
     cx.spawn(async (cx) => {
       try {
@@ -758,16 +899,19 @@ export default class Issues extends View {
     });
   }
 
+  /** @param {string} id */
   hasIssue(id) {
     return this.issues.some((issue) => issue.id === id);
   }
 
+  /** @param {Context} cx */
   back(cx) {
     if (this.hasUnsavedEdits()) this.detailError = "Save or cancel your edits first";
     else this.closeIssue();
     cx.notify();
   }
 
+  /** @param {Context} cx */
   save(cx) {
     const editing = this.editing,
       tracker = this.tracker;
@@ -796,18 +940,24 @@ export default class Issues extends View {
   }
 
   // The code spans in the issue's body that name files in the project, found once per body.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   filesInBody(issue, cx) {
     const { root, on } = this.project,
       key = `${root}\n${issue.body}`;
     if (issue.body === null) return new Set();
     if (!on) prefetchEditor();
     if (this.bodyFiles?.key === key) return this.bodyFiles.files;
-    const bodyFiles = (this.bodyFiles = { key, files: new Set() }),
+    /** @type {{ key: string, files: Set<string> }} */
+    this.bodyFiles = { key, files: new Set() };
+    const bodyFiles = this.bodyFiles,
       paths = codeSpanPaths(issue.body);
     if (!paths.length) return bodyFiles.files;
     cx.spawn(async (cx) => {
       const listFiles = 'for path; do [ -f "$path" ] && printf "%s\\n" "$path"; done; true';
-      const found = await exec("sh", ["-c", listFiles, "sh", ...paths], { cwd: root, on }).catch(() => null);
+      const found = await exec("sh", ["-c", listFiles, "sh", ...paths], { cwd: root, on }).catch(() => NONE);
       if (found?.code !== 0 || this.bodyFiles !== bodyFiles) return;
       bodyFiles.files = new Set(found.stdout.split("\n").filter(Boolean));
       cx.notify();
@@ -816,8 +966,13 @@ export default class Issues extends View {
   }
 
   // Opens a text file in the user's editor, and hands a URL or any other file to macOS `open`.
+  /**
+   * @param {Issue} issue
+   * @param {string} url
+   * @param {Context} cx
+   */
   openLink(issue, url, cx) {
-    const { file, url: address } = linkTarget(url, this.project.root);
+    const { file, url: address } = /** @type {{ file?: string, url?: string }} */ (linkTarget(url, this.project.root));
     if (file && this.project?.on) {
       this.detailError = `${file} is on ${this.project.on}, so it can't be opened here`;
       cx.notify();
@@ -841,6 +996,11 @@ export default class Issues extends View {
 
   // Shows the checkbox's new state at once. Saves run one after another, each over the body the
   // previous one wrote, so quick clicks never look like an edit made elsewhere meanwhile.
+  /**
+   * @param {Issue} issue
+   * @param {number} line
+   * @param {Context} cx
+   */
   toggleTask(issue, line, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable || this.editing) return;
@@ -854,6 +1014,7 @@ export default class Issues extends View {
     }
     const body = issue.body;
     this.detailError = null;
+    /** @type {Promise<void>} */
     const saved = (this.taskSaves ?? Promise.resolve()).catch(() => {}).then(() => tracker.update(before, { body }));
     this.taskSaves = saved;
     cx.spawn(async (cx) => {
@@ -871,6 +1032,10 @@ export default class Issues extends View {
   // A fresh Claude session, or a shell without Claude Code, in a new worktree space on the issue's branch, working the issue with /issues:work.
   // Without a branch, the worktree dialog asks for one. The tracker saves the start while the worktree opens, and the
   // list shows it as soon as it's saved, since opening can take many seconds.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   startWork(issue, cx) {
     const tracker = this.tracker;
     if (!tracker?.writable) {
@@ -886,13 +1051,15 @@ export default class Issues extends View {
           ? this.openWithIssuesWorktree(issue)
           : this.spaceName(issue)
               .then((spaceName) => this.openWorktreeDialog(issue, spaceName))
-              .then(() => null);
+              .then(() => NONE);
         const starting = tracker.start(issue).then(
+          /** @returns {string | null} */
           () => {
             this.refresh(cx);
             return null;
           },
-          (e) => `Could not start: ${e.message ?? e}`,
+          /** @returns {string | null} */
+          (/** @type {any} */ e) => `Could not start: ${e.message ?? e}`,
         );
         const [openError, startError] = await Promise.all([opening, starting]);
         this.detailError = startError ?? openError;
@@ -906,6 +1073,10 @@ export default class Issues extends View {
 
   // The tracker's labels, read once per tracker, which the panel makes anew each refresh, with the issue's own
   // labels. A tracker without a list, Beads, offers only the issue's labels, to remove.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   openLabelsMenu(issue, cx) {
     const tracker = this.tracker;
     if (this.labelChoices?.tracker !== tracker)
@@ -932,6 +1103,7 @@ export default class Issues extends View {
   }
 
   // Shows each edit on its issue, puts a failed one's field back, and saves the edits no copy has claimed.
+  /** @param {Context} cx */
   applyFieldEdits(cx) {
     for (const [id, edit] of this.projectEdits()) {
       const issue = this.findIssue(edit.issueId);
@@ -940,6 +1112,11 @@ export default class Issues extends View {
     }
   }
 
+  /**
+   * @param {string} id
+   * @param {FieldEdit} edit
+   * @param {Context} cx
+   */
   saveFieldEdit(id, edit, cx) {
     const tracker = this.tracker;
     cx.spawn(async (cx) => {
@@ -957,6 +1134,7 @@ export default class Issues extends View {
   }
 
   // Re-lists the issues and, with an issue open, reads that issue again in full, even when the list kept its body.
+  /** @param {Context} cx */
   refreshView(cx) {
     const issue = this.findIssue(this.openId),
       tracker = this.tracker;
@@ -984,6 +1162,7 @@ export default class Issues extends View {
     return Boolean(this.refreshing || this.refreshingIssue || this.projectEdits().some(([, edit]) => !edit.failed));
   }
 
+  /** @param {Theme} t */
   refreshButton(t) {
     const busy = this.busy(),
       icon = svg("mods/issues/icons/rotate-cw.svg").size(REFRESH_ICON_PX);
@@ -1009,6 +1188,7 @@ export default class Issues extends View {
   }
 
   // An alert while any edit failed to save, which a click dismisses.
+  /** @param {Theme} t */
   failedEditAlert(t) {
     const failed = this.projectEdits().filter(([, edit]) => edit.failed);
     if (!failed.length) return null;
@@ -1029,11 +1209,18 @@ export default class Issues extends View {
   }
 
   // Starting and continuing work wait on the tracker and issues worktree, so the footer says what they're doing meanwhile.
+  /**
+   * @param {Issue} issue
+   * @param {string} status
+   * @param {Context} cx
+   */
   showOpening(issue, status, cx) {
+    /** @type {{ id: string, status: string, merging?: boolean } | null} */
     this.opening = { id: issue.id, status };
     cx.notify();
   }
 
+  /** @param {Theme} t */
   openingFooter(t) {
     return h_flex()
       .flex_none()
@@ -1048,7 +1235,12 @@ export default class Issues extends View {
   }
 
   // An available update, with Update and a dismiss control, or the note that an update finished.
+  /** @param {Theme} t */
   updateFooter(t) {
+    /**
+     * @param {string} id
+     * @param {(cx: Context) => void} onDismiss
+     */
     const dismiss = (id, onDismiss) =>
       div()
         .id(id)
@@ -1073,7 +1265,7 @@ export default class Issues extends View {
       .border_color(t.border)
       .text_size(11)
       .text_color(t.dim);
-    if (!this.update) {
+    if (!this.availableUpdate) {
       return row.child(div().flex_1().min_w(0).truncate().child(UPDATED_NOTE)).child(
         dismiss("issues-updated-dismiss", (cx) => {
           this.updated = false;
@@ -1094,12 +1286,18 @@ export default class Issues extends View {
 
   // Whether the issue view offers Merge for the open issue, checked again for each list the panel reads. The last
   // answer for the same issue stands meanwhile, so the button doesn't flicker on every poll.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   mergeOffered(issue, cx) {
     const key = `${issue.id}\n${issue.branch}\n${this.generation}`;
     if (this.mergeOffer?.key === key) return this.mergeOffer.offered;
     const project = this.project,
       kept = this.mergeOffer?.id === issue.id && this.mergeOffer.offered;
-    const offer = (this.mergeOffer = { key, id: issue.id, offered: kept });
+    /** @type {{ key: string, id: string, offered: boolean }} */
+    this.mergeOffer = { key, id: issue.id, offered: kept };
+    const offer = this.mergeOffer;
     if (!this.tracker?.writable || !project) {
       offer.offered = false;
       return false;
@@ -1115,6 +1313,10 @@ export default class Issues extends View {
 
   // Merges the issue's branch into main and marks it done, through the same module as `issues merge`, then removes
   // its worktree and closes the space showing it, through the removal dialog only when a check fails.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   mergeBranch(issue, cx) {
     const tracker = this.tracker,
       project = this.project;
@@ -1140,6 +1342,10 @@ export default class Issues extends View {
 
   // Picks up an issue already in progress: its space when one is open, selected at once, else a new space on
   // its worktree, else a new worktree on its branch, fetched from origin when the work began elsewhere.
+  /**
+   * @param {Issue} issue
+   * @param {Context} cx
+   */
   continueWork(issue, cx) {
     const project = this.project;
     this.detailError = null;
@@ -1177,11 +1383,15 @@ export default class Issues extends View {
   // Opens the issue's branch with issues worktree, which switches to the space already showing it, or opens one
   // nested under the repository's space with Claude working the issue when it runs. Returns an error message, or null.
   // Without issues installed, the worktree dialog opens instead.
+  /**
+   * @param {Issue} issue
+   * @returns {Promise<string | null>}
+   */
   async openWithIssuesWorktree(issue) {
     const spaceName = await this.spaceName(issue);
     const args = await issuesWorktreeArgs(issue, { spaceName, isNew: needsNewBranch(issue) });
     const result = await exec("issues", args, { cwd: this.project.root, timeout: ISSUES_WORKTREE_TIMEOUT_MS }).catch(
-      () => null,
+      () => NONE,
     );
     if (!result) {
       await this.openWorktreeDialog(issue, spaceName);
@@ -1192,10 +1402,15 @@ export default class Issues extends View {
     return `Could not open the worktree: ${lastLine || `issues worktree exited with ${result.code}`}`;
   }
 
+  /** @param {Issue} issue */
   spaceName(issue) {
     return panelIssueSpaceName(this.project, issue.id);
   }
 
+  /**
+   * @param {Issue} issue
+   * @param {string} spaceName
+   */
   async openWorktreeDialog(issue, spaceName) {
     const project = this.project;
     const session = await workIssueSession(issue, project);
@@ -1216,20 +1431,27 @@ export default class Issues extends View {
     });
   }
   // Expanding a group whose issues weren't listed lists them.
+  /**
+   * @param {Group} group
+   * @param {Context} cx
+   */
   toggle(group, cx) {
     setSectionOpen(this.scopeKey, group.id, !this.isExpanded(group));
     if (group.unloaded && this.isExpanded(group)) this.refresh(cx);
     cx.notify();
   }
 
+  /** @param {import("./issue.js").Group} group */
   isExpanded(group) {
     return isSectionOpen(this.scopeKey, group);
   }
 
   // Room for SLA and priority under the ID when the tracker shows them, otherwise for the longest listed
   // ID, and in either case for the longest due date.
+  /** @param {Group[]} groups */
   idColumnWidth(groups) {
     const listed = groups.flatMap((group) => group.issues);
+    /** @param {string[]} texts */
     const widest = (texts) => Math.max(0, ...texts.map((text) => text.length)) * ID_CHARACTER_PX;
     const dueWidth = widest(listed.map((issue) => dueStatus(issue)?.text ?? ""));
     return Math.max(this.prioritized() ? ID_COLUMN_PX : widest(listed.map((issue) => issue.id)), dueWidth);
@@ -1239,6 +1461,11 @@ export default class Issues extends View {
     return this.tracker?.prioritized !== false;
   }
 
+  /**
+   * @param {Issue} issue
+   * @param {number} idColumnWidth
+   * @param {Theme} t
+   */
   row(issue, idColumnWidth, t) {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues),
@@ -1256,7 +1483,7 @@ export default class Issues extends View {
       .gap(3)
       .rounded(7)
       .cursor_pointer()
-      .hover((s) => s.bg(rowHover(t)))
+      .hover((s) => s.bg(/** @type {Color} */ (rowHover(t))))
       .on_mouse_up("left", (_e, cx) => {
         cx.stop_propagation();
         this.openId = issue.id;
@@ -1378,12 +1605,18 @@ export default class Issues extends View {
   }
 
   // Whether a space shows the issue's worktree, and whether it is the active space.
+  /** @param {Issue} issue */
   spaceShowingWorktree(issue) {
     const space = worktreeSpace(this.repository, issue.branch);
     return { inSpace: Boolean(space), inActiveSpace: Boolean(space?.active) };
   }
 
   // The assignee's name after their avatar once it is cached, then the agent it's delegated to, if any.
+  /**
+   * @param {Issue} issue
+   * @param {Theme} t
+   * @param {Color} [textColor]
+   */
   assignee(issue, t, textColor = t.dim) {
     const avatar = avatarImage(issue.assigneeAvatar, (loading) => this.avatarLoads.push(loading));
     const delegateAvatar = avatarImage(issue.delegateAvatar, (loading) => this.avatarLoads.push(loading));
@@ -1427,6 +1660,7 @@ export default class Issues extends View {
       );
   }
 
+  /** @param {string | null} label */
   groups(label) {
     const { tracker } = this;
     if (!tracker) return [];
@@ -1434,6 +1668,11 @@ export default class Issues extends View {
   }
 
   // Its issue count, or while its issues aren't listed, … when expanded and so being listed, else a refresh icon.
+  /**
+   * @param {Group} group
+   * @param {boolean} expanded
+   * @param {Theme} t
+   */
   groupCount(group, expanded, t) {
     const count = groupCountText(group);
     if (count !== null) return div().text_color(t.dim).child(count);
@@ -1442,11 +1681,17 @@ export default class Issues extends View {
   }
 
   // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
+  /**
+   * @param {Group} group
+   * @param {number} shown
+   * @param {number} idColumnWidth
+   * @param {Theme} t
+   */
   group(group, shown, idColumnWidth, t) {
     const expanded = this.isExpanded(group),
       hidden = group.issues.length - shown;
     const icon = statusIcon(group.id);
-    const fill = statusTints(group.id, t)?.fill ?? t.raised;
+    const fill = /** @type {Color} */ (statusTints(group.id, t)?.fill ?? t.raised);
     return v_flex()
       .flex_none()
       .gap(1)
@@ -1502,6 +1747,7 @@ export default class Issues extends View {
   }
 
   // Each expanded group's share of the rows the list draws, in order, until the limit runs out.
+  /** @param {Group[]} groups */
   shownCounts(groups) {
     let remaining = this.rowLimit;
     return groups.map((group) => {
@@ -1512,18 +1758,24 @@ export default class Issues extends View {
     });
   }
 
+  /** @param {Group[]} groups */
   emptyText(groups) {
     if (!this.loaded) return "Loading…";
     return holdsNoIssues(groups) ? "Use /issues:create to create an issue" : null;
   }
 
   // The scope listed now: { scope, project, milestone }, a milestone's under its project.
+  /** @returns {NonNullable<ReturnType<typeof findScope>>} */
   currentScope() {
     const { scopes } = this.tracker;
     return findScope(scopes, this.listedScope) ?? { scope: scopes[0], project: null, milestone: null };
   }
 
   // Each title piece after its ">": every piece but the source truncates, so a long name shrinks before it.
+  /**
+   * @param {import("gpui-kit").Element} header
+   * @param {Theme} t
+   */
   headerTitle(header, t) {
     const pieces = headerTitlePieces(this.tracker, this.repositoryName);
     return pieces.reduce(
@@ -1545,15 +1797,22 @@ export default class Issues extends View {
   }
 
   // The label the list is narrowed to: the one picked, unless no listed issue carries it any more.
+  /** @param {string[]} labels */
   shownLabel(labels) {
     const label = this.scopeKey ? selectedLabel(this.scopeKey) : null;
     return labels.includes(label) ? label : null;
   }
 
   // Each filter that narrows the list (filters.js) as its own row: its heading beside its dropdown.
+  /**
+   * @param {string[]} labels
+   * @param {string | null} label
+   * @param {Theme} t
+   */
   filterSections(labels, label, t) {
     const { scopes } = this.tracker ?? {};
     const listed = scopes ? { scopes, ...this.currentScope() } : {};
+    /** @type {Record<string, (options: any, selected: string, key: string) => void>} */
     const openMenu = { scope: openScopeMenu, label: openLabelMenu };
     return listFilters(listed, labels, label).map((filter) =>
       filterRow(
@@ -1566,6 +1825,7 @@ export default class Issues extends View {
     );
   }
 
+  /** @param {Theme} t */
   header(t) {
     const failedEditAlert = this.failedEditAlert(t);
     return h_flex()
@@ -1586,11 +1846,16 @@ export default class Issues extends View {
   }
 
   // The panel's header over `content`, which stands in for the list.
+  /**
+   * @param {import("gpui-kit").Element} content
+   * @param {Theme} t
+   */
   listFrame(content, t) {
     return v_flex().size_full().min_h(0).child(this.header(t)).child(content);
   }
 
   // Start and Continue in a row report their failures in detailError, so the list shows them too.
+  /** @param {Theme} t */
   list(t) {
     if (this.untrackable === NOT_A_REPOSITORY) {
       return this.listFrame(
@@ -1598,7 +1863,7 @@ export default class Issues extends View {
           {
             initializing: this.initializing,
             error: this.initializeError,
-            onInitialize: (cx) => this.initializeUntrackedFolder(cx),
+            onInitialize: (/** @type {Context} */ cx) => this.initializeUntrackedFolder(cx),
           },
           t,
         ),
@@ -1608,16 +1873,17 @@ export default class Issues extends View {
     if (this.untrackable) return this.listFrame(untrackableView(this.untrackable, t), t);
     if (this.setup) {
       return this.setup.render(t, {
-        onRetry: (cx) => {
+        onRetry: (/** @type {Context} */ cx) => {
           forgetLookups();
           this.refresh(cx);
           cx.notify();
         },
         header: this.header(t),
-        onCollapse: (cx) => this.toggleCollapsed(cx),
+        onCollapse: (/** @type {Context} */ cx) => this.toggleCollapsed(cx),
       });
     }
-    if (this.settingsView) return this.settingsView.render(t, { onCollapse: (cx) => this.toggleCollapsed(cx) });
+    if (this.settingsView)
+      return this.settingsView.render(t, { onCollapse: (/** @type {Context} */ cx) => this.toggleCollapsed(cx) });
     const labels = this.listedLabels(),
       label = this.shownLabel(labels);
     const groups = this.groups(label),
@@ -1665,6 +1931,7 @@ export default class Issues extends View {
       );
   }
 
+  /** @param {Theme} t */
   frame(t) {
     return v_flex()
       .id("issues")
@@ -1682,6 +1949,7 @@ export default class Issues extends View {
 
   // The expand button, centered on the expanded panel's header, which is 42px tall, over a badge for each
   // group the list shows, with the count its header shows.
+  /** @param {Theme} t */
   strip(t) {
     const label = this.shownLabel(this.listedLabels());
     return this.frame(t)
@@ -1706,6 +1974,10 @@ export default class Issues extends View {
       .children(stripBadges(this.groups(label)).map((badge) => this.stripBadge(badge, t)));
   }
 
+  /**
+   * @param {ReturnType<typeof stripBadges>[number]} badge
+   * @param {Theme} t
+   */
   stripBadge({ id, label, text, unloaded }, t) {
     const icon = statusIcon(id);
     return v_flex()
@@ -1729,6 +2001,7 @@ export default class Issues extends View {
   }
 
   // Moving to another repository, an issue change and a newly selected scope each refresh the list.
+  /** @param {Context} cx */
   keepListCurrent(cx) {
     if (contextKey() !== this.context) this.refresh(cx, { reuse: true });
     else if (issuesChangedAt() !== this.seenChangeAt) this.refresh(cx);
@@ -1739,23 +2012,25 @@ export default class Issues extends View {
     } else this.refreshOnReturn(cx);
   }
 
+  /** @param {Context} cx */
   render(cx) {
     if (this.menu) return this.menu.render();
     if (this.worktreeDialog) return this.worktreeDialog.render();
     this.keepListCurrent(cx);
     this.noticeSpaceSwitch();
-    if (this.collapse.collapsed) return this.strip(theme());
+    if (this.collapse.collapsed) return this.strip(/** @type {Theme} */ (theme()));
     this.openSpaceIssue(cx);
     this.applyFieldEdits(cx);
     this.setup?.takePickedTeam(cx);
     this.settingsView?.takePicks(cx);
-    const t = theme(),
+    const t = /** @type {Theme} */ (theme()),
       issue = this.findIssue(this.openId);
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
+    /** @type {Promise<unknown>[]} */
     this.avatarLoads = [];
     const content =
       issue && this.settingsView
-        ? this.settingsView.render(t, { onCollapse: (cx) => this.toggleCollapsed(cx) })
+        ? this.settingsView.render(t, { onCollapse: (/** @type {Context} */ cx) => this.toggleCollapsed(cx) })
         : issue
           ? (this.loadBody(issue, cx),
             issueDetail(
@@ -1808,6 +2083,6 @@ export default class Issues extends View {
     return this.frame(t)
       .child(v_flex().flex_1().min_h(0).child(content))
       .when(Boolean(this.opening), (e) => e.child(this.openingFooter(t)))
-      .when(!this.opening && Boolean(this.update || this.updated), (e) => e.child(this.updateFooter(t)));
+      .when(!this.opening && Boolean(this.availableUpdate || this.updated), (e) => e.child(this.updateFooter(t)));
   }
 }

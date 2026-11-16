@@ -3,8 +3,16 @@
 import { div } from "gpui-kit";
 import { h_flex } from "gpui-base";
 
+/** @import { Theme } from "./menu.js" */
+
 const DROPDOWN_MAX_PX = 260;
 
+/**
+ * @param {string} id
+ * @param {string} label
+ * @param {() => void} onClick
+ * @param {Theme} t
+ */
 function dropdown(id, label, onClick, t) {
   return h_flex()
     .id(id)
@@ -26,6 +34,13 @@ function dropdown(id, label, onClick, t) {
     .child(div().flex_none().text_color(t.dim).child("▾"));
 }
 
+/**
+ * @param {string} id
+ * @param {string} heading
+ * @param {string} shown
+ * @param {() => void} onClick
+ * @param {Theme} t
+ */
 export function filterRow(id, heading, shown, onClick, t) {
   return h_flex()
     .flex_none()

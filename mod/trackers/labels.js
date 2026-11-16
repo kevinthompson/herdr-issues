@@ -2,6 +2,11 @@
 // tracker has before anything is saved, so a misspelled name changes nothing.
 
 // Throws, naming each one, when any of `names` isn't among `known`.
+/**
+ * @param {string[]} names
+ * @param {string[]} known
+ * @param {string} place
+ */
 export function refuseUnknownLabels(names, known, place) {
   const unknown = names.filter((name) => !known.includes(name));
   if (unknown.length === 1) throw new Error(`${place} has no label named ${unknown[0]}`);

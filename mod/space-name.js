@@ -5,14 +5,21 @@
 // the start of the name or whitespace, so a mark before the name, such as `󰄱   #123`, still matches. The marks for
 // whether a space's session is working, waiting on the person or done are here too, for `issues mark`, and a new issue
 // space, which the panel and `issues worktree <id>` open, is named marked working from the start.
+/** @import { Project } from "./trackers/index.js" */
 import { mainCheckout } from "./location.js";
 import { repositoryName, spaceNameTemplate, trackerSetting } from "./trackers/setting.js";
 
 // A Linear ID such as ABC-12, or a GitHub ID such as #12.
 const ISSUE_ID = String.raw`[A-Z][A-Z0-9]*-\d+|#\d+`;
+/** @param {string} text */
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** @param {string} pattern */
 const atEndOfName = (pattern) => new RegExp(String.raw`(?:^|\s)${pattern}$`);
 
+/**
+ * @param {string} name
+ * @param {string} issueSpace
+ */
 export const spaceNameEndsWith = (name, issueSpace) => atEndOfName(escapeRegExp(issueSpace)).test(name);
 
 // Nerd Font Material Design glyphs, which Herdr's interface font renders: md-checkbox_blank_outline, md-timer_sand and
@@ -26,12 +33,21 @@ export const SPACE_MARKS = { working: WORKING_MARK, waiting: WAITING_MARK, done:
 const MARK_GAP = "   ";
 const LEADING_MARK = new RegExp(`^(?:${Object.values(SPACE_MARKS).join("|")}) +`, "u");
 
+/** @param {string} name */
 export const unmarkedSpaceName = (name) => name.replace(LEADING_MARK, "");
 
+/**
+ * @param {string} name
+ * @param {keyof typeof SPACE_MARKS} state
+ */
 export const markedSpaceName = (name, state) => `${SPACE_MARKS[state]}${MARK_GAP}${unmarkedSpaceName(name)}`;
 
 // The repository's `spaceName` template, its entry's or else the top level's, and the repository name its `<repo>`
 // stands for.
+/**
+ * @param {Project} project
+ * @returns {Promise<{ template: string | null, repo: string }>}
+ */
 async function spaceTemplate(project) {
   const template = await spaceNameTemplate(project);
   if (!template) return { template: null, repo: "" };
@@ -41,15 +57,24 @@ async function spaceTemplate(project) {
   return { template, repo };
 }
 
+/**
+ * @param {Project} project
+ * @param {string} issueId
+ */
 export async function issueSpaceName(project, issueId) {
   const { template, repo } = await spaceTemplate(project);
   if (!template) return issueId;
   return template.replaceAll("<repo>", repo).replaceAll("<issueId>", issueId);
 }
 
+/** @param {string} name */
 export const newIssueSpaceName = (name) => markedSpaceName(name, "working");
 
 // The name the panel opens an issue's space with: its space name, or its ID when that can't be worked out, marked working.
+/**
+ * @param {Project | null | undefined} project
+ * @param {string} issueId
+ */
 export async function panelIssueSpaceName(project, issueId) {
   const name = project ? await issueSpaceName(project, issueId).catch(() => issueId) : issueId;
   return newIssueSpaceName(name);
@@ -57,6 +82,11 @@ export async function panelIssueSpaceName(project, issueId) {
 
 // The issue ID in a space's name: an ID, or the ID in a name the template gives, ending the name.
 // Undefined when the name doesn't end with one an issue's space would have.
+/**
+ * @param {string} name
+ * @param {{ template?: string | null, repo?: string }} [named]
+ * @returns {string | undefined}
+ */
 export function issueIdInSpaceName(name, { template = null, repo = "" } = {}) {
   const patterns = [`(${ISSUE_ID})`];
   if (template?.includes("<issueId>")) {
@@ -70,6 +100,10 @@ export function issueIdInSpaceName(name, { template = null, repo = "" } = {}) {
 }
 
 // The issue ID in the name of a space showing the project, read with the repository's template.
+/**
+ * @param {Project} project
+ * @param {string} name
+ */
 export async function issueIdOfSpace(project, name) {
   const named = await spaceTemplate(project).catch(() => ({}));
   return issueIdInSpaceName(name, named);

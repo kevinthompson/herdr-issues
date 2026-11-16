@@ -7,6 +7,10 @@
 // Every space gets every check: a session marked done working with `issues complete` may have handed off before its
 // branch was merged, so that mark says nothing about whether the checkout is safe to remove.
 
+/** @typedef {{ result: string, text: string }} Finding */
+/** @typedef {{ dirty?: any, submodules?: any, branch?: any, warning?: any }} Checks */
+/** @typedef {"dirty" | "submodules" | "branch"} CheckName */
+
 export const PASS = "pass";
 // A failure that loses work existing only in this checkout.
 export const LOSS = "loss";
@@ -15,9 +19,13 @@ export const CAUTION = "caution";
 
 // Runs the checks side by side through `lookups`, { dirty, submodules, branch }, handing each answer to
 // `answered(name, result)` as it arrives.
+/**
+ * @param {Record<CheckName, () => unknown>} lookups
+ * @param {(name: CheckName, result: unknown) => unknown} answered
+ */
 export function runChecks(lookups, answered) {
   return Promise.all(
-    ["dirty", "submodules", "branch"].map((name) =>
+    /** @type {CheckName[]} */ (["dirty", "submodules", "branch"]).map((name) =>
       Promise.resolve()
         .then(lookups[name])
         .catch((error) => ({ error: String(error?.message ?? error) }))
@@ -26,15 +34,16 @@ export function runChecks(lookups, answered) {
   );
 }
 
-/** @param {{ dirty?: any, submodules?: any, branch?: any }} checks */
+/** @param {Checks} checks */
 export function checksAnswered({ dirty, submodules, branch }) {
   return dirty !== undefined && submodules !== undefined && branch !== undefined;
 }
 
 // The answered checks' findings, { result, text }, in a fixed order: uncommitted changes, submodule
 // commits, whether the branch is on main or in review, whether it is pushed, and the warning.
-/** @param {{ dirty?: any, submodules?: any, branch?: any, warning?: any }} checks */
+/** @param {Checks} checks @returns {Finding[]} */
 export function removalFindings({ dirty, submodules, branch, warning }) {
+  /** @type {Finding[]} */
   const findings = [];
   if (dirty?.error) findings.push({ result: CAUTION, text: `Couldn't check for uncommitted changes: ${dirty.error}` });
   else if (dirty === true) findings.push({ result: LOSS, text: "It has uncommitted changes: they will be lost." });
@@ -53,6 +62,10 @@ export function removalFindings({ dirty, submodules, branch, warning }) {
   return findings;
 }
 
+/**
+ * @param {{ bases: string[], mergedInto: string | null, unpushed: number | null, pullRequest?: unknown }} state
+ * @returns {Finding[]}
+ */
 function branchFindings({ bases, mergedInto, unpushed, pullRequest }) {
   return [
     mergedInto
@@ -82,13 +95,14 @@ function branchFindings({ bases, mergedInto, unpushed, pullRequest }) {
 // Whether the dialog removes the checkout without asking: every check answered and passed, and no other space nests
 // under this one, since closing a space closes the spaces nested under it. `ask`: whoever opened it wants the person
 // to confirm whatever the checks find.
-/** @param {{ dirty?: any, submodules?: any, branch?: any, warning?: any }} checks */
+/** @param {Checks} checks @param {number} nestedSpaceCount @param {{ ask?: boolean }} [options] */
 export function removesWithoutAsking(checks, nestedSpaceCount, { ask = false } = {}) {
   if (ask || !checksAnswered(checks) || nestedSpaceCount > 0) return false;
   return removalFindings(checks).every((finding) => finding.result === PASS);
 }
 
 // { mark, text }: ❌ when a finding loses work only this checkout holds, ⚠️ for any other failure, ✅ otherwise.
+/** @param {Finding[]} findings */
 export function removalVerdict(findings) {
   if (findings.some((finding) => finding.result === LOSS))
     return { mark: "❌", text: "Removing it loses work that exists only in this checkout." };

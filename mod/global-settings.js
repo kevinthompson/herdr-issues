@@ -33,19 +33,35 @@ import {
   topLevelSettings,
 } from "./trackers/setting.js";
 
+/** @import { AsyncContext, Context, NativeElement } from "gpui-kit" */
+/** @import { InputState as InputStateType, TextareaState as TextareaStateType } from "gpui-base" */
+/** @import { Theme } from "./menu.js" */
+/** @import { SelectOption } from "./select.js" */
+/** @import { ApprovalKey } from "./setup.js" */
+/** @import { AgentKey, AgentValues, SaveRequest } from "./settings-form.js" */
+
+/** @typedef {{ key: string, title: string, placeholder: string, parse: (text: string) => string | number | null, sentence: string }} TypedQuestion */
+/** @typedef {Record<string, string | number | boolean | null>} SavedValues */
+
+/** @type {SelectOption} */
 const DEFAULT_ON_APPROVAL_CHOICE = {
   id: CLEAR_CHOICE,
   label: "Default (Pull request or merge)",
   detail: "A pull request when the repository's origin is on GitHub, and a merge into main otherwise.",
 };
+/**
+ * @param {SelectOption[]} choices
+ * @param {string} id
+ */
 const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label;
 
+/** @type {TypedQuestion[]} */
 const TYPED_QUESTIONS = [
   {
     key: "spaceName",
     title: "Issue space name",
     placeholder: "<issueId>",
-    parse: (text) => text.trim() || null,
+    parse: (/** @type {string} */ text) => text.trim() || null,
     sentence:
       "The name of each issue's worktree space, where <issueId> is the issue's ID and <repo> the repository's name. Leave it empty to name spaces after the issue's ID.",
   },
@@ -69,16 +85,24 @@ const WORK_PROMPT_SENTENCE =
   "Instructions appended to the system prompt of every Claude session that works an issue. A repository's own prompt is added after this one.";
 
 export class GlobalSettings extends SettingsForm {
+  /**
+   * @param {{ onSaved: (cx: AsyncContext) => void }} callbacks
+   */
   constructor({ onSaved }) {
     super({ onSaved });
-    /** @type {Record<string, any>} */
+    /** @type {SavedValues} */
     this.saved = null;
+    /** @type {Record<string, string | null>} */
     this.chosen = {};
+    /** @type {Record<string, InputStateType> | null} */
     this.typedInputs = null;
+    /** @type {TextareaStateType | null} */
     this.workPromptInput = null;
-    this.selects = null;
   }
 
+  /**
+   * @param {Context} cx
+   */
   load(cx) {
     this.selects = {
       ...Object.fromEntries(
@@ -90,18 +114,21 @@ export class GlobalSettings extends SettingsForm {
     cx.spawn(async (cx) => {
       try {
         const settings = await topLevelSettings();
-        const value = (key) =>
-          typeof settings[key] === "string" ? settings[key].trim() || null : (settings[key] ?? null);
+        /** @param {string} key */
+        const value = (key) => {
+          const raw = /** @type {Record<string, string | number | boolean | undefined>} */ (settings)[key];
+          return typeof raw === "string" ? raw.trim() || null : (raw ?? null);
+        };
         this.saved = {
           ...Object.fromEntries(
             [...TYPED_QUESTIONS.map(({ key }) => key), "workPrompt"].map((key) => [key, value(key)]),
           ),
-          close: closeChoice(value("close")),
+          close: closeChoice(/** @type {string | null} */ (value("close"))),
           ...ownApproval(settings),
         };
         this.chosen = {
           ...Object.fromEntries(SELECT_KEYS.map((key) => [key, this.saved[key]])),
-          waitForChecks: checksChoiceId(this.saved.waitForChecks),
+          waitForChecks: checksChoiceId(/** @type {boolean | null} */ (this.saved.waitForChecks)),
         };
         this.typedInputs = Object.fromEntries(
           TYPED_QUESTIONS.map(({ key, placeholder }) => {
@@ -114,10 +141,12 @@ export class GlobalSettings extends SettingsForm {
             return [key, input];
           }),
         );
-        this.openAgent(Object.fromEntries(Object.keys(AGENT_DEFAULTS).map((key) => [key, value(key)])));
+        this.openAgent(
+          /** @type {AgentValues} */ (Object.fromEntries(Object.keys(AGENT_DEFAULTS).map((key) => [key, value(key)]))),
+        );
         this.workPromptInput = TextareaState.new({
           placeholder: "No prompt",
-          value: this.saved.workPrompt ?? "",
+          value: String(this.saved.workPrompt ?? ""),
           rows: WORK_PROMPT_ROWS,
         });
         this.workPromptInput.set_soft_wrap(true);
@@ -132,6 +161,11 @@ export class GlobalSettings extends SettingsForm {
   }
 
   // `value` for approval, onApproval, waitForChecks or close, or null to remove it.
+  /**
+   * @param {string} key
+   * @param {string | null} value
+   * @param {Context} cx
+   */
   choose(key, value, cx) {
     this.chosen = { ...this.chosen, [key]: value };
     this.saveNow(cx);
@@ -148,8 +182,10 @@ export class GlobalSettings extends SettingsForm {
   // Each typed setting's value, or its problem when it can't be saved.
   typed() {
     if (!this.typedInputs) return { values: {}, problems: {} };
-    const values = {},
-      problems = {};
+    /** @type {Record<string, string | number | null>} */
+    const values = {};
+    /** @type {Record<string, string>} */
+    const problems = {};
     for (const { key, parse } of TYPED_QUESTIONS) {
       try {
         values[key] = parse(this.typedInputs[key].value());
@@ -178,7 +214,8 @@ export class GlobalSettings extends SettingsForm {
     const approvalSettings = this.approvalValues();
     const approvalChanged = APPROVAL_KEYS.some(
       (key) =>
-        (key !== "waitForChecks" || this.fields().waitForChecksSelect) && approvalSettings[key] !== this.saved[key],
+        (key !== "waitForChecks" || this.fields().waitForChecksSelect) &&
+        approvalSettings[/** @type {ApprovalKey} */ (key)] !== this.saved[key],
     );
     const current = {
       close: this.chosen.close,
@@ -186,7 +223,9 @@ export class GlobalSettings extends SettingsForm {
       ...this.agentValues,
       workPrompt: this.workPromptInput?.value().trim() || null,
     };
-    const savedFor = (key) => (key in AGENT_DEFAULTS ? this.savedAgent[key] : this.saved[key]);
+    /** @param {string} key */
+    const savedFor = (key) =>
+      key in AGENT_DEFAULTS ? this.savedAgent[/** @type {AgentKey} */ (key)] : this.saved[key];
     const changed = Object.fromEntries(
       Object.entries(current)
         .filter(([key, value]) => (value ?? null) !== savedFor(key))
@@ -197,6 +236,9 @@ export class GlobalSettings extends SettingsForm {
 
   // The changed keys, written together, after which they're the saved values, or null when nothing changed. A typed
   // value that can't be saved isn't a change yet.
+  /**
+   * @returns {SaveRequest | null}
+   */
   saveRequest() {
     const changes = this.changes();
     if (Object.keys(changes).length === 0) return null;
@@ -205,12 +247,16 @@ export class GlobalSettings extends SettingsForm {
       written: () => {
         const agent = Object.entries(changes).filter(([key]) => key in AGENT_DEFAULTS);
         const others = Object.entries(changes).filter(([key]) => !(key in AGENT_DEFAULTS));
-        this.savedAgent = { ...this.savedAgent, ...Object.fromEntries(agent) };
+        this.savedAgent = { ...this.savedAgent, .../** @type {AgentValues} */ (Object.fromEntries(agent)) };
         this.saved = { ...this.saved, ...Object.fromEntries(others) };
       },
     };
   }
 
+  /**
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   form(content, t) {
     const fields = this.fields();
     const { problems } = this.typed();
@@ -281,12 +327,24 @@ export class GlobalSettings extends SettingsForm {
   }
 
   // The select of approval, onApproval or waitForChecks, led by `defaultChoice`.
+  /**
+   * @param {ApprovalKey} key
+   * @param {SelectOption} defaultChoice
+   * @param {Theme} t
+   */
   approvalQuestion(key, defaultChoice, t) {
     const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
     return this.selectQuestion(key, title, sentence, [defaultChoice, ...choices], t);
   }
 
   // A select of approval, onApproval, waitForChecks or close, opening on the top level's value or Default.
+  /**
+   * @param {string} key
+   * @param {string} title
+   * @param {string | null} sentence
+   * @param {SelectOption[]} options
+   * @param {Theme} t
+   */
   selectQuestion(key, title, sentence, options, t) {
     return this.question(title, sentence, t, (controls) =>
       controls.child(

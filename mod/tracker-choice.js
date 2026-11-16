@@ -15,6 +15,12 @@ import { checkBeads, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
 import { originNotOnGitHub, BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM, LINEAR_KEY_PAGE } from "./trackers/problems.js";
 
+/** @import { AsyncContext, Color, Context, NativeElement } from "gpui-kit" */
+/** @import { Theme } from "./menu.js" */
+/** @import { SetupProblem } from "./trackers/problems.js" */
+
+/** @typedef {{ key: string, name: string }} Team */
+
 export const TRACKERS = [
   { id: "github", label: "GitHub Issues" },
   { id: "linear", label: "Linear" },
@@ -24,43 +30,69 @@ const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TEAM_DROPDOWN_MAX_PX = 280;
 
 // What each tracker checks before it's ready; Linear's check answers with the teams the key can see.
+/** @type {Record<string, (main: string) => Promise<Team[] | void>>} */
 const READINESS_CHECKS = { github: checkGitHub, linear: linearTeams, beads: checkBeads };
 
+/**
+ * @param {string} main
+ */
 async function checkGitHub(main) {
   await checkGitHubLogin();
-  const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: main }).catch(() => null);
+  const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: main }).catch(
+    /** @returns {{ code: number, stdout: string }} */ () => null,
+  );
   if (origin?.code !== 0 || !/github\.com[:/]/.test(origin.stdout)) throw originNotOnGitHub();
 }
 
 // The teams the API key can see, by name.
+/**
+ * @returns {Promise<Team[]>}
+ */
 async function linearTeams() {
   const linear = await linearClient();
   const { teams } = await linear(TEAMS);
   return [...teams.nodes].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
 
+/**
+ * @param {string} id
+ * @param {string} text
+ * @param {Color} color
+ */
 export const markdown = (id, text, color) => TextView.markdown(id, text).flex_none().text_size(12).text_color(color);
 
+/**
+ * @template A
+ */
 export class TrackerChoice {
   // main: the repository's main checkout. picks: the shared state the team dropdown hands its pick back through.
   // alongside(): more work the check waits for; onReady(its result, cx) runs once the chosen tracker's check
   // passes. onTeam(cx) runs once a team is picked, from the owner's render, where Herdr refuses cx.notify().
-  constructor(main, { picks, alongside = async () => null, onReady, onTeam }) {
+  /**
+   * @param {string} main
+   * @param {{ picks: string, alongside?: () => Promise<A>, onReady: (alongside: A, cx: AsyncContext) => void, onTeam: (cx: Context) => void }} callbacks
+   */
+  constructor(main, { picks, alongside = /** @returns {Promise<A>} */ async () => null, onReady, onTeam }) {
     this.main = main;
     this.picks = picks;
     this.alongside = alongside;
     this.onReady = onReady;
     this.onTeam = onTeam;
+    /** @type {string | null} */
     this.choice = null;
+    /** @type {Team[] | null} */
     this.teams = null;
+    /** @type {string | null} */
     this.team = null;
     this.checking = false;
+    /** @type {SetupProblem | null} */
     this.problem = null;
     // The Linear API key being entered, which is never kept once saved.
     this.keyInput = InputState.new({ placeholder: "lin_api_…" });
     this.keyInput.set_masked(true);
     this.keyText = "";
     this.savingKey = false;
+    /** @type {string | null} */
     this.keyError = null;
     this.keyInput.on("change", (_e, cx) => {
       this.keyText = this.keyInput.value();
@@ -74,12 +106,19 @@ export class TrackerChoice {
     Object.assign(this, { choice: null, teams: null, team: null, checking: false, problem: null });
   }
 
+  /**
+   * @param {string} choice
+   * @param {Context} cx
+   */
   choose(choice, cx) {
     if (choice !== this.choice) this.team = null;
     this.choice = choice;
     this.check(cx);
   }
 
+  /**
+   * @param {Context} cx
+   */
   check(cx) {
     const choice = this.choice;
     Object.assign(this, { checking: true, problem: null });
@@ -88,7 +127,7 @@ export class TrackerChoice {
       try {
         const [teams, alongside] = await Promise.all([READINESS_CHECKS[choice](this.main), this.alongside()]);
         if (this.choice !== choice) return;
-        this.teams = teams ?? null;
+        this.teams = /** @type {Team[] | undefined} */ (teams) ?? null;
         this.onReady(alongside, cx);
       } catch (/** @type {any} */ e) {
         if (this.choice === choice) this.problem = e;
@@ -101,6 +140,9 @@ export class TrackerChoice {
   }
 
   // Makes the Beads database the check found missing, then checks again.
+  /**
+   * @param {Context} cx
+   */
   makeBeadsDatabase(cx) {
     const choice = this.choice;
     Object.assign(this, { checking: true, problem: null });
@@ -117,6 +159,9 @@ export class TrackerChoice {
   }
 
   // Saves the entered key, then checks again as `onKeySaved` says.
+  /**
+   * @param {Context} cx
+   */
   saveKey(cx) {
     const apiKey = this.keyText.trim();
     if (!apiKey || this.savingKey) return;
@@ -137,6 +182,10 @@ export class TrackerChoice {
     cx.notify();
   }
 
+  /**
+   * @param {string} id
+   * @param {Theme} t
+   */
   keyForm(id, t) {
     return v_flex()
       .flex_none()
@@ -190,6 +239,13 @@ export class TrackerChoice {
   }
 
   // A problem with its fix. A Linear key problem asks for the key, and saving one runs onCheckAgain.
+  /**
+   * @param {string} id
+   * @param {SetupProblem} problem
+   * @param {(cx: Context) => void} onCheckAgain
+   * @param {Theme} t
+   * @param {NativeElement | null} [extra]
+   */
   problemView(id, problem, onCheckAgain, t, extra = null) {
     const asksForKey = problem.code === LINEAR_KEY_PROBLEM;
     if (asksForKey) this.onKeySaved = onCheckAgain;
@@ -210,6 +266,11 @@ export class TrackerChoice {
   }
 
   // Adds to `content` that the check is running, or the problem it found, with a way to make a missing Beads database.
+  /**
+   * @param {NativeElement} content
+   * @param {string} id
+   * @param {Theme} t
+   */
   withCheckStatus(content, id, t) {
     return content
       .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Checking…")))
@@ -217,7 +278,7 @@ export class TrackerChoice {
         e.child(
           this.problemView(
             id,
-            this.problem ?? {},
+            this.problem ?? /** @type {SetupProblem} */ ({}),
             (cx) => this.check(cx),
             t,
             this.problem?.code === BEADS_NOT_INITIALIZED
@@ -234,6 +295,9 @@ export class TrackerChoice {
   }
 
   // Takes the team picked in the dropdown, which hands it over through shared state.
+  /**
+   * @param {Context} cx
+   */
   takePickedTeam(cx) {
     const picks = /** @type {Record<string, any>} */ (shared(this.picks) ?? {}),
       team = picks[this.main];
@@ -250,6 +314,10 @@ export class TrackerChoice {
     return team ? `${team.name} (${team.key})` : (this.team ?? "");
   }
 
+  /**
+   * @param {string} id
+   * @param {Theme} t
+   */
   teamDropdown(id, t) {
     if (!this.teams?.length)
       return div().text_size(12).text_color(t.dim).child("The Linear API key can't see any teams.");

@@ -18,11 +18,21 @@ import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 
+/** @import { Context, NativeElement } from "gpui-kit" */
+/** @import { Theme } from "./menu.js" */
+/** @import { SelectOption } from "./select.js" */
+/** @import { SetupProblem } from "./trackers/problems.js" */
+
+/** @typedef {"approval" | "onApproval" | "waitForChecks"} ApprovalKey */
+/** @typedef {{ title: string, sentence: string | null, choices: SelectOption[] }} ApprovalQuestion */
+/** @typedef {{ approval: string, onApproval: string, waitForChecks: string | null }} ProposedApproval */
+
 const TEAM_PICKS = "issues.setupTeams";
 const ANSWER_LABEL_PX = 80;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 // Approval, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
 // the choices, each with what it means.
+/** @type {Record<ApprovalKey, ApprovalQuestion>} */
 export const APPROVAL_QUESTIONS = {
   approval: {
     title: "How is work approved?",
@@ -77,6 +87,10 @@ export const APPROVAL_QUESTIONS = {
 };
 
 // A plain sentence for a folder no tracker can serve because it's on another machine.
+/**
+ * @param {string} sentence
+ * @param {Theme} t
+ */
 export function untrackableView(sentence, t) {
   return v_flex().p(14).child(div().whitespace_normal().text_color(t.dim).child(sentence));
 }
@@ -85,6 +99,10 @@ const BLANK_STATE_ICON_PX = 40;
 
 // Centered in place of the list: an icon, why there are no issues, the button that fixes it, and how to put
 // the panel away instead.
+/**
+ * @param {{ id: string, sentence: string, label: string, enabled?: boolean, error?: string | null, onClick: (cx: Context) => void }} props
+ * @param {Theme} t
+ */
 function blankState({ id, sentence, label, enabled = true, error = null, onClick }, t) {
   return v_flex()
     .flex_1()
@@ -111,6 +129,9 @@ function blankState({ id, sentence, label, enabled = true, error = null, onClick
 
 // The chord sits in a monospace chip because the UI font draws a capital I like a lowercase l, and ⌘⇧L changes
 // the Herdr layout instead.
+/**
+ * @param {Theme} t
+ */
 function collapseHint(t) {
   const keyChip = div()
     .flex_none()
@@ -134,6 +155,10 @@ function collapseHint(t) {
 }
 
 // For a folder outside a git repository, with a button that makes it one.
+/**
+ * @param {{ initializing: boolean, error: string | null, onInitialize: (cx: Context) => void }} props
+ * @param {Theme} t
+ */
 export function notARepositoryView({ initializing, error, onInitialize }, t) {
   return blankState(
     {
@@ -148,22 +173,34 @@ export function notARepositoryView({ initializing, error, onInitialize }, t) {
   );
 }
 
+/**
+ * @param {SelectOption[]} choices
+ * @param {string | null | undefined} id
+ */
 const answerLabel = (choices, id) => choices.find((choice) => choice.id === id)?.label ?? "";
 
 export class TrackerSetup {
   // main: the repository's main checkout. onSaved(cx) runs once its entry is written.
+  /**
+   * @param {string} main
+   * @param {(cx: Context) => void} onSaved
+   */
   constructor(main, onSaved) {
     this.main = main;
     this.onSaved = onSaved;
+    /** @type {SetupProblem | null} */
     this.failure = null;
     this.choosingAnother = false;
     this.settingUp = false;
     this.step = "tracker";
     this.saving = false;
+    /** @type {SetupProblem | null} */
     this.saveProblem = null;
     // The proposed approval, onApproval and waitForChecks once the tracker is ready, and the answers to them, with
     // waitForChecks as its select's id (settings-fields.js).
+    /** @type {Partial<Record<ApprovalKey, string>>} */
     this.answers = {};
+    /** @type {ProposedApproval | null} */
     this.proposed = null;
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
@@ -179,6 +216,9 @@ export class TrackerSetup {
   }
 
   // The configured tracker's SetupProblem, or null when the repository has no tracker.
+  /**
+   * @param {SetupProblem | null} failure
+   */
   showFailure(failure) {
     this.failure = failure;
     if (!failure) this.choosingAnother = false;
@@ -186,6 +226,9 @@ export class TrackerSetup {
 
   // The steps for the answers so far; before onApproval is chosen, the proposed choice decides whether waiting
   // for checks is asked.
+  /**
+   * @returns {string[]}
+   */
   steps() {
     const onApproval = this.answers.onApproval ?? this.proposed?.onApproval ?? "pull-request";
     return [
@@ -199,6 +242,9 @@ export class TrackerSetup {
   }
 
   // Drops every answer and returns to the blank state; a check still running is ignored once it finishes.
+  /**
+   * @param {Context} cx
+   */
   cancel(cx) {
     this.forgetAnswers();
     this.settingUp = false;
@@ -210,6 +256,10 @@ export class TrackerSetup {
     this.tracker.reset();
   }
 
+  /**
+   * @param {string} step
+   * @param {Context} cx
+   */
   goTo(step, cx) {
     Object.assign(this, { step, saveProblem: null });
     this.tracker.problem = null;
@@ -217,6 +267,9 @@ export class TrackerSetup {
   }
 
   // The previous step, or, choosing another tracker for one that fails to load, the failure.
+  /**
+   * @param {Context} cx
+   */
   back(cx) {
     const steps = this.steps(),
       index = steps.indexOf(this.step);
@@ -228,6 +281,9 @@ export class TrackerSetup {
   }
 
   // An entry that fails to load proposes the defaults instead of its own settings.
+  /**
+   * @returns {Promise<ProposedApproval>}
+   */
   async proposeApproval() {
     const proposed = await approvalSettings({ root: this.main, on: null }).catch(() =>
       resolveApprovalSettings(this.main, null),
@@ -235,17 +291,28 @@ export class TrackerSetup {
     return { ...proposed, waitForChecks: checksChoiceId(proposed.waitForChecks) };
   }
 
+  /**
+   * @param {Context} cx
+   */
   takePickedTeam(cx) {
     this.tracker.takePickedTeam(cx);
   }
 
   // Answers approval, onApproval or waitForChecks, and goes on to the next step.
+  /**
+   * @param {ApprovalKey} key
+   * @param {string} id
+   * @param {Context} cx
+   */
   chooseApproval(key, id, cx) {
     this.answers = { ...this.answers, [key]: id };
     const steps = this.steps();
     this.goTo(steps[steps.indexOf(key) + 1], cx);
   }
 
+  /**
+   * @param {Context} cx
+   */
   save(cx) {
     const { choice, team } = this.tracker;
     const { approval, onApproval, waitForChecks } = this.answers;
@@ -273,6 +340,10 @@ export class TrackerSetup {
   }
 
   // header: the panel's header, which a failure shows under; the steps draw their own bar in its place.
+  /**
+   * @param {Theme} t
+   * @param {{ onRetry: (cx: Context) => void, header: NativeElement, onCollapse: Parameters<typeof collapseButton>[0] }} props
+   */
   render(t, { onRetry, header, onCollapse }) {
     this.onCollapse = onCollapse;
     const content = v_flex().id("issues-setup").flex_1().min_h(0).overflow_y_scrollbar().p(14).gap(12);
@@ -321,12 +392,21 @@ export class TrackerSetup {
           ),
         );
     }
-    const page = { tracker: this.trackerPage, team: this.teamPage, review: this.reviewPage }[this.step];
-    const shown = page ? page.call(this, content, t) : this.approvalPage(this.step, content, t);
+    const page = /** @type {Record<string, ((content: NativeElement, t: Theme) => NativeElement) | undefined>} */ ({
+      tracker: this.trackerPage,
+      team: this.teamPage,
+      review: this.reviewPage,
+    })[this.step];
+    const shown = page
+      ? page.call(this, content, t)
+      : this.approvalPage(/** @type {ApprovalKey} */ (this.step), content, t);
     return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(shown);
   }
 
   // Back at the top left, as an open issue has its way back, and where the step falls at the top right.
+  /**
+   * @param {Theme} t
+   */
   stepBar(t) {
     const steps = this.steps(),
       index = steps.indexOf(this.step);
@@ -375,6 +455,12 @@ export class TrackerSetup {
 
   // A page's question, a sentence under it, and its options, each with what it means. The current answer is
   // solid, and the proposed one says so.
+  /**
+   * @param {NativeElement} content
+   * @param {string} title
+   * @param {string | null} sentence
+   * @param {Theme} t
+   */
   question(content, title, sentence, t) {
     return content
       .child(div().font_semibold().child(title))
@@ -383,6 +469,12 @@ export class TrackerSetup {
       );
   }
 
+  /**
+   * @param {string} kind
+   * @param {SelectOption[]} choices
+   * @param {{ chosen: string | null | undefined, proposed?: string | null, onChoose: (id: string, cx: Context) => void, enabled?: boolean }} props
+   * @param {Theme} t
+   */
   options(kind, choices, { chosen, proposed = null, onChoose, enabled = true }, t) {
     return v_flex()
       .flex_none()
@@ -417,6 +509,10 @@ export class TrackerSetup {
       );
   }
 
+  /**
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   trackerPage(content, t) {
     const tracker = this.tracker;
     const sentence = this.failure
@@ -437,6 +533,10 @@ export class TrackerSetup {
     return tracker.withCheckStatus(page, "setup-problem", t);
   }
 
+  /**
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   teamPage(content, t) {
     return this.question(content, "Which Linear team?", "The panel lists this team's issues.", t)
       .child(this.tracker.teamDropdown("setup-team", t))
@@ -448,6 +548,11 @@ export class TrackerSetup {
   }
 
   // The page for approval, onApproval or waitForChecks.
+  /**
+   * @param {ApprovalKey} key
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   approvalPage(key, content, t) {
     const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
     return this.question(content, title, sentence, t).child(
@@ -464,14 +569,24 @@ export class TrackerSetup {
     );
   }
 
+  /**
+   * @param {NativeElement} content
+   * @param {Theme} t
+   */
   reviewPage(content, t) {
-    const approvalAnswer = (key) => answerLabel(APPROVAL_QUESTIONS[key].choices, this.answers[key]);
+    const approvalAnswer = (/** @type {ApprovalKey} */ key) =>
+      answerLabel(APPROVAL_QUESTIONS[key].choices, this.answers[key]);
+    /** @type {[string, string][]} */
     const answers = [
       ["Tracker", answerLabel(TRACKERS, this.tracker.choice)],
-      ...(this.tracker.choice === "linear" ? [["Team", this.tracker.teamLabel()]] : []),
+      ...(this.tracker.choice === "linear"
+        ? /** @type {[string, string][]} */ ([["Team", this.tracker.teamLabel()]])
+        : []),
       ["Approval", approvalAnswer("approval")],
       ["When work is approved...", approvalAnswer("onApproval")],
-      ...(this.answers.onApproval === "pull-request" ? [["Checks", approvalAnswer("waitForChecks")]] : []),
+      ...(this.answers.onApproval === "pull-request"
+        ? /** @type {[string, string][]} */ ([["Checks", approvalAnswer("waitForChecks")]])
+        : []),
     ];
     return this.question(
       content,
@@ -495,7 +610,14 @@ export class TrackerSetup {
       )
       .when(this.saving, (e) => e.child(div().text_size(12).text_color(t.dim).child("Saving…")))
       .when(!this.saving && Boolean(this.saveProblem), (e) =>
-        e.child(this.tracker.problemView("setup-problem", this.saveProblem ?? {}, (cx) => this.save(cx), t)),
+        e.child(
+          this.tracker.problemView(
+            "setup-problem",
+            this.saveProblem ?? /** @type {SetupProblem} */ ({}),
+            (cx) => this.save(cx),
+            t,
+          ),
+        ),
       )
       .when(!this.saving && !this.saveProblem, (e) =>
         e.child(h_flex().child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true }))),

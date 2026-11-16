@@ -3,13 +3,19 @@
 const TASK = /^(\s*)[-*+] \[([ xX])\] (.*)$/;
 const FENCE = /^\s*(```|~~~)/;
 
+/** @param {string} line */
 const indentOf = (line) => /^\s*/.exec(line)[0].length;
 
 // Splits a body into Markdown runs ({ markdown }) and task items ({ line, indent, checked, text }),
 // where `line` is the item's index in the body's lines. Items inside fenced code stay Markdown.
+/**
+ * @param {string} body
+ * @returns {({ markdown: string } | { line: number, indent: number, checked: boolean, text: string })[]}
+ */
 export function bodySegments(body) {
   const lines = body.split("\n"),
     segments = [];
+  /** @type {string[]} */
   let markdown = [],
     inFence = false;
   const flushMarkdown = () => {
@@ -28,6 +34,7 @@ export function bodySegments(body) {
     const taskLine = index,
       indent = task[1].length,
       text = [task[3].trim()];
+    /** @param {string | undefined} next */
     const continues = (next) => next !== undefined && next.trim() && indentOf(next) > indent && !TASK.test(next);
     while (continues(lines[index + 1])) text.push(lines[++index].trim());
     segments.push({ line: taskLine, indent, checked: task[2] !== " ", text: text.join(" ") });
@@ -37,6 +44,7 @@ export function bodySegments(body) {
 }
 
 // The body with the task item on `line` checked if it was unchecked, and unchecked if it was checked.
+/** @param {string} body @param {number} line */
 export function toggleTask(body, line) {
   const lines = body.split("\n"),
     task = TASK.exec(lines[line] ?? "");

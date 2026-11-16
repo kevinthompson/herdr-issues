@@ -3,6 +3,11 @@
 // mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly.
 // `issues merge --check` runs checkMerge, mergeIssue's checks alone, so a session can confirm before asking for
 // approval that approving will merge: it tests the merge with git merge-tree and changes no checkout or ref.
+/**
+ * @import { ExecResult } from "herdr"
+ * @import { Issue, Project, Tracker } from "./trackers/index.js"
+ * @import { Checkout } from "./worktree.js"
+ */
 import { exec } from "herdr";
 import { checkouts, MAIN_BRANCHES } from "./worktree.js";
 import { approvalSettings } from "./trackers/setting.js";
@@ -10,22 +15,43 @@ import { announceIssueChange } from "./changes.js";
 
 export class MergeRefusal extends Error {}
 
+/**
+ * @param {string} cwd
+ * @param {string[]} args
+ * @param {string | null} [on]
+ */
 async function git(cwd, args, on) {
-  const result = await exec("git", args, { cwd, on }).catch(() => null);
+  const result = await exec("git", args, { cwd, on }).catch(/** @returns {ExecResult | null} */ () => null);
   return { ok: result?.code === 0, out: (result?.stdout ?? "").trim(), err: (result?.stderr ?? "").trim() };
 }
 
+/**
+ * @param {string} path
+ * @param {string | null | undefined} on
+ * @param {{ untracked: boolean }} options
+ */
 const changedFiles = async (path, on, { untracked }) =>
   (await git(path, ["status", "--porcelain", `--untracked-files=${untracked ? "normal" : "no"}`], on)).out;
 
+/**
+ * @param {Checkout} main
+ * @param {string} branch
+ * @param {string | null | undefined} on
+ */
 const commitsMainLacks = async (main, branch, on) =>
   Number((await git(main.path, ["rev-list", "--count", `${main.branch}..${branch}`], on)).out) || 0;
 
 // Whether the issue view offers to merge `branch`: the repository merges locally, and the branch's worktree has
 // commits main lacks and nothing uncommitted. Anything mergeIssue checks besides is reported when it's clicked.
+/**
+ * @param {string | null | undefined} branch
+ * @param {Project} project
+ */
 export async function canOfferMerge(branch, project) {
   if (!branch || project.on != null) return false;
-  const { onApproval } = await approvalSettings(project).catch(() => ({ onApproval: null }));
+  const { onApproval } = await approvalSettings(project).catch(() => ({
+    onApproval: /** @type {string | null} */ (null),
+  }));
   if (onApproval !== "merge") return false;
   const [main, ...linked] = await checkouts(project.root, project.on);
   const worktree = linked.find((checkout) => checkout.branch === branch);
@@ -35,6 +61,11 @@ export async function canOfferMerge(branch, project) {
 }
 
 // Checks every reason not to merge before changing anything; returns the main checkout, { path, branch }.
+/**
+ * @param {string} branch
+ * @param {Project} project
+ * @returns {Promise<Checkout>}
+ */
 async function mergeableMain(branch, project) {
   const { on } = project;
   const { onApproval } = await approvalSettings(project);
@@ -61,12 +92,22 @@ async function mergeableMain(branch, project) {
   return main;
 }
 
+/**
+ * @param {string} branch
+ * @param {Checkout} main
+ * @param {string[]} conflicts
+ * @param {string} error
+ */
 const uncleanMerge = (branch, main, conflicts, error) => {
   const detail = conflicts.length ? `: ${conflicts.join(", ")}` : error ? `: ${error.split("\n").pop()}` : "";
   return new MergeRefusal(`${branch} doesn't merge cleanly into ${main.branch}, so nothing was merged${detail}`);
 };
 
 // Throws the MergeRefusal mergeIssue would, without changing anything; returns the main checkout, { path, branch }.
+/**
+ * @param {Issue} issue
+ * @param {Project} project
+ */
 export async function checkMerge(issue, project) {
   const { branch } = issue;
   if (!branch) throw new MergeRefusal(`${issue.id} has no branch.`);
@@ -83,6 +124,11 @@ export async function checkMerge(issue, project) {
 
 // Merges the issue's branch into main with a merge commit, then marks the issue done and tells every panel.
 // A conflicting merge is aborted, leaving the main checkout as it was. Returns the main branch's name.
+/**
+ * @param {Issue} issue
+ * @param {Tracker} tracker
+ * @param {Project} project
+ */
 export async function mergeIssue(issue, tracker, project) {
   const { branch } = issue,
     { on } = project;
@@ -96,7 +142,7 @@ export async function mergeIssue(issue, tracker, project) {
     throw uncleanMerge(branch, main, conflicts, merged.err);
   }
   const marking = await tracker.update(issue, { status: "done" }).then(
-    () => null,
+    /** @returns {Error | null} */ () => null,
     (error) => error,
   );
   await announceIssueChange();

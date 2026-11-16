@@ -4,6 +4,11 @@
 import { installCommands, packageManagers } from "../package-managers.js";
 
 export class SetupProblem extends Error {
+  /**
+   * @param {string} message
+   * @param {string} fix
+   * @param {string | null} [code]
+   */
   constructor(message, fix, code = null) {
     super(message);
     this.fix = fix;
@@ -23,6 +28,10 @@ const KEYCHAIN_ACCESS_FIX =
   LINEAR_KEY_FIX;
 
 // Installing a missing tool with the person's package managers, or as `instructions` say when they have none.
+/**
+ * @param {string} packageName
+ * @param {string} instructions
+ */
 async function installFix(packageName, instructions) {
   const commands = installCommands(await packageManagers(), packageName);
   return `Install it ${commands ? `with ${commands}` : instructions}, then check again.`;
@@ -35,6 +44,7 @@ export const ghMissing = async () =>
   );
 export const ghLoggedOut = () =>
   new SetupProblem("The GitHub CLI (gh) isn't logged in", "Run `gh auth login` in a terminal, then check again.");
+/** @param {string} message */
 export const ghFailed = (message) =>
   new SetupProblem(
     message,
@@ -57,17 +67,23 @@ export const beadsNotInitialized = () =>
     "Run `bd init` in the repository's main checkout, then check again.",
     BEADS_NOT_INITIALIZED,
   );
+/** @param {string} message */
 export const bdFailed = (message) =>
   new SetupProblem(message, "Check that `bd list` works in the repository's main checkout, then check again.");
 export const LINEAR_KEY_PROBLEM = "linear-key";
 export const linearKeyMissing = (store = KEYCHAIN) =>
   new SetupProblem(`No Linear API key in ${store}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+/**
+ * @param {string} reason
+ * @param {string} [store]
+ */
 export const linearKeyUnreadable = (reason, store = KEYCHAIN) =>
   new SetupProblem(
     `Couldn't read the Linear API key from ${store}${reason ? ` (${reason})` : ""}`,
     store === KEYCHAIN ? KEYCHAIN_ACCESS_FIX : LINEAR_KEY_FIX,
     LINEAR_KEY_PROBLEM,
   );
+/** @param {string} reason */
 export const linearKeyUnsaved = (reason) =>
   new SetupProblem(
     `Couldn't save the Linear API key in ${KEYCHAIN}${reason ? ` (${reason})` : ""}`,
@@ -76,15 +92,18 @@ export const linearKeyUnsaved = (reason) =>
   );
 export const linearKeyInvalid = (store = KEYCHAIN) =>
   new SetupProblem(`Linear refused the API key in ${store}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+/** @param {string} message */
 export const badSetting = (message) =>
   new SetupProblem(
     message,
     "Fix the repository's entry in `~/.config/herdr-app/issues.json`, or choose a different tracker to replace it.",
   );
+/** @param {string} message */
 export const badApprovalSetting = (message) =>
   new SetupProblem(
     message,
     "Fix the repository's `approval`, `onApproval` and `waitForChecks` in `~/.config/herdr-app/issues.json`, then check again, or choose a tracker again to choose them anew.",
   );
+/** @param {string} message */
 export const settingsUnreadable = (message) =>
   new SetupProblem(message, "Fix `~/.config/herdr-app/issues.json` so it's valid JSON, then check again.");

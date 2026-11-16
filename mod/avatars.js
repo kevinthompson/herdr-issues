@@ -5,6 +5,7 @@ import { appHome, exec } from "herdr";
 import { fileKey } from "./file-key.js";
 
 const FOLDER = "data/issues/avatars";
+/** @type {Record<string, string>} */
 const EXTENSIONS = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -15,17 +16,19 @@ const EXTENSIONS = {
 
 // key → the image's path from the app folder, or null while it downloads or after it failed.
 const avatars = new Map();
+/** @type {Promise<string[]> | null} */
 let cached = null;
 
 // The files already downloaded, read once.
 function cachedFiles() {
   cached ??= exec("ls", ["-1", `${appHome()}/${FOLDER}`]).then(
     (listing) => (listing.code === 0 ? listing.stdout.split("\n").filter(Boolean) : []),
-    () => [],
+    /** @returns {string[]} */ () => [],
   );
   return cached;
 }
 
+/** @param {string} url @param {string} key @returns {Promise<string | null>} */
 async function download(url, key) {
   const folder = `${appHome()}/${FOLDER}`,
     partial = `${folder}/${key}.part`;
@@ -40,15 +43,23 @@ async function download(url, key) {
   return moved.code === 0 ? `${FOLDER}/${key}.${extension}` : null;
 }
 
+/** @param {string} url @param {string} key @returns {Promise<string | null>} */
 async function load(url, key) {
   const existing = (await cachedFiles()).find((file) => file.startsWith(`${key}.`) && !file.endsWith(".part"));
-  const path = existing ? `${FOLDER}/${existing}` : await download(url, key).catch(() => null);
+  const path = existing
+    ? `${FOLDER}/${existing}`
+    : await download(url, key).catch(/** @returns {string | null} */ () => null);
   avatars.set(key, path);
   return path;
 }
 
 // The avatar's path for image(), or null until it is on disk. The first request for an avatar starts
 // its download and hands onLoading the promise of its path, so the caller can redraw when it arrives.
+/**
+ * @param {string | null | undefined} url
+ * @param {(path: Promise<string | null>) => void} onLoading
+ * @returns {string | null}
+ */
 export function avatarImage(url, onLoading) {
   if (!url) return null;
   const key = fileKey(url);

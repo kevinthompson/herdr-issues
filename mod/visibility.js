@@ -3,19 +3,24 @@
 // place, such as one in a pane of its own, counts as shown.
 import { layout, window } from "herdr";
 
+/** @typedef {{ type?: string, id?: string, active?: string, hidden?: boolean, content?: { mod?: string }, children?: LayoutNode[] }} LayoutNode */
+
 const MOD = "issues";
 
+/** @param {LayoutNode} node @returns {LayoutNode[]} */
 const shownChildren = (node) => {
   const children = node.children ?? [];
   if (node.type !== "stack") return children;
   const active = node.active ?? children[0]?.id;
   return children.filter((child) => child.id === active);
 };
+/** @param {LayoutNode} node @returns {boolean} */
 const placesPanel = (node) => node.content?.mod === MOD || (node.children ?? []).some(placesPanel);
+/** @param {LayoutNode} node @returns {boolean} */
 const showsPanel = (node) => !node.hidden && (node.content?.mod === MOD || shownChildren(node).some(showsPanel));
 
 export function panelVisible() {
   if (window()?.active === false) return false;
-  const root = layout();
+  const root = /** @type {LayoutNode | null} */ (layout());
   return !root || !placesPanel(root) || showsPanel(root);
 }

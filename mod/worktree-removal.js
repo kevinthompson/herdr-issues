@@ -4,15 +4,31 @@
 // them again, once they've run for DIALOG_DELAY_MS, or at once when a check fails, `ask` is set or other spaces nest
 // under this one. One removal runs per space until it finishes or its dialog closes.
 
+/**
+ * @import { PaneInfo, SpaceInfo } from "herdr"
+ * @typedef {{ top: string, main: string, name: string, linked: boolean }} Repo
+ * @typedef {{ name: string, dir: string, pinned: string }} Submodule
+ * @typedef {{ error: string }} CheckFailure
+ * @typedef {{
+ *   dirty?: boolean | CheckFailure,
+ *   submodules?: string[] | CheckFailure,
+ *   branch?: Awaited<ReturnType<typeof branchState>> | CheckFailure,
+ * }} RemovalChecks
+ */
 import { exec, run, spaces, panes, openOverlay } from "herdr";
 import { branchState, checkouts } from "./worktree.js";
 import { checksAnswered, removalFindings, removesWithoutAsking, runChecks, PASS } from "./removal.js";
 
 export const DIALOG_DELAY_MS = 300;
 
+/** @type {Map<string, object>} */
 const removalsBySpace = new Map();
 
 // Opens the dialog that removes the space's worktree and closes the space.
+/**
+ * @param {string} spaceId
+ * @param {{ ask?: boolean }} [options]
+ */
 export function openRemovalDialog(spaceId, { ask = false } = {}) {
   openOverlay({
     mod: "issues",
@@ -24,12 +40,21 @@ export function openRemovalDialog(spaceId, { ask = false } = {}) {
 }
 
 // Where a space is now: its first terminal's live folder, else where it was made.
+/**
+ * @param {{ tabs?: { id: string }[], folder?: string | null } | null | undefined} space
+ * @param {PaneInfo[]} [paneList]
+ */
 export function place(space, paneList = panes()) {
   if (!space) return null;
   const tabs = new Set((space.tabs ?? []).map((tab) => tab.id));
   return paneList.find((pane) => tabs.has(pane.tab) && pane.cwd)?.cwd || space.folder || null;
 }
 
+/**
+ * @param {string} cwd
+ * @param {string[]} args
+ * @param {string | null} [on]
+ */
 export async function git(cwd, args, on) {
   const result = await exec("git", args, { cwd, on });
   return {
@@ -41,6 +66,11 @@ export async function git(cwd, args, on) {
 
 // The repo a folder belongs to: its main checkout and name, and whether
 // the folder is itself a linked worktree. null outside git.
+/**
+ * @param {string} folder
+ * @param {string | null} [on]
+ * @returns {Promise<Repo | null>}
+ */
 export async function repoOf(folder, on) {
   const top = await git(folder, ["rev-parse", "--show-toplevel"], on);
   const common = await git(folder, ["rev-parse", "--path-format=absolute", "--git-common-dir"], on);
@@ -52,6 +82,14 @@ export async function repoOf(folder, on) {
 // The submodule repos git keeps for a checkout (nested ones too, checked out
 // or not): { name, dir, pinned }. `config` is the args that read its
 // .gitmodules; `pinned` is the commit its parent records ("" if none).
+/**
+ * @param {string} gitDir
+ * @param {string[]} config
+ * @param {string | null | undefined} on
+ * @param {Submodule[]} [out]
+ * @param {string} [parent]
+ * @returns {Promise<Submodule[]>}
+ */
 async function modules(gitDir, config, on, out = [], parent = "") {
   const keys = await git(
     gitDir,
@@ -75,6 +113,10 @@ async function modules(gitDir, config, on, out = [], parent = "") {
 }
 
 // Whether a checkout has uncommitted changes.
+/**
+ * @param {string} top
+ * @param {string | null | undefined} on
+ */
 async function uncommitted(top, on) {
   const status = await git(top, ["--no-optional-locks", "-c", "core.fsmonitor=false", "status", "--porcelain"], on);
   if (!status.ok) throw new Error(status.err || "git status failed.");
@@ -84,10 +126,15 @@ async function uncommitted(top, on) {
 // The worktree's submodules, and the names of those with commits that exist
 // nowhere else: not on a remote, and not the commit the parent pins (git
 // fetches that by hash, so it is often on no remote branch here).
+/**
+ * @param {string} top
+ * @param {string | null | undefined} on
+ */
 async function submodules(top, on) {
   const gitDir = await git(top, ["rev-parse", "--absolute-git-dir"], on);
   if (!gitDir.ok) throw new Error(gitDir.err || "git rev-parse failed.");
   const mods = await modules(gitDir.out, ["--file", `${top}/.gitmodules`], on);
+  /** @type {string[]} */
   const unpushed = [];
   for (const m of mods) {
     const local = await git(
@@ -103,11 +150,22 @@ async function submodules(top, on) {
 
 // The other spaces the sidebar nests under this one, which closing it closes too: when the space shows or starts
 // in the repository's main checkout, every other space showing one of its linked worktrees.
+/**
+ * @param {SpaceInfo} space
+ * @param {Repo} repo
+ * @param {string | null | undefined} on
+ */
 async function nestedWorktreeSpaces(space, repo, on) {
   const [main, ...linked] = await checkouts(repo.main, on);
   const paneList = panes();
+  /**
+   * @param {string | null} folder
+   * @param {string} path
+   */
   const inside = (folder, path) => folder === path || Boolean(folder?.startsWith(`${path}/`));
+  /** @param {string | null} folder */
   const inLinked = (folder) => linked.some((checkout) => inside(folder, checkout.path));
+  /** @param {string | null} folder */
   const inMain = (folder) => Boolean(main) && inside(folder, main.path) && !inLinked(folder);
   if (!inMain(place(space, paneList)) && !inMain(space.folder)) return [];
   return spaces().filter(
@@ -117,12 +175,19 @@ async function nestedWorktreeSpaces(space, repo, on) {
 
 // One space's removal: the checks removal.js reads, each filled in as it answers, and the spaces nested under it.
 export class WorktreeRemoval {
+  /**
+   * @param {SpaceInfo} space
+   * @param {Repo} repo
+   */
   constructor(space, repo) {
     this.space = space;
     this.repo = repo;
     this.on = space.machine;
+    /** @type {RemovalChecks} */
     this.checks = {};
+    /** @type {SpaceInfo[] | null} */
     this.nestedSpaces = null;
+    /** @type {Set<() => void>} */
     this.listeners = new Set();
     this.finished = Promise.all([
       runChecks(
@@ -132,12 +197,12 @@ export class WorktreeRemoval {
           branch: () => branchState(repo, this.on),
         },
         (name, result) => {
-          this.checks[name] = result;
+          /** @type {Record<string, unknown>} */ (this.checks)[name] = result;
           this.changed();
         },
       ),
       nestedWorktreeSpaces(space, repo, this.on)
-        .catch(() => [])
+        .catch(/** @returns {SpaceInfo[]} */ () => [])
         .then((nested) => {
           this.nestedSpaces = nested;
           this.changed();
@@ -146,6 +211,7 @@ export class WorktreeRemoval {
   }
 
   // Calls `listener` whenever a check answers, until the returned function is called.
+  /** @param {() => void} listener */
   onChange(listener) {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -207,12 +273,17 @@ export class WorktreeRemoval {
 }
 
 // The removal running for a space, which its dialog carries on with.
+/** @param {string} spaceId */
 export function removalInFlight(spaceId) {
   const removal = removalsBySpace.get(spaceId);
   return removal instanceof WorktreeRemoval ? removal : undefined;
 }
 
 // Starts a removal for a space with none running, for a dialog opened directly.
+/**
+ * @param {SpaceInfo} space
+ * @param {Repo} repo
+ */
 export function startRemoval(space, repo) {
   const removal = new WorktreeRemoval(space, repo);
   removalsBySpace.set(space.id, removal);
@@ -220,6 +291,10 @@ export function startRemoval(space, repo) {
 }
 
 // Ends the space's removal, so the next close starts afresh.
+/**
+ * @param {string} spaceId
+ * @param {object} removal
+ */
 export function forgetRemoval(spaceId, removal) {
   if (removalsBySpace.get(spaceId) === removal) removalsBySpace.delete(spaceId);
 }
@@ -227,6 +302,10 @@ export function forgetRemoval(spaceId, removal) {
 // Removes the worktree a space shows and closes the space, through the dialog only when the person needs to see it.
 // `sleep(ms)` waits on the caller's executor (cx.sleep). A space not on a linked worktree goes straight to the dialog,
 // which says so. Throws when the space closed but its checkout couldn't be removed.
+/**
+ * @param {string} spaceId
+ * @param {{ ask?: boolean, sleep: (ms: number) => Promise<unknown> }} options
+ */
 export async function closeWorktreeSpace(spaceId, { ask = false, sleep }) {
   if (removalsBySpace.has(spaceId)) return;
   const space = spaces().find((candidate) => candidate.id === spaceId);

@@ -11,6 +11,47 @@ import { mainCheckout } from "../location.js";
 import { ghMissing, ghLoggedOut, ghFailed } from "./problems.js";
 import { refuseUnknownLabels } from "./labels.js";
 
+/** @typedef {import("./index.js").Issue} Issue */
+/** @typedef {import("./index.js").Tracker} Tracker */
+/** @typedef {import("./index.js").Project} Project */
+/** @typedef {import("./index.js").PullRequest} PullRequest */
+/** @typedef {import("./setting.js").Setting} Setting */
+
+/**
+ * @typedef {object} GitHubPullRequestNode
+ * @property {number} number
+ * @property {string} title
+ * @property {string} url
+ * @property {string} state
+ * @property {boolean} isDraft
+ * @property {string} headRefName
+ * @property {{ nameWithOwner: string }} repository
+ */
+
+/**
+ * An issue as the GraphQL queries below return it; `body` only comes with ISSUE.
+ * @typedef {object} GitHubIssueNode
+ * @property {number} number
+ * @property {string} title
+ * @property {string} url
+ * @property {string} createdAt
+ * @property {string} updatedAt
+ * @property {string | null} closedAt
+ * @property {string} state
+ * @property {string | null} stateReason
+ * @property {{ dueOn: string | null } | null} milestone
+ * @property {{ nodes: { name: string, color: string }[] }} labels
+ * @property {{ nodes: { login: string, name: string | null, avatarUrl: string }[] }} assignees
+ * @property {{ nodes: { number: number, state: string, repository: { nameWithOwner: string } }[] }} blockedBy
+ * @property {{ nodes: GitHubPullRequestNode[] }} closedByPullRequestsReferences
+ * @property {string | null} [body]
+ */
+
+/** @typedef {(args: string[]) => Promise<string>} Gh */
+
+/** @type {() => null} */
+const noResult = () => null;
+
 const PAGE_SIZE = 50;
 const MAX_PAGES = 20;
 const RECENTLY_CLOSED = 20;
@@ -24,6 +65,10 @@ const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateR
   blockedBy(first: ${BLOCKERS}) { nodes { number state repository { nameWithOwner } } }
   closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
     nodes { number title url state isDraft headRefName repository { nameWithOwner } } }`;
+/**
+ * @param {string} state
+ * @param {string} orderBy
+ */
 const ISSUES = (state, orderBy) => `query($owner: String!, $name: String!, $first: Int!, $after: String) {
   repository(owner: $owner, name: $name) { issues(states: [${state}], first: $first, after: $after,
     orderBy: { field: ${orderBy}, direction: DESC }) {
@@ -34,14 +79,20 @@ const ISSUE = `query($owner: String!, $name: String!, $number: Int!) {
 // The statuses a person can pick. In review follows from a linked pull request, so it can't be set.
 const SETTABLE_STATUSES = ["todo", "in-progress", "done", "canceled"];
 
+/** @param {string} id */
 const issueNumber = (id) => Number(String(id).replace(/^#/, ""));
 
+/** @param {GitHubPullRequestNode} pullRequest */
 function pullRequestStatus({ state, isDraft }) {
   if (state === "MERGED") return "merged";
   if (state === "CLOSED") return "closed";
   return isDraft ? "draft" : "open";
 }
 
+/**
+ * @param {GitHubIssueNode} node
+ * @param {PullRequest[]} pullRequests
+ */
 function statusOf(node, pullRequests) {
   if (node.state === "CLOSED") return node.stateReason === "COMPLETED" ? "done" : "canceled";
   if (pullRequests.some((pullRequest) => pullRequest.status !== "closed")) return "in-review";
@@ -49,6 +100,7 @@ function statusOf(node, pullRequests) {
 }
 
 // The branch GitHub's "Create a branch" names for an issue: its number, then its title as a slug.
+/** @param {GitHubIssueNode} node */
 function suggestedBranch(node) {
   const slug = node.title
     .toLowerCase()
@@ -59,6 +111,10 @@ function suggestedBranch(node) {
 }
 
 // Closed blockers are only listed once Done or Canceled is expanded, so only the open ones may block.
+/**
+ * @param {GitHubIssueNode} node
+ * @param {string} repo
+ */
 function openBlockers(node, repo) {
   return node.blockedBy.nodes
     .filter((blocker) => blocker.state === "OPEN")
@@ -69,6 +125,11 @@ function openBlockers(node, repo) {
     );
 }
 
+/**
+ * @param {GitHubIssueNode} node
+ * @param {string} repo
+ * @returns {Issue}
+ */
 function toIssue(node, repo) {
   const pullRequests = node.closedByPullRequestsReferences.nodes.map((pullRequest) => ({
     url: pullRequest.url,
@@ -109,12 +170,18 @@ function toIssue(node, repo) {
 }
 
 // The signed-in GitHub user's login, read once.
+/** @type {string | null} */
 let viewerLogin = null;
 
 // Each main checkout's origin repository as "owner/name", looked up once while the mod runs; a failed
 // lookup is forgotten so the next refresh asks again.
+/** @type {Map<string, Promise<string>>} */
 const originRepositories = new Map();
 
+/**
+ * @param {string} root
+ * @param {Gh} gh
+ */
 function originRepository(root, gh) {
   if (!originRepositories.has(root)) {
     const lookup = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]).then((stdout) =>
@@ -127,8 +194,9 @@ function originRepository(root, gh) {
 }
 
 // Runs the GitHub CLI in the main checkout `root`, resolving with its output.
-const ghIn = (root) => async (args) => {
-  const result = await exec("gh", args, { cwd: root }).catch(() => null);
+/** @param {string} root */
+const ghIn = (root) => async (/** @type {string[]} */ args) => {
+  const result = await exec("gh", args, { cwd: root }).catch(noResult);
   if (!result) throw await ghMissing();
   if (result.code !== 0) throw ghFailed(result.stderr.trim().split("\n").pop() || `gh ${args[0]} failed`);
   return result.stdout;
@@ -136,15 +204,25 @@ const ghIn = (root) => async (args) => {
 
 // Throws the problem that stops the GitHub CLI from answering as the person: not installed, or not logged in.
 export async function checkGitHubLogin() {
-  const installed = await exec("gh", ["--version"]).catch(() => null);
+  const installed = await exec("gh", ["--version"]).catch(noResult);
   if (installed?.code !== 0) throw await ghMissing();
-  const auth = await exec("gh", ["auth", "status", "--hostname", "github.com"]).catch(() => null);
+  const auth = await exec("gh", ["auth", "status", "--hostname", "github.com"]).catch(noResult);
   if (auth?.code !== 0) throw ghLoggedOut();
 }
 
 // The repository a GitHub-tracked main checkout's issues live in, as "owner/name".
+/**
+ * @param {string} root
+ * @param {Setting} setting
+ * @returns {string | Promise<string>}
+ */
 export const githubRepository = (root, setting) => setting.repo ?? originRepository(root, ghIn(root));
 
+/**
+ * @param {Project} project
+ * @param {Setting} setting
+ * @returns {Promise<Tracker | null>}
+ */
 export async function githubTracker({ root: projectRoot, on }, setting) {
   if (on != null) return null;
   const root = await mainCheckout(projectRoot, on);
@@ -152,6 +230,11 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
   const repo = await githubRepository(root, setting);
   const [owner, name] = repo.split("/");
 
+  /**
+   * @param {string} query
+   * @param {Record<string, string | number | null>} variables
+   * @returns {Promise<any>} The GraphQL answer's `data`, whose shape each query decides.
+   */
   async function graphql(query, variables) {
     const args = ["api", "graphql", "-f", `query=${query}`, "-f", `owner=${owner}`, "-f", `name=${name}`];
     for (const [key, value] of Object.entries(variables)) {
@@ -162,8 +245,14 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     return answer.data;
   }
 
+  /**
+   * @param {string} query
+   * @param {{ pages: number, size: number }} pageLimit
+   */
   async function issuePages(query, pageLimit) {
+    /** @type {GitHubIssueNode[]} */
     const nodes = [];
+    /** @type {string | null} */
     let after = null;
     for (let page = 0; page < pageLimit.pages; page++) {
       const { issues } = (await graphql(query, { first: pageLimit.size, after })).repository;
@@ -179,6 +268,11 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     return viewerLogin;
   }
 
+  /**
+   * @param {string} method
+   * @param {string} path
+   * @param {Record<string, string>} fields
+   */
   const rest = (method, path, fields) =>
     gh([
       "api",
@@ -187,24 +281,41 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
       `repos/${repo}/${path}`,
       ...Object.entries(fields).flatMap(([key, value]) => ["-f", `${key}=${value}`]),
     ]);
+  /**
+   * @param {Issue} issue
+   * @param {Record<string, string>} fields
+   */
   const editIssue = (issue, fields) => rest("PATCH", `issues/${issue.number}`, fields);
+  /**
+   * @param {Issue} issue
+   * @param {string} method
+   * @param {string} login
+   */
   const assignees = (issue, method, login) =>
     rest(method, `issues/${issue.number}/assignees`, { "assignees[]": login });
 
+  /** @param {string} id */
   async function get(id) {
     const number = issueNumber(id);
     if (!Number.isInteger(number)) return null;
-    const answer = await graphql(ISSUE, { number }).catch(() => null);
+    const answer = await graphql(ISSUE, { number }).catch(noResult);
     const node = answer?.repository?.issue;
     return node ? toIssue(node, repo) : null;
   }
 
   async function labels() {
-    return JSON.parse(await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)])).map(
-      (label) => label.name,
+    /** @type {{ name: string }[]} */
+    const found = JSON.parse(
+      await gh(["label", "list", "--repo", repo, "--json", "name", "--limit", String(MAX_LABELS)]),
     );
+    return found.map((label) => label.name);
   }
 
+  /**
+   * @param {Issue} issue
+   * @param {string[]} addLabels
+   * @param {string[]} removeLabels
+   */
   async function changeLabels(issue, addLabels, removeLabels) {
     refuseUnknownLabels([...addLabels, ...removeLabels], await labels(), repo);
     await gh([
@@ -218,6 +329,10 @@ export async function githubTracker({ root: projectRoot, on }, setting) {
     ]);
   }
 
+  /**
+   * @param {Issue} issue
+   * @param {string} status
+   */
   async function setStatus(issue, status) {
     if (!SETTABLE_STATUSES.includes(status)) throw new Error(`GitHub issues can't be set to ${status}`);
     if (status === "done") return editIssue(issue, { state: "closed", state_reason: "completed" });
