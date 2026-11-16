@@ -86,5 +86,10 @@ test("install refuses without a terminal when the mod is linked to another check
 
   assert.equal(result.status, 1);
   assert.match(result.stdout, /linked to .*elsewhere\/mod, another checkout/);
+  assert.match(result.stdout, /another copy of the herdr-issues repository/);
+  assert.match(
+    result.stdout,
+    /Repointing makes Herdr load the mod, the issues command run, and Claude Code install the plugin from/,
+  );
   assert.match(result.stderr, /standard input is not a terminal/);
 });

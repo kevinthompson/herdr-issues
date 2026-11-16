@@ -31,7 +31,9 @@ install() {
     current_link=$(readlink "$mod_link")
     if [[ $current_link != "$repo_root/mod" && $current_link != "$repo_root" ]]; then
       printf 'The issues mod is linked to %s, another checkout.\n' "$current_link"
-      printf 'Installing points the mod, the issues command and the Claude plugin at %s instead.\n' "$repo_root"
+      printf 'That is another copy of the herdr-issues repository, usually one cloned to work on the mod, whose ./setup linked Herdr to it.\n'
+      printf 'Repointing makes Herdr load the mod, the issues command run, and Claude Code install the plugin from %s instead, so they follow this install'\''s updates.\n' "$repo_root"
+      printf 'The other checkout itself stays as it is; running ./setup in it later points them back to it.\n'
       [[ -t 0 ]] || fail "standard input is not a terminal, so nothing was changed; run the install command in a terminal to choose"
       read -r -p "Repoint them? [y/N] " answer
       [[ $answer == [yY]* ]] || fail "nothing was changed"
