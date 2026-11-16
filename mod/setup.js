@@ -98,13 +98,13 @@ export function untrackableView(sentence, t) {
 
 const BLANK_STATE_ICON_PX = 40;
 
-// Centered in place of the list: an icon, why there are no issues, the button that fixes it, and how to put
-// the panel away instead.
+// Centered in place of the list: an icon, why there are no issues, the button that fixes it when there is
+// one, and how to put the panel away instead.
 /**
- * @param {{ id: string, sentence: string, label: string, enabled?: boolean, error?: string | null, onClick: (cx: Context) => void }} props
+ * @param {{ sentence: string, action?: { id: string, label: string, enabled?: boolean, onClick: (cx: Context) => void }, error?: string | null }} props
  * @param {Theme} t
  */
-function blankState({ id, sentence, label, enabled = true, error = null, onClick }, t) {
+function blankState({ sentence, action, error = null }, t) {
   return v_flex()
     .flex_1()
     .min_h(0)
@@ -114,7 +114,11 @@ function blankState({ id, sentence, label, enabled = true, error = null, onClick
     .justify_center()
     .child(svg("mods/issues/icons/file-text.svg").size(BLANK_STATE_ICON_PX).text_color(t.dim))
     .child(div().whitespace_normal().text_center().text_color(t.muted).child(sentence))
-    .child(button(id, label, onClick, t, { primary: true, enabled }))
+    .children(
+      action
+        ? [button(action.id, action.label, action.onClick, t, { primary: true, enabled: action.enabled ?? true })]
+        : [],
+    )
     .when(Boolean(error), (e) =>
       e.child(
         div()
@@ -163,12 +167,14 @@ function collapseHint(t) {
 export function notARepositoryView({ initializing, error, onInitialize }, t) {
   return blankState(
     {
-      id: "initialize-repository",
       sentence: "Issues currently only works in git repositories.",
-      label: initializing ? "Initializing…" : "Initialize Repository",
-      enabled: !initializing,
+      action: {
+        id: "initialize-repository",
+        label: initializing ? "Initializing…" : "Initialize Repository",
+        enabled: !initializing,
+        onClick: onInitialize,
+      },
       error,
-      onClick: onInitialize,
     },
     t,
   );
@@ -381,12 +387,14 @@ export class TrackerSetup {
         .child(
           blankState(
             {
-              id: "setup-start",
               sentence: "Issues isn't set up for this repository.",
-              label: "Set Up Issues",
-              onClick: (cx) => {
-                this.settingUp = true;
-                cx.notify();
+              action: {
+                id: "setup-start",
+                label: "Set Up Issues",
+                onClick: (cx) => {
+                  this.settingUp = true;
+                  cx.notify();
+                },
               },
             },
             t,
