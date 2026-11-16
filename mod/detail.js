@@ -588,11 +588,8 @@ export function issueDetail(view, t) {
     .child(
       headerBar(
         {
-          leading: iconButton(
-            { id: "issue-back", icon: "chevron-left", tooltip: "Back to issues", onClick: onBack },
-            t,
-          ),
           title: "Issues",
+          secondary: "Issue Detail",
           trailing: [view.failedEditAlert, view.refreshButton, view.settingsButton, collapseButton(view.onCollapse, t)],
         },
         t,
@@ -607,7 +604,14 @@ export function issueDetail(view, t) {
         .items_center()
         .border_b(1)
         .border_color(t.border)
-        .child(div().flex_1().min_w(0).pl(4).truncate().text_size(11).text_color(t.accent).child(issue.id))
+        .child(
+          div()
+            .flex_1()
+            .min_w(0)
+            .child(
+              iconButton({ id: "issue-back", icon: "chevron-left", tooltip: "Back to issues", onClick: onBack }, t),
+            ),
+        )
         .child(editActions(view, t))
         .when(!view.editor && view.mergeable, (e) => e.child(mergeButton(view, t)))
         .when(!view.editor, (e) => e.child(workActions(view, t))),
@@ -632,7 +636,12 @@ export function issueDetail(view, t) {
         .gap(8)
         .border_b(1)
         .border_color(t.border)
-        .child(div().whitespace_normal().text_size(16).font_semibold().child(issue.title))
+        .child(
+          v_flex()
+            .gap(2)
+            .child(div().truncate().text_size(11).text_color(t.accent).child(issue.id))
+            .child(div().whitespace_normal().text_size(16).font_semibold().child(issue.title)),
+        )
         .child(facts(view, t)),
     )
     .child(
