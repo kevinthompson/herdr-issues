@@ -15,16 +15,18 @@
 // of seconds of at least 10; an entry's overrides the top level's, and pollSettings resolves it, 60 without either.
 // updateCheckHours, at the top level only, is how often the panel fetches its own checkout's origin to offer an
 // update (update.js), a whole number of hours of at least 1; updateSettings resolves it, 6 without it.
-// spaceName, approval, onApproval, waitForChecks and close are optional at the top level and in any entry, an
-// entry's winning, and are checked the same way in either; worktreeSetup is optional in any entry. In spaceName,
-// <issueId> is the issue's ID and <repo> the repository's name without its owner; without it, an issue's space is
-// named after its ID. approval is whether a session asks the person to approve its work, ask or auto, ask
+// spaceName, approval, onApproval, waitForChecks, pushAfterMerge and close are optional at the top level and in
+// any entry, an entry's winning, and are checked the same way in either; worktreeSetup is optional in any entry. In
+// spaceName, <issueId> is the issue's ID and <repo> the repository's name without its owner; without it, an issue's
+// space is named after its ID. approval is whether a session asks the person to approve its work, ask or auto, ask
 // without it; onApproval is how the branch then reaches main, merge (locally) or pull-request, a pull request
 // without it when origin is on GitHub, else merge; waitForChecks, true or false, false without it, is whether a
-// session with a pull request stays until its checks pass. The retired merge and complete still apply where a
-// place sets none of these: merge auto means approval auto and onApproval merge, review means ask and merge, and
-// pull-request means onApproval pull-request; complete pull-request-passing means waitForChecks true, and its other
-// values false. Saving any of the three removes merge and complete there; approvalSettings resolves them all.
+// session with a pull request stays until its checks pass; pushAfterMerge, true or false, false without it, is
+// whether a local merge then pushes main to its upstream remote (merge.js). The retired merge and complete still
+// apply where a place sets none of these: merge auto means approval auto and onApproval merge, review means ask and
+// merge, and pull-request means onApproval pull-request; complete pull-request-passing means waitForChecks true, and
+// its other values false. Saving any of approval, onApproval and waitForChecks removes merge and complete there;
+// approvalSettings resolves them all.
 // worktreeSetup is a shell command `issues
 // worktree` runs in each new checkout (cli/worktree.js). close is what a finished /issues:work session does about
 // its worktree: ask asks whether to close it now, mentioning cmd+shift+w, and auto closes it, both with `issues
@@ -46,7 +48,7 @@
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
-// tracker with saveTrackerChoice, its approval, onApproval and waitForChecks with saveApprovalSettings, its close with saveCloseSetting, its
+// tracker with saveTrackerChoice, its approval settings and pushAfterMerge with saveApprovalSettings, its close with saveCloseSetting, its
 // name with saveNameSetting, its pollSeconds, spaceName and worktreeSetup with saveRepositorySettings, its model
 // and effort settings with saveAgentSettings, and its workPrompt with saveWorkPrompt; it changes the top level
 // with saveTopLevelSettings.
@@ -66,6 +68,7 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  * @property {string} [approval]
  * @property {string} [onApproval]
  * @property {boolean} [waitForChecks]
+ * @property {boolean} [pushAfterMerge]
  * @property {string} [close]
  * @property {string} [worktreeSetup]
  * @property {number} [pollSeconds]
@@ -84,6 +87,7 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  * @property {string} [approval]
  * @property {string} [onApproval]
  * @property {boolean} [waitForChecks]
+ * @property {boolean} [pushAfterMerge]
  * @property {string} [close]
  * @property {string} [spaceName]
  * @property {string} [workModel]
@@ -106,6 +110,7 @@ export const APPROVALS = ["ask", "auto"];
 export const DEFAULT_APPROVAL = "ask";
 export const ON_APPROVALS = ["merge", "pull-request"];
 export const DEFAULT_WAIT_FOR_CHECKS = false;
+export const DEFAULT_PUSH_AFTER_MERGE = false;
 const RETIRED_MERGES = ["auto", "review", "pull-request"];
 const RETIRED_COMPLETES = ["merged", "pull-request-open", "pull-request-passing"];
 export const CLOSES = ["ask", "auto"];
@@ -211,7 +216,7 @@ function checkWorkSettings(settings, where) {
  * @param {string} where
  */
 function checkApproval(
-  { approval, onApproval, waitForChecks, merge, complete } = /** @type {Record<string, any>} */ ({}),
+  { approval, onApproval, waitForChecks, pushAfterMerge, merge, complete } = /** @type {Record<string, any>} */ ({}),
   where,
 ) {
   if (approval != null && !APPROVALS.includes(approval))
@@ -220,6 +225,8 @@ function checkApproval(
     throw badApprovalSetting(`${where} needs an onApproval of ${ON_APPROVALS.join(", ")}`);
   if (waitForChecks != null && typeof waitForChecks !== "boolean")
     throw badApprovalSetting(`${where} needs a waitForChecks of true or false`);
+  if (pushAfterMerge != null && typeof pushAfterMerge !== "boolean")
+    throw badApprovalSetting(`${where} needs a pushAfterMerge of true or false`);
   if (merge != null && !RETIRED_MERGES.includes(merge))
     throw badApprovalSetting(`${where} needs a merge of ${RETIRED_MERGES.join(", ")}`);
   if (complete != null && !RETIRED_COMPLETES.includes(complete))
@@ -376,6 +383,7 @@ export function ownApproval(source) {
     approval: source?.approval ?? retired.approval ?? null,
     onApproval: source?.onApproval ?? retired.onApproval ?? null,
     waitForChecks: source?.waitForChecks ?? retiredWait,
+    pushAfterMerge: source?.pushAfterMerge ?? null,
   };
 }
 
@@ -406,6 +414,7 @@ export async function resolveApprovalSettings(main, setting, topLevel = null) {
     approval: entry.approval ?? top.approval ?? DEFAULT_APPROVAL,
     onApproval: entry.onApproval ?? top.onApproval ?? (await defaultOnApproval(main)),
     waitForChecks: entry.waitForChecks ?? top.waitForChecks ?? DEFAULT_WAIT_FOR_CHECKS,
+    pushAfterMerge: entry.pushAfterMerge ?? top.pushAfterMerge ?? DEFAULT_PUSH_AFTER_MERGE,
   };
 }
 
@@ -426,8 +435,10 @@ export async function closeSettings(project) {
 
 export const APPROVAL_KEYS = ["approval", "onApproval", "waitForChecks"];
 const RETIRED_APPROVAL_KEYS = ["merge", "complete"];
+// The approval settings and pushAfterMerge, which setup and the settings view ask about together.
+export const APPROVAL_QUESTION_KEYS = [...APPROVAL_KEYS, "pushAfterMerge"];
 
-// Where the repository's approval, onApproval, waitForChecks and close come from: { entry, topLevel,
+// Where the repository's approval, onApproval, waitForChecks, pushAfterMerge and close come from: { entry, topLevel,
 // defaultOnApproval }, the entry's and the top level's own values (ownApproval), null where unset, and the
 // onApproval that applies without either.
 /**
@@ -484,7 +495,7 @@ export async function resolveNameSettings(main, setting) {
   return { name: entry ?? defaultName, entry, defaultName };
 }
 
-const SETUP_KEYS = ["tracker", "team", "repo", ...APPROVAL_KEYS, ...RETIRED_APPROVAL_KEYS];
+const SETUP_KEYS = ["tracker", "team", "repo", ...APPROVAL_QUESTION_KEYS, ...RETIRED_APPROVAL_KEYS];
 
 // Writes `change(entry)` as the entry of the repository whose main checkout is `main`, in the place of any entry
 // it has under either spelling of its path, and keeps every other repository's entry. `entry` is null without one.
@@ -506,9 +517,9 @@ async function changeEntry(main, change) {
   forgetLookups();
 }
 
-// Makes `setting`, a tracker with its team or repo and its approval settings (approval, onApproval, and waitForChecks
-// for a pull request), the choices of the repository whose main checkout is `main`. It replaces those keys and the
-// retired merge and complete in the repository's entry but keeps that entry's other keys.
+// Makes `setting`, a tracker with its team or repo and its approval settings (approval, onApproval, waitForChecks
+// for a pull request and pushAfterMerge for a merge), the choices of the repository whose main checkout is `main`.
+// It replaces those keys and the retired merge and complete in the repository's entry but keeps its other keys.
 /**
  * @param {string} main
  * @param {Setting} setting
@@ -552,17 +563,20 @@ function withValues(entry, values) {
   return changed;
 }
 
-// Sets the approval settings of the repository whose main checkout is `main`: `approval`, `onApproval` and
-// `waitForChecks`, each of which null removes so the global value or its default applies. It also removes the
-// retired merge and complete, which those three replace, so pass all three. It changes only those keys of the
-// repository's existing entry, and writes nothing for a value trackerSetting would refuse or a repository without
-// an entry.
+// Sets the approval settings of the repository whose main checkout is `main`: `approval`, `onApproval`,
+// `waitForChecks` and `pushAfterMerge`, each of which null removes so the global value or its default applies. It
+// also removes the retired merge and complete, which the first three replace, so pass all four. It changes only
+// those keys of the repository's existing entry, and writes nothing for a value trackerSetting would refuse or a
+// repository without an entry.
 /**
  * @param {string} main
- * @param {{ approval?: string | null, onApproval?: string | null, waitForChecks?: boolean | null }} approvals
+ * @param {{ approval?: string | null, onApproval?: string | null, waitForChecks?: boolean | null, pushAfterMerge?: boolean | null }} approvals
  */
-export async function saveApprovalSettings(main, { approval = null, onApproval = null, waitForChecks = null }) {
-  const values = { approval, onApproval, waitForChecks };
+export async function saveApprovalSettings(
+  main,
+  { approval = null, onApproval = null, waitForChecks = null, pushAfterMerge = null },
+) {
+  const values = { approval, onApproval, waitForChecks, pushAfterMerge };
   checkApproval(values, "This repository");
   await changeEntry(main, (entry) => {
     if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
@@ -751,7 +765,7 @@ export async function saveWorkPrompt(main, prompt) {
 }
 
 export const TOP_LEVEL_KEYS = [
-  ...APPROVAL_KEYS,
+  ...APPROVAL_QUESTION_KEYS,
   "close",
   "spaceName",
   "pollSeconds",

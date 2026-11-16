@@ -2,21 +2,20 @@
 // Set Up Issues button walks through one question per page, with Back at the top left and the step and Cancel,
 // which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
 // back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; whether
-// a session asks for approval of its work; how the branch then gets into main; for a pull request,
-// whether the session waits for its checks, each asked with the settings view's dropdown (select.js) and a Next
-// button; and a review of the choices, which points to the
-// gear's settings (settings.js) for the rest. Only Save on the
-// review writes the repository's entry in issues.json (setting.js), and the panel lists the issues. Approval
-// proposes the repository's current or default settings. A configured tracker that fails to load with a
-// SetupProblem (trackers/problems.js) shows the problem and its fix, with Check again and a way to choose a
-// different tracker. A Linear API key that is missing, unreadable or refused, at either point, comes with a
-// masked field that saves a key Linear accepts.
+// a session asks for approval of its work; how the branch then gets into main; for a pull request, whether the
+// session waits for its checks, and for a merge, whether main is pushed afterwards, each asked with the settings
+// view's dropdown (select.js) and a Next button; and a review of the choices, which points to the gear's settings
+// (settings.js) for the rest. Only Save on the review writes the repository's entry in issues.json (setting.js),
+// and the panel lists the issues. Approval proposes the repository's current or default settings. A configured
+// tracker that fails to load with a SetupProblem (trackers/problems.js) shows the problem and its fix, with Check
+// again and a way to choose a different tracker. A Linear API key that is missing, unreadable or refused, at
+// either point, comes with a masked field that saves a key Linear accepts.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { button, icon } from "./detail.js";
 import { collapseButton, headerBar } from "./header.js";
-import { checksChoiceId, waitForChecksOf } from "./settings-fields.js";
+import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
@@ -26,9 +25,9 @@ import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 /** @import { SelectOption } from "./select.js" */
 /** @import { SetupProblem } from "./trackers/problems.js" */
 
-/** @typedef {"approval" | "onApproval" | "waitForChecks"} ApprovalKey */
+/** @typedef {"approval" | "onApproval" | "waitForChecks" | "pushAfterMerge"} ApprovalKey */
 /** @typedef {{ title: string, sentence: string | null, choices: SelectOption[] }} ApprovalQuestion */
-/** @typedef {{ approval: string, onApproval: string, waitForChecks: string | null }} ProposedApproval */
+/** @typedef {{ approval: string, onApproval: string, waitForChecks: string | null, pushAfterMerge: string | null }} ProposedApproval */
 
 const TEAM_PICKS = "issues.setupTeams";
 const ANSWER_LABEL_PX = 80;
@@ -85,6 +84,14 @@ export const APPROVAL_QUESTIONS = {
         detail:
           "The session and its worktree stay open until the checks pass, so failures are fixed before the worktree closes.",
       },
+    ],
+  },
+  pushAfterMerge: {
+    title: "Push main after merging?",
+    sentence: "Once the branch merges into main on this computer, main can be pushed to the remote it tracks.",
+    choices: [
+      { id: "no", label: "Don't push", detail: "Main stays on this computer until you push it." },
+      { id: "yes", label: "Push main", detail: "Main is pushed to its remote after each merge." },
     ],
   },
 };
@@ -211,8 +218,8 @@ export class TrackerSetup {
     this.saving = false;
     /** @type {SetupProblem | null} */
     this.saveProblem = null;
-    // The proposed approval, onApproval and waitForChecks once the tracker is ready, and the answers to them, with
-    // waitForChecks as its select's id (settings-fields.js).
+    // The proposed approval settings and pushAfterMerge once the tracker is ready, and the answers to them, with
+    // waitForChecks and pushAfterMerge as their selects' ids (settings-fields.js).
     /** @type {Partial<Record<ApprovalKey, string>>} */
     this.answers = {};
     /** @type {ProposedApproval | null} */
@@ -239,7 +246,7 @@ export class TrackerSetup {
   }
 
   // The steps for the answers so far; before onApproval is chosen, the proposed choice decides whether waiting
-  // for checks is asked.
+  // for checks or pushing after merging is asked.
   /**
    * @returns {string[]}
    */
@@ -251,6 +258,7 @@ export class TrackerSetup {
       "approval",
       "onApproval",
       ...(onApproval === "pull-request" ? ["waitForChecks"] : []),
+      ...(onApproval === "merge" ? ["pushAfterMerge"] : []),
       "review",
     ];
   }
@@ -302,7 +310,11 @@ export class TrackerSetup {
     const proposed = await approvalSettings({ root: this.main, on: null }).catch(() =>
       resolveApprovalSettings(this.main, null),
     );
-    return { ...proposed, waitForChecks: checksChoiceId(proposed.waitForChecks) };
+    return {
+      ...proposed,
+      waitForChecks: yesNoChoiceId(proposed.waitForChecks),
+      pushAfterMerge: yesNoChoiceId(proposed.pushAfterMerge),
+    };
   }
 
   /**
@@ -328,7 +340,7 @@ export class TrackerSetup {
     this.goTo(this.tracker.choice === "linear" ? "team" : "approval", cx);
   }
 
-  // The select's value for approval, onApproval or waitForChecks: the earlier answer, or else the proposed one.
+  // The select's value for an approval question: the earlier answer, or else the proposed one.
   /**
    * @param {ApprovalKey} key
    */
@@ -336,7 +348,7 @@ export class TrackerSetup {
     return this.answers[key] ?? this.proposed?.[key] ?? APPROVAL_QUESTIONS[key].choices[0].id;
   }
 
-  // Answers approval, onApproval or waitForChecks without leaving the step, so the step count follows onApproval.
+  // Answers an approval question without leaving the step, so the step count follows onApproval.
   /**
    * @param {ApprovalKey} key
    * @param {string} id
@@ -347,7 +359,7 @@ export class TrackerSetup {
     cx.notify();
   }
 
-  // Records the select's value for approval, onApproval or waitForChecks, and goes on to the next step.
+  // Records the select's value for an approval question, and goes on to the next step.
   /**
    * @param {ApprovalKey} key
    * @param {Context} cx
@@ -363,13 +375,14 @@ export class TrackerSetup {
    */
   save(cx) {
     const { choice, team } = this.tracker;
-    const { approval, onApproval, waitForChecks } = this.answers;
+    const { approval, onApproval, waitForChecks, pushAfterMerge } = this.answers;
     const setting = {
       tracker: choice,
       ...(choice === "linear" && { team }),
       approval,
       onApproval,
-      ...(onApproval === "pull-request" && { waitForChecks: waitForChecksOf(waitForChecks) }),
+      ...(onApproval === "pull-request" && { waitForChecks: yesNoValue(waitForChecks) }),
+      ...(onApproval === "merge" && { pushAfterMerge: yesNoValue(pushAfterMerge) }),
     };
     Object.assign(this, { saving: true, saveProblem: null });
     cx.spawn(async (cx) => {
@@ -595,7 +608,7 @@ export class TrackerSetup {
       );
   }
 
-  // The page for approval, onApproval or waitForChecks: its select, the chosen option's detail, and Next.
+  // The page for an approval question: its select, the chosen option's detail, and Next.
   /**
    * @param {ApprovalKey} key
    * @param {NativeElement} content
@@ -631,6 +644,9 @@ export class TrackerSetup {
       ["When work is approved...", approvalAnswer("onApproval")],
       ...(this.answers.onApproval === "pull-request"
         ? /** @type {[string, string][]} */ ([["Checks", approvalAnswer("waitForChecks")]])
+        : []),
+      ...(this.answers.onApproval === "merge"
+        ? /** @type {[string, string][]} */ ([["Push", approvalAnswer("pushAfterMerge")]])
         : []),
     ];
     return this.question(

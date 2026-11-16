@@ -6,7 +6,7 @@ import { commitFile, createRepository, git, temporaryFolder } from "./support/re
 import { stubHerdr } from "./support/herdr.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
-import { canOfferMerge, checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
+import { canOfferMerge, checkMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "../mod/merge.js";
 
 beforeEach(() => forgetLookups());
 
@@ -54,7 +54,7 @@ describe("mergeIssue", () => {
     const setup = setUp(t);
     const { repository, tracker, updates, counts, issue, project } = setup;
 
-    assert.equal(await mergeIssue(issue, tracker, project), "main");
+    assert.deepEqual(await mergeIssue(issue, tracker, project), { mainBranch: "main", pushed: false });
 
     assert.equal(git(repository, "log", "-1", "--format=%s"), "Merge branch 'feature'");
     assert.equal(git(repository, "rev-list", "--count", "--merges", "-1", "HEAD"), "1");
@@ -78,7 +78,10 @@ describe("mergeIssue", () => {
   test("merges past untracked files in the main checkout", async (t) => {
     const setup = setUp(t);
     writeFileSync(join(setup.repository, "scratch.txt"), "notes\n");
-    assert.equal(await mergeIssue(setup.issue, setup.tracker, setup.project), "main");
+    assert.deepEqual(await mergeIssue(setup.issue, setup.tracker, setup.project), {
+      mainBranch: "main",
+      pushed: false,
+    });
   });
 
   test("refuses when the branch's worktree has uncommitted changes", async (t) => {
@@ -111,6 +114,58 @@ describe("mergeIssue", () => {
       await assertRefuses(setup, /merges through pull requests: merge feature's pull request instead/);
     });
   }
+});
+
+describe("mergeIssue with pushAfterMerge", () => {
+  // setUp's repository with main tracking a bare remote, and an entry holding `entry`.
+  function setUpWithRemote(t, entry) {
+    const setup = setUp(t);
+    const remote = join(setup.repository, "..", "remote.git");
+    git(setup.repository, "init", "-q", "--bare", "-b", "main", remote);
+    git(setup.repository, "remote", "add", "origin", remote);
+    git(setup.repository, "push", "-q", "-u", "origin", "main");
+    mkdirSync(join(settingsPath(), ".."), { recursive: true });
+    writeFileSync(settingsPath(), JSON.stringify({ repos: { [setup.repository]: { tracker: "beads", ...entry } } }));
+    return { ...setup, remote };
+  }
+
+  test("pushes main to its remote after the merge when it's true", async (t) => {
+    const { repository, remote, tracker, issue, project } = setUpWithRemote(t, { pushAfterMerge: true });
+
+    assert.deepEqual(await mergeIssue(issue, tracker, project), { mainBranch: "main", pushed: true });
+
+    assert.equal(git(remote, "rev-parse", "main"), head(repository));
+  });
+
+  for (const entry of [{ pushAfterMerge: false }, {}]) {
+    test(`doesn't push main with ${JSON.stringify(entry)}`, async (t) => {
+      const { repository, remote, tracker, issue, project } = setUpWithRemote(t, entry);
+      const before = git(remote, "rev-parse", "main");
+
+      assert.deepEqual(await mergeIssue(issue, tracker, project), { mainBranch: "main", pushed: false });
+
+      assert.notEqual(head(repository), before);
+      assert.equal(git(remote, "rev-parse", "main"), before);
+    });
+  }
+
+  test("keeps the merge and the done status when the push fails, saying why", async (t) => {
+    const setup = setUpWithRemote(t, { pushAfterMerge: true });
+    const { repository, remote, tracker, updates, issue, project } = setup;
+    const elsewhere = join(repository, "..", "elsewhere");
+    git(repository, "clone", "-q", remote, elsewhere);
+    commitFile(elsewhere, "other.txt", "pushed first\n");
+    git(elsewhere, "push", "-q", "origin", "main");
+
+    await assert.rejects(mergeIssue(issue, tracker, project), (error) => {
+      assert.ok(error instanceof MergedWithProblems, error.message);
+      assert.match(error.message, /^Merged feature into main, but could not push main: .*rejected/);
+      return true;
+    });
+
+    assert.equal(git(repository, "log", "-1", "--format=%s"), "Merge branch 'feature'");
+    assert.deepEqual(updates, [{ id: "#7", status: "done" }]);
+  });
 });
 
 describe("canOfferMerge", () => {

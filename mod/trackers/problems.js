@@ -102,7 +102,7 @@ export const badSetting = (message) =>
 export const badApprovalSetting = (message) =>
   new SetupProblem(
     message,
-    "Fix the repository's `approval`, `onApproval` and `waitForChecks` in `~/.config/herdr-app/issues.json`, then check again, or choose a tracker again to choose them anew.",
+    "Fix the repository's `approval`, `onApproval`, `waitForChecks` and `pushAfterMerge` in `~/.config/herdr-app/issues.json`, then check again, or choose a tracker again to choose them anew.",
   );
 /** @param {string} message */
 export const settingsUnreadable = (message) =>

@@ -1,10 +1,11 @@
 // The settings at issues.json's top level, which apply to every repository without its own: the settings view's
 // Global form (settings.js). It shows only the settings that have a top-level version, under the Repository form's
 // section headings except Tracker (GLOBAL_SECTIONS in settings-fields.js). Approval: whether a session asks for
-// approval of its work, approval; how the branch then gets into main, onApproval; and whether a session waits for
+// approval of its work, approval; how the branch then gets into main, onApproval; whether a session waits for
 // its pull request's checks, waitForChecks, shown for a pull request or the default onApproval, which is a pull
-// request for a repository on GitHub (settings-fields.js), where a retired merge and complete open as the values
-// they mean and any change to the three saves all three. Worktrees: the name of each issue's space, spaceName; and
+// request for a repository on GitHub; and whether main is pushed after merging, pushAfterMerge, shown for a merge
+// or the default onApproval (settings-fields.js). A retired merge and complete open as the values they mean, and
+// any change to the four saves all four. Worktrees: the name of each issue's space, spaceName; and
 // what a finished session does about its worktree, close. Issue sessions: their model and effort, workModel and
 // workEffort; and the prompt appended to their system prompt, workPrompt, before any repository's own. Panel: how
 // often the panel polls each tracker, pollSeconds, and checks for its own update, updateCheckHours, each a whole
@@ -16,13 +17,7 @@ import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
-import {
-  CLEAR_CHOICE,
-  GLOBAL_SECTIONS,
-  checksChoiceId,
-  globalSettingsFields,
-  waitForChecksOf,
-} from "./settings-fields.js";
+import { CLEAR_CHOICE, GLOBAL_SECTIONS, yesNoChoiceId, globalSettingsFields, yesNoValue } from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import {
   AGENT_DEFAULTS,
@@ -31,7 +26,8 @@ import {
   DEFAULT_POLL_SECONDS,
   DEFAULT_UPDATE_CHECK_HOURS,
   DEFAULT_WAIT_FOR_CHECKS,
-  APPROVAL_KEYS,
+  DEFAULT_PUSH_AFTER_MERGE,
+  APPROVAL_QUESTION_KEYS,
   closeChoice,
   ownApproval,
   parsePollSeconds,
@@ -87,7 +83,7 @@ const TYPED_QUESTIONS = [
     sentence: `How often, in whole hours of 1 or more, the panel checks for an update to itself. Leave it empty to check every ${DEFAULT_UPDATE_CHECK_HOURS} hours.`,
   },
 ];
-const SELECT_KEYS = [...APPROVAL_KEYS, "close"];
+const SELECT_KEYS = [...APPROVAL_QUESTION_KEYS, "close"];
 const WORK_PROMPT_SENTENCE =
   "Instructions appended to the system prompt of every Claude session that works an issue. A repository's own prompt is added after this one.";
 
@@ -135,7 +131,8 @@ export class GlobalSettings extends SettingsForm {
         };
         this.chosen = {
           ...Object.fromEntries(SELECT_KEYS.map((key) => [key, this.saved[key]])),
-          waitForChecks: checksChoiceId(/** @type {boolean | null} */ (this.saved.waitForChecks)),
+          waitForChecks: yesNoChoiceId(/** @type {boolean | null} */ (this.saved.waitForChecks)),
+          pushAfterMerge: yesNoChoiceId(/** @type {boolean | null} */ (this.saved.pushAfterMerge)),
         };
         this.typedInputs = Object.fromEntries(
           TYPED_QUESTIONS.map(({ key, placeholder }) => {
@@ -167,7 +164,7 @@ export class GlobalSettings extends SettingsForm {
     });
   }
 
-  // `value` for approval, onApproval, waitForChecks or close, or null to remove it.
+  // `value` for approval, onApproval, waitForChecks, pushAfterMerge or close, or null to remove it.
   /**
    * @param {string} key
    * @param {string | null} value
@@ -203,26 +200,30 @@ export class GlobalSettings extends SettingsForm {
     return { values, problems };
   }
 
-  // The approval, onApproval and waitForChecks to save; waitForChecks only under a pull request or the default.
+  // The approval, onApproval, waitForChecks and pushAfterMerge to save; waitForChecks only under a pull request or
+  // the default, and pushAfterMerge only under a merge or the default.
   approvalValues() {
-    const { approval, onApproval, waitForChecks } = this.chosen;
+    const { approval, onApproval, waitForChecks, pushAfterMerge } = this.chosen;
+    const { waitForChecksSelect, pushAfterMergeSelect } = this.fields();
     return {
       approval,
       onApproval,
-      waitForChecks: this.fields().waitForChecksSelect ? waitForChecksOf(waitForChecks) : null,
+      waitForChecks: waitForChecksSelect ? yesNoValue(waitForChecks) : null,
+      pushAfterMerge: pushAfterMergeSelect ? yesNoValue(pushAfterMerge) : null,
     };
   }
 
   // Every top-level setting whose control differs from the top level, as its value or null. A change to any of
-  // approval, onApproval and waitForChecks includes all three, since saving them removes the retired merge and
-  // complete; a hidden waitForChecks isn't a change by itself.
+  // approval, onApproval, waitForChecks and pushAfterMerge includes all four, since saving them removes the retired
+  // merge and complete; a hidden waitForChecks or pushAfterMerge isn't a change by itself.
   changes() {
     if (!this.saved) return {};
     const approvalSettings = this.approvalValues();
-    const approvalChanged = APPROVAL_KEYS.some(
-      (key) =>
-        (key !== "waitForChecks" || this.fields().waitForChecksSelect) &&
-        approvalSettings[/** @type {ApprovalKey} */ (key)] !== this.saved[key],
+    const { waitForChecksSelect, pushAfterMergeSelect } = this.fields();
+    /** @type {Record<string, boolean>} */
+    const shown = { waitForChecks: waitForChecksSelect, pushAfterMerge: pushAfterMergeSelect };
+    const approvalChanged = APPROVAL_QUESTION_KEYS.some(
+      (key) => (shown[key] ?? true) && approvalSettings[/** @type {ApprovalKey} */ (key)] !== this.saved[key],
     );
     const current = {
       close: this.chosen.close,
@@ -269,7 +270,7 @@ export class GlobalSettings extends SettingsForm {
   }
 
   // The question for each setting's key, or null while it hasn't loaded or doesn't apply: waitForChecks only under a
-  // pull request or the default onApproval.
+  // pull request or the default onApproval, and pushAfterMerge only under a merge or the default.
   /**
    * @param {Theme} t
    * @returns {(key: string) => NativeElement | null}
@@ -295,7 +296,18 @@ export class GlobalSettings extends SettingsForm {
               "waitForChecks",
               {
                 id: CLEAR_CHOICE,
-                label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})`,
+                label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, yesNoChoiceId(DEFAULT_WAIT_FOR_CHECKS))})`,
+              },
+              t,
+            )
+          : null,
+      pushAfterMerge: () =>
+        fields.pushAfterMergeSelect
+          ? this.approvalQuestion(
+              "pushAfterMerge",
+              {
+                id: CLEAR_CHOICE,
+                label: `Default (${choiceLabel(APPROVAL_QUESTIONS.pushAfterMerge.choices, yesNoChoiceId(DEFAULT_PUSH_AFTER_MERGE))})`,
               },
               t,
             )
@@ -335,7 +347,7 @@ export class GlobalSettings extends SettingsForm {
     return (key) => questions[key]?.() ?? null;
   }
 
-  // The select of approval, onApproval or waitForChecks, led by `defaultChoice`.
+  // The select of approval, onApproval, waitForChecks or pushAfterMerge, led by `defaultChoice`.
   /**
    * @param {ApprovalKey} key
    * @param {SelectOption} defaultChoice
@@ -346,7 +358,7 @@ export class GlobalSettings extends SettingsForm {
     return this.selectQuestion(key, title, sentence, [defaultChoice, ...choices], t);
   }
 
-  // A select of approval, onApproval, waitForChecks or close, opening on the top level's value or Default.
+  // A select of an approval question or close, opening on the top level's value or Default.
   /**
    * @param {string} key
    * @param {string} title

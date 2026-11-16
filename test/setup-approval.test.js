@@ -1,4 +1,4 @@
-// Setup's approval, onApproval and waitForChecks steps: a select of the settings view's choices, the chosen
+// Setup's approval, onApproval, waitForChecks and pushAfterMerge steps: a select of the settings view's choices, the chosen
 // option's detail, and Next.
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -12,7 +12,7 @@ const cx = {
   notify() {},
 };
 
-function readySetup(proposed = { approval: "ask", onApproval: "merge", waitForChecks: "no" }) {
+function readySetup(proposed = { approval: "ask", onApproval: "merge", waitForChecks: "no", pushAfterMerge: "no" }) {
   const setup = new TrackerSetup("/repo", () => {});
   setup.tracker.choice = "github";
   setup.settingUp = true;
@@ -33,7 +33,7 @@ const pressNext = (page, key) => callArg(byId(page, `setup-${key}-next`), "on_cl
 test("each approval step renders a select of its question's choices instead of buttons", (t) => {
   stubHerdr(t);
   const setup = readySetup();
-  for (const key of ["approval", "onApproval", "waitForChecks"]) {
+  for (const key of ["approval", "onApproval", "waitForChecks", "pushAfterMerge"]) {
     setup.step = key;
     const { page, props } = renderStep(t, setup);
 
@@ -62,20 +62,32 @@ test("a select starts on the proposed value, shows its detail, and starts on the
   assert.ok(texts(page).includes(APPROVAL_QUESTIONS.approval.choices[1].detail));
 });
 
-test("onApproval's choice decides whether waitForChecks is asked, and Next follows it", (t) => {
+test("onApproval's choice decides whether waitForChecks or pushAfterMerge is asked, and Next follows it", (t) => {
   stubHerdr(t);
   const setup = readySetup();
   setup.step = "onApproval";
   const { props } = renderStep(t, setup);
 
   props.onChoose("pull-request", cx);
-  assert.match(setup.stepBarState().stepText, /^Step 3 of 5$/);
+  assert.deepEqual(setup.steps(), ["tracker", "approval", "onApproval", "waitForChecks", "review"]);
   props.onChoose("merge", cx);
-  assert.match(setup.stepBarState().stepText, /^Step 3 of 4$/);
+  assert.deepEqual(setup.steps(), ["tracker", "approval", "onApproval", "pushAfterMerge", "review"]);
 
   pressNext(renderStep(t, setup).page, "onApproval");
-  assert.equal(setup.step, "review");
+  assert.equal(setup.step, "pushAfterMerge");
   assert.deepEqual(setup.answers, { onApproval: "merge" });
+});
+
+test("Next on pushAfterMerge records the select's value for the review", (t) => {
+  stubHerdr(t);
+  const setup = readySetup({ approval: "ask", onApproval: "merge", waitForChecks: "yes", pushAfterMerge: "yes" });
+  for (const key of ["approval", "onApproval", "pushAfterMerge"]) {
+    setup.step = key;
+    pressNext(renderStep(t, setup).page, key);
+  }
+
+  assert.equal(setup.step, "review");
+  assert.deepEqual(setup.answers, { approval: "ask", onApproval: "merge", pushAfterMerge: "yes" });
 });
 
 test("Next on waitForChecks records the select's value for the review", (t) => {
