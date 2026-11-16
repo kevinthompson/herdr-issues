@@ -109,7 +109,7 @@ test("issues worktree <id> opens the issue's space marked working", (t) => {
 
   runWorktree(root, bin, ["#7"]);
 
-  assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("7-mark-it"), name: `${WORKING} name #7` }]);
+  assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("7-mark-it"), name: `${WORKING}  name #7` }]);
 });
 
 test("issues worktree <id> --name marks the name it's given, replacing any mark", (t) => {
@@ -117,9 +117,9 @@ test("issues worktree <id> --name marks the name it's given, replacing any mark"
   const { bin, spacesOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
   stubGh(bin, "Name it");
 
-  runWorktree(root, bin, ["#7", "--name", "\u{F0132} Chosen"]);
+  runWorktree(root, bin, ["#7", "--name", "\u{F0132}  Chosen"]);
 
-  assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("7-name-it"), name: `${WORKING} Chosen` }]);
+  assert.deepEqual(spacesOpened(), [{ folder: worktreeFolder("7-name-it"), name: `${WORKING}  Chosen` }]);
 });
 
 test("issues worktree <id> selects a space already open on the branch without renaming it", (t) => {
