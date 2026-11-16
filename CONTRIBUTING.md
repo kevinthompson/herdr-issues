@@ -20,8 +20,8 @@ See [How changes reach the running app and Claude Code](AGENTS.md#how-changes-re
 ```sh
 npm test
 herdr-app check ~/.config/herdr-app/mods/issues   # in a worktree: herdr-app check "$PWD/mod"
-bash -n bootstrap install setup uninstall scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
-shellcheck bootstrap install setup uninstall scripts/demo-setup .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
+bash -n bootstrap install setup uninstall .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
+shellcheck bootstrap install setup uninstall .claude/hooks/reload-mod.sh claude-plugin/hooks/*.sh
 ```
 
 `shellcheck` is optional. See [Checks before committing](AGENTS.md#checks-before-committing).
@@ -36,15 +36,9 @@ Open a pull request against `main` from a branch of your fork. Say what the chan
 
 ## Recording the demo
 
-`scripts/demo-setup` builds two demo projects, `blog` and `recipe-app`, so a recording shows none of your own repositories or tracker accounts. Each is a git repository with its issues in a local Beads database, its own Herdr space, and a nested worktree space for each issue in progress.
+Record against `~/Code/herdr-issues-demo` (clone `kevinthompson/herdr-issues-demo` there if you don't have it), which holds a `blog` project with its issues in a local Beads database, so a recording shows none of your own repositories or tracker accounts.
 
-It needs `bd`, `herdr-app`, `hc`, `issues`, `git` and `node`, with the Herdr app running. The projects go in `~/Demo`; set `DEMO_ROOT` to put them elsewhere, for example `DEMO_ROOT=~/Recordings scripts/demo-setup`.
-
-Each project commits a `.claude/settings.json` whose status line prints nothing, so Claude sessions in the demo projects and their worktrees show no status line. Your own `~/.claude/settings.json` is never changed.
-
-1. Run `scripts/demo-setup`.
+1. Run `~/Code/herdr-issues-demo/bin/reset` before each take. It resets the project and reopens its space and the blog-1 and blog-2 worktrees.
 2. In the `blog` space, narrow the panel's list with the **Label** dropdown.
 3. **Start** "Add tags to posts" from the panel. It opens the issue's worktree in a new space with a Claude session working it.
-4. Remove the worktree of "Fix broken links on the archive page", whose branch is already merged into main, so it is ready to close: open the worktree dialog for its space, for example with **Remove worktree** in the space's menu, and remove it. See [Removing a worktree](docs/using-the-panel.md#removing-a-worktree).
-5. Before each new take, run `scripts/demo-setup` again. It tears the projects down and builds them afresh.
-6. When finished, run `scripts/demo-setup --teardown`. It closes the projects' spaces and removes their worktrees, repositories and `issues.json` entries.
+4. Remove the worktree of "Fix broken links on the archive page" (blog-1), whose branch is already merged into main, so it is ready to close: open the worktree dialog for its space, for example with **Remove worktree** in the space's menu, and remove it. See [Removing a worktree](docs/using-the-panel.md#removing-a-worktree).
