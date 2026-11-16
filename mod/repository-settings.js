@@ -62,7 +62,7 @@ export class RepositorySettings extends SettingsForm {
     this.tracker = new TrackerChoice(main, {
       picks: TEAM_PICKS,
       onReady: (_none, cx) => { this.trackerReady = true; cx.notify(); },
-      onTeam: (cx) => cx.notify(),
+      onTeam: () => {},
     });
     this.saved = null; this.merge = null; this.complete = null;
     this.savedClose = null; this.close = null;

@@ -40,14 +40,16 @@ export class SettingsView {
     for (const form of Object.values(this.forms)) form.load(cx);
   }
 
-  // Takes the team and the scope picked in their popups, which hand them over through shared state.
+  // Takes the team and the scope picked in their popups, which hand them over through shared state. The panel
+  // calls this from its render, before drawing the view, so the render that follows shows the picks; Herdr
+  // refuses cx.notify() there and shows the view's last render with an error instead.
   takePicks(cx) {
     this.forms.repository.takePickedTeam(cx);
     const picks = shared(SCOPE_PICKS) ?? {}, scope = picks[this.main];
     if (!scope) return;
     const { [this.main]: _taken, ...others } = picks;
     setShared(SCOPE_PICKS, others);
-    if (!this.shown().saving && scope in this.forms) { this.scope = scope; cx.notify(); }
+    if (!this.shown().saving && scope in this.forms) this.scope = scope;
   }
 
   shown() {
