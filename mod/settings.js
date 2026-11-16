@@ -1,6 +1,6 @@
-// The settings view, which the gear in the panel's header opens in place of the list, with Back at the top left as
-// the setup view (setup.js) has. Under the header, a row like the list's label filter (filter-row.js), with a
-// border beneath it, chooses its scope from a scope menu popup (menu.js), opening on Repository: the focused
+// The settings view, which the gear in the panel's header opens in place of the list, its header reading Issues
+// then Settings. Under the header, a row (filter-row.js) with Back on the left and, on the right, a dropdown with a
+// border beneath the row, chooses its scope from a scope menu popup (menu.js), opening on Repository: the focused
 // repository's own settings (repository-settings.js), or Global, the settings at issues.json's top level that
 // apply to every repository without its own (global-settings.js), both built on the pieces the forms share
 // (settings-form.js). The popup hands its pick back through shared state, keyed by the main checkout. Both forms
@@ -13,7 +13,7 @@ import { div } from "gpui-kit";
 import { v_flex } from "gpui-base";
 import { shared, setShared } from "herdr";
 import { collapseButton, headerBar, iconButton } from "./header.js";
-import { filterRow } from "./filter-row.js";
+import { leadingFilterRow } from "./filter-row.js";
 import { GlobalSettings } from "./global-settings.js";
 import { openScopeMenu } from "./menu.js";
 import { RepositorySettings } from "./repository-settings.js";
@@ -127,9 +127,9 @@ export class SettingsView {
       .min_h(0)
       .child(this.bar(t, onCollapse))
       .child(
-        filterRow(
+        leadingFilterRow(
           "settings-scope",
-          "Settings",
+          this.backButton(t),
           shownLabel,
           () => openScopeMenu(SCOPES, this.scope, this.main, SCOPE_PICKS),
           t,
@@ -140,6 +140,19 @@ export class SettingsView {
       );
   }
 
+  /** @param {Theme} t */
+  backButton(t) {
+    return iconButton(
+      {
+        id: "settings-back",
+        icon: "chevron-left",
+        tooltip: "Back",
+        onClick: this.leaving ? null : (cx) => this.back(cx),
+      },
+      t,
+    );
+  }
+
   /**
    * @param {Theme} t
    * @param {Parameters<typeof collapseButton>[0]} onCollapse
@@ -147,16 +160,9 @@ export class SettingsView {
   bar(t, onCollapse) {
     return headerBar(
       {
-        leading: iconButton(
-          {
-            id: "settings-back",
-            icon: "chevron-left",
-            tooltip: "Back",
-            onClick: this.leaving ? null : (cx) => this.back(cx),
-          },
-          t,
-        ),
-        title: "Settings",
+        icon: "issues",
+        title: "Issues",
+        secondary: "Settings",
         trailing: [
           this.saving() ? div().flex_none().text_color(t.dim).child("Saving…") : null,
           collapseButton(onCollapse, t),
