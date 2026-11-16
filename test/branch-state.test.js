@@ -172,10 +172,17 @@ describe("branchState", () => {
       assert.deepEqual(state, { branch: "feature", bases: ["main", "origin/main"], mergedInto: null, unpushed: 1, pullRequest: PULL_REQUEST });
     });
 
-    test("names the pull request when the work is complete only once its checks pass", async (t) => {
-      const { repo } = reviewedClone(t, { complete: "pull-request-passing" });
+    test("names the pull request when the session waits for its checks", async (t) => {
+      const { repo } = reviewedClone(t, { merge: null, onApproval: "pull-request", waitForChecks: true });
       const state = await branchState(repo, null);
       assert.equal(state.pullRequest, PULL_REQUEST);
+    });
+
+    test("ignores the pull request when onApproval merges", async (t) => {
+      const { repo, commands } = reviewedClone(t, { merge: null, onApproval: "merge" });
+      const state = await branchState(repo, null);
+      assert.equal(state.pullRequest, null);
+      assert.ok(!commands.some((command) => command.startsWith("gh pr view")));
     });
   });
 

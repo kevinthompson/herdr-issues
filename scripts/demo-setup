@@ -103,7 +103,7 @@ EOF
   git -C "$path" add -A
   git -C "$path" commit -q -m "Initial commit"
   (cd "$path" && bd init --stealth --non-interactive --prefix "$prefix" >/dev/null)
-  node "$setup_json" set-repo "$settings" "$path" '{"tracker":"beads","merge":"auto"}'
+  node "$setup_json" set-repo "$settings" "$path" '{"tracker":"beads","approval":"auto","onApproval":"merge"}'
 }
 
 # Creates each issue on stdin, one per line: number|title|label|priority (0-4)|status|blocking number|description|task

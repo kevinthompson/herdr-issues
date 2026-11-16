@@ -2,7 +2,7 @@
 import { readFile } from "node:fs/promises";
 import { mainCheckout, repositoryRoot } from "../mod/location.js";
 import { trackerFor } from "../mod/trackers/index.js";
-import { closeSettings, mergeSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
+import { closeSettings, landingSettings, nameSettings, pollSettings, updateSettings, workSettings } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
@@ -25,8 +25,8 @@ Commands:
                            and body; --json: the whole issue, with the bodyHash edit needs. Comments aren't included
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
-  setting <key>            Print one of the repository's settings, with its default applied: merge, complete, close, name,
-                           pollSeconds, updateCheckHours, workModel, workEffort or workPrompt
+  setting <key>            Print one of the repository's settings, with its default applied: approval, onApproval,
+                           waitForChecks, close, name, pollSeconds, updateCheckHours, workModel, workEffort or workPrompt
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
@@ -53,7 +53,7 @@ Commands:
   worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
-                           refuse, changing nothing, when it can't merge cleanly or the repository uses pull requests
+                           refuse, changing nothing, when it can't merge cleanly or onApproval is pull-request
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
                            The statuses: ${STATUSES.join(", ")}
   start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
@@ -148,7 +148,7 @@ async function spaceName([id]) {
 }
 
 const SETTINGS = {
-  merge: mergeSettings, complete: mergeSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
+  approval: landingSettings, onApproval: landingSettings, waitForChecks: landingSettings, close: closeSettings, name: nameSettings, pollSeconds: pollSettings, updateCheckHours: updateSettings,
   workModel: workSettings, workEffort: workSettings, workPrompt: workSettings,
 };
 

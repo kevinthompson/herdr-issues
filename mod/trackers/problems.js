@@ -52,7 +52,7 @@ export const linearKeyInvalid = (store = KEYCHAIN) =>
   new SetupProblem(`Linear refused the API key in ${store}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
 export const badSetting = (message) => new SetupProblem(message,
   "Fix the repository's entry in `~/.config/herdr-app/issues.json`, or choose a different tracker to replace it.");
-export const badMergeSetting = (message) => new SetupProblem(message,
-  "Fix the repository's `merge` and `complete` in `~/.config/herdr-app/issues.json`, then check again, or choose a tracker again to choose them anew.");
+export const badLandingSetting = (message) => new SetupProblem(message,
+  "Fix the repository's `approval`, `onApproval` and `waitForChecks` in `~/.config/herdr-app/issues.json`, then check again, or choose a tracker again to choose them anew.");
 export const settingsUnreadable = (message) => new SetupProblem(message,
   "Fix `~/.config/herdr-app/issues.json` so it's valid JSON, then check again.");
