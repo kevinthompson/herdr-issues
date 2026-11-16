@@ -1062,7 +1062,7 @@ export default class Issues extends View {
     this.openSpaceIssue(cx);
     this.applyFieldEdits(cx);
     this.setup?.takePickedTeam(cx);
-    this.settingsView?.takePickedTeam(cx);
+    this.settingsView?.takePicks(cx);
     const t = theme(), issue = this.findIssue(this.openId);
     publishOpenIssue(this.project && !this.project.on ? this.project.root : null, issue).catch(() => {});
     this.avatarLoads = [];

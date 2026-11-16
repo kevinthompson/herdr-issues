@@ -3,7 +3,7 @@
 // edit to the panel, which shows it at once and saves it. The issue's labels dropdown is a popup too, with props
 // { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
 // where picking a label checks or unchecks it.
-// The panel's scope, milestone and label dropdowns are popups too, with props { menu: "scope", scopes, current, key, store }:
+// The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick.
