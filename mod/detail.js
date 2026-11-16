@@ -8,7 +8,7 @@ import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, statusIcon } from "./issue.js";
 import { DUE_COLORS, fieldBar, isLightTheme } from "./colors.js";
-import { collapseButton, headerBar, iconButton } from "./header.js";
+import { collapseButton, headerBar } from "./header.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -604,14 +604,8 @@ export function issueDetail(view, t) {
         .items_center()
         .border_b(1)
         .border_color(t.border)
-        .child(
-          div()
-            .flex_1()
-            .min_w(0)
-            .child(
-              iconButton({ id: "issue-back", icon: "chevron-left", tooltip: "Back to issues", onClick: onBack }, t),
-            ),
-        )
+        .child(button("issue-back", icon("chevron-left"), onBack, t, { tooltip: "Back to issues" }))
+        .child(div().flex_1().min_w(0))
         .child(editActions(view, t))
         .when(!view.editor && view.mergeable, (e) => e.child(mergeButton(view, t)))
         .when(!view.editor, (e) => e.child(workActions(view, t))),
