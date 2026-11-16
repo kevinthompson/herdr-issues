@@ -170,7 +170,11 @@ describe("GitHub tracker labels", () => {
 });
 
 describe("GitHub tracker comments", () => {
-  const comment = (login, createdAt, body) => ({ author: login && { login }, createdAt, body });
+  const comment = (login, createdAt, body) => ({
+    author: login && { login, avatarUrl: `https://avatars.example/${login}` },
+    createdAt,
+    body,
+  });
 
   test("get loads an issue's comments with its body, in GitHub's oldest-first order", async (t) => {
     const { tracker } = await trackerWith(t, [
@@ -182,8 +186,13 @@ describe("GitHub tracker comments", () => {
       }),
     ]);
     assert.deepEqual((await tracker.get("#1")).comments, [
-      { author: "someone", created: "2026-01-02T00:00:00Z", body: "First" },
-      { author: "ghost", created: "2026-01-03T00:00:00Z", body: "From a deleted account" },
+      {
+        author: "someone",
+        avatar: "https://avatars.example/someone",
+        created: "2026-01-02T00:00:00Z",
+        body: "First",
+      },
+      { author: "ghost", avatar: null, created: "2026-01-03T00:00:00Z", body: "From a deleted account" },
     ]);
   });
 

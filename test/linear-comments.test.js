@@ -59,10 +59,32 @@ test("get loads an issue's comments with its body, oldest first", async (t) => {
     ]),
   );
   assert.deepEqual((await tracker.get("WEB-1")).comments, [
-    { author: "First", created: "2026-01-02T00:00:00Z", body: "Earlier" },
-    { author: "Second", created: "2026-01-03T00:00:00Z", body: "Later" },
-    { author: "GitHub", created: "2026-01-04T00:00:00Z", body: "Linked a pull request" },
+    { author: "First", avatar: null, created: "2026-01-02T00:00:00Z", body: "Earlier" },
+    { author: "Second", avatar: null, created: "2026-01-03T00:00:00Z", body: "Later" },
+    { author: "GitHub", avatar: null, created: "2026-01-04T00:00:00Z", body: "Linked a pull request" },
   ]);
+});
+
+test("get gives each comment its author's or bot actor's avatar", async (t) => {
+  const tracker = await trackerWith(
+    t,
+    issueNode([
+      {
+        ...comment("Person", "2026-01-02T00:00:00Z", "Hi"),
+        user: { name: "Person", avatarUrl: "https://a.example/p" },
+      },
+      {
+        user: null,
+        botActor: { name: "GitHub", avatarUrl: "https://a.example/gh" },
+        createdAt: "2026-01-03T00:00:00Z",
+        body: "Linked a pull request",
+      },
+    ]),
+  );
+  assert.deepEqual(
+    (await tracker.get("WEB-1")).comments.map((comment) => comment.avatar),
+    ["https://a.example/p", "https://a.example/gh"],
+  );
 });
 
 test("get gives an issue without comments an empty list", async (t) => {

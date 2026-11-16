@@ -2,7 +2,7 @@
 // (each a dropdown), its labels (with a dropdown that adds and removes them), its other details and its Markdown body, which Edit swaps for an editor. Merge shows
 // when the issue's finished branch can merge into main from here (merge.js).
 // Task-list items in the body are checkboxes that check off in place. A Linear or GitHub issue's comments follow
-// the body, read-only, and hide while it is edited.
+// the body, read-only, each a card headed by its author's avatar, name and date, and hide while it is edited.
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
 import { optionLabel } from "./menu.js";
@@ -13,6 +13,7 @@ import { collapseButton, headerBar } from "./header.js";
 import { rowBeneathHeader } from "./filter-row.js";
 import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
 import { SPIN_MS } from "./action-button-state.js";
+import { AVATAR_PX } from "./avatars.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -51,6 +52,7 @@ import { SPIN_MS } from "./action-button-state.js";
  * @property {string} [trackerName]
  * @property {(url: string, cx: Context) => void} onLink
  * @property {(text: string) => string} linkFiles
+ * @property {(url: string | null) => string | null} avatarPath The cached avatar's path for image(), or null until it is on disk.
  * @property {(field: "status" | "priority", cx: Context) => void} onMenu
  * @property {(cx: Context) => void} onLabelsMenu
  * @property {(cx: Context) => void} onBack
@@ -610,6 +612,7 @@ function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel
 
 const TASK_INDENT_PX = 9;
 const AFTER_TASKS_PX = 14;
+const COMMENT_PADDING_PX = 10;
 
 /**
  * @param {TaskSegment} task
@@ -681,35 +684,54 @@ function body(view, t) {
 
 /**
  * The issue's comments, oldest first, read-only: task-list items in them are plain Markdown, not checkboxes.
- * @param {Pick<DetailView, "issue" | "onLink" | "linkFiles">} view
+ * @param {Pick<DetailView, "issue" | "onLink" | "linkFiles" | "avatarPath">} view
  * @param {Theme} t
  */
-function comments({ issue, onLink, linkFiles }, t) {
+function comments({ issue, onLink, linkFiles, avatarPath }, t) {
   return v_flex()
     .flex_none()
     .mt(AFTER_TASKS_PX)
     .pt(10)
-    .gap(12)
+    .gap(8)
     .border_t(1)
     .border_color(t.border)
     .child(div().text_size(11).font_semibold().text_color(t.muted).child("Comments"))
     .children(
-      (issue.comments ?? []).map((comment, index) =>
-        v_flex()
-          .gap(2)
+      (issue.comments ?? []).map((comment, index) => {
+        const avatar = avatarPath(comment.avatar);
+        return v_flex()
+          .rounded(8)
+          .border_1()
+          .border_color(t.border)
+          .bg(t.raised)
           .child(
             h_flex()
+              .px(COMMENT_PADDING_PX)
+              .py(6)
               .gap(6)
+              .items_center()
               .text_size(11)
+              .border_b(1)
+              .border_color(t.border)
+              .when(Boolean(avatar), (e) =>
+                e.child(
+                  image(avatar ?? "")
+                    .flex_none()
+                    .size(AVATAR_PX)
+                    .rounded(AVATAR_PX / 2),
+                ),
+              )
               .child(div().min_w(0).truncate().font_semibold().child(comment.author))
               .child(div().flex_none().text_color(t.dim).child(shortDate(comment.created))),
           )
           .child(
             TextView.markdown(`issue-comment-${issue.id}-${index}`, linkFiles(comment.body))
               .selectable()
+              .px(COMMENT_PADDING_PX)
+              .py(8)
               .on_link_click(onLink),
-          ),
-      ),
+          );
+      }),
     );
 }
 

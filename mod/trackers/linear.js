@@ -60,7 +60,7 @@ import {
  * @property {{ nodes: LinearComment[] }} [comments]
  */
 
-/** @typedef {{ user: { name: string } | null, botActor: { name: string } | null, createdAt: string, body: string }} LinearComment */
+/** @typedef {{ user: { name: string, avatarUrl: string | null } | null, botActor: { name: string, avatarUrl: string | null } | null, createdAt: string, body: string }} LinearComment */
 
 /**
  * @typedef {object} LinearProject
@@ -137,7 +137,7 @@ const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
     id name url priority status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description
-  comments(first: ${COMMENTS}, orderBy: createdAt) { nodes { user { name } botActor { name } createdAt body } } } }`;
+  comments(first: ${COMMENTS}, orderBy: createdAt) { nodes { user { name avatarUrl } botActor { name avatarUrl } createdAt body } } } }`;
 const TEAM_STATES = `query($id: String!) { team(id: $id) { states { nodes { id name type position } } } }`;
 const ASSIGNEE_AND_VIEWER = `query($id: String!) { viewer { id } issue(id: $id) { assignee { id } } }`;
 const VIEWER = "query { viewer { id } }";
@@ -434,6 +434,7 @@ function oldestFirst(comments) {
   return comments
     .map((comment) => ({
       author: comment.user?.name ?? comment.botActor?.name ?? "Unknown",
+      avatar: (comment.user ?? comment.botActor)?.avatarUrl ?? null,
       created: comment.createdAt,
       body: comment.body.trim(),
     }))
