@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// PostToolUse hook: after Claude creates or changes a GitHub issue with `gh issue`, merges a pull request
-// that may close one, creates or changes a Beads issue with `bd`, or creates or changes a Linear issue with
+// PostToolUse hook: after Claude creates or changes a GitHub issue with `gh issue`, adds or removes a GitHub
+// issue dependency with `gh api -X POST|DELETE …/dependencies/…`, merges a pull request that may close one, creates or changes a Beads issue with `bd`, or creates or changes a Linear issue with
 // the Linear MCP's save_issue, touches ~/.config/herdr-app/data/issues/changed, which every copy of the
 // Herdr issues panel watches, so its list shows the change, such as an issue closed once its branch merged,
 // without waiting for its poll.
@@ -17,8 +17,12 @@ const GITHUB_ISSUE_CHANGE = /\bgh\s+(issue\s+(create|close|reopen|edit|delete|tr
 
 const BEADS_ISSUE_CHANGE = /\bbd\s+(?:-C\s+(?:"[^"]*"|'[^']*'|\S+)\s+)?(create|update|close|reopen|dep\s+(add|remove|rm))\b/;
 
+const GITHUB_DEPENDENCY_CHANGE =
+  /\bgh\s+api\b(?=[^|;&]*\/issues\/\d+\/dependencies\/)(?=[^|;&]*(?:-X|--method)[\s=]*["']?(?:POST|DELETE)\b)/i;
+
 const changedGithubIssue = ({ tool_name, tool_input }) =>
-  tool_name === "Bash" && GITHUB_ISSUE_CHANGE.test(tool_input?.command ?? "");
+  tool_name === "Bash" &&
+  [GITHUB_ISSUE_CHANGE, GITHUB_DEPENDENCY_CHANGE].some((pattern) => pattern.test(tool_input?.command ?? ""));
 
 const changedBeadsIssue = ({ tool_name, tool_input }) =>
   tool_name === "Bash" && BEADS_ISSUE_CHANGE.test(tool_input?.command ?? "");
