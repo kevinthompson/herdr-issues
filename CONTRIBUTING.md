@@ -33,12 +33,3 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org), and 
 ## Pull requests
 
 Open a pull request against `main` from a branch of your fork. Say what the change does and why, how you checked it, and, for a change to the panel, include before-and-after screenshots.
-
-## Recording the demo
-
-Record against `~/Code/herdr-issues-demo` (clone `kevinthompson/herdr-issues-demo` there if you don't have it), which holds a `blog` project with its issues in a local Beads database, so a recording shows none of your own repositories or tracker accounts.
-
-1. Run `~/Code/herdr-issues-demo/bin/reset` before each take. It resets the project and reopens its space and the blog-1 and blog-2 worktrees.
-2. In the `blog` space, narrow the panel's list with the **Label** dropdown.
-3. **Start** "Add tags to posts" from the panel. It opens the issue's worktree in a new space with a Claude session working it.
-4. Remove the worktree of "Fix broken links on the archive page" (blog-1), whose branch is already merged into main, so it is ready to close: open the worktree dialog for its space, for example with **Remove worktree** in the space's menu, and remove it. See [Removing a worktree](docs/using-the-panel.md#removing-a-worktree).
