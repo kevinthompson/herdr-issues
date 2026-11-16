@@ -25,10 +25,10 @@ const GEAR_HINT = "Change this repository's other settings later with the gear i
 // the choices, each with what it means.
 export const LANDING_QUESTIONS = {
   approval: {
-    title: "Before the work lands, ask for approval?", sentence: null,
+    title: "How is work approved?", sentence: null,
     choices: [
       { id: "ask", label: "Ask me", detail: "The session shows you what changed and waits for your approval before it merges or opens a pull request." },
-      { id: "auto", label: "Don't ask", detail: "The session merges or opens a pull request as soon as its work is verified." },
+      { id: "auto", label: "Automatically", detail: "The session merges or opens a pull request as soon as its work is verified." },
     ],
   },
   onApproval: {
