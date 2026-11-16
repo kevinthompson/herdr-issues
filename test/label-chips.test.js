@@ -51,3 +51,19 @@ test("draws a label outside a group, even one named with ' > ', as one part", ()
   const [chip] = labelChips({ labels: ["area > web"], labelColors: { "area > web": "#eb5757" } }, darkTheme);
   assert.deepEqual(texts(chip), ["area > web"]);
 });
+
+test("draws an issue's project first, as a two-part chip tinted with the project's color", () => {
+  const chips = labelChips(
+    { labels: ["Bug"], project: { id: "project-1", name: "Calendar N+1", color: "#5e6ad2" } },
+    darkTheme,
+  );
+  assert.deepEqual(chips.map(texts), [["Project", "Calendar N+1"], ["Bug"]]);
+  assert.match(callArg(parts(chips[0])[0], "bg"), /^#5e6ad2[0-9a-f]{2}$/);
+});
+
+test("leaves out the project chip when asked, and draws none for an issue without a project", () => {
+  const project = { id: "project-1", name: "Calendar N+1", color: "#5e6ad2" };
+  assert.deepEqual(labelChips({ labels: ["Bug"], project }, darkTheme, { withProject: false }).map(texts), [["Bug"]]);
+  assert.deepEqual(labelChips({ labels: ["Bug"], project: null }, darkTheme).map(texts), [["Bug"]]);
+  assert.deepEqual(labelChips({ labels: ["Bug"] }, darkTheme).map(texts), [["Bug"]]);
+});

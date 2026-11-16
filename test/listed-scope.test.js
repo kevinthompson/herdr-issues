@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { listedScopeName, headerTitleText } from "../mod/listed-scope.js";
+import { listedScopeName, headerTitleText, listsProject } from "../mod/listed-scope.js";
 import { scopesFor } from "../mod/trackers/linear.js";
 
 const project = {
@@ -60,4 +60,15 @@ test("the header titles each tracker by the repository's name, then the tracker'
 
 test("before the name setting loads, the header shows only the tracker's name", () => {
   assert.equal(headerTitleText({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, null), "GitHub");
+});
+
+test("a project's scope and its milestones' scopes list that project, and no other scope does", () => {
+  const project = { id: "p1" };
+  assert.equal(listsProject("project:p1", project), true);
+  assert.equal(listsProject("project:p1:m1", project), true);
+  assert.equal(listsProject("project:p10", project), false);
+  assert.equal(listsProject("project:p2:m1", project), false);
+  assert.equal(listsProject("team:WEB", project), false);
+  assert.equal(listsProject("project:p1", null), false);
+  assert.equal(listsProject(undefined, project), false);
 });

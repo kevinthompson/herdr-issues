@@ -49,7 +49,7 @@ import { offeredUpdate, dismissUpdate, installTab, finishedUpdate } from "./upda
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
-import { listedScopeName, headerTitleText } from "./listed-scope.js";
+import { listedScopeName, headerTitleText, listsProject } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
 import { filterRow } from "./filter-row.js";
 import {
@@ -1499,7 +1499,8 @@ export default class Issues extends View {
     const waiting = waitingIssues(issue, this.issues),
       sla = slaStatus(issue),
       due = dueStatus(issue),
-      pullRequestCount = issue.pullRequests?.length ?? 0;
+      pullRequestCount = issue.pullRequests?.length ?? 0,
+      chips = labelChips(issue, t, { withProject: !listsProject(this.listedScope, issue.project) }).slice(0, 3);
     const finishable = canFinishWork(issue),
       startable = canStartWork(issue, this.issues);
     const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
@@ -1567,7 +1568,7 @@ export default class Issues extends View {
               .min_w(0)
               .gap(3)
               .child(div().whitespace_normal().child(issue.title))
-              .when(issue.labels.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
+              .when(chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
                 e.child(
                   h_flex()
                     .flex_wrap()
@@ -1577,7 +1578,7 @@ export default class Issues extends View {
                     .text_size(11)
                     .text_color(t.dim)
                     .overflow_hidden()
-                    .children(labelChips(issue, t).slice(0, 3))
+                    .children(chips)
                     .when(blockers.length > 0, (e) =>
                       e.child(
                         h_flex()
