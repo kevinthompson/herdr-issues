@@ -1,6 +1,8 @@
 // Merges an issue's branch into main in the repository's main checkout and marks the issue done, for repositories
 // whose work lands locally (onApproval "merge"). `issues merge` and the issue view's Merge button both run
 // mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly.
+// `issues merge --check` runs checkMerge, mergeIssue's checks alone, so a session can confirm before asking for
+// approval that approving will merge: it tests the merge with git merge-tree and changes no checkout or ref.
 import { exec } from "herdr";
 import { checkouts, MAIN_BRANCHES } from "./worktree.js";
 import { landingSettings } from "./trackers/setting.js";
@@ -58,18 +60,31 @@ async function mergeableMain(branch, project) {
   return main;
 }
 
+const uncleanMerge = (branch, main, conflicts, error) => {
+  const detail = conflicts.length ? `: ${conflicts.join(", ")}` : error ? `: ${error.split("\n").pop()}` : "";
+  return new MergeRefusal(`${branch} doesn't merge cleanly into ${main.branch}, so nothing was merged${detail}`);
+};
+
+// Throws the MergeRefusal mergeIssue would, without changing anything; returns the main checkout, { path, branch }.
+export async function checkMerge(issue, project) {
+  const { branch } = issue;
+  if (!branch) throw new MergeRefusal(`${issue.id} has no branch.`);
+  const main = await mergeableMain(branch, project);
+  const trialMerge = await git(main.path, ["merge-tree", "--write-tree", "--name-only", "--no-messages", main.branch, branch], project.on);
+  if (!trialMerge.ok) throw uncleanMerge(branch, main, trialMerge.out.split("\n").slice(1).filter(Boolean), trialMerge.err);
+  return main;
+}
+
 // Merges the issue's branch into main with a merge commit, then marks the issue done and tells every panel.
 // A conflicting merge is aborted, leaving the main checkout as it was. Returns the main branch's name.
 export async function mergeIssue(issue, tracker, project) {
   const { branch } = issue, { on } = project;
-  if (!branch) throw new MergeRefusal(`${issue.id} has no branch.`);
-  const main = await mergeableMain(branch, project);
+  const main = await checkMerge(issue, project);
   const merged = await git(main.path, ["merge", "--no-ff", "--no-edit", "-m", `Merge branch '${branch}'`, branch], on);
   if (!merged.ok) {
     const conflicts = (await git(main.path, ["diff", "--name-only", "--diff-filter=U"], on)).out.split("\n").filter(Boolean);
     await git(main.path, ["merge", "--abort"], on);
-    const detail = conflicts.length ? `: ${conflicts.join(", ")}` : merged.err ? `: ${merged.err.split("\n").pop()}` : "";
-    throw new MergeRefusal(`${branch} doesn't merge cleanly into ${main.branch}, so nothing was merged${detail}`);
+    throw uncleanMerge(branch, main, conflicts, merged.err);
   }
   const marking = await tracker.update(issue, { status: "done" }).then(() => null, (error) => error);
   await announceIssueChange();

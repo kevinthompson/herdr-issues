@@ -8,7 +8,7 @@ import { checkGitHubLogin } from "../mod/trackers/github.js";
 import { checkBeads } from "../mod/trackers/beads.js";
 import { needsNewBranch, STATUSES } from "../mod/issue.js";
 import { issueSpaceName } from "../mod/space-name.js";
-import { mergeIssue, MergeRefusal } from "../mod/merge.js";
+import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { bodyHash, ChangeRefusal, changeIssueLabels, editIssueBody, setIssueStatus, startIssue } from "./change.js";
@@ -54,6 +54,8 @@ Commands:
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done;
                            refuse, changing nothing, when it can't merge cleanly or onApproval is pull-request
+  merge --check <id>       Make every check merge makes, including a trial merge that changes no checkout, and change
+                           nothing: exit 0 when merge would go through, else print merge's refusal and exit 1
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
                            The statuses: ${STATUSES.join(", ")}
   start <id>               Mark the issue in progress, assigning the person where the tracker does, and refresh the panels
@@ -329,9 +331,16 @@ async function worktree(args) {
 }
 
 async function merge(args) {
-  if (args.length !== 1 || args[0].startsWith("-")) throw new UsageError("merge needs one issue ID");
-  const issue = await issueToWork(args[0]);
+  const checkOnly = args[0] === "--check";
+  const [id, ...rest] = checkOnly ? args.slice(1) : args;
+  if (!id || rest.length || id.startsWith("-")) throw new UsageError(checkOnly ? "merge --check needs one issue ID" : "merge needs one issue ID");
+  const issue = await issueToWork(id);
   try {
+    if (checkOnly) {
+      const main = await checkMerge(issue, await currentProject());
+      console.log(`${issue.branch} merges cleanly into ${main.branch}`);
+      return;
+    }
     const mainBranch = await mergeIssue(issue, await currentTracker(), await currentProject());
     console.log(`Merged ${issue.branch} into ${mainBranch} and marked ${issue.id} done`);
   } catch (error) {
