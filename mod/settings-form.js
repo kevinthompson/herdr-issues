@@ -1,7 +1,7 @@
 // What the settings view's forms (settings.js) share: each question's title, controls and description, typed
 // fields, the line saying why its last save failed, saving as the form changes
 // (autosave.js), where a picked choice or Enter in a field saves at once and typing saves once it pauses, and the
-// issue sessions' model and effort. Those two are select menus (select.js) of their allowed values led by a choice
+// issue sessions' model and effort, and each section's heading above its questions. Those two are select menus (select.js) of their allowed values led by a choice
 // that removes the setting, labeled with what then applies; workModel's Other takes another model alias or full
 // name typed in. Each form gives saveRequest(), what to write and how its saved values change once written, or null
 // when nothing can be saved yet.
@@ -16,6 +16,7 @@ import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setti
 /** @import { InputState as InputStateType, TextareaState } from "gpui-base" */
 /** @import { Theme } from "./menu.js" */
 /** @import { SelectOption } from "./select.js" */
+/** @import { SettingsSection } from "./settings-fields.js" */
 
 /** @typedef {"workModel" | "workEffort"} AgentKey */
 /** @typedef {{ key: AgentKey, title: string, sentence: string | null, choices: string[] }} AgentQuestion */
@@ -251,6 +252,42 @@ export class SettingsForm {
           .child(this.error ?? ""),
       ),
     );
+  }
+
+  // Each section's heading above its questions, where questionFor(key) is the question's element, or null while it
+  // doesn't show; a section none of whose questions shows has no heading.
+  /**
+   * @param {NativeElement} content
+   * @param {SettingsSection[]} sections
+   * @param {(key: string) => NativeElement | null} questionFor
+   * @param {Theme} t
+   */
+  sections(content, sections, questionFor, t) {
+    return content.children(
+      sections.flatMap(({ title, keys }) => {
+        const questions = keys.map(questionFor).filter(Boolean);
+        return questions.length > 0 ? [this.sectionHeading(title, t), ...questions] : [];
+      }),
+    );
+  }
+
+  // Styled as the list's status headings.
+  /**
+   * @param {string} title
+   * @param {Theme} t
+   */
+  sectionHeading(title, t) {
+    return div()
+      .flex_none()
+      .mt(6)
+      .px(10)
+      .py(4)
+      .rounded(6)
+      .text_size(11)
+      .font_semibold()
+      .bg(t.raised)
+      .text_color(t.foreground)
+      .child(title);
   }
 
   /**

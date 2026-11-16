@@ -1,13 +1,14 @@
 // The settings at issues.json's top level, which apply to every repository without its own: the settings view's
-// Global form (settings.js). It shows only the settings that have a top-level version: whether a session asks for
-// approval of its work, approval; how the branch then gets into main, onApproval; whether a session waits
-// for its pull request's checks, waitForChecks, shown for a pull request or the default onApproval, which is a
-// pull request for a repository on GitHub (settings-fields.js), where a retired merge and complete open as the
-// values they mean and any change to the three saves all three; what a finished session does about its worktree,
-// close; the name of each issue's space, spaceName; how often the panel polls each tracker, pollSeconds, and checks
-// for its own update, updateCheckHours, each a whole number before it can be saved; the issue sessions' model and
-// effort, workModel and workEffort; and the prompt appended to their system prompt, workPrompt, before any
-// repository's own. Each opens on the top level's value. Each select leads with a Default choice and each field
+// Global form (settings.js). It shows only the settings that have a top-level version, under the Repository form's
+// section headings except Tracker (GLOBAL_SECTIONS in settings-fields.js). Approval: whether a session asks for
+// approval of its work, approval; how the branch then gets into main, onApproval; and whether a session waits for
+// its pull request's checks, waitForChecks, shown for a pull request or the default onApproval, which is a pull
+// request for a repository on GitHub (settings-fields.js), where a retired merge and complete open as the values
+// they mean and any change to the three saves all three. Worktrees: the name of each issue's space, spaceName; and
+// what a finished session does about its worktree, close. Issue sessions: their model and effort, workModel and
+// workEffort; and the prompt appended to their system prompt, workPrompt, before any repository's own. Panel: how
+// often the panel polls each tracker, pollSeconds, and checks for its own update, updateCheckHours, each a whole
+// number before it can be saved. Each opens on the top level's value. Each select leads with a Default choice and each field
 // shows the default as placeholder, and either removes the key, so the default applies. Each change saves as it's
 // made (settings-form.js), writing only the changed keys with saveTopLevelSettings (setting.js); a field holding a
 // value that can't be saved writes nothing until it's fixed.
@@ -15,7 +16,13 @@ import { div } from "gpui-kit";
 import { InputState, TextareaState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
-import { CLEAR_CHOICE, checksChoiceId, globalSettingsFields, waitForChecksOf } from "./settings-fields.js";
+import {
+  CLEAR_CHOICE,
+  GLOBAL_SECTIONS,
+  checksChoiceId,
+  globalSettingsFields,
+  waitForChecksOf,
+} from "./settings-fields.js";
 import { AGENT_QUESTIONS, CLOSE_CHOICES, CLOSE_SENTENCE, SettingsForm, WORK_PROMPT_ROWS } from "./settings-form.js";
 import {
   AGENT_DEFAULTS,
@@ -258,10 +265,21 @@ export class GlobalSettings extends SettingsForm {
    * @param {Theme} t
    */
   form(content, t) {
+    return this.sections(this.errorLine(content, t), GLOBAL_SECTIONS, this.questionRenderer(t), t);
+  }
+
+  // The question for each setting's key, or null while it hasn't loaded or doesn't apply: waitForChecks only under a
+  // pull request or the default onApproval.
+  /**
+   * @param {Theme} t
+   * @returns {(key: string) => NativeElement | null}
+   */
+  questionRenderer(t) {
     const fields = this.fields();
     const { problems } = this.typed();
-    return this.errorLine(content, t)
-      .child(
+    /** @type {Record<string, () => NativeElement | null>} */
+    const questions = {
+      approval: () =>
         this.approvalQuestion(
           "approval",
           {
@@ -270,21 +288,19 @@ export class GlobalSettings extends SettingsForm {
           },
           t,
         ),
-      )
-      .child(this.approvalQuestion("onApproval", DEFAULT_ON_APPROVAL_CHOICE, t))
-      .when(fields.waitForChecksSelect, (e) =>
-        e.child(
-          this.approvalQuestion(
-            "waitForChecks",
-            {
-              id: CLEAR_CHOICE,
-              label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})`,
-            },
-            t,
-          ),
-        ),
-      )
-      .child(
+      onApproval: () => this.approvalQuestion("onApproval", DEFAULT_ON_APPROVAL_CHOICE, t),
+      waitForChecks: () =>
+        fields.waitForChecksSelect
+          ? this.approvalQuestion(
+              "waitForChecks",
+              {
+                id: CLEAR_CHOICE,
+                label: `Default (${choiceLabel(APPROVAL_QUESTIONS.waitForChecks.choices, checksChoiceId(DEFAULT_WAIT_FOR_CHECKS))})`,
+              },
+              t,
+            )
+          : null,
+      close: () =>
         this.selectQuestion(
           "close",
           "How are worktrees closed?",
@@ -292,38 +308,31 @@ export class GlobalSettings extends SettingsForm {
           [{ id: CLEAR_CHOICE, label: `Default (${choiceLabel(CLOSE_CHOICES, DEFAULT_CLOSE)})` }, ...CLOSE_CHOICES],
           t,
         ),
-      )
-      .when(Boolean(this.typedInputs), (e) =>
-        e.children(
-          TYPED_QUESTIONS.map(({ key, title, sentence }) =>
-            this.question(title, sentence, t, (controls) =>
-              controls.child(this.textField(this.typedInputs[key], t)).when(Boolean(problems[key]), (e) =>
-                e.child(
-                  div()
-                    .whitespace_normal()
-                    .text_size(12)
-                    .text_color(t.ansi1)
-                    .child(problems[key] ?? ""),
-                ),
-              ),
+      workPrompt: () =>
+        this.workPromptInput &&
+        this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
+          controls.child(this.textareaField(this.workPromptInput, t)),
+        ),
+    };
+    for (const { key, title, sentence } of TYPED_QUESTIONS)
+      questions[key] = () =>
+        this.typedInputs &&
+        this.question(title, sentence, t, (controls) =>
+          controls.child(this.textField(this.typedInputs[key], t)).when(Boolean(problems[key]), (e) =>
+            e.child(
+              div()
+                .whitespace_normal()
+                .text_size(12)
+                .text_color(t.ansi1)
+                .child(problems[key] ?? ""),
             ),
           ),
-        ),
-      )
-      .when(Boolean(this.savedAgent), (e) =>
-        e.children(
-          AGENT_QUESTIONS.map((question) =>
-            this.agentQuestion(question, `Default (${AGENT_DEFAULTS[question.key]})`, fields.workModelInput, t),
-          ),
-        ),
-      )
-      .when(Boolean(this.workPromptInput), (e) =>
-        e.child(
-          this.question("Work prompt", WORK_PROMPT_SENTENCE, t, (controls) =>
-            controls.child(this.textareaField(this.workPromptInput, t)),
-          ),
-        ),
-      );
+        );
+    for (const question of AGENT_QUESTIONS)
+      questions[question.key] = () =>
+        this.savedAgent &&
+        this.agentQuestion(question, `Default (${AGENT_DEFAULTS[question.key]})`, fields.workModelInput, t);
+    return (key) => questions[key]?.() ?? null;
   }
 
   // The select of approval, onApproval or waitForChecks, led by `defaultChoice`.

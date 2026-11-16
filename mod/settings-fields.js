@@ -5,11 +5,61 @@
 // Other, which it is when the person picks it or the entry already holds a model the select doesn't list. The
 // Global form's (global-settings.js) differ only in showing the checks question for the default onApproval too.
 // The checks question's select holds waitForChecks as the ids yes and no, which checksChoiceId and waitForChecksOf
-// convert.
+// convert. Both forms group their questions under the same section headings in the same order, each form showing
+// only the sections and questions it has: REPOSITORY_SECTIONS and GLOBAL_SECTIONS, keyed by each question's setting,
+// where name is the repository's name and tracker includes Linear's team.
 import { SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
 
 export const CLEAR_CHOICE = "clear";
 export const OTHER_WORK_MODEL = "other";
+
+/** @typedef {{ title: string, keys: string[] }} SettingsSection */
+
+/** @type {SettingsSection[]} */
+const SETTINGS_SECTIONS = [
+  { title: "Tracker", keys: ["name", "tracker"] },
+  { title: "Approval", keys: ["approval", "onApproval", "waitForChecks"] },
+  { title: "Worktrees", keys: ["worktreeSetup", "spaceName", "close"] },
+  { title: "Issue sessions", keys: ["workModel", "workEffort", "workPrompt"] },
+  { title: "Panel", keys: ["pollSeconds", "updateCheckHours"] },
+];
+
+/**
+ * @param {string[]} formKeys
+ * @returns {SettingsSection[]}
+ */
+const sectionsWith = (formKeys) =>
+  SETTINGS_SECTIONS.map(({ title, keys }) => ({ title, keys: keys.filter((key) => formKeys.includes(key)) })).filter(
+    ({ keys }) => keys.length > 0,
+  );
+
+export const REPOSITORY_SECTIONS = sectionsWith([
+  "name",
+  "tracker",
+  "approval",
+  "onApproval",
+  "waitForChecks",
+  "worktreeSetup",
+  "spaceName",
+  "close",
+  "workModel",
+  "workEffort",
+  "workPrompt",
+  "pollSeconds",
+]);
+
+export const GLOBAL_SECTIONS = sectionsWith([
+  "approval",
+  "onApproval",
+  "waitForChecks",
+  "spaceName",
+  "close",
+  "workModel",
+  "workEffort",
+  "workPrompt",
+  "pollSeconds",
+  "updateCheckHours",
+]);
 
 /**
  * @param {string | null | undefined} model
