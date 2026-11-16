@@ -140,7 +140,9 @@ export class WorktreeDialog {
           let result;
           try {
             result = await exec("sh", ["-c", 'printf %s "$HOME"'], { on: this.on });
-          } catch {}
+          } catch {
+            result = undefined;
+          }
           if (!result || result.code !== 0 || !result.stdout.trim())
             result = await exec("powershell.exe", ["-NoProfile", "-Command", "[Console]::Write($HOME)"], {
               on: this.on,
