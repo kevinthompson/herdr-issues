@@ -101,6 +101,7 @@ import { TrackerSetup, untrackableView, notARepositoryView } from "./setup.js";
 import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
+import { stillWaitingForSpace } from "./opening-wait.js";
 import { canOfferMerge, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 
@@ -576,6 +577,7 @@ export default class Issues extends View {
       const repository = await repositoryState(this.issues, project).catch(() => NONE);
       if (generation !== this.generation) return;
       this.repository = repository;
+      this.settleOpening(cx);
       const shown = this.shownByContext.get(this.resolvedContext);
       if (shown?.listKey === this.listKey) shown.repository = repository;
       cx.notify();
@@ -596,6 +598,10 @@ export default class Issues extends View {
   /** @param {Context} cx */
   poll(cx) {
     this.noticeSpaceSwitch();
+    if (this.opening?.awaitingSince !== undefined) {
+      this.settleOpening(cx);
+      if (this.opening) this.refresh(cx);
+    }
     if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
     this.checkForUpdate(cx);
   }
@@ -1050,11 +1056,48 @@ export default class Issues extends View {
         const [openError, startError] = await Promise.all([opening, starting]);
         this.detailError = startError ?? openError;
         this.refresh(cx);
-      } finally {
+        this.finishOpening(issue, opensWithIssuesWorktree(issue, this.project), cx);
+      } catch (e) {
         this.opening = null;
         cx.notify();
+        throw e;
       }
     });
+  }
+
+  // Ends the opening state, unless the issues worktree opened without error: then the issue's buttons stay loading
+  // until a read of the repository shows its space, or the wait times out.
+  /**
+   * @param {Issue} issue
+   * @param {boolean} awaitSpace
+   * @param {Context} cx
+   */
+  finishOpening(issue, awaitSpace, cx) {
+    if (awaitSpace && !this.detailError && this.opening) {
+      this.opening = { ...this.opening, awaitingSince: Date.now() };
+      this.settleOpening(cx);
+    } else {
+      this.opening = null;
+      cx.notify();
+    }
+  }
+
+  // Ends an opening state that was waiting for the issue's space once the space shows or the wait runs out.
+  /** @param {Context} cx */
+  settleOpening(cx) {
+    const opening = this.opening;
+    if (opening?.awaitingSince === undefined) return;
+    const issue = this.findIssue(opening.id);
+    const waiting =
+      issue &&
+      stillWaitingForSpace({
+        failed: false,
+        inSpace: this.spaceShowingWorktree(issue).inSpace,
+        waitedMs: Date.now() - opening.awaitingSince,
+        timeoutMs: ISSUES_WORKTREE_TIMEOUT_MS,
+      });
+    if (!waiting) this.opening = null;
+    cx.notify();
   }
 
   // The tracker's labels, read once per tracker, which the panel makes anew each refresh, with the issue's own
@@ -1195,7 +1238,7 @@ export default class Issues extends View {
    * @param {Context} cx
    */
   showOpening(issue, status, cx) {
-    /** @type {{ id: string, status: string, merging?: boolean } | null} */
+    /** @type {{ id: string, status: string, merging?: boolean, awaitingSince?: number } | null} */
     this.opening = { id: issue.id, status };
     cx.notify();
   }
@@ -1355,8 +1398,8 @@ export default class Issues extends View {
       } catch (/** @type {any} */ e) {
         this.detailError = `Could not continue: ${e.message ?? e}`;
       }
-      this.opening = null;
-      cx.notify();
+      this.refresh(cx);
+      this.finishOpening(issue, opensWithIssuesWorktree(issue, project), cx);
     });
   }
 
@@ -1571,6 +1614,7 @@ export default class Issues extends View {
                         inSpace,
                         inActiveSpace,
                         opening: this.opening?.id === issue.id,
+                        loading: this.opening?.id === issue.id && !this.opening.merging,
                         onStart: (cx) => this.startWork(issue, cx),
                         onContinue: (cx) => this.continueWork(issue, cx),
                       },
@@ -2012,6 +2056,7 @@ export default class Issues extends View {
                 linkFiles: (markdown) => linkCodeSpanFiles(markdown, this.project.root, this.filesInBody(issue, cx)),
                 startable: canStartWork(issue, this.issues),
                 opening: this.opening?.id === issue.id,
+                loading: this.opening?.id === issue.id && !this.opening.merging,
                 onStart: (cx) => this.startWork(issue, cx),
                 finishable: canFinishWork(issue),
                 ...this.spaceShowingWorktree(issue),
