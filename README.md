@@ -7,8 +7,10 @@ An Issues panel for the Herdr desktop app and a Claude Code plugin that work as 
 ## How they work together
 
 1. **Write the issues.** `/issues:plan` turns an idea, a brief or a full spec into a series of issues by interviewing you, and `/issues:create` writes issues for work that is already settled. `/issues:triage` rewrites existing issues until each is a self-contained hand-off.
-2. **See them in the panel.** The panel lists the new issues, grouped by status, where you can read them, edit them and change their status and priority.3. **Start one.** **Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue. `/issues:start` does the same from a Claude session, for one issue, several, or the next few that are ready.4. **Claude works it.** `/issues:work` catches up on any work already on the branch, marks the issue in progress, does the work and verifies it.
-3. **Merge it or open its pull request.** As the repository's [approval settings](docs/configuration.md#approval-onapproval-and-waitforchecks) say, the session asks you to approve the work or goes straight on, then merges the branch into main or opens its pull request.
+2. **See them in the panel.** The panel lists the new issues, grouped by status, where you can read them, edit them and change their status and priority.
+3. **Start one.** **Start** opens the issue's branch in a new worktree, shown as a Herdr space nested under the repository's space, with a Claude session running `/issues:work` on the issue. `/issues:start` does the same from a Claude session, for one issue, several, or the next few that are ready.
+4. **Claude works it.** `/issues:work` catches up on any work already on the branch, marks the issue in progress, does the work and verifies it.
+5. **Merge it or open its pull request.** As the repository's [approval settings](docs/configuration.md#approval-onapproval-and-waitforchecks) say, the session asks you to approve the work or goes straight on, then merges the branch into main or opens its pull request.
 
 Claude sessions in Herdr know which issues the panel lists and which one is open, so "the issues" and "this issue" mean what you see.
 
