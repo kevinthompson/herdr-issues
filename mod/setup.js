@@ -765,7 +765,7 @@ export class TrackerSetup {
           : details,
       )
       .when(first, (e) => e.rounded_t(CARD_RADIUS_PX - 1))
-      .when(chosen, (e) => e.bg(/** @type {Color} */ (rowHover(t))))
+      .when(chosen, (e) => e.bg(t.selected))
       .when(enabled && !chosen, (e) =>
         e
           .cursor_pointer()
