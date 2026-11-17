@@ -10,7 +10,7 @@ import { h_flex } from "gpui-base";
 
 export const ROW_HEIGHT_PX = 40;
 export const ROW_BORDER_PX = 1;
-const ROW_PADDING_X_PX = 10;
+export const ROW_PADDING_X_PX = 10;
 export const DROPDOWN_HEIGHT_PX = 24;
 const DROPDOWN_MAX_PX = 260;
 

@@ -17,7 +17,7 @@ import { v_flex } from "gpui-base";
 import { shared, setShared } from "herdr";
 import { actionButton } from "./action-button.js";
 import { collapseButton, headerBar } from "./header.js";
-import { leadingFilterRow } from "./filter-row.js";
+import { leadingFilterRow, ROW_PADDING_X_PX } from "./filter-row.js";
 import { GlobalSettings } from "./global-settings.js";
 import { openScopeMenu } from "./menu.js";
 import { RepositorySettings } from "./repository-settings.js";
@@ -130,9 +130,8 @@ export class SettingsView {
       .flex_1()
       .min_h(0)
       .overflow_y_scrollbar()
-      .px(24)
-      .pt(24)
-      .pb(40)
+      .p(ROW_PADDING_X_PX)
+      .pt(16)
       .gap(32);
     return v_flex()
       .size_full()
