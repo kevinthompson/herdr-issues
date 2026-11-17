@@ -122,7 +122,7 @@ const bdIn = (root) => async (/** @type {string[]} */ args) => {
 // Whether each main checkout can run `bd`, checked once while the mod runs and again after the setup view checks.
 const cachedInstalls = cachedLookup();
 /** @param {string} root */
-const checkInstalled = (root) =>
+export const checkBeadsInstalled = (root) =>
   cachedInstalls(root, async () => {
     const result = await exec("bd", ["version"], { cwd: root }).catch(noResult);
     if (!result || result.code === 127) throw await bdMissing();
@@ -131,7 +131,12 @@ const checkInstalled = (root) =>
 // Throws bdMissing when the main checkout `root` can't run `bd`, and beadsNotInitialized when it has no database.
 /** @param {string} root */
 export async function checkBeads(root) {
-  await checkInstalled(root);
+  await checkBeadsInstalled(root);
+  await checkBeadsDatabase(root);
+}
+
+/** @param {string} root */
+export async function checkBeadsDatabase(root) {
   const metadata = await readTextFile(`${root}/.beads/metadata.json`).catch(noResult);
   if (metadata === null) throw beadsNotInitialized();
 }
