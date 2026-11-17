@@ -5,7 +5,7 @@
 // where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
 // scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
-// a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
+// a group's in muted, spaced capitals below a divider that spans the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick.
 import { div, image } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
@@ -38,15 +38,12 @@ const ROW = 28,
   DIVIDER_GAP = 4,
   ICON_PX = 16,
   ICON_GAP = 6,
-  CHECK_GAP = 9;
-// The theme's text color at this opacity, so the band follows light and dark themes.
-const HEADING_TINT_ALPHA = "0a";
-/**
- * @param {Theme} t
- * @returns {`#${string}`}
- */
-const headingTint = (t) =>
-  /^#[0-9a-f]{6}$/i.test(t.foreground) ? `${t.foreground}${HEADING_TINT_ALPHA}` : "#00000000";
+  CHECK_GAP = 9,
+  HEADING_TEXT_SIZE = 11;
+// The text has no letter-spacing style, so a hair space between letters spaces the capitals.
+export const HAIR_SPACE = String.fromCodePoint(0x200a);
+/** @param {string} heading */
+const spacedCapitals = (heading) => [...heading.toUpperCase()].join(HAIR_SPACE);
 
 /** @type {Record<string, MenuOption[]>} */
 const OPTIONS = {
@@ -120,15 +117,11 @@ function optionList(options, isChecked, onPick) {
                 .flex_none()
                 .flex()
                 .items_center()
-                .mb(DIVIDER_GAP)
-                .bg(headingTint(t))
-                .border_b(1)
-                .border_color(t.border)
-                .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1))
-                .text_size(10.5)
+                .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1).border_color(t.border))
+                .text_size(HEADING_TEXT_SIZE)
                 .font_semibold()
                 .text_color(t.muted)
-                .child(option.heading.toUpperCase())
+                .child(spacedCapitals(option.heading))
             : option.subheading
               ? div()
                   .id(`subheading-${option.subheading}`)
@@ -204,7 +197,7 @@ const DIVIDER_HEIGHT = DIVIDER_GAP * 2 + 1;
 const menuHeight = (options) =>
   options.reduce(
     (height, option, index) =>
-      height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0)),
+      height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading && index > 0 ? DIVIDER_GAP : 0)),
     PADDING * 2,
   );
 
