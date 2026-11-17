@@ -60,6 +60,8 @@ const lightness = (hex) => {
   return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
 };
 
+const panelBehindCards = (/** @type {Theme} */ t) => (HEX.test(t.canvas ?? "") ? t.canvas : t.surface) ?? "";
+
 // A status's fill, hover and border colors in the theme `t`; null for a status without a color.
 /** @param {string} status @param {Theme} t */
 export function statusTints(status, t) {
@@ -79,7 +81,7 @@ function colorTints(color, t) {
     hover: `${color}${STATUS_ALPHAS.hover}`,
     border: `${color}${STATUS_ALPHAS.border}`,
   };
-  if (!isLightTheme(t) || !HEX.test(t.surface ?? "") || !HEX.test(color)) return translucent;
+  if (!isLightTheme(t) || !HEX.test(panelBehindCards(t)) || !HEX.test(color)) return translucent;
   const tint = (/** @type {keyof typeof STATUS_ALPHAS} */ part) =>
     lightTint(color, t, parseInt(STATUS_ALPHAS[part], 16) / 255, LIGHT_STATUS_MIN_STEPS[part]);
   return { fill: tint("fill"), hover: tint("hover"), border: tint("border") };
@@ -90,13 +92,14 @@ function colorTints(color, t) {
 // lightness to get there, its `share` is darkened toward the text instead.
 /** @param {string} color @param {Theme} t @param {number} share @param {number} minStep */
 function lightTint(color, t, share, minStep) {
-  const panel = lightness(t.surface),
+  const panelColor = panelBehindCards(t),
+    panel = lightness(panelColor),
     text = lightness(t.foreground),
     leastDistance = Math.abs(panel - text) * minStep,
     colorDistance = Math.abs(panel - lightness(color));
   if (colorDistance >= leastDistance)
-    return /** @type {string} */ (mixColors(t.surface, color, Math.max(share, leastDistance / colorDistance)));
-  const tint = /** @type {string} */ (mixColors(t.surface, color, share)),
+    return /** @type {string} */ (mixColors(panelColor, color, Math.max(share, leastDistance / colorDistance)));
+  const tint = /** @type {string} */ (mixColors(panelColor, color, share)),
     targetLightness = panel - leastDistance;
   return /** @type {string} */ (
     mixColors(tint, t.foreground, (lightness(tint) - targetLightness) / (lightness(tint) - text))
@@ -121,10 +124,10 @@ export function rowHover(t) {
 /** @param {Theme} t */
 export const fieldBar = (t) => (isLightTheme(t) ? t.chrome : (mixColors(t.surface, t.raised, 0.35) ?? t.surface));
 
-// A settings card's fill and a chip on it: the panel's color moved a little, then further, toward its text, so
-// each reads as a step off the panel in light and dark themes.
+// A card's fill, the theme's surface over the panel's canvas, and a chip on it, moved toward its text so it
+// reads as a step off the card in light and dark themes.
 /** @param {Theme} t */
-export const cardFill = (t) => mixColors(t.surface, t.foreground, 0.03) ?? t.raised;
+export const cardFill = (t) => t.surface;
 /** @param {Theme} t */
 export const chipFill = (t) => mixColors(t.surface, t.foreground, 0.1) ?? t.raised;
 

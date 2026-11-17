@@ -1979,7 +1979,7 @@ export default class Issues extends View {
       .min_h(0)
       .rounded(10)
       .overflow_hidden()
-      .bg(t.surface)
+      .bg(t.canvas ?? t.surface)
       .border_1()
       .border_color(t.border)
       .text_color(t.foreground)
