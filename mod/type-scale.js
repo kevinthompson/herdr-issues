@@ -6,5 +6,6 @@ export const TEXT_SM_PX = 14;
 export const TEXT_MD_PX = 16;
 export const TEXT_LG_PX = 18;
 export const TEXT_XL_PX = 20;
-// The page question's line height, 1.3 times its size.
-export const TEXT_XL_LINE_HEIGHT_PX = 26;
+// The page question's line height, 1.3 times its size. It's a length string because `line_height` reads a bare
+// number as a multiple of the text size.
+export const TEXT_XL_LINE_HEIGHT = "26px";
