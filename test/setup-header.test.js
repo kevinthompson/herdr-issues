@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
-import { byId, callArg, texts } from "./support/gpui.js";
+import { byId, callArg, texts, walk } from "./support/gpui.js";
+import { iconButton } from "../mod/header.js";
 import { TrackerSetup } from "../mod/setup.js";
 
 const theme = new Proxy({}, { get: () => "#000" });
@@ -26,6 +27,31 @@ test("the setup header reads Issues then Setup, with Cancel and collapse on its 
   assert.equal(texts(bar).includes("Set up issues"), false);
 });
 
+test("Cancel is an icon button styled as the settings gear, just before collapse, and drops the answers", (t) => {
+  stubHerdr(t);
+  const setup = setupAt("approval");
+  setup.settingUp = true;
+  const bar = setup.stepBar(theme);
+  const cancel = byId(bar, "setup-cancel");
+  const gear = iconButton({ id: "issues-settings-open", icon: "settings", tooltip: "Settings", onClick() {} }, theme);
+
+  assert.equal(callArg(cancel, "tooltip"), "Cancel setup");
+  assert.equal(cancel.kids[0].calls.find(([name]) => name === "path")[1], "mods/issues/icons/x.svg");
+  assert.deepEqual(
+    cancel.calls.filter(([name]) => !["id", "tooltip", "on_click"].includes(name)).map(([name]) => name),
+    gear.calls.filter(([name]) => !["id", "tooltip", "on_click"].includes(name)).map(([name]) => name),
+  );
+  const trailing = [...walk(bar)].filter((node) => ["setup-cancel", "issues-collapse"].includes(callArg(node, "id")));
+  assert.deepEqual(
+    trailing.map((node) => callArg(node, "id")),
+    ["setup-cancel", "issues-collapse"],
+  );
+
+  callArg(cancel, "on_click")(null, { notify() {} });
+  assert.equal(setup.settingUp, false);
+  assert.equal(setup.step, "tracker");
+});
+
 test("the setup view's first step has no back button but shows its step count", (t) => {
   stubHerdr(t);
   const bar = setupAt("tracker").stepBar(theme);
@@ -34,7 +60,7 @@ test("the setup view's first step has no back button but shows its step count", 
   assert.ok(texts(bar).some((text) => /^Step 1 of \d+$/.test(text)));
 });
 
-test("a later step shows an enabled back button, drawn with the other buttons' height", (t) => {
+test("a later step shows an enabled back button, drawn as the settings view's Back", (t) => {
   stubHerdr(t);
   const setup = setupAt("approval");
   const back = byId(setup.stepBar(theme), "setup-back");
@@ -45,6 +71,32 @@ test("a later step shows an enabled back button, drawn with the other buttons' h
   assert.ok(back.calls.some(([name]) => name === "on_mouse_down"));
   assert.equal(setup.stepBarState().backEnabled, true);
   assert.match(setup.stepBarState().stepText, /^Step [2-9] of \d+$/);
+});
+
+// The step bar's segments, as the colors they're filled with.
+const segmentFills = (setup, palette) => {
+  const bar = setup.stepBar(palette);
+  return setup
+    .steps()
+    .map((_, index) => callArg(byId(bar, `setup-step-segment-${index}`), "bg"))
+    .map((fill) => (fill === palette.accent ? "accent" : fill));
+};
+
+test("the step bar fills one segment per step up to the current one in the accent", (t) => {
+  stubHerdr(t);
+  const palette = { ...theme, accent: "#3366ff", surface: "#101010", muted: "#909090", foreground: "#eeeeee" };
+  const muted = "#434343";
+
+  assert.deepEqual(segmentFills(setupAt("tracker"), palette), ["accent", muted, muted]);
+  assert.deepEqual(segmentFills(setupAt("approval"), palette), ["accent", "accent", muted]);
+  assert.deepEqual(segmentFills(setupAt("review"), palette), ["accent", "accent", "accent"]);
+
+  const linear = setupAt("team");
+  linear.tracker.choice = "linear";
+  assert.deepEqual(segmentFills(linear, palette), ["accent", "accent", muted, muted]);
+  linear.step = "review";
+  assert.deepEqual(segmentFills(linear, palette), ["accent", "accent", "accent", "accent"]);
+  assert.equal(linear.stepBarState().stepText, "Step 4 of 4");
 });
 
 test("the back button is disabled while checking or saving", (t) => {
