@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
 import { byId, callArg, texts, walk } from "./support/gpui.js";
 import { TrackerSetup } from "../mod/setup.js";
+import { BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM } from "../mod/trackers/problems.js";
 
 const theme = new Proxy({}, { get: () => "#000" });
 const cx = {
@@ -21,6 +22,9 @@ function startedSetup() {
 }
 
 const render = (setup) => setup.render(theme, { onRetry() {}, header: null, onCollapse() {} });
+
+// Whether a tracker row's radio indicator is filled.
+const radioFilled = (page, id) => Boolean(callArg(byId(page, `setup-tracker-${id}-radio`), "bg"));
 
 // The bordered card holding `text`.
 const cardWith = (page, text) =>
@@ -40,7 +44,7 @@ test("the tracker step lists each tracker as a row in one card under a Tracker h
   assert.equal(texts(card).includes("Where do this repository's issues live?"), false);
 });
 
-test("pressing a tracker's row runs its check, and the checked tracker is marked", (t) => {
+test("pressing a tracker's row runs its check, and the chosen tracker's radio is filled", (t) => {
   stubHerdr(t);
   const setup = startedSetup();
   const choose = t.mock.method(setup.tracker, "choose", () => {});
@@ -49,8 +53,10 @@ test("pressing a tracker's row runs its check, and the checked tracker is marked
   assert.deepEqual(choose.mock.calls[0].arguments.slice(0, 1), ["linear"]);
   setup.tracker.choice = "beads";
   const page = render(setup);
-  assert.ok(texts(byId(page, "setup-tracker-beads")).includes("✓"));
-  assert.equal(texts(byId(page, "setup-tracker-github")).includes("✓"), false);
+  assert.ok(radioFilled(page, "beads"));
+  assert.equal(radioFilled(page, "github"), false);
+  assert.equal(callArg(byId(page, "setup-tracker-beads"), "on_click"), undefined);
+  assert.ok(callArg(byId(page, "setup-tracker-github"), "on_click"));
 });
 
 test("while a tracker is checked, its rows can't be pressed and the check's status shows", (t) => {
@@ -61,8 +67,31 @@ test("while a tracker is checked, its rows can't be pressed and the check's stat
   const page = render(setup);
 
   assert.equal(callArg(byId(page, "setup-tracker-github"), "on_click"), undefined);
-  assert.ok(texts(page).includes("Checking…"));
-  assert.equal(texts(byId(page, "setup-tracker-github")).includes("✓"), false);
+  assert.ok(texts(byId(page, "setup-tracker-github")).includes("Checking…"));
+  assert.ok(radioFilled(page, "github"));
+});
+
+test("a failed check shows its problem, fix and buttons inside the chosen tracker's row", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "beads";
+  setup.tracker.problem = { code: BEADS_NOT_INITIALIZED, message: "No Beads database.", fix: "Run `bd init`." };
+  const row = byId(render(setup), "setup-tracker-beads");
+
+  assert.ok(texts(row).includes("No Beads database."));
+  assert.ok([...walk(row)].some((node) => callArg(node, "path") === "mods/issues/icons/circle-alert.svg"));
+  assert.ok(byId(row, "setup-problem-check"));
+  assert.ok(byId(row, "setup-problem-beads-init"));
+  assert.equal(byId(render(setup), "setup-tracker-next"), undefined);
+});
+
+test("a Linear key problem puts the key form in the Linear row", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "linear";
+  setup.tracker.problem = { code: LINEAR_KEY_PROBLEM, message: "No Linear API key." };
+
+  assert.ok(byId(byId(render(setup), "setup-tracker-linear"), "setup-problem-save-key"));
 });
 
 test("back on the tracker step, Next goes on with the tracker that passed its check", (t) => {

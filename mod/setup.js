@@ -3,7 +3,8 @@
 // answers and returns to the blank state from where the settings gear goes once setup is saved, the settings
 // view's row holds Back, the step, and a segment per step filled up to the current one. Each page opens with its
 // question as a heading, then sections of cards laid out as the settings view's (setting-row.js): the trackers,
-// GitHub Issues, Linear or Beads, a row each that chooses and checks it (tracker-choice.js); Linear's team; on one
+// GitHub Issues, Linear or Beads, a radio row each that chooses it and shows its check (tracker-choice.js), and the
+// problem the check finds inside it; Linear's team; on one
 // page, the approval settings as the settings view's rows with its labels, each a dropdown (select.js) with the
 // chosen option's detail, where waiting for a pull request's checks or pushing main after a merge follows
 // onApproval as a dependent field; and a review of the answers, which points to the gear's settings (settings.js)
@@ -57,6 +58,10 @@ const TRACKER_DESCRIPTIONS = {
   linear: "Issues in one of your Linear teams, read and written with a Linear API key.",
   beads: "Issues in a Beads database kept in the repository, read and written with bd.",
 };
+// A tracker's label line, which its radio indicator centers on.
+const TRACKER_LABEL_LINE_HEIGHT_PX = 22;
+const RADIO_PX = 16;
+const RADIO_DOT_PX = 6;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 // Approval, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
 // the choices, each with what it means.
@@ -265,6 +270,24 @@ export function emptyListView(t) {
     t,
   );
 }
+
+// A radio button's circle: outlined, or filled with the accent color around a dot of the panel's color when chosen.
+/**
+ * @param {string} id
+ * @param {boolean} chosen
+ * @param {Theme} t
+ */
+const radioIndicator = (id, chosen, t) =>
+  h_flex()
+    .id(id)
+    .flex_none()
+    .size(RADIO_PX)
+    .items_center()
+    .justify_center()
+    .rounded_full()
+    .border_1()
+    .border_color(chosen ? t.accent : t.muted)
+    .when(chosen, (e) => e.bg(t.accent).child(div().size(RADIO_DOT_PX).rounded_full().bg(t.surface)));
 
 /**
  * @param {SelectOption[]} choices
@@ -689,35 +712,43 @@ export class TrackerSetup {
       .child(button(id, label, onClick, t, { primary: true }));
   }
 
-  // A tracker's row in the tracker card: its label and description, marked when it's the answer, and choosing it
-  // when pressed.
+  // A tracker's row in the tracker card: a radio indicator beside its label, its description, and for the answer
+  // its check's status. An unchosen row chooses its tracker when pressed; the chosen one leaves presses to its
+  // status's buttons and key field.
   /**
    * @param {{ id: string, label: string }} tracker
    * @param {{ chosen: boolean, enabled: boolean, first: boolean }} state
    * @param {Theme} t
    */
   trackerRow({ id, label }, { chosen, enabled, first }, t) {
+    const details = v_flex()
+      .flex_1()
+      .min_w(0)
+      .gap(4)
+      .child(
+        div()
+          .text_size(TEXT_MD_PX)
+          .line_height(TRACKER_LABEL_LINE_HEIGHT_PX)
+          .font_semibold()
+          .text_color(t.foreground)
+          .child(label),
+      )
+      .child(div().whitespace_normal().text_size(TEXT_XS_PX).text_color(t.muted).child(TRACKER_DESCRIPTIONS[id]));
     const row = h_flex()
       .id(`setup-tracker-${id}`)
       .items_start()
-      .gap(12)
+      .gap(10)
       .child(
-        v_flex()
-          .flex_1()
-          .min_w(0)
-          .gap(4)
-          .child(div().text_size(TEXT_MD_PX).font_semibold().text_color(t.foreground).child(label))
-          .child(div().whitespace_normal().text_size(TEXT_XS_PX).text_color(t.muted).child(TRACKER_DESCRIPTIONS[id])),
-      )
-      .child(
-        div()
+        h_flex()
           .flex_none()
-          .text_color(t.accent)
-          .child(chosen ? "✓" : ""),
+          .h(TRACKER_LABEL_LINE_HEIGHT_PX)
+          .items_center()
+          .child(radioIndicator(`setup-tracker-${id}-radio`, chosen, t)),
       )
+      .child(chosen ? this.tracker.withCheckStatus(details, "setup-problem", t) : details)
       .when(first, (e) => e.rounded_t(CARD_RADIUS_PX - 1))
       .when(chosen, (e) => e.bg(/** @type {Color} */ (rowHover(t))))
-      .when(enabled, (e) =>
+      .when(enabled && !chosen, (e) =>
         e
           .cursor_pointer()
           .hover((s) => s.bg(/** @type {Color} */ (rowHover(t))))
@@ -735,7 +766,7 @@ export class TrackerSetup {
     const sentence = this.failure
       ? "Choose a different issue tracker for this repository."
       : "This repository has no issue tracker yet. Choose where its issues live.";
-    const chosen = tracker.checking ? null : tracker.choice;
+    const chosen = tracker.choice;
     const status = tracker.checking || Boolean(tracker.problem);
     return content
       .child(this.pageHeading("Where do this repository's issues live?", sentence, t))
@@ -748,7 +779,6 @@ export class TrackerSetup {
           t,
         ),
       )
-      .when(status, (e) => e.child(tracker.withCheckStatus(this.inset(), "setup-problem", t)))
       .when(!status && Boolean(chosen) && this.readyTracker === chosen, (e) =>
         e.child(this.nextButton("setup-tracker-next", "Next", (cx) => this.goTo(this.stepAfterTracker(), cx), t)),
       );
