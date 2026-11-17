@@ -1772,7 +1772,7 @@ export default class Issues extends View {
           .items_center()
           .border_1()
           .border_color(t.border)
-          .when(joined, (e) => e.border_b(0).rounded_t(CARD_RADIUS_PX))
+          .when(joined, (e) => e.rounded_t(CARD_RADIUS_PX))
           .when(!joined, (e) => e.rounded(CARD_RADIUS_PX))
           .cursor_pointer()
           .text_size(11)
@@ -1802,6 +1802,7 @@ export default class Issues extends View {
         e.child(
           card(t)
             .rounded_t(0)
+            .border_t(0)
             .children(
               rows.map((row, index) =>
                 row
