@@ -112,6 +112,7 @@ import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
 import { stillWaitingForSpace } from "./opening-wait.js";
+import { Openings } from "./openings.js";
 import { canOfferMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 import { idColumnWidth } from "./id-column.js";
@@ -294,6 +295,7 @@ export default class Issues extends View {
     this.editing = null;
     this.saving = false;
     this.detailError = null;
+    this.openings = new Openings();
     this.links = {
       hasIssue: (/** @type {string} */ id) => this.hasIssue(id),
       onOpen: (/** @type {string} */ id, /** @type {Context} */ cx) => this.open(id, cx),
@@ -613,9 +615,9 @@ export default class Issues extends View {
   /** @param {Context} cx */
   poll(cx) {
     this.noticeSpaceSwitch();
-    if (this.opening?.awaitingSince !== undefined) {
+    if (this.openings.awaiting) {
       this.settleOpening(cx);
-      if (this.opening) this.refresh(cx);
+      if (this.openings.awaiting) this.refresh(cx);
     }
     if (!this.refreshOnReturn(cx) && this.visible && this.pollDue()) this.refresh(cx);
     this.checkForUpdate(cx);
@@ -1073,7 +1075,7 @@ export default class Issues extends View {
         this.refresh(cx);
         this.finishOpening(issue, opensWithIssuesWorktree(issue, this.project), cx);
       } catch (e) {
-        this.opening = null;
+        this.openings.end(issue.id);
         cx.notify();
         throw e;
       }
@@ -1088,30 +1090,31 @@ export default class Issues extends View {
    * @param {Context} cx
    */
   finishOpening(issue, awaitSpace, cx) {
-    if (awaitSpace && !this.detailError && this.opening) {
-      this.opening = { ...this.opening, awaitingSince: Date.now() };
+    if (awaitSpace && !this.detailError) {
+      this.openings.awaitSpace(issue.id, Date.now());
       this.settleOpening(cx);
     } else {
-      this.opening = null;
+      this.openings.end(issue.id);
       cx.notify();
     }
   }
 
-  // Ends an opening state that was waiting for the issue's space once the space shows or the wait runs out.
+  // Ends each opening state that was waiting for its issue's space once the space shows or the wait runs out.
   /** @param {Context} cx */
   settleOpening(cx) {
-    const opening = this.opening;
-    if (opening?.awaitingSince === undefined) return;
-    const issue = this.findIssue(opening.id);
-    const waiting =
-      issue &&
-      stillWaitingForSpace({
-        failed: false,
-        inSpace: this.spaceShowingWorktree(issue).inSpace,
-        waitedMs: Date.now() - opening.awaitingSince,
-        timeoutMs: ISSUES_WORKTREE_TIMEOUT_MS,
-      });
-    if (!waiting) this.opening = null;
+    if (!this.openings.awaiting) return;
+    this.openings.settle((id, awaitingSince) => {
+      const issue = this.findIssue(id);
+      return Boolean(
+        issue &&
+        stillWaitingForSpace({
+          failed: false,
+          inSpace: this.spaceShowingWorktree(issue).inSpace,
+          waitedMs: Date.now() - awaitingSince,
+          timeoutMs: ISSUES_WORKTREE_TIMEOUT_MS,
+        }),
+      );
+    });
     cx.notify();
   }
 
@@ -1251,15 +1254,18 @@ export default class Issues extends View {
    * @param {Issue} issue
    * @param {string} status
    * @param {Context} cx
+   * @param {{ merging?: boolean }} [options]
    */
-  showOpening(issue, status, cx) {
-    /** @type {{ id: string, status: string, merging?: boolean, awaitingSince?: number } | null} */
-    this.opening = { id: issue.id, status };
+  showOpening(issue, status, cx, options) {
+    this.openings.begin(issue.id, status, options);
     cx.notify();
   }
 
-  /** @param {Theme} t */
-  openingFooter(t) {
+  /**
+   * @param {Theme} t
+   * @param {string} status
+   */
+  openingFooter(t, status) {
     return h_flex()
       .flex_none()
       .h(30)
@@ -1269,7 +1275,7 @@ export default class Issues extends View {
       .border_color(t.border)
       .text_size(11)
       .text_color(t.dim)
-      .child(div().min_w(0).truncate().child(this.opening.status));
+      .child(div().min_w(0).truncate().child(status));
   }
 
   // An available update, with Update and a dismiss control, or the note that an update finished.
@@ -1359,8 +1365,7 @@ export default class Issues extends View {
     const tracker = this.tracker,
       project = this.project;
     this.detailError = null;
-    this.showOpening(issue, `Merging ${issue.branch} into main…`, cx);
-    this.opening.merging = true;
+    this.showOpening(issue, `Merging ${issue.branch} into main…`, cx, { merging: true });
     cx.spawn(async (cx) => {
       try {
         await mergeIssue(issue, tracker, project);
@@ -1375,7 +1380,7 @@ export default class Issues extends View {
             ? e.message
             : `Could not merge: ${e.message ?? e}`;
       }
-      this.opening = null;
+      this.openings.end(issue.id);
       this.refresh(cx);
       cx.notify();
     });
@@ -1627,8 +1632,8 @@ export default class Issues extends View {
                         startable,
                         inSpace,
                         inActiveSpace,
-                        opening: this.opening?.id === issue.id,
-                        loading: this.opening?.id === issue.id && !this.opening.merging,
+                        opening: Boolean(this.openings.get(issue.id)),
+                        loading: this.openings.get(issue.id)?.merging === false,
                         onStart: (cx) => this.startWork(issue, cx),
                         onContinue: (cx) => this.continueWork(issue, cx),
                       },
@@ -2082,14 +2087,14 @@ export default class Issues extends View {
                 linkFiles: (markdown) => linkCodeSpanFiles(markdown, this.project.root, this.filesInBody(issue, cx)),
                 avatarPath: (url) => avatarImage(url, (loading) => this.avatarLoads.push(loading)),
                 startable: canStartWork(issue, this.issues),
-                opening: this.opening?.id === issue.id,
-                loading: this.opening?.id === issue.id && !this.opening.merging,
+                opening: Boolean(this.openings.get(issue.id)),
+                loading: this.openings.get(issue.id)?.merging === false,
                 onStart: (cx) => this.startWork(issue, cx),
                 finishable: canFinishWork(issue),
                 ...this.spaceShowingWorktree(issue),
                 onContinue: (cx) => this.continueWork(issue, cx),
                 mergeable: this.mergeOffered(issue, cx),
-                merging: Boolean(this.opening?.merging && this.opening.id === issue.id),
+                merging: Boolean(this.openings.get(issue.id)?.merging),
                 onMerge: (cx) => this.mergeBranch(issue, cx),
                 onSave: (cx) => this.save(cx),
                 onCancel: (cx) => {
@@ -2106,9 +2111,10 @@ export default class Issues extends View {
         await Promise.all(avatarLoads);
         cx.notify();
       });
+    const latestOpening = this.openings.latest;
     return this.frame(t)
       .child(v_flex().flex_1().min_h(0).child(content))
-      .when(Boolean(this.opening), (e) => e.child(this.openingFooter(t)))
-      .when(!this.opening && Boolean(this.availableUpdate || this.updated), (e) => e.child(this.updateFooter(t)));
+      .when(Boolean(latestOpening), (e) => e.child(this.openingFooter(t, latestOpening?.status ?? "")))
+      .when(!latestOpening && Boolean(this.availableUpdate || this.updated), (e) => e.child(this.updateFooter(t)));
   }
 }
