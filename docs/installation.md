@@ -2,12 +2,13 @@
 
 ## Requirements
 
-- Herdr (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
+- [Herdr](https://herdr.dev/) (`herdr-app`), opened at least once so `~/.config/herdr-app/keys.json` exists
 - Claude Code (`claude`), only for the `issues:*` skills and the Claude hooks; without it, setup installs the panel and the `issues` command and skips the plugin with a warning, and running setup again after installing Claude Code adds it
 - `git`
 - Node.js (`node`) 22.15 or later, for the `issues` command; setup offers to install it with Homebrew or devbox (see below)
 - the [GitHub CLI](https://cli.github.com) (`gh`), for repositories tracked in GitHub Issues
-- the Linear MCP server in Claude Code, for repositories tracked in Linear; [Configuration](configuration.md#credentials) explains adding it
+- for repositories tracked in Linear, a personal Linear API key and the Linear MCP server in Claude Code; [Configuration](configuration.md#credentials) explains creating the key and adding the server
+- [Beads](https://github.com/steveyegge/beads) (`bd`, `brew install beads`), for repositories tracked locally with Beads
 
 ## Installing
 
