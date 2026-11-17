@@ -12,7 +12,8 @@ import { div } from "gpui-kit";
 import { h_flex, v_flex, Input, InputState, Textarea } from "gpui-base";
 import { settings } from "herdr";
 import { AutosaveQueue } from "./autosave.js";
-import { cardFill, chipFill } from "./colors.js";
+import { chipFill } from "./colors.js";
+import { card, section, CARD_RADIUS_PX } from "./section.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, workModelChoice } from "./settings-fields.js";
 import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
@@ -101,7 +102,6 @@ const CONTROL_COLUMN_MAX_PX = 280;
 const COLUMN_GAP_PX = 24;
 const ROW_PADDING_X_PX = 20;
 const ROW_PADDING_Y_PX = 18;
-const CARD_RADIUS_PX = 8;
 const OTHER_WORK_MODEL_OPTION = {
   id: OTHER_WORK_MODEL,
   label: "Other…",
@@ -324,24 +324,17 @@ export class SettingsForm {
    * @param {Theme} t
    */
   section(title, rows, t) {
-    return v_flex()
-      .flex_none()
-      .gap(12)
-      .child(div().px(4).text_size(11).font_bold().text_color(t.muted).child(title.toUpperCase()))
-      .child(
-        v_flex()
-          .rounded(CARD_RADIUS_PX)
-          .border_1()
-          .border_color(t.border)
-          .bg(/** @type {Color} */ (cardFill(t)))
-          .children(
-            rows.map((row, index) =>
-              row
-                .when(index > 0, (e) => e.border_t(1).border_color(t.border))
-                .when(index === rows.length - 1, (e) => e.rounded_b(CARD_RADIUS_PX - 1)),
-            ),
-          ),
-      );
+    return section(
+      title,
+      card(t).children(
+        rows.map((row, index) =>
+          row
+            .when(index > 0, (e) => e.border_t(1).border_color(t.border))
+            .when(index === rows.length - 1, (e) => e.rounded_b(CARD_RADIUS_PX - 1)),
+        ),
+      ),
+      t,
+    );
   }
 
   // A setting's row: its label beside its controls, or above them when the label is wide.
