@@ -100,6 +100,7 @@ import { avatarImage, AVATAR_PX } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
 import { DUE_COLORS, rowHover, statusTints } from "./colors.js";
+import { pullRequestBadgeColor } from "./pull-request-status.js";
 import { card, CARD_RADIUS_PX } from "./section.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit, showFieldEdit, trackerFields } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
@@ -120,7 +121,7 @@ import { idColumnWidth } from "./id-column.js";
 import { groupSpacing } from "./group-spacing.js";
 
 /** @import { Context, AsyncContext, Color } from "gpui-kit" */
-/** @import { Issue, Tracker, Project } from "./trackers/index.js" */
+/** @import { Issue, Tracker, Project, PullRequest } from "./trackers/index.js" */
 /** @import { ListedGroup as Group } from "./issue.js" */
 /** @import { Theme } from "./menu.js" */
 /** @typedef {ReturnType<typeof location>} Where */
@@ -231,17 +232,17 @@ const settingsButton = (onClick, t) =>
   iconButton({ id: "issues-settings-open", icon: "settings", tooltip: "Settings", onClick }, t);
 
 /**
- * @param {number} count
+ * @param {PullRequest[]} pullRequests
  * @param {Theme} t
  */
-const pullRequestBadge = (count, t) =>
+const pullRequestBadge = (pullRequests, t) =>
   h_flex()
     .flex_none()
     .gap(PULL_REQUEST_ICON_TO_COUNT_GAP_PX)
     .items_center()
-    .text_color(t.dim)
+    .text_color(t[pullRequestBadgeColor(pullRequests)])
     .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(PULL_REQUEST_ICON_PX))
-    .child(div().child(String(count)));
+    .child(div().child(String(pullRequests.length)));
 
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
@@ -1537,7 +1538,7 @@ export default class Issues extends View {
                             )
                         : div().flex_none().size(PRIORITY_ICON_PX),
                     )
-                    .when(pullRequestCount > 0, (e) => e.child(pullRequestBadge(pullRequestCount, t))),
+                    .when(pullRequestCount > 0, (e) => e.child(pullRequestBadge(issue.pullRequests, t))),
                 ),
               ),
           )
