@@ -3,8 +3,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
-import { byId, callArg, texts } from "./support/gpui.js";
+import { byId, callArg, texts, walk } from "./support/gpui.js";
 import { APPROVAL_QUESTIONS, TrackerSetup } from "../mod/setup.js";
+import { SETTING_LABELS } from "../mod/settings-form.js";
 
 const theme = new Proxy({}, { get: () => "#000" });
 const cx = {
@@ -53,7 +54,7 @@ test("the approval step asks each question with a select of its choices and the 
   for (const [key, { options, value }] of Object.entries(props)) {
     assert.deepEqual(options, APPROVAL_QUESTIONS[key].choices);
     assert.equal(value, setup.approvalValue(key));
-    assert.ok(texts(page).includes(APPROVAL_QUESTIONS[key].title));
+    assert.ok(texts(page).includes(SETTING_LABELS[key].title));
     assert.ok(texts(page).includes(APPROVAL_QUESTIONS[key].choices.find(({ id }) => id === value).detail));
   }
 });
@@ -97,4 +98,45 @@ test("going back from the review shows the earlier answers", (t) => {
   setup.back(cx);
   assert.equal(setup.step, "approval");
   assert.equal(renderApproval(t, setup).props.approval.value, "auto");
+});
+
+// The bordered card holding the approval rows.
+const approvalCard = (page) =>
+  [...walk(page)].find(
+    (node) => node.calls.some(([name]) => name === "border_1") && texts(node).includes(SETTING_LABELS.approval.title),
+  );
+
+test("the approval step's questions are settings rows in one card under an Approval heading, below the page heading", (t) => {
+  stubHerdr(t);
+  const { page } = renderApproval(t, readySetup());
+  const card = approvalCard(page);
+
+  assert.ok(texts(page).includes("APPROVAL"));
+  for (const key of ["approval", "onApproval", "pushAfterMerge"])
+    assert.ok(texts(card).includes(SETTING_LABELS[key].title));
+  assert.ok(texts(page).includes(APPROVAL_QUESTIONS.approval.title));
+  assert.equal(texts(card).includes(APPROVAL_QUESTIONS.approval.title), false);
+});
+
+test("the dependent approval field follows onApproval in the same card, its condition above its label", (t) => {
+  stubHerdr(t);
+  const palette = new Proxy({ surface: "#111111" }, { get: (target, name) => target[name] ?? "#000" });
+  const setup = readySetup();
+  const dependentRow = (key) => {
+    const page = setup.render(palette, { onRetry() {}, header: null, onCollapse() {} });
+    const card = approvalCard(page);
+    const cardTexts = texts(card);
+    const { after, title } = SETTING_LABELS[key];
+    if (!cardTexts.includes(title)) return null;
+    assert.equal(cardTexts[cardTexts.indexOf(after) + 1], title);
+    return card.kids.find((row) => texts(row).includes(title));
+  };
+
+  const pushRow = dependentRow("pushAfterMerge");
+  assert.ok(pushRow.calls.some(([name, value]) => name === "bg" && value === "#111111"));
+  assert.equal(dependentRow("waitForChecks"), null);
+
+  setup.chooseApproval("onApproval", "pull-request", cx);
+  assert.ok(dependentRow("waitForChecks"));
+  assert.equal(dependentRow("pushAfterMerge"), null);
 });

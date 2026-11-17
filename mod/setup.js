@@ -1,25 +1,30 @@
 // The panel's view for a repository whose issues it can't list. With no tracker, it shows a blank state whose
-// Set Up Issues button walks through its steps a page each, with Back and the step at the top left, as an open
-// issue's view has its way back, and Cancel, which drops the answers and returns to the blank state, as an icon
-// button in the header where the settings gear goes once setup is saved: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; on one
-// page, whether a session asks for approval of its work, how the branch then gets into main and, for a pull
-// request, whether the session waits for its checks, or for a merge, whether main is pushed afterwards, each
-// asked with the settings view's dropdown (select.js), then a Next button; and a review of the choices, which points to the gear's settings
-// (settings.js) for the rest. Only Save on the review writes the repository's entry in issues.json (setting.js),
-// and the panel lists the issues. Each repository's setup is kept while the panel shows another repository, and
-// resumes on its step with its answers until it's saved, for as long as the panel runs. Approval proposes the repository's current or default settings. A configured
-// tracker that fails to load with a SetupProblem (trackers/problems.js) shows the problem and its fix, with Check
-// again and a way to choose a different tracker. A Linear API key that is missing, unreadable or refused, at
-// either point, comes with a masked field that saves a key Linear accepts.
+// Set Up Issues button walks through its steps a page each. Under the header, whose Cancel icon button drops the
+// answers and returns to the blank state from where the settings gear goes once setup is saved, the settings
+// view's row holds Back, the step, and a segment per step filled up to the current one. Each page opens with its
+// question as a heading, then sections of cards laid out as the settings view's (setting-row.js): the trackers,
+// GitHub Issues, Linear or Beads, a row each that chooses and checks it (tracker-choice.js); Linear's team; on one
+// page, the approval settings as the settings view's rows with its labels, each a dropdown (select.js) with the
+// chosen option's detail, where waiting for a pull request's checks or pushing main after a merge follows
+// onApproval as a dependent field; and a review of the answers, which points to the gear's settings (settings.js)
+// for the rest. Only Save on the review writes the repository's entry in issues.json (setting.js), and the panel
+// lists the issues. Each repository's setup is kept while the panel shows another repository, and resumes on its
+// step with its answers until it's saved, for as long as the panel runs. Approval proposes the repository's
+// current or default settings. A configured tracker that fails to load with a SetupProblem (trackers/problems.js)
+// shows the problem and its fix, with Check again and a way to choose a different tracker. A Linear API key that
+// is missing, unreadable or refused, at either point, comes with a masked field that saves a key Linear accepts.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { actionButton } from "./action-button.js";
-import { mixColors } from "./colors.js";
+import { mixColors, rowHover } from "./colors.js";
 import { button } from "./detail.js";
-import { rowBeneathHeader } from "./filter-row.js";
+import { rowBeneathHeader, ROW_PADDING_X_PX } from "./filter-row.js";
 import { collapseButton, headerBar, iconButton } from "./header.js";
+import { CARD_RADIUS_PX, SECTION_INSET_PX } from "./section.js";
+import { cardSection, padRow, settingRow, CONTROL_COLUMN_MAX_PX } from "./setting-row.js";
 import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
+import { SETTING_LABELS } from "./settings-form.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
@@ -40,7 +45,17 @@ const STEP_SEGMENT_GAP_PX = 4;
 // A step not yet reached: the panel's color moved toward its muted text, so it shows in light and dark themes.
 /** @param {Theme} t */
 const unreachedSegmentFill = (t) => mixColors(t.surface, t.muted, 0.4) ?? t.border;
-const ANSWER_LABEL_PX = 80;
+// The settings view's (settings.js) spacing, so setup's pages line up with it.
+const PAGE_PADDING_TOP_PX = 16;
+const SECTION_GAP_PX = 32;
+// The tracker's name in the settings view's Tracker section (repository-settings.js).
+const TRACKER_LABEL = "Issue source";
+/** @type {Record<string, string>} */
+const TRACKER_DESCRIPTIONS = {
+  github: "Issues in the repository's GitHub repository, read and written with gh.",
+  linear: "Issues in one of your Linear teams, read and written with a Linear API key.",
+  beads: "Issues in a Beads database kept in the repository, read and written with bd.",
+};
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 // Approval, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
 // the choices, each with what it means.
@@ -263,6 +278,9 @@ export class TrackerSetup {
     this.answers = {};
     /** @type {ProposedApproval | null} */
     this.proposed = null;
+    // The tracker whose check last passed, which the tracker step's Next goes on with after Back.
+    /** @type {string | null} */
+    this.readyTracker = null;
     /** @type {Record<ApprovalKey, SelectMenu> | null} */
     this.selects = null;
     this.tracker = new TrackerChoice(main, {
@@ -317,7 +335,14 @@ export class TrackerSetup {
   }
 
   forgetAnswers() {
-    Object.assign(this, { step: "tracker", choosingAnother: false, saveProblem: null, answers: {}, proposed: null });
+    Object.assign(this, {
+      step: "tracker",
+      choosingAnother: false,
+      saveProblem: null,
+      answers: {},
+      proposed: null,
+      readyTracker: null,
+    });
     this.tracker.reset();
   }
 
@@ -375,12 +400,17 @@ export class TrackerSetup {
    */
   ready(proposed, cx) {
     this.proposed = proposed;
+    this.readyTracker = this.tracker.choice;
     this.selects ??= /** @type {Record<ApprovalKey, SelectMenu>} */ (
       Object.fromEntries(
         Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`setup-${key}`, title, cx)]),
       )
     );
-    this.goTo(this.tracker.choice === "linear" ? "team" : "approval", cx);
+    this.goTo(this.stepAfterTracker(), cx);
+  }
+
+  stepAfterTracker() {
+    return this.tracker.choice === "linear" ? "team" : "approval";
   }
 
   // The select's value for an approval question: the earlier answer, or else the proposed one.
@@ -449,30 +479,34 @@ export class TrackerSetup {
    */
   render(t, { onRetry, header, onCollapse }) {
     this.onCollapse = onCollapse;
-    const content = v_flex().id("issues-setup").flex_1().min_h(0).overflow_y_scrollbar().p(14).gap(12);
+    const content = v_flex()
+      .id("issues-setup")
+      .flex_1()
+      .min_h(0)
+      .overflow_y_scrollbar()
+      .p(ROW_PADDING_X_PX)
+      .pt(PAGE_PADDING_TOP_PX)
+      .gap(SECTION_GAP_PX);
     if (this.failure && !this.choosingAnother) {
+      const chooseAnother = button(
+        "setup-choose-another",
+        "Choose a different tracker",
+        (cx) => {
+          this.choosingAnother = true;
+          cx.notify();
+        },
+        t,
+      );
       return v_flex()
         .size_full()
         .min_h(0)
         .child(header)
         .child(
-          content.child(div().font_semibold().child("Issues can't load")).child(
-            this.tracker.problemView(
-              "setup-failure",
-              this.failure,
-              onRetry,
-              t,
-              button(
-                "setup-choose-another",
-                "Choose a different tracker",
-                (cx) => {
-                  this.choosingAnother = true;
-                  cx.notify();
-                },
-                t,
-              ),
+          content
+            .child(this.pageHeading("Issues can't load", null, t))
+            .child(
+              this.inset().child(this.tracker.problemView("setup-failure", this.failure, onRetry, t, chooseAnother)),
             ),
-          ),
         );
     }
     if (!this.failure && !this.settingUp) {
@@ -587,56 +621,83 @@ export class TrackerSetup {
     };
   }
 
-  // A page's question and a sentence under it.
+  // A page's question as its heading with a sentence under it, inset like the section headings below it.
   /**
-   * @param {NativeElement} content
    * @param {string} title
    * @param {string | null} sentence
    * @param {Theme} t
    */
-  question(content, title, sentence, t) {
-    return content
-      .child(div().font_semibold().child(title))
+  pageHeading(title, sentence, t) {
+    return v_flex()
+      .flex_none()
+      .px(SECTION_INSET_PX)
+      .gap(4)
+      .child(div().font_semibold().text_color(t.foreground).child(title))
       .when(Boolean(sentence), (e) =>
-        e.child(div().whitespace_normal().text_size(12).text_color(t.muted).child(sentence)),
+        e.child(
+          div()
+            .whitespace_normal()
+            .text_size(12)
+            .text_color(t.muted)
+            .child(sentence ?? ""),
+        ),
       );
   }
 
-  // The tracker's options, each a button with what it means under it; the current answer is solid.
+  // Loose text and buttons under a page's cards, inset like its heading.
+  inset() {
+    return v_flex().flex_none().px(SECTION_INSET_PX).gap(8);
+  }
+
+  // The page's button that moves on, at its bottom right.
   /**
-   * @param {string} kind
-   * @param {SelectOption[]} choices
-   * @param {{ chosen: string | null | undefined, onChoose: (id: string, cx: Context) => void, enabled?: boolean }} props
+   * @param {string} id
+   * @param {string} label
+   * @param {(cx: Context) => void} onClick
    * @param {Theme} t
    */
-  options(kind, choices, { chosen, onChoose, enabled = true }, t) {
-    return v_flex()
+  nextButton(id, label, onClick, t) {
+    return h_flex()
       .flex_none()
+      .justify_end()
+      .child(button(id, label, onClick, t, { primary: true }));
+  }
+
+  // A tracker's row in the tracker card: its label and description, marked when it's the answer, and choosing it
+  // when pressed.
+  /**
+   * @param {{ id: string, label: string }} tracker
+   * @param {{ chosen: boolean, enabled: boolean, first: boolean }} state
+   * @param {Theme} t
+   */
+  trackerRow({ id, label }, { chosen, enabled, first }, t) {
+    const row = h_flex()
+      .id(`setup-tracker-${id}`)
+      .items_start()
       .gap(12)
-      .children(
-        choices.map(({ id, label, detail }) =>
-          v_flex()
-            .flex_none()
-            .gap(4)
-            .child(
-              h_flex().child(
-                button(`setup-${kind}-${id}`, label, (cx) => onChoose(id, cx), t, {
-                  primary: id === chosen,
-                  enabled,
-                }),
-              ),
-            )
-            .when(Boolean(detail), (e) =>
-              e.child(
-                div()
-                  .whitespace_normal()
-                  .text_size(12)
-                  .text_color(t.dim)
-                  .child(detail ?? ""),
-              ),
-            ),
-        ),
+      .child(
+        v_flex()
+          .flex_1()
+          .min_w(0)
+          .gap(4)
+          .child(div().font_semibold().text_color(t.foreground).child(label))
+          .child(div().whitespace_normal().text_size(12).text_color(t.muted).child(TRACKER_DESCRIPTIONS[id])),
+      )
+      .child(
+        div()
+          .flex_none()
+          .text_color(t.accent)
+          .child(chosen ? "✓" : ""),
+      )
+      .when(first, (e) => e.rounded_t(CARD_RADIUS_PX - 1))
+      .when(chosen, (e) => e.bg(/** @type {Color} */ (rowHover(t))))
+      .when(enabled, (e) =>
+        e
+          .cursor_pointer()
+          .hover((s) => s.bg(/** @type {Color} */ (rowHover(t))))
+          .on_click((_e, cx) => this.tracker.choose(id, cx)),
       );
+    return padRow(row, t);
   }
 
   /**
@@ -648,19 +709,23 @@ export class TrackerSetup {
     const sentence = this.failure
       ? "Choose a different issue tracker for this repository."
       : "This repository has no issue tracker yet. Choose where its issues live.";
-    const page = this.question(content, "Where do this repository's issues live?", sentence, t).child(
-      this.options(
-        "tracker",
-        TRACKERS,
-        {
-          chosen: tracker.checking ? null : tracker.choice,
-          onChoose: (id, cx) => tracker.choose(id, cx),
-          enabled: !tracker.checking,
-        },
-        t,
-      ),
-    );
-    return tracker.withCheckStatus(page, "setup-problem", t);
+    const chosen = tracker.checking ? null : tracker.choice;
+    const status = tracker.checking || Boolean(tracker.problem);
+    return content
+      .child(this.pageHeading("Where do this repository's issues live?", sentence, t))
+      .child(
+        cardSection(
+          "Tracker",
+          TRACKERS.map((each, index) =>
+            this.trackerRow(each, { chosen: each.id === chosen, enabled: !tracker.checking, first: index === 0 }, t),
+          ),
+          t,
+        ),
+      )
+      .when(status, (e) => e.child(tracker.withCheckStatus(this.inset(), "setup-problem", t)))
+      .when(!status && Boolean(chosen) && this.readyTracker === chosen, (e) =>
+        e.child(this.nextButton("setup-tracker-next", "Next", (cx) => this.goTo(this.stepAfterTracker(), cx), t)),
+      );
   }
 
   /**
@@ -668,41 +733,64 @@ export class TrackerSetup {
    * @param {Theme} t
    */
   teamPage(content, t) {
-    return this.question(content, "Which Linear team?", "The panel lists this team's issues.", t)
-      .child(this.tracker.teamDropdown("setup-team", t))
+    return content
+      .child(this.pageHeading("Which Linear team?", "The panel lists this team's issues.", t))
+      .child(cardSection("Team", [padRow(v_flex().child(this.tracker.teamDropdown("setup-team", t)), t)], t))
       .when(Boolean(this.tracker.team), (e) =>
-        e.child(
-          h_flex().child(button("setup-team-next", "Next", (cx) => this.goTo("approval", cx), t, { primary: true })),
-        ),
+        e.child(this.nextButton("setup-team-next", "Next", (cx) => this.goTo("approval", cx), t)),
       );
   }
 
-  // The approval questions, each with its select and the chosen option's detail, then one Next.
+  // The approval questions as the settings view's rows, each with its select and the chosen option's detail, then
+  // one Next.
   /**
    * @param {NativeElement} content
    * @param {Theme} t
    */
   approvalPage(content, t) {
     return content
-      .gap(20)
-      .children(this.approvalKeys().map((key) => this.approvalQuestion(key, t)))
+      .child(this.pageHeading(APPROVAL_QUESTIONS.approval.title, APPROVAL_QUESTIONS.approval.sentence, t))
       .child(
-        h_flex().child(button("setup-approval-next", "Next", (cx) => this.nextApproval(cx), t, { primary: true })),
-      );
+        cardSection(
+          "Approval",
+          this.approvalKeys().map((key) => this.approvalRow(key, t)),
+          t,
+        ),
+      )
+      .child(this.nextButton("setup-approval-next", "Next", (cx) => this.nextApproval(cx), t));
   }
 
   /**
    * @param {ApprovalKey} key
    * @param {Theme} t
    */
-  approvalQuestion(key, t) {
-    const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
+  approvalRow(key, t) {
+    const { choices } = APPROVAL_QUESTIONS[key];
     const select = /** @type {Record<ApprovalKey, SelectMenu>} */ (this.selects)[key];
     const value = this.approvalValue(key);
     const detail = choices.find(({ id }) => id === value)?.detail ?? "";
-    return this.question(v_flex().flex_none().gap(12), title, sentence, t)
-      .child(select.render(t, { options: choices, value, onChoose: (id, cx) => this.chooseApproval(key, id, cx) }))
-      .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail));
+    return settingRow(SETTING_LABELS[key], t, (controls) =>
+      controls
+        .child(select.render(t, { options: choices, value, onChoose: (id, cx) => this.chooseApproval(key, id, cx) }))
+        .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail)),
+    );
+  }
+
+  // An answer's row on the review: the setting's name and the chosen value.
+  /**
+   * @param {string} name
+   * @param {string} value
+   * @param {Theme} t
+   */
+  answerRow(name, value, t) {
+    return padRow(
+      h_flex()
+        .items_start()
+        .gap(12)
+        .child(div().flex_1().min_w(0).font_semibold().text_color(t.foreground).child(name))
+        .child(div().flex_none().max_w(CONTROL_COLUMN_MAX_PX).whitespace_normal().text_color(t.muted).child(value)),
+      t,
+    );
   }
 
   /**
@@ -711,57 +799,57 @@ export class TrackerSetup {
    */
   reviewPage(content, t) {
     const approvalAnswer = (/** @type {ApprovalKey} */ key) =>
-      answerLabel(APPROVAL_QUESTIONS[key].choices, this.answers[key]);
-    /** @type {[string, string][]} */
-    const answers = [
-      ["Tracker", answerLabel(TRACKERS, this.tracker.choice)],
-      ...(this.tracker.choice === "linear"
-        ? /** @type {[string, string][]} */ ([["Team", this.tracker.teamLabel()]])
-        : []),
-      ["Approval", approvalAnswer("approval")],
-      ["When work is approved...", approvalAnswer("onApproval")],
-      ...(this.answers.onApproval === "pull-request"
-        ? /** @type {[string, string][]} */ ([["Checks", approvalAnswer("waitForChecks")]])
-        : []),
-      ...(this.answers.onApproval === "merge"
-        ? /** @type {[string, string][]} */ ([["Push", approvalAnswer("pushAfterMerge")]])
-        : []),
+      this.answerRow(SETTING_LABELS[key].title, answerLabel(APPROVAL_QUESTIONS[key].choices, this.answers[key]), t);
+    const { onApproval } = this.answers;
+    const trackerRows = [
+      this.answerRow(TRACKER_LABEL, answerLabel(TRACKERS, this.tracker.choice), t),
+      ...(this.tracker.choice === "linear" ? [this.answerRow("Team", this.tracker.teamLabel(), t)] : []),
     ];
-    return this.question(
-      content,
-      "Review your setup",
-      "Save writes these choices for this repository. Go back to change one.",
-      t,
-    )
+    const approvalRows = [
+      approvalAnswer("approval"),
+      approvalAnswer("onApproval"),
+      ...(onApproval === "pull-request" ? [approvalAnswer("waitForChecks")] : []),
+      ...(onApproval === "merge" ? [approvalAnswer("pushAfterMerge")] : []),
+    ];
+    const hint = div().flex_1().min_w(0).whitespace_normal().text_size(12).text_color(t.dim).child(GEAR_HINT);
+    return content
       .child(
-        v_flex()
-          .flex_none()
-          .gap(6)
-          .children(
-            answers.map(([name, value]) =>
-              h_flex()
-                .gap(8)
-                .text_size(12)
-                .child(div().w(ANSWER_LABEL_PX).flex_none().text_color(t.dim).child(name))
-                .child(div().flex_1().whitespace_normal().text_color(t.foreground).child(value)),
-            ),
-          ),
+        this.pageHeading(
+          "Review your setup",
+          "Save writes these choices for this repository. Go back to change one.",
+          t,
+        ),
       )
-      .when(this.saving, (e) => e.child(div().text_size(12).text_color(t.dim).child("Saving…")))
+      .child(cardSection("Tracker", trackerRows, t))
+      .child(cardSection("Approval", approvalRows, t))
+      .when(this.saving, (e) =>
+        e.child(this.inset().child(div().text_size(12).text_color(t.dim).child("Saving…")).child(hint)),
+      )
       .when(!this.saving && Boolean(this.saveProblem), (e) =>
         e.child(
-          this.tracker.problemView(
-            "setup-problem",
-            this.saveProblem ?? /** @type {SetupProblem} */ ({}),
-            (cx) => this.save(cx),
-            t,
-          ),
+          this.inset()
+            .child(
+              this.tracker.problemView(
+                "setup-problem",
+                this.saveProblem ?? /** @type {SetupProblem} */ ({}),
+                (cx) => this.save(cx),
+                t,
+              ),
+            )
+            .child(hint),
         ),
       )
       .when(!this.saving && !this.saveProblem, (e) =>
-        e.child(h_flex().child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true }))),
-      )
-      .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(GEAR_HINT));
+        e.child(
+          h_flex()
+            .flex_none()
+            .px(SECTION_INSET_PX)
+            .gap(16)
+            .items_center()
+            .child(hint)
+            .child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true })),
+        ),
+      );
   }
 }
 
