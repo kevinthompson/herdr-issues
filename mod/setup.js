@@ -14,8 +14,10 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
+import { actionButton } from "./action-button.js";
 import { mixColors } from "./colors.js";
-import { button, icon } from "./detail.js";
+import { button } from "./detail.js";
+import { rowBeneathHeader } from "./filter-row.js";
 import { collapseButton, headerBar, iconButton } from "./header.js";
 import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
@@ -537,17 +539,20 @@ export class TrackerSetup {
         ),
       )
       .child(
-        h_flex()
-          .px(10)
-          .py(8)
+        rowBeneathHeader(t)
           .gap(8)
-          .items_center()
           .when(backShown, (e) =>
             e.child(
-              button("setup-back", icon("chevron-left"), (cx) => this.back(cx), t, {
-                tooltip: "Back",
-                enabled: backEnabled,
-              }),
+              actionButton(
+                {
+                  id: "setup-back",
+                  icon: "chevron-left",
+                  tooltip: "Back",
+                  onClick: (cx) => this.back(cx),
+                  enabled: backEnabled,
+                },
+                t,
+              ),
             ),
           )
           .child(div().flex_1().text_size(12).text_color(t.dim).child(stepText))

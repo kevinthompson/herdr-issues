@@ -60,7 +60,7 @@ test("the setup view's first step has no back button but shows its step count", 
   assert.ok(texts(bar).some((text) => /^Step 1 of \d+$/.test(text)));
 });
 
-test("a later step shows an enabled back button, drawn with the other buttons' height", (t) => {
+test("a later step shows an enabled back button, drawn as the settings view's Back", (t) => {
   stubHerdr(t);
   const setup = setupAt("approval");
   const back = byId(setup.stepBar(theme), "setup-back");
