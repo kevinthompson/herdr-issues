@@ -114,6 +114,7 @@ import { openBehindArgs } from "./open-behind.js";
 import { stillWaitingForSpace } from "./opening-wait.js";
 import { canOfferMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
+import { idColumnWidth } from "./id-column.js";
 
 /** @import { Context, AsyncContext, Color } from "gpui-kit" */
 /** @import { Issue, Tracker, Project } from "./trackers/index.js" */
@@ -159,9 +160,6 @@ const PRIORITY_ICON_PX = 18;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 /** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
-// Wide enough for a five-digit ID such as CAL-12345 at the list's 11px, and the same in every repository so the
-// titles line up wherever the panel is. A longer ID is cut off.
-const ID_COLUMN_PX = 72;
 // An issue row's padding inside its group's card.
 const ROW_PADDING_PX = 14;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
@@ -1495,9 +1493,10 @@ export default class Issues extends View {
 
   /**
    * @param {Issue} issue
+   * @param {number} idColumnPx
    * @param {Theme} t
    */
-  row(issue, t) {
+  row(issue, idColumnPx, t) {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues),
       sla = slaStatus(issue),
@@ -1528,7 +1527,7 @@ export default class Issues extends View {
           .child(
             v_flex()
               .flex_none()
-              .w(ID_COLUMN_PX)
+              .w(idColumnPx)
               .pt(1)
               .gap(3)
               .text_size(11)
@@ -1723,13 +1722,14 @@ export default class Issues extends View {
   /**
    * @param {Group} group
    * @param {number} shown
+   * @param {number} idColumnPx
    * @param {Theme} t
    */
-  group(group, shown, t) {
+  group(group, shown, idColumnPx, t) {
     const expanded = this.isExpanded(group),
       hidden = group.issues.length - shown;
     const icon = statusIcon(group.id);
-    const rows = expanded ? group.issues.slice(0, shown).map((issue) => this.row(issue, t)) : [];
+    const rows = expanded ? group.issues.slice(0, shown).map((issue) => this.row(issue, idColumnPx, t)) : [];
     if (expanded && hidden > 0)
       rows.push(
         div()
@@ -1917,6 +1917,11 @@ export default class Issues extends View {
       error = this.error ?? this.detailError,
       listsNoIssues = this.loaded && holdsNoIssues(groups);
     const shown = this.shownCounts(groups);
+    const idColumnPx = idColumnWidth(
+      groups.flatMap((group, index) =>
+        this.isExpanded(group) ? group.issues.slice(0, shown[index]).map((issue) => issue.id) : [],
+      ),
+    );
     this.revealGroup(groups);
     return v_flex()
       .size_full()
@@ -1947,7 +1952,7 @@ export default class Issues extends View {
           .pt(16)
           .pb(ROW_PADDING_X_PX)
           .gap(6)
-          .children(groups.map((group, index) => this.group(group, shown[index], t)))
+          .children(groups.map((group, index) => this.group(group, shown[index], idColumnPx, t)))
           .when(!this.loaded && !error, (e) => e.child(div().p(8).text_color(t.dim).child("Loading…")))
           .when(listsNoIssues && !error, (e) => e.child(emptyListView(t))),
       );
