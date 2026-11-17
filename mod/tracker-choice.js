@@ -1,7 +1,7 @@
 // Choosing a repository's tracker, which the setup view (setup.js) and the settings view (settings.js) share:
 // GitHub Issues, Linear or Beads, each checked before it counts as ready (gh installed and logged in with origin
 // on GitHub, a Linear API key that works, or bd installed with a database in the main checkout, which it offers
-// to make), and Linear's team. A Linear API key that is missing, unreadable or refused comes with a masked field
+// to make), with a success message listing what a passing check verified, and Linear's team. A Linear API key that is missing, unreadable or refused comes with a masked field
 // that saves a key Linear accepts (linear.js), and a link to the page where Linear creates one. Linear's team
 // dropdown is a scope menu popup (menu.js), whose pick comes back through the shared state its owner names.
 import { div, svg } from "gpui-kit";
@@ -35,6 +35,14 @@ const PROBLEM_MESSAGE_LINE_HEIGHT_PX = 18;
 // What each tracker checks before it's ready; Linear's check answers with the teams the key can see.
 /** @type {Record<string, (main: string) => Promise<Team[] | void>>} */
 const READINESS_CHECKS = { github: checkGitHub, linear: linearTeams, beads: checkBeads };
+
+// What a passing readiness check verified, as its success message lists it.
+/** @type {Record<string, string[]>} */
+const VERIFIED = {
+  github: ["gh is installed", "gh is logged in", "origin is on GitHub"],
+  linear: ["The Linear API key works"],
+  beads: ["bd is installed", "A Beads database is in the main checkout"],
+};
 
 /**
  * @param {string} main
@@ -289,6 +297,52 @@ export class TrackerChoice {
           .gap(6)
           .child(button(`${id}-check`, "Check again", onCheckAgain, t))
           .when(Boolean(extra), (e) => e.child(extra)),
+      );
+  }
+
+  // The chosen tracker's passing check: that it's ready, marked with a check icon, and what was verified beneath.
+  /**
+   * @param {string} id
+   * @param {Theme} t
+   */
+  successView(id, t) {
+    const label = TRACKERS.find(({ id }) => id === this.choice)?.label ?? "";
+    return v_flex()
+      .id(id)
+      .flex_none()
+      .gap(4)
+      .child(
+        h_flex()
+          .items_start()
+          .gap(6)
+          .text_color(t.ansi2)
+          .child(
+            h_flex()
+              .flex_none()
+              .h(PROBLEM_MESSAGE_LINE_HEIGHT_PX)
+              .items_center()
+              .child(svg("mods/issues/icons/circle-check.svg").size(PROBLEM_ICON_PX).text_color(t.ansi2)),
+          )
+          .child(
+            div()
+              .flex_1()
+              .min_w(0)
+              .whitespace_normal()
+              .text_size(TEXT_SM_PX)
+              .line_height(`${PROBLEM_MESSAGE_LINE_HEIGHT_PX}px`)
+              .font_semibold()
+              .child(`${label} is ready`),
+          ),
+      )
+      .children(
+        (VERIFIED[this.choice ?? ""] ?? []).map((line) =>
+          div()
+            .pl(PROBLEM_ICON_PX + 6)
+            .whitespace_normal()
+            .text_size(TEXT_XS_PX)
+            .text_color(t.muted)
+            .child(line),
+        ),
       );
   }
 
