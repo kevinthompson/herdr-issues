@@ -1704,6 +1704,35 @@ export default class Issues extends View {
       );
   }
 
+  // The name of the person who created the issue, after their avatar once it is cached.
+  /**
+   * @param {Issue} issue
+   * @param {Theme} t
+   */
+  creator(issue, t) {
+    const avatar = avatarImage(issue.creatorAvatar, (loading) => this.avatarLoads.push(loading));
+    return h_flex()
+      .min_w(0)
+      .gap(5)
+      .items_center()
+      .text_size(PROPERTY_TEXT_PX)
+      .text_color(t.foreground)
+      .when(Boolean(avatar), (e) =>
+        e.child(
+          image(avatar ?? "")
+            .flex_none()
+            .size(AVATAR_PX)
+            .rounded(AVATAR_PX / 2),
+        ),
+      )
+      .child(
+        div()
+          .min_w(0)
+          .truncate()
+          .child(issue.creator ?? ""),
+      );
+  }
+
   /** @param {string | null} label */
   groups(label) {
     const { tracker } = this;
@@ -2075,6 +2104,7 @@ export default class Issues extends View {
                 refreshButton: this.refreshButton(t),
                 settingsButton: this.canOpenSettings() ? settingsButton((cx) => this.openSettings(cx), t) : null,
                 assignee: issue.assignee ? this.assignee(issue, t, t.foreground).text_size(PROPERTY_TEXT_PX) : null,
+                creator: issue.creator ? this.creator(issue, t) : null,
                 blocking: blockedIssues(issue, this.issues),
                 onBack: (cx) => this.back(cx),
                 onCollapse: (cx) => this.toggleCollapsed(cx),
