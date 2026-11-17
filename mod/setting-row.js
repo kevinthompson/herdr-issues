@@ -9,6 +9,7 @@ import { h_flex, v_flex } from "gpui-base";
 import { settings } from "herdr";
 import { chipFill } from "./colors.js";
 import { card, section, CARD_RADIUS_PX } from "./section.js";
+import { TEXT_MD_PX, TEXT_XS_PX } from "./type-scale.js";
 
 /** @import { Color, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -69,17 +70,17 @@ export function settingRow({ title, sentence, after, tokens, wide = false }, t, 
     .when(Boolean(after), (e) =>
       e.child(
         div()
-          .text_size(11)
+          .text_size(TEXT_XS_PX)
           .text_color(t.muted)
           .child(after ?? ""),
       ),
     )
-    .child(div().font_semibold().text_color(t.foreground).child(title))
+    .child(div().text_size(TEXT_MD_PX).font_semibold().text_color(t.foreground).child(title))
     .when(Boolean(sentence), (e) =>
       e.child(
         div()
           .whitespace_normal()
-          .text_size(12)
+          .text_size(TEXT_XS_PX)
           .text_color(t.muted)
           .child(sentence ?? ""),
       ),

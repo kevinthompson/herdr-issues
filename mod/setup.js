@@ -28,6 +28,7 @@ import { SETTING_LABELS } from "./settings-form.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
+import { TEXT_LG_PX, TEXT_MD_PX, TEXT_SM_PX, TEXT_XL_LINE_HEIGHT_PX, TEXT_XL_PX, TEXT_XS_PX } from "./type-scale.js";
 
 /** @import { Color, Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -132,13 +133,13 @@ export function untrackableView(sentence, t) {
 
 const BLANK_STATE_ICON_PX = 40;
 
-// Centered in place of the list: an icon, why there are no issues, the button that fixes it when there is
-// one, and how to put the panel away instead.
+// Centered in place of the list: an icon, why there are no issues, as a heading above a sentence or as the
+// sentence alone, the button that fixes it when there is one, and how to put the panel away instead.
 /**
- * @param {{ sentence: string | NativeElement, action?: { id: string, label: string, enabled?: boolean, onClick: (cx: Context) => void }, error?: string | null }} props
+ * @param {{ heading?: string, sentence: string | NativeElement, action?: { id: string, label: string, enabled?: boolean, onClick: (cx: Context) => void }, error?: string | null }} props
  * @param {Theme} t
  */
-function blankState({ sentence, action, error = null }, t) {
+function blankState({ heading, sentence, action, error = null }, t) {
   return v_flex()
     .flex_1()
     .min_h(0)
@@ -148,9 +149,25 @@ function blankState({ sentence, action, error = null }, t) {
     .justify_center()
     .child(svg("mods/issues/icons/file-text.svg").size(BLANK_STATE_ICON_PX).text_color(t.dim))
     .child(
-      typeof sentence === "string"
-        ? div().whitespace_normal().text_center().text_color(t.muted).child(sentence)
-        : sentence,
+      v_flex()
+        .items_center()
+        .gap(6)
+        .when(Boolean(heading), (e) =>
+          e.child(
+            div()
+              .whitespace_normal()
+              .text_center()
+              .text_size(TEXT_LG_PX)
+              .font_semibold()
+              .text_color(t.foreground)
+              .child(heading ?? ""),
+          ),
+        )
+        .child(
+          typeof sentence === "string"
+            ? div().whitespace_normal().text_center().text_size(TEXT_SM_PX).text_color(t.muted).child(sentence)
+            : sentence,
+        ),
     )
     .children(
       action
@@ -162,7 +179,7 @@ function blankState({ sentence, action, error = null }, t) {
         div()
           .whitespace_normal()
           .text_center()
-          .text_size(12)
+          .text_size(TEXT_XS_PX)
           .text_color(t.ansi1)
           .child(error ?? ""),
       ),
@@ -197,7 +214,7 @@ function collapseHint(t) {
     .justify_center()
     .items_center()
     .gap_x(4)
-    .text_size(12)
+    .text_size(TEXT_XS_PX)
     .text_color(t.dim)
     .child(div().child("Press"))
     .child(codeChip("CMD + Shift + I", t))
@@ -517,7 +534,8 @@ export class TrackerSetup {
         .child(
           blankState(
             {
-              sentence: "Issues isn't set up for this repository.",
+              heading: "Issues isn't set up for this repository",
+              sentence: "Choose an issue tracker and how finished work is approved.",
               action: {
                 id: "setup-start",
                 label: "Set Up Issues",
@@ -589,7 +607,7 @@ export class TrackerSetup {
               ),
             ),
           )
-          .child(div().flex_1().text_size(12).text_color(t.dim).child(stepText))
+          .child(div().flex_1().text_size(TEXT_SM_PX).text_color(t.muted).child(stepText))
           .child(
             h_flex()
               .flex_none()
@@ -632,12 +650,20 @@ export class TrackerSetup {
       .flex_none()
       .px(SECTION_INSET_PX)
       .gap(4)
-      .child(div().font_semibold().text_color(t.foreground).child(title))
+      .child(
+        div()
+          .whitespace_normal()
+          .text_size(TEXT_XL_PX)
+          .line_height(TEXT_XL_LINE_HEIGHT_PX)
+          .font_semibold()
+          .text_color(t.foreground)
+          .child(title),
+      )
       .when(Boolean(sentence), (e) =>
         e.child(
           div()
             .whitespace_normal()
-            .text_size(12)
+            .text_size(TEXT_SM_PX)
             .text_color(t.muted)
             .child(sentence ?? ""),
         ),
@@ -680,8 +706,8 @@ export class TrackerSetup {
           .flex_1()
           .min_w(0)
           .gap(4)
-          .child(div().font_semibold().text_color(t.foreground).child(label))
-          .child(div().whitespace_normal().text_size(12).text_color(t.muted).child(TRACKER_DESCRIPTIONS[id])),
+          .child(div().text_size(TEXT_MD_PX).font_semibold().text_color(t.foreground).child(label))
+          .child(div().whitespace_normal().text_size(TEXT_XS_PX).text_color(t.muted).child(TRACKER_DESCRIPTIONS[id])),
       )
       .child(
         div()
@@ -772,7 +798,7 @@ export class TrackerSetup {
     return settingRow(SETTING_LABELS[key], t, (controls) =>
       controls
         .child(select.render(t, { options: choices, value, onChoose: (id, cx) => this.chooseApproval(key, id, cx) }))
-        .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail)),
+        .child(div().whitespace_normal().text_size(TEXT_XS_PX).text_color(t.dim).child(detail)),
     );
   }
 
@@ -787,8 +813,17 @@ export class TrackerSetup {
       h_flex()
         .items_start()
         .gap(12)
-        .child(div().flex_1().min_w(0).font_semibold().text_color(t.foreground).child(name))
-        .child(div().flex_none().max_w(CONTROL_COLUMN_MAX_PX).whitespace_normal().text_color(t.muted).child(value)),
+        .text_size(TEXT_SM_PX)
+        .child(div().flex_1().min_w(0).text_color(t.muted).child(name))
+        .child(
+          div()
+            .flex_none()
+            .max_w(CONTROL_COLUMN_MAX_PX)
+            .whitespace_normal()
+            .font_semibold()
+            .text_color(t.foreground)
+            .child(value),
+        ),
       t,
     );
   }
@@ -811,7 +846,7 @@ export class TrackerSetup {
       ...(onApproval === "pull-request" ? [approvalAnswer("waitForChecks")] : []),
       ...(onApproval === "merge" ? [approvalAnswer("pushAfterMerge")] : []),
     ];
-    const hint = div().flex_1().min_w(0).whitespace_normal().text_size(12).text_color(t.dim).child(GEAR_HINT);
+    const hint = div().flex_1().min_w(0).whitespace_normal().text_size(TEXT_XS_PX).text_color(t.muted).child(GEAR_HINT);
     return content
       .child(
         this.pageHeading(
@@ -823,7 +858,7 @@ export class TrackerSetup {
       .child(cardSection("Tracker", trackerRows, t))
       .child(cardSection("Approval", approvalRows, t))
       .when(this.saving, (e) =>
-        e.child(this.inset().child(div().text_size(12).text_color(t.dim).child("Saving…")).child(hint)),
+        e.child(this.inset().child(div().text_size(TEXT_XS_PX).text_color(t.dim).child("Saving…")).child(hint)),
       )
       .when(!this.saving && Boolean(this.saveProblem), (e) =>
         e.child(
