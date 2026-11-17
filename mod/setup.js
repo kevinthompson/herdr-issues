@@ -22,6 +22,7 @@ import { mixColors, rowHover } from "./colors.js";
 import { button } from "./detail.js";
 import { rowBeneathHeader, ROW_PADDING_X_PX } from "./filter-row.js";
 import { collapseButton, headerBar, iconButton } from "./header.js";
+import { isRepositoryFolder } from "./location.js";
 import { CARD_RADIUS_PX, SECTION_INSET_PX } from "./section.js";
 import { cardSection, padRow, settingRow, CONTROL_COLUMN_MAX_PX } from "./setting-row.js";
 import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
@@ -963,5 +964,12 @@ export class KeptSetups {
     });
     this.byMain.set(main, setup);
     return setup;
+  }
+
+  // Forgets the setups of repositories whose .git is gone, so one made again starts its setup fresh.
+  async forgetRemoved() {
+    for (const main of [...this.byMain.keys()]) {
+      if (!(await isRepositoryFolder(main))) this.byMain.delete(main);
+    }
   }
 }

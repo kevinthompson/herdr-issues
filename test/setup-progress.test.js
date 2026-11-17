@@ -1,7 +1,7 @@
 // Each repository's setup kept by KeptSetups while the panel shows another repository: resumed on return,
 // emptied by Cancel, forgotten once saved, and still the one a check that finishes later applies to.
 import assert from "node:assert/strict";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
@@ -127,4 +127,23 @@ test("a tracker check that finishes after another repository is shown applies to
   assert.equal(a.tracker.checking, false);
   assert.equal(b.step, "tracker");
   assert.equal(b.tracker.choice, null);
+});
+
+test("a repository's kept setup is forgotten once its .git is removed", async (t) => {
+  stubHerdr(t);
+  const cx = context();
+  const kept = new KeptSetups(() => {});
+  const removed = temporaryFolder(t),
+    remaining = temporaryFolder(t);
+  mkdirSync(join(removed, ".git"));
+  mkdirSync(join(remaining, ".git"));
+  const removedSetup = kept.forRepository(removed),
+    remainingSetup = kept.forRepository(remaining);
+  advance(removedSetup, "auto", cx);
+
+  rmSync(join(removed, ".git"), { recursive: true });
+  await kept.forgetRemoved();
+
+  assert.notEqual(kept.forRepository(removed), removedSetup);
+  assert.equal(kept.forRepository(remaining), remainingSetup);
 });

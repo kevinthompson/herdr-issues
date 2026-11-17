@@ -355,6 +355,7 @@ export default class Issues extends View {
         const where = location();
         if (!where.cwd) throw new Error("No folder in focus");
         const root = where.on == null ? await repositoryRoot(where) : null;
+        if (!root) await this.keptSetups.forgetRemoved();
         if (generation !== this.generation) return;
         if (!root) {
           this.showUntrackable(where, context);
