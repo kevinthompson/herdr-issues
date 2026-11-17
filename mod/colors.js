@@ -97,3 +97,8 @@ export const fieldBar = (t) => (isLightTheme(t) ? t.chrome : (mixColors(t.surfac
 export const cardFill = (t) => mixColors(t.surface, t.foreground, 0.03) ?? t.raised;
 /** @param {Theme} t */
 export const chipFill = (t) => mixColors(t.surface, t.foreground, 0.1) ?? t.raised;
+
+// Text a step softer than the theme's text color, so a heading over it in that color stands out without the
+// theme offering a brighter one.
+/** @param {Theme} t */
+export const softText = (t) => mixColors(t.foreground, t.muted, 0.35) ?? t.foreground;

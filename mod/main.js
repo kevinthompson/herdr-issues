@@ -69,7 +69,15 @@ import {
   dueStatus,
   PRIORITIES,
 } from "./issue.js";
-import { issueDetail, issueLinks, workButton, labelChips, button, COMPACT_BUTTON_WIDTH_PX } from "./detail.js";
+import {
+  issueDetail,
+  issueLinks,
+  workButton,
+  labelChips,
+  PROPERTY_TEXT_PX,
+  button,
+  COMPACT_BUTTON_WIDTH_PX,
+} from "./detail.js";
 import { collapseButton, headerBar, iconButton, HEADER_HEIGHT_PX, ICON_BUTTON_PX } from "./header.js";
 import {
   FieldMenu,
@@ -2039,7 +2047,7 @@ export default class Issues extends View {
                 failedEditAlert: this.failedEditAlert(t),
                 refreshButton: this.refreshButton(t),
                 settingsButton: this.canOpenSettings() ? settingsButton((cx) => this.openSettings(cx), t) : null,
-                assignee: issue.assignee ? this.assignee(issue, t, t.muted) : null,
+                assignee: issue.assignee ? this.assignee(issue, t, t.foreground).text_size(PROPERTY_TEXT_PX) : null,
                 blocking: blockedIssues(issue, this.issues),
                 onBack: (cx) => this.back(cx),
                 onCollapse: (cx) => this.toggleCollapsed(cx),

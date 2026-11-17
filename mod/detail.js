@@ -1,16 +1,20 @@
-// One issue, drawn inside the panel in place of the list: a way back, its status and priority
-// (each a dropdown), its labels (with a dropdown that adds and removes them), its other details and its Markdown body, which Edit swaps for an editor. Merge shows
-// when the issue's finished branch can merge into main from here (merge.js).
+// One issue, drawn inside the panel in place of the list: a way back, then its ID and title above sections
+// (section.js) that scroll together. Properties is a card of its status and priority (each a dropdown) above
+// its other details, among them its labels (with a dropdown that adds and removes them) and its branch, which
+// copies when clicked. Description is its Markdown body, which Edit swaps for an editor. Merge shows when the
+// issue's finished branch can merge into main from here (merge.js).
 // Task-list items in the body are checkboxes that check off in place. A Linear or GitHub issue's comments follow
 // the body, read-only, each a card headed by its author's avatar, name and date, and hide while it is edited.
 import { div, svg, image } from "gpui-kit";
 import { v_flex, h_flex, TextView, Editor } from "gpui-base";
+import { settings } from "herdr";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, shortDate, statusIcon } from "./issue.js";
-import { DUE_COLORS, fieldBar, isLightTheme, labelTint } from "./colors.js";
+import { DUE_COLORS, isLightTheme, labelTint, softText } from "./colors.js";
 import { collapseButton, headerBar } from "./header.js";
-import { rowBeneathHeader } from "./filter-row.js";
+import { rowBeneathHeader, ROW_PADDING_X_PX } from "./filter-row.js";
+import { card, section, sectionHeading, SECTION_INSET_PX } from "./section.js";
 import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
 import { SPIN_MS } from "./action-button-state.js";
 import { AVATAR_PX } from "./avatars.js";
@@ -78,10 +82,15 @@ const STATUS_ICON_PX = 14;
 function dropdown(field, label, { issue, writable, onMenu }, t) {
   const icon = field === "status" ? statusIcon(issue.status) : null;
   return h_flex()
-    .gap(6)
+    .gap(PROPERTY_GAP_PX)
     .items_center()
-    .text_size(11)
-    .child(div().text_color(t.dim).child(label))
+    .child(
+      div()
+        .flex_none()
+        .text_color(t.dim)
+        .when(field === "status", (e) => e.w(PROPERTY_LABEL_PX))
+        .child(label),
+    )
     .child(
       h_flex()
         .id(`field-${field}`)
@@ -149,59 +158,30 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
     );
 }
 
-const FACT_ROW_PX = 18,
-  FACT_ICON_PX = 12;
+export const PROPERTY_TEXT_PX = 11;
+// The terminal's monospace font looks larger than the UI font at the same size.
+const BRANCH_TEXT_PX = 10;
+const FACT_ROW_PX = 20,
+  PROPERTY_LABEL_PX = 84,
+  PROPERTY_GAP_PX = 12,
+  CARD_PADDING_X_PX = 14;
 
 /**
- * One of the issue's facts on a line of its own: its name dimmed, then its value.
- * @param {string} label
- * @param {NativeElement} value
- * @param {Theme} t
- */
-function fact(label, value, t) {
-  return h_flex()
-    .min_h(FACT_ROW_PX)
-    .gap(4)
-    .items_center()
-    .child(div().flex_none().text_color(t.dim).child(label))
-    .child(value);
-}
-
-/**
- * A fact named by an icon, which names it in words on hover. The icon sits on the first line of a
- * value that wraps or lists several things.
- * @param {string} icon
+ * One of the issue's properties as a row: its name dimmed in a fixed column, then its value, which sits on the
+ * name's line when it wraps or lists several things.
  * @param {string} name
  * @param {NativeElement | string} value
  * @param {Theme} t
  */
-function iconFact(icon, name, value, t) {
+function property(name, value, t) {
   return h_flex()
-    .gap(10)
+    .gap(PROPERTY_GAP_PX)
     .items_start()
     .child(
-      div()
-        .id(`fact-${icon}`)
-        .flex_none()
-        .h(FACT_ROW_PX)
-        .flex()
-        .items_center()
-        .tooltip(name)
-        .child(svg(`mods/issues/icons/${icon}.svg`).size(FACT_ICON_PX).text_color(t.dim)),
+      div().flex_none().w(PROPERTY_LABEL_PX).min_h(FACT_ROW_PX).flex().items_center().text_color(t.dim).child(name),
     )
     .child(div().flex_1().min_w(0).min_h(FACT_ROW_PX).flex().items_center().child(value));
 }
-
-/**
- * @param {string} key
- * @param {string} icon
- * @param {string} name
- * @param {string[]} ids
- * @param {Pick<DetailView, "hasIssue" | "onOpen">} view
- * @param {Theme} t
- */
-const linkedFact = (key, icon, name, ids, view, t) =>
-  iconFact(icon, name, fact(`${name}:`, issueLinks(key, ids, view, t, t.accent), t), t);
 
 /**
  * A label as Linear draws it: a dot in the label's color before its name, when the tracker knows the color.
@@ -275,11 +255,10 @@ export const labelChips = ({ labels, labelColors, labelParts, project }, t, { wi
  */
 function labelsRow({ issue, labelsEditable, onLabelsMenu }, t) {
   return h_flex()
-    .pt(4)
     .flex_wrap()
     .gap(4)
     .items_center()
-    .children(labelChips(issue, t))
+    .children(labelChips(issue, t, { withProject: false }))
     .when(labelsEditable, (e) =>
       e.child(
         h_flex()
@@ -302,37 +281,92 @@ function labelsRow({ issue, labelsEditable, onLabelsMenu }, t) {
 }
 
 /**
- * `blocking`: the IDs of issues that list this one in their blocked_by.
+ * The branch in the terminal's font, which copies it when clicked.
+ * @param {string} branch
+ * @param {Theme} t
+ */
+function branchName(branch, t) {
+  return div()
+    .id("detail-branch")
+    .min_w(0)
+    .truncate()
+    .font_family(/** @type {string} */ (settings().font_family))
+    .text_size(BRANCH_TEXT_PX)
+    .text_color(t.foreground)
+    .cursor_pointer()
+    .tooltip("Copy branch")
+    .hover((s) => s.underline())
+    .on_click((_e, cx) => cx.write_to_clipboard(branch))
+    .child(branch);
+}
+
+/**
+ * The project's name after a dot in its color.
+ * @param {import("./trackers/index.js").IssueProject} project
+ */
+export function projectName({ name, color }) {
+  return h_flex()
+    .min_w(0)
+    .gap(6)
+    .items_center()
+    .when(Boolean(color), (e) =>
+      e.child(
+        div()
+          .flex_none()
+          .size(8)
+          .rounded(4)
+          .bg(/** @type {Color} */ (color)),
+      ),
+    )
+    .child(div().min_w(0).truncate().child(name));
+}
+
+/**
+ * The issue's properties in a card: its status and priority dropdowns above a divider, then a row for each other
+ * property it has. `blocking`: the IDs of issues that list this one in their blocked_by.
  * @param {DetailView} view
  * @param {Theme} t
  */
-function facts(view, t) {
+function properties(view, t) {
   const {
-      issue: { blockedBy, branch, pullRequests: attached },
+      issue: { blockedBy, branch, project, pullRequests: attached },
       blocking,
       assignee,
     } = view,
     due = dueStatus(view.issue);
-  return v_flex()
-    .gap(2)
-    .text_size(11)
-    .text_color(t.muted)
-    .when(Boolean(assignee), (e) => e.child(iconFact("user", "Assignee", assignee, t)))
-    .when(Boolean(due), (e) =>
-      e.child(iconFact("calendar", "Due", div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text), t)),
+  const rows = [
+    assignee && property("Assignee", assignee, t),
+    due && property("Due", div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text), t),
+    project && property("Project", projectName(project), t),
+    (view.issue.labels.length > 0 || view.labelsEditable) && property("Labels", labelsRow(view, t), t),
+    blockedBy.length > 0 && property("Blocked by", issueLinks("detail-blocker", blockedBy, view, t, t.accent), t),
+    blocking.length > 0 && property("Blocking", issueLinks("detail-blocking", blocking, view, t, t.accent), t),
+    branch && property("Branch", branchName(branch, t), t),
+    attached?.length > 0 && property(attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t),
+  ].filter(Boolean);
+  return card(t)
+    .text_size(PROPERTY_TEXT_PX)
+    .text_color(t.foreground)
+    .child(
+      h_flex()
+        .flex_wrap()
+        .px(CARD_PADDING_X_PX)
+        .py(10)
+        .gap_x(32)
+        .gap_y(8)
+        .items_center()
+        .when(rows.length > 0, (e) => e.border_b(1).border_color(t.border))
+        .child(dropdown("status", "Status", view, t))
+        .when(view.prioritized, (e) => e.child(dropdown("priority", "Priority", view, t))),
     )
-    .when(blockedBy.length > 0, (e) => e.child(linkedFact("detail-blocker", "ban", "Blocked by", blockedBy, view, t)))
-    .when(blocking.length > 0, (e) =>
-      e.child(linkedFact("detail-blocking", "circle-arrow-right", "Blocking", blocking, view, t)),
-    )
-    .when(Boolean(branch), (e) => e.child(iconFact("git-branch", "Branch", div().min_w(0).truncate().child(branch), t)))
-    .when(attached?.length > 0, (e) =>
+    .when(rows.length > 0, (e) =>
       e.child(
-        iconFact("pull-request", attached.length > 1 ? "Pull requests" : "Pull request", pullRequests(view, t), t),
+        v_flex()
+          .px(CARD_PADDING_X_PX)
+          .py(10)
+          .gap(6)
+          .children(/** @type {NativeElement[]} */ (rows)),
       ),
-    )
-    .when(view.issue.labels.length > 0 || Boolean(view.issue.project) || view.labelsEditable, (e) =>
-      e.child(labelsRow(view, t)),
     );
 }
 
@@ -361,7 +395,7 @@ function pullRequestLine(issueId, pullRequest, onLink, t) {
     .min_w(0)
     .gap(6)
     .items_start()
-    .child(div().flex_none().text_color(t[color]).child(status))
+    .child(div().flex_none().px(6).rounded_full().border_1().border_color(t.border).text_color(t[color]).child(status))
     .child(
       h_flex()
         .id(`pull-request-${issueId}-${pullRequest.url}`)
@@ -612,7 +646,8 @@ function editActions({ issue, writable, editor, saving, onEdit, onSave, onCancel
 
 const TASK_INDENT_PX = 9;
 const AFTER_TASKS_PX = 14;
-const COMMENT_PADDING_PX = 10;
+const COMMENT_PADDING_PX = 12;
+const COMMENT_AUTHOR_GAP_PX = 8;
 
 /**
  * @param {TaskSegment} task
@@ -660,13 +695,12 @@ function taskItem(task, { issue, writable, onToggleTask, onLink, linkFiles }, t)
  * @param {Theme} t
  */
 function body(view, t) {
-  const { issue, editor, onLink, linkFiles } = view;
-  if (editor) return Editor.new(editor).size_full();
-  if (issue.body === null) return div().text_color(t.dim).child("Loading…");
+  const { issue, onLink, linkFiles } = view;
+  const text = div().px(SECTION_INSET_PX).text_color(t.dim);
+  if (issue.body === null) return text.child("Loading…");
+  if (!issue.body.trim()) return text.child("No description");
   return v_flex()
-    .id(`issue-body-${issue.id}`)
-    .size_full()
-    .overflow_y_scrollbar()
+    .px(SECTION_INSET_PX)
     .gap(4)
     .children(
       /** @type {BodySegment[]} */ (bodySegments(issue.body)).map((segment, index, segments) =>
@@ -678,8 +712,7 @@ function body(view, t) {
               .when(index > 0 && segments[index - 1].markdown === undefined, (e) => e.mt(AFTER_TASKS_PX))
           : taskItem(/** @type {TaskSegment} */ (segment), view, t),
       ),
-    )
-    .when(Boolean(issue.comments?.length), (e) => e.child(comments(view, t)));
+    );
 }
 
 /**
@@ -688,51 +721,48 @@ function body(view, t) {
  * @param {Theme} t
  */
 function comments({ issue, onLink, linkFiles, avatarPath }, t) {
-  return v_flex()
-    .flex_none()
-    .mt(AFTER_TASKS_PX)
-    .pt(10)
-    .gap(8)
-    .border_t(1)
-    .border_color(t.border)
-    .child(div().text_size(11).font_semibold().text_color(t.muted).child("Comments"))
-    .children(
-      (issue.comments ?? []).map((comment, index) => {
-        const avatar = avatarPath(comment.avatar);
-        return v_flex()
-          .rounded(8)
-          .border_1()
-          .border_color(t.border)
-          .bg(t.raised)
-          .child(
-            h_flex()
-              .px(COMMENT_PADDING_PX)
-              .py(6)
-              .gap(6)
-              .items_center()
-              .text_size(11)
-              .border_b(1)
-              .border_color(t.border)
-              .when(Boolean(avatar), (e) =>
-                e.child(
-                  image(avatar ?? "")
-                    .flex_none()
-                    .size(AVATAR_PX)
-                    .rounded(AVATAR_PX / 2),
-                ),
-              )
-              .child(div().min_w(0).truncate().font_semibold().child(comment.author))
-              .child(div().flex_none().text_color(t.dim).child(shortDate(comment.created))),
-          )
-          .child(
-            TextView.markdown(`issue-comment-${issue.id}-${index}`, linkFiles(comment.body))
-              .selectable()
-              .px(COMMENT_PADDING_PX)
-              .py(8)
-              .on_link_click(onLink),
-          );
-      }),
-    );
+  const issueComments = issue.comments ?? [];
+  return section(
+    "Comments",
+    v_flex()
+      .gap(8)
+      .children(
+        issueComments.map((comment, index) => {
+          const avatar = avatarPath(comment.avatar);
+          const textIndent = COMMENT_PADDING_PX + (avatar ? AVATAR_PX + COMMENT_AUTHOR_GAP_PX : 0);
+          return card(t)
+            .pt(10)
+            .pb(12)
+            .gap(6)
+            .child(
+              h_flex()
+                .px(COMMENT_PADDING_PX)
+                .gap(COMMENT_AUTHOR_GAP_PX)
+                .items_center()
+                .when(Boolean(avatar), (e) =>
+                  e.child(
+                    image(avatar ?? "")
+                      .flex_none()
+                      .size(AVATAR_PX)
+                      .rounded(AVATAR_PX / 2),
+                  ),
+                )
+                .child(div().min_w(0).truncate().font_bold().text_color(t.foreground).child(comment.author))
+                .child(div().flex_none().text_color(t.dim).child(shortDate(comment.created))),
+            )
+            .child(
+              TextView.markdown(`issue-comment-${issue.id}-${index}`, linkFiles(comment.body))
+                .selectable()
+                .pl(textIndent)
+                .pr(COMMENT_PADDING_PX)
+                .text_color(/** @type {Color} */ (softText(t)))
+                .on_link_click(onLink),
+            );
+        }),
+      ),
+    t,
+    issueComments.length,
+  );
 }
 
 /**
@@ -741,7 +771,7 @@ function comments({ issue, onLink, linkFiles, avatarPath }, t) {
  * @param {Theme} t
  */
 function issueIdLine({ issue, trackerName, onLink }, t) {
-  const line = div().truncate().text_size(11).text_color(t.accent).child(issue.id);
+  const line = div().truncate().text_size(12).text_color(t.accent).child(issue.id);
   if (!issue.url) return line;
   const { url } = issue;
   return h_flex().child(
@@ -773,7 +803,7 @@ export const detailHeader = (view, t) =>
  * @param {Theme} t
  */
 export function issueDetail(view, t) {
-  const { issue, error, onBack } = view;
+  const { error, onBack } = view;
   return v_flex()
     .id("issue-detail")
     .size_full()
@@ -792,7 +822,7 @@ export function issueDetail(view, t) {
       e.child(
         div()
           .flex_none()
-          .px(14)
+          .px(ROW_PADDING_X_PX)
           .py(6)
           .text_size(11)
           .text_color(t.ansi1)
@@ -800,35 +830,67 @@ export function issueDetail(view, t) {
           .child(error ?? ""),
       ),
     )
-    .child(
-      v_flex()
-        .flex_none()
-        .px(14)
-        .py(10)
-        .gap(8)
-        .border_b(1)
-        .border_color(t.border)
-        .child(
-          v_flex()
-            .gap(2)
-            .child(issueIdLine(view, t))
-            .child(div().whitespace_normal().text_size(16).font_semibold().child(issue.title)),
-        )
-        .child(facts(view, t)),
-    )
-    .child(
-      h_flex()
-        .flex_none()
-        .flex_wrap()
-        .px(14)
-        .py(8)
-        .gap(14)
-        .items_center()
-        .border_b(1)
-        .border_color(t.border)
-        .bg(/** @type {Color} */ (fieldBar(t)))
-        .child(dropdown("status", "Status", view, t))
-        .when(view.prioritized, (e) => e.child(dropdown("priority", "Priority", view, t))),
-    )
-    .child(div().flex_1().min_h(0).px(14).py(10).child(body(view, t)));
+    .child(view.editor ? editingContent(view, t) : content(view, t));
 }
+
+/**
+ * The issue's ID and title.
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
+function titleBlock(view, t) {
+  return v_flex()
+    .flex_none()
+    .px(SECTION_INSET_PX)
+    .gap(4)
+    .child(issueIdLine(view, t))
+    .child(div().whitespace_normal().text_size(16).font_semibold().child(view.issue.title));
+}
+
+/**
+ * The area beneath the action row, inset as the rows above it are.
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
+const contentArea = (view, t) =>
+  v_flex()
+    .id(`issue-content-${view.issue.id}`)
+    .flex_1()
+    .min_h(0)
+    .px(ROW_PADDING_X_PX)
+    .pt(16)
+    .pb(ROW_PADDING_X_PX)
+    .gap(24)
+    .child(titleBlock(view, t))
+    .child(section("Properties", properties(view, t), t));
+
+/**
+ * The title, properties, description and comments, scrolling together.
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
+const content = (view, t) =>
+  contentArea(view, t)
+    .overflow_y_scrollbar()
+    .child(section("Description", body(view, t), t))
+    .when(Boolean(view.issue.comments?.length), (e) => e.child(comments(view, t)));
+
+/**
+ * While the description is edited, its editor fills the space beneath the properties and the comments hide.
+ * @param {DetailView} view
+ * @param {Theme} t
+ */
+const editingContent = (view, t) =>
+  contentArea(view, t).child(
+    v_flex()
+      .flex_1()
+      .min_h(0)
+      .gap(12)
+      .child(sectionHeading("Description", t))
+      .child(
+        div()
+          .flex_1()
+          .min_h(0)
+          .child(Editor.new(/** @type {EditorState} */ (view.editor)).size_full()),
+      ),
+  );

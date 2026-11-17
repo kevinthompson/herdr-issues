@@ -6,7 +6,7 @@ import { actionButtonState } from "./action-button-state.js";
 /** @import { Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
 
-export const ACTION_GAP_PX = 4;
+export const ACTION_GAP_PX = 8;
 const ICON_PX = 14;
 export const BUTTON_HEIGHT_PX = 26;
 const BUTTON_WIDTH_PX = 34;
