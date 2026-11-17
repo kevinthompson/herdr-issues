@@ -247,8 +247,6 @@ const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
 // The open and closed arrows differ in width, so a group's name would shift as it toggles without a fixed slot.
 const GROUP_ARROW_PX = 10;
-const GROUP_REFRESH_ICON_PX = 11,
-  STRIP_REFRESH_ICON_PX = 10;
 const SYNC_SPIN_MS = 1000;
 const NOT_A_REPOSITORY = "not-a-repository";
 const ON_ANOTHER_MACHINE = "The issues panel can't track issues for a folder on another machine.";
@@ -1714,7 +1712,7 @@ export default class Issues extends View {
     return groupIssues(this.issues, this.unloaded, label, { recentlyClosed: tracker.recentlyClosed ?? null });
   }
 
-  // Its issue count, or while its issues aren't listed, … when expanded and so being listed, else a refresh icon.
+  // Its issue count, or while its issues aren't listed, … when expanded and so being listed, else nothing.
   /**
    * @param {Group} group
    * @param {boolean} expanded
@@ -1722,9 +1720,9 @@ export default class Issues extends View {
    */
   groupCount(group, expanded, t) {
     const count = groupCountText(group);
-    if (count !== null) return div().text_color(t.dim).child(count);
-    if (expanded) return div().text_color(t.dim).child("…");
-    return svg("mods/issues/icons/rotate-cw.svg").flex_none().size(GROUP_REFRESH_ICON_PX).text_color(t.dim);
+    if (count !== null) return div().text_color(t.muted).child(count);
+    if (expanded) return div().text_color(t.muted).child("…");
+    return null;
   }
 
   // The group's heading, and when it is expanded, a card of its first `shown` issues, then Show more for the rest.
@@ -1796,7 +1794,7 @@ export default class Issues extends View {
             ),
           )
           .child(div().font_semibold().child(group.label))
-          .child(this.groupCount(group, expanded, t)),
+          .children([this.groupCount(group, expanded, t)].filter((count) => count !== null)),
       )
       .when(joined, (e) =>
         e.child(
@@ -2031,9 +2029,10 @@ export default class Issues extends View {
       .on_click((_e, cx) => this.expandToGroup(id, cx, { unloaded }))
       .when(Boolean(icon), (e) => e.child(image(icon ?? "").size(STRIP_ICON_PX)))
       .child(
-        unloaded
-          ? svg("mods/issues/icons/rotate-cw.svg").size(STRIP_REFRESH_ICON_PX).text_color(t.muted)
-          : div().text_size(10).text_color(t.muted).child(text),
+        div()
+          .text_size(10)
+          .text_color(t.muted)
+          .child(unloaded ? "–" : text),
       );
   }
 
