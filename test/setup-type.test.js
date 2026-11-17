@@ -48,6 +48,8 @@ test("each page's question is 20px semibold and its sentence 14px", (t) => {
   const question = holding(page, "Where do this repository's issues live?");
 
   assert.equal(callArg(question, "text_size"), 20);
+  // A bare number would be a multiple of the text size, not pixels.
+  assert.equal(callArg(question, "line_height"), "26px");
   assert.ok(called(question, "font_semibold"));
   assert.equal(callArg(question, "text_color"), FOREGROUND);
   assert.equal(sizeOf(page, "This repository has no issue tracker yet. Choose where its issues live."), 14);

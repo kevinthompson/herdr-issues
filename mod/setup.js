@@ -28,7 +28,7 @@ import { SETTING_LABELS } from "./settings-form.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
-import { TEXT_LG_PX, TEXT_MD_PX, TEXT_SM_PX, TEXT_XL_LINE_HEIGHT_PX, TEXT_XL_PX, TEXT_XS_PX } from "./type-scale.js";
+import { TEXT_LG_PX, TEXT_MD_PX, TEXT_SM_PX, TEXT_XL_LINE_HEIGHT, TEXT_XL_PX, TEXT_XS_PX } from "./type-scale.js";
 
 /** @import { Color, Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -654,7 +654,7 @@ export class TrackerSetup {
         div()
           .whitespace_normal()
           .text_size(TEXT_XL_PX)
-          .line_height(TEXT_XL_LINE_HEIGHT_PX)
+          .line_height(TEXT_XL_LINE_HEIGHT)
           .font_semibold()
           .text_color(t.foreground)
           .child(title),
