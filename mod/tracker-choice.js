@@ -15,7 +15,7 @@ import { checkGhInstalled, checkGhLoggedIn } from "./trackers/github.js";
 import { checkBeadsInstalled, checkBeadsDatabase, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
 import { originNotOnGitHub, BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM, LINEAR_KEY_PAGE } from "./trackers/problems.js";
-import { TEXT_SM_PX, TEXT_XS_PX } from "./type-scale.js";
+import { TEXT_XS_PX } from "./type-scale.js";
 
 /** @import { AsyncContext, Color, Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -31,7 +31,7 @@ export const TRACKERS = [
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TEAM_DROPDOWN_MAX_PX = 280;
 const STEP_ICON_PX = 14;
-const STEP_LINE_HEIGHT_PX = 18;
+const STEP_LINE_HEIGHT_PX = 16;
 
 // The steps each tracker checks before it's ready, in order. A step throws the SetupProblem it finds, and is
 // handed the main checkout and the previous step's result; Linear's last step answers with the teams the key can see.
@@ -151,7 +151,7 @@ function stepList(id, results, t) {
               .flex_1()
               .min_w(0)
               .whitespace_normal()
-              .text_size(TEXT_SM_PX)
+              .text_size(TEXT_XS_PX)
               .line_height(`${STEP_LINE_HEIGHT_PX}px`)
               .when(status === "failed", (e) => e.font_semibold())
               .child(label),
