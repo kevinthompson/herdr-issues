@@ -52,10 +52,10 @@ test("before a tracker is known, the name falls back to plain text", () => {
 test("the header titles each tracker by the repository's name, then the tracker's name, without the owner", () => {
   assert.equal(
     headerTitleText({ name: "GitHub", repo: "kevinthompson/herdr-issues" }, "herdr-issues"),
-    "herdr-issues › GitHub",
+    "herdr-issues  ›  GitHub",
   );
-  assert.equal(headerTitleText({ name: "Linear", scopes: [] }, "calendar"), "calendar › Linear");
-  assert.equal(headerTitleText({ name: "Beads" }, "notes"), "notes › Beads");
+  assert.equal(headerTitleText({ name: "Linear", scopes: [] }, "calendar"), "calendar  ›  Linear");
+  assert.equal(headerTitleText({ name: "Beads" }, "notes"), "notes  ›  Beads");
 });
 
 test("before the name setting loads, the header shows only the tracker's name", () => {
