@@ -80,7 +80,7 @@ import {
   PROPERTY_TEXT_PX,
   COMPACT_BUTTON_WIDTH_PX,
 } from "./detail.js";
-import { collapseButton, headerBar, iconButton, HEADER_HEIGHT_PX, ICON_BUTTON_PX } from "./header.js";
+import { collapseButton, headerBar, headerCell, iconButton } from "./header.js";
 import {
   FieldMenu,
   ScopeMenu,
@@ -1988,25 +1988,28 @@ export default class Issues extends View {
       .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
   }
 
-  // The expand button, centered on the expanded panel's header, which is 30px tall, over a badge for each
+  // The expand button, centered in a cell drawn like the expanded panel's header, over a badge for each
   // group the list shows, with the count its header shows.
   /** @param {Theme} t */
   strip(t) {
     const label = this.shownLabel(this.listedLabels());
     return this.frame(t)
       .items_center()
-      .pt((HEADER_HEIGHT_PX - ICON_BUTTON_PX) / 2)
       .gap(10)
       .child(
-        iconButton(
-          {
-            id: "issues-expand",
-            icon: "issues",
-            tooltip: listedScopeName(this.tracker, this.listedScope),
-            onClick: (cx) => this.toggleCollapsed(cx),
-          },
-          t,
-        ),
+        headerCell(t)
+          .justify_center()
+          .child(
+            iconButton(
+              {
+                id: "issues-expand",
+                icon: "issues",
+                tooltip: listedScopeName(this.tracker, this.listedScope),
+                onClick: (cx) => this.toggleCollapsed(cx),
+              },
+              t,
+            ),
+          ),
       )
       .children(stripBadges(this.groups(label)).map((badge) => this.stripBadge(badge, t)));
   }
