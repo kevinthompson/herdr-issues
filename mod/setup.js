@@ -1,7 +1,7 @@
 // The panel's view for a repository whose issues it can't list. With no tracker, it shows a blank state whose
-// Set Up Issues button walks through its steps a page each, with Back at the top left and the step and Cancel,
-// which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
-// back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; on one
+// Set Up Issues button walks through its steps a page each, with Back and the step at the top left, as an open
+// issue's view has its way back, and Cancel, which drops the answers and returns to the blank state, as an icon
+// button in the header where the settings gear goes once setup is saved: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; on one
 // page, whether a session asks for approval of its work, how the branch then gets into main and, for a pull
 // request, whether the session waits for its checks, or for a merge, whether main is pushed afterwards, each
 // asked with the settings view's dropdown (select.js), then a Next button; and a review of the choices, which points to the gear's settings
@@ -15,7 +15,7 @@ import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
 import { button, icon } from "./detail.js";
-import { collapseButton, headerBar } from "./header.js";
+import { collapseButton, headerBar, iconButton } from "./header.js";
 import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
@@ -517,7 +517,12 @@ export class TrackerSetup {
             title: "Issues",
             secondary: "Setup",
             trailing: [
-              this.failure ? null : button("setup-cancel", "Cancel", (cx) => this.cancel(cx), t),
+              this.failure
+                ? null
+                : iconButton(
+                    { id: "setup-cancel", icon: "x", tooltip: "Cancel setup", onClick: (cx) => this.cancel(cx) },
+                    t,
+                  ),
               collapseButton(this.onCollapse, t),
             ],
           },
