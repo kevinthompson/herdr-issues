@@ -6,6 +6,7 @@ import { stubHerdr } from "./support/herdr.js";
 import { byId, callArg, texts, walk } from "./support/gpui.js";
 import { TrackerSetup } from "../mod/setup.js";
 import { BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM } from "../mod/trackers/problems.js";
+import { TEXT_SM_PX } from "../mod/type-scale.js";
 
 const theme = new Proxy({}, { get: () => "#000" });
 const cx = {
@@ -259,30 +260,122 @@ test("a configured tracker that fails to load shows the problem under a page hea
   assert.ok(byId(page, "setup-choose-another"));
 });
 
-test("once GitHub Issues' check passes, the tracker row lists what was checked and that it's ready", (t) => {
+// A theme whose every color is its own name, so a test can tell which theme color a view used.
+const namedTheme = new Proxy({}, { get: (_, name) => name });
+const renderNamed = (setup) => setup.render(namedTheme, { onRetry() {}, header: null, onCollapse() {} });
+
+// Each step line under `listId`: its text, icon, icon color, text color and text size.
+function stepLines(page, listId) {
+  const list = byId(page, listId);
+  return list.kids.map((line) => {
+    const icon = [...walk(line)].find((node) => node.tag === "svg");
+    const label = [...walk(line)].find((node) => node.kids.some((kid) => typeof kid === "string"));
+    return {
+      text: texts(line).join(""),
+      icon: callArg(icon, "path").split("/").pop(),
+      iconColor: callArg(icon, "text_color"),
+      textColor: callArg(line, "text_color"),
+      size: callArg(label, "text_size"),
+    };
+  });
+}
+
+// Runs the chosen tracker's check to the end, as the app would.
+async function runCheck(setup, choice) {
+  const spawned = [];
+  const runCx = { ...cx, spawn: (body) => spawned.push(body(runCx)) };
+  setup.tracker.choose(choice, runCx);
+  await Promise.all(spawned);
+}
+
+test("once Linear's check passes, the Linear row lists its key and API access steps as passed", (t) => {
   stubHerdr(t);
   const setup = startedSetup();
-  setup.tracker.choice = "github";
+  setup.tracker.choice = "linear";
   assert.equal(byId(render(setup), "setup-ready"), undefined);
 
   setup.ready(proposed, cx);
-  const success = texts(byId(byId(render(setup), "setup-tracker-github"), "setup-ready"));
-  for (const line of ["gh is installed", "gh is logged in", "origin is on GitHub", "GitHub Issues is ready"])
-    assert.ok(success.includes(line), line);
+  const lines = stepLines(byId(renderNamed(setup), "setup-tracker-linear"), "setup-ready");
+  assert.deepEqual(
+    lines.map(({ text, icon, iconColor, textColor }) => [text, icon, iconColor, textColor]),
+    [
+      ["Linear API key found", "circle-check.svg", "ansi2", "foreground"],
+      ["Linear API access verified", "circle-check.svg", "ansi2", "foreground"],
+    ],
+  );
 });
 
-test("each tracker's success message names its own checks", (t) => {
+test("each tracker's passing check lists every step it checked, in order", (t) => {
   stubHerdr(t);
-  for (const [choice, lines] of [
-    ["linear", ["The Linear API key works", "Linear is ready"]],
-    ["beads", ["bd is installed", "A Beads database is in the main checkout", "Beads is ready"]],
+  for (const [choice, steps] of [
+    ["github", ["GitHub CLI installed", "GitHub CLI logged in", "Origin on GitHub"]],
+    ["beads", ["Beads installed", "Beads database found"]],
   ]) {
     const setup = startedSetup();
     setup.tracker.choice = choice;
     setup.ready(proposed, cx);
-    const success = texts(byId(byId(render(setup), `setup-tracker-${choice}`), "setup-ready"));
-    for (const line of lines) assert.ok(success.includes(line), line);
+    const lines = stepLines(renderNamed(setup), "setup-ready");
+    assert.deepEqual(
+      lines.map(({ text }) => text),
+      steps,
+    );
+    assert.ok(lines.every(({ icon }) => icon === "circle-check.svg"));
   }
+});
+
+test("with bd missing, the Beads check fails its first step and skips the database step", async (t) => {
+  stubHerdr(t, { exec: async () => ({ code: 127, stdout: "", stderr: "" }) });
+  const setup = startedSetup();
+  await runCheck(setup, "beads");
+
+  const row = byId(renderNamed(setup), "setup-tracker-beads");
+  assert.deepEqual(
+    stepLines(row, "setup-problem-steps").map(({ text, icon, iconColor, textColor, size }) => [
+      text,
+      icon,
+      iconColor,
+      textColor,
+      size,
+    ]),
+    [
+      ["The Beads CLI (bd) isn't installed", "circle-alert.svg", "ansi1", "ansi1", TEXT_SM_PX],
+      ["Beads database found", "circle-dashed.svg", "dim", "muted", TEXT_SM_PX],
+    ],
+  );
+  assert.ok(byId(row, "setup-problem-check"));
+});
+
+test("with bd installed and no database, the Beads check passes bd and fails the database with Run bd init", async (t) => {
+  stubHerdr(t, { exec: async () => ({ code: 0, stdout: "", stderr: "" }) });
+  const setup = startedSetup();
+  await runCheck(setup, "beads");
+
+  const row = byId(renderNamed(setup), "setup-tracker-beads");
+  assert.deepEqual(
+    stepLines(row, "setup-problem-steps").map(({ text, icon }) => [text, icon]),
+    [
+      ["Beads installed", "circle-check.svg"],
+      ["This repository has no Beads database", "circle-alert.svg"],
+    ],
+  );
+  assert.ok(byId(row, "setup-problem-beads-init"));
+});
+
+test("with gh logged out, the GitHub check passes installed, fails logged in and skips origin", async (t) => {
+  stubHerdr(t, {
+    exec: async (command, args) => ({ code: command === "gh" && args[0] === "auth" ? 1 : 0, stdout: "", stderr: "" }),
+  });
+  const setup = startedSetup();
+  await runCheck(setup, "github");
+
+  assert.deepEqual(
+    stepLines(renderNamed(setup), "setup-problem-steps").map(({ text, icon }) => [text, icon]),
+    [
+      ["GitHub CLI installed", "circle-check.svg"],
+      ["The GitHub CLI (gh) isn't logged in", "circle-alert.svg"],
+      ["Origin on GitHub", "circle-dashed.svg"],
+    ],
+  );
 });
 
 test("the success message hides while checking, with a problem, and after choosing another tracker", (t) => {
@@ -313,5 +406,5 @@ test("after bd init makes the missing database and the check passes, the Beads s
 
   setup.tracker.problem = null;
   setup.ready(proposed, cx);
-  assert.ok(texts(byId(byId(render(setup), "setup-tracker-beads"), "setup-ready")).includes("Beads is ready"));
+  assert.ok(texts(byId(byId(render(setup), "setup-tracker-beads"), "setup-ready")).includes("Beads database found"));
 });

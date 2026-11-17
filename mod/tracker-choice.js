@@ -1,17 +1,18 @@
 // Choosing a repository's tracker, which the setup view (setup.js) and the settings view (settings.js) share:
-// GitHub Issues, Linear or Beads, each checked before it counts as ready (gh installed and logged in with origin
-// on GitHub, a Linear API key that works, or bd installed with a database in the main checkout, which it offers
-// to make), with a success message listing what a passing check verified, and Linear's team. A Linear API key that is missing, unreadable or refused comes with a masked field
-// that saves a key Linear accepts (linear.js), and a link to the page where Linear creates one. Linear's team
-// dropdown is a scope menu popup (menu.js), whose pick comes back through the shared state its owner names.
+// GitHub Issues, Linear or Beads, each checked step by step before it counts as ready (gh installed and logged in
+// with origin on GitHub, a Linear API key found and accepted, or bd installed with a database in the main
+// checkout, which it offers to make), with each step's result listed as passed, failed or skipped, and Linear's
+// team. A Linear API key that is missing, unreadable or refused comes with a masked field that saves a key Linear
+// accepts (linear.js), and a link to the page where Linear creates one. Linear's team dropdown is a scope menu
+// popup (menu.js), whose pick comes back through the shared state its owner names.
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Input, InputState } from "gpui-base";
 import { exec, shared, setShared } from "herdr";
 import { button } from "./detail.js";
 import { openScopeMenu } from "./menu.js";
 import { linearClient, saveLinearKey } from "./trackers/linear.js";
-import { checkGitHubLogin } from "./trackers/github.js";
-import { checkBeads, initializeBeads } from "./trackers/beads.js";
+import { checkGhInstalled, checkGhLoggedIn } from "./trackers/github.js";
+import { checkBeadsInstalled, checkBeadsDatabase, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
 import { originNotOnGitHub, BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM, LINEAR_KEY_PAGE } from "./trackers/problems.js";
 import { TEXT_SM_PX, TEXT_XS_PX } from "./type-scale.js";
@@ -29,26 +30,65 @@ export const TRACKERS = [
 ];
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TEAM_DROPDOWN_MAX_PX = 280;
-const PROBLEM_ICON_PX = 14;
-const PROBLEM_MESSAGE_LINE_HEIGHT_PX = 18;
+const STEP_ICON_PX = 14;
+const STEP_LINE_HEIGHT_PX = 18;
 
-// What each tracker checks before it's ready; Linear's check answers with the teams the key can see.
-/** @type {Record<string, (main: string) => Promise<Team[] | void>>} */
-const READINESS_CHECKS = { github: checkGitHub, linear: linearTeams, beads: checkBeads };
-
-// What a passing readiness check verified, as its success message lists it.
-/** @type {Record<string, string[]>} */
-const VERIFIED = {
-  github: ["gh is installed", "gh is logged in", "origin is on GitHub"],
-  linear: ["The Linear API key works"],
-  beads: ["bd is installed", "A Beads database is in the main checkout"],
+// The steps each tracker checks before it's ready, in order. A step throws the SetupProblem it finds, and is
+// handed the main checkout and the previous step's result; Linear's last step answers with the teams the key can see.
+/** @typedef {{ label: string, run: (main: string, previous: any) => Promise<any> }} ReadinessStep */
+/** @typedef {{ label: string, status: "passed" | "failed" | "skipped" }} StepResult */
+/** @type {Record<string, ReadinessStep[]>} */
+const READINESS_STEPS = {
+  github: [
+    { label: "GitHub CLI installed", run: checkGhInstalled },
+    { label: "GitHub CLI logged in", run: checkGhLoggedIn },
+    { label: "Origin on GitHub", run: checkOriginOnGitHub },
+  ],
+  linear: [
+    { label: "Linear API key found", run: linearClient },
+    { label: "Linear API access verified", run: linearTeams },
+  ],
+  beads: [
+    { label: "Beads installed", run: checkBeadsInstalled },
+    { label: "Beads database found", run: checkBeadsDatabase },
+  ],
 };
+
+const STEP_ICONS = {
+  passed: "mods/issues/icons/circle-check.svg",
+  failed: "mods/issues/icons/circle-alert.svg",
+  skipped: "mods/issues/icons/circle-dashed.svg",
+};
+
+// Runs `choice`'s steps in order until one fails: each step's result (a failed step labeled with its problem's
+// message, and the steps after it skipped), the problem, and the last step's value once every step passed.
+/**
+ * @param {string} choice
+ * @param {string} main
+ * @returns {Promise<{ results: StepResult[], problem: SetupProblem | null, value: any }>}
+ */
+export async function runReadinessSteps(choice, main) {
+  const steps = READINESS_STEPS[choice];
+  /** @type {StepResult[]} */
+  const results = [];
+  let value;
+  for (const [index, step] of steps.entries()) {
+    try {
+      value = await step.run(main, value);
+      results.push({ label: step.label, status: "passed" });
+    } catch (/** @type {any} */ problem) {
+      results.push({ label: problem.message ?? step.label, status: "failed" });
+      for (const { label } of steps.slice(index + 1)) results.push({ label, status: "skipped" });
+      return { results, problem, value: null };
+    }
+  }
+  return { results, problem: null, value };
+}
 
 /**
  * @param {string} main
  */
-async function checkGitHub(main) {
-  await checkGitHubLogin();
+async function checkOriginOnGitHub(main) {
   const origin = await exec("git", ["remote", "get-url", "origin"], { cwd: main }).catch(
     /** @returns {{ code: number, stdout: string }} */ () => null,
   );
@@ -57,10 +97,11 @@ async function checkGitHub(main) {
 
 // The teams the API key can see, by name.
 /**
+ * @param {string} _main
+ * @param {(query: string) => Promise<any>} linear
  * @returns {Promise<Team[]>}
  */
-async function linearTeams() {
-  const linear = await linearClient();
+async function linearTeams(_main, linear) {
   const { teams } = await linear(TEAMS);
   return [...teams.nodes].sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
 }
@@ -72,6 +113,52 @@ async function linearTeams() {
  */
 export const markdown = (id, text, color) =>
   TextView.markdown(id, text).flex_none().text_size(TEXT_XS_PX).text_color(color);
+
+// Each step's result on a line of its own: a green check when it passed, the error icon and its problem in red
+// when it failed, and a dimmed icon with muted text when it never ran.
+/**
+ * @param {string} id
+ * @param {StepResult[]} results
+ * @param {Theme} t
+ */
+function stepList(id, results, t) {
+  /** @type {Record<StepResult["status"], { icon: Color, text: Color }>} */
+  const colors = {
+    passed: { icon: t.ansi2, text: t.foreground },
+    failed: { icon: t.ansi1, text: t.ansi1 },
+    skipped: { icon: t.dim, text: t.muted },
+  };
+  return v_flex()
+    .id(id)
+    .flex_none()
+    .gap(4)
+    .children(
+      results.map(({ label, status }, index) =>
+        h_flex()
+          .id(`${id}-${index}`)
+          .items_start()
+          .gap(6)
+          .text_color(colors[status].text)
+          .child(
+            h_flex()
+              .flex_none()
+              .h(STEP_LINE_HEIGHT_PX)
+              .items_center()
+              .child(svg(STEP_ICONS[status]).size(STEP_ICON_PX).text_color(colors[status].icon)),
+          )
+          .child(
+            div()
+              .flex_1()
+              .min_w(0)
+              .whitespace_normal()
+              .text_size(TEXT_SM_PX)
+              .line_height(`${STEP_LINE_HEIGHT_PX}px`)
+              .when(status === "failed", (e) => e.font_semibold())
+              .child(label),
+          ),
+      ),
+    );
+}
 
 /**
  * @template A
@@ -99,6 +186,9 @@ export class TrackerChoice {
     this.checking = false;
     /** @type {SetupProblem | null} */
     this.problem = null;
+    // Each readiness step's result from the last check that failed one.
+    /** @type {StepResult[] | null} */
+    this.results = null;
     // The Linear API key being entered, which is never kept once saved.
     this.keyInput = InputState.new({ placeholder: "lin_api_…" });
     this.keyInput.set_masked(true);
@@ -115,7 +205,7 @@ export class TrackerChoice {
   }
 
   reset() {
-    Object.assign(this, { choice: null, teams: null, team: null, checking: false, problem: null });
+    Object.assign(this, { choice: null, teams: null, team: null, checking: false, problem: null, results: null });
   }
 
   /**
@@ -133,13 +223,14 @@ export class TrackerChoice {
    */
   check(cx) {
     const choice = this.choice;
-    Object.assign(this, { checking: true, problem: null });
+    Object.assign(this, { checking: true, problem: null, results: null });
     forgetLookups();
     cx.spawn(async (cx) => {
       try {
-        const [teams, alongside] = await Promise.all([READINESS_CHECKS[choice](this.main), this.alongside()]);
+        const [outcome, alongside] = await Promise.all([runReadinessSteps(choice, this.main), this.alongside()]);
         if (this.choice !== choice) return;
-        this.teams = /** @type {Team[] | undefined} */ (teams) ?? null;
+        if (outcome.problem) return Object.assign(this, { problem: outcome.problem, results: outcome.results });
+        this.teams = /** @type {Team[] | undefined} */ (outcome.value) ?? null;
         this.onReady(alongside, cx);
       } catch (/** @type {any} */ e) {
         if (this.choice === choice) this.problem = e;
@@ -157,7 +248,7 @@ export class TrackerChoice {
    */
   makeBeadsDatabase(cx) {
     const choice = this.choice;
-    Object.assign(this, { checking: true, problem: null });
+    Object.assign(this, { checking: true, problem: null, results: null });
     cx.spawn(async (cx) => {
       try {
         await initializeBeads(this.main);
@@ -250,44 +341,24 @@ export class TrackerChoice {
       );
   }
 
-  // A problem with its fix: the message marked with an error icon, the fix beneath it, then the buttons. A Linear
-  // key problem asks for the key, and saving one runs onCheckAgain.
+  // A problem with its fix: each readiness step's result when `results` has them, or else the message marked with
+  // an error icon, then the fix beneath it and the buttons. A Linear key problem asks for the key, and saving one
+  // runs onCheckAgain.
   /**
    * @param {string} id
    * @param {SetupProblem} problem
    * @param {(cx: Context) => void} onCheckAgain
    * @param {Theme} t
    * @param {NativeElement | null} [extra]
+   * @param {StepResult[] | null} [results]
    */
-  problemView(id, problem, onCheckAgain, t, extra = null) {
+  problemView(id, problem, onCheckAgain, t, extra = null, results = null) {
     const asksForKey = problem.code === LINEAR_KEY_PROBLEM;
     if (asksForKey) this.onKeySaved = onCheckAgain;
     return v_flex()
       .flex_none()
       .gap(8)
-      .child(
-        h_flex()
-          .items_start()
-          .gap(6)
-          .text_color(t.ansi1)
-          .child(
-            h_flex()
-              .flex_none()
-              .h(PROBLEM_MESSAGE_LINE_HEIGHT_PX)
-              .items_center()
-              .child(svg("mods/issues/icons/circle-alert.svg").size(PROBLEM_ICON_PX).text_color(t.ansi1)),
-          )
-          .child(
-            div()
-              .flex_1()
-              .min_w(0)
-              .whitespace_normal()
-              .text_size(TEXT_SM_PX)
-              .line_height(`${PROBLEM_MESSAGE_LINE_HEIGHT_PX}px`)
-              .font_semibold()
-              .child(problem.message),
-          ),
-      )
+      .child(stepList(`${id}-steps`, results ?? [{ label: problem.message, status: "failed" }], t))
       .when(asksForKey, (e) => e.child(this.keyForm(id, t)))
       .when(Boolean(problem.fix), (e) =>
         e.child(markdown(`${id}-fix`, problem.fix ?? "", t.muted).on_link_click((url, cx) => cx.open_url(url))),
@@ -300,50 +371,18 @@ export class TrackerChoice {
       );
   }
 
-  // The chosen tracker's passing check: that it's ready, marked with a check icon, and what was verified beneath.
+  // The chosen tracker's passing check: every step it checked, each marked as passed.
   /**
    * @param {string} id
    * @param {Theme} t
    */
   successView(id, t) {
-    const label = TRACKERS.find(({ id }) => id === this.choice)?.label ?? "";
-    return v_flex()
-      .id(id)
-      .flex_none()
-      .gap(4)
-      .child(
-        h_flex()
-          .items_start()
-          .gap(6)
-          .text_color(t.ansi2)
-          .child(
-            h_flex()
-              .flex_none()
-              .h(PROBLEM_MESSAGE_LINE_HEIGHT_PX)
-              .items_center()
-              .child(svg("mods/issues/icons/circle-check.svg").size(PROBLEM_ICON_PX).text_color(t.ansi2)),
-          )
-          .child(
-            div()
-              .flex_1()
-              .min_w(0)
-              .whitespace_normal()
-              .text_size(TEXT_SM_PX)
-              .line_height(`${PROBLEM_MESSAGE_LINE_HEIGHT_PX}px`)
-              .font_semibold()
-              .child(`${label} is ready`),
-          ),
-      )
-      .children(
-        (VERIFIED[this.choice ?? ""] ?? []).map((line) =>
-          div()
-            .pl(PROBLEM_ICON_PX + 6)
-            .whitespace_normal()
-            .text_size(TEXT_XS_PX)
-            .text_color(t.muted)
-            .child(line),
-        ),
-      );
+    const steps = READINESS_STEPS[this.choice ?? ""] ?? [];
+    return stepList(
+      id,
+      steps.map(({ label }) => ({ label, status: "passed" })),
+      t,
+    );
   }
 
   // Adds to `content` that the check is running, or the problem it found, with a way to make a missing Beads database.
@@ -365,6 +404,7 @@ export class TrackerChoice {
             this.problem?.code === BEADS_NOT_INITIALIZED
               ? button(`${id}-beads-init`, "Run bd init", (cx) => this.makeBeadsDatabase(cx), t)
               : null,
+            this.results,
           ),
         ),
       );
