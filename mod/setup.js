@@ -29,7 +29,7 @@ import { SETTING_LABELS } from "./settings-form.js";
 import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./trackers/setting.js";
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
-import { TEXT_LG_PX, TEXT_MD_PX, TEXT_SM_PX, TEXT_XL_LINE_HEIGHT, TEXT_XL_PX, TEXT_XS_PX } from "./type-scale.js";
+import { TEXT_LG_PX, TEXT_SM_PX, TEXT_XL_LINE_HEIGHT, TEXT_XL_PX, TEXT_XS_PX } from "./type-scale.js";
 
 /** @import { Color, Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -59,7 +59,7 @@ const TRACKER_DESCRIPTIONS = {
   beads: "Issues in a Beads database kept in the repository, read and written with bd.",
 };
 // A tracker's label line, which its radio indicator centers on.
-const TRACKER_LABEL_LINE_HEIGHT_PX = 22;
+const TRACKER_LABEL_LINE_HEIGHT_PX = 20;
 const RADIO_PX = 16;
 const RADIO_DOT_PX = 6;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
@@ -726,7 +726,7 @@ export class TrackerSetup {
       .gap(4)
       .child(
         div()
-          .text_size(TEXT_MD_PX)
+          .text_size(TEXT_SM_PX)
           .line_height(`${TRACKER_LABEL_LINE_HEIGHT_PX}px`)
           .font_semibold()
           .text_color(t.foreground)

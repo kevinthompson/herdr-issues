@@ -85,7 +85,7 @@ test("a problem's message sets its line height in pixels", (t) => {
   assert.ok(isPxLength(callArg(message, "line_height")), `line_height was ${callArg(message, "line_height")}`);
 });
 
-test("tracker and setting row labels are 16px semibold over 12px descriptions", (t) => {
+test("tracker and setting row labels are 14px semibold over 12px descriptions", (t) => {
   stubHerdr(t);
   const trackers = render(startedSetup());
   const row = settingRow(
@@ -98,7 +98,7 @@ test("tracker and setting row labels are 16px semibold over 12px descriptions", 
     [trackers, "GitHub Issues"],
     [row, "Model"],
   ]) {
-    assert.equal(sizeOf(tree, label), 16);
+    assert.equal(sizeOf(tree, label), 14);
     assert.ok(called(holding(tree, label), "font_semibold"));
   }
   assert.equal(sizeOf(trackers, "Issues in the repository's GitHub repository, read and written with gh."), 12);
