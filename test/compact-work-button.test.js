@@ -5,8 +5,8 @@ import { workButton } from "../mod/detail.js";
 import { SPIN_MS } from "../mod/action-button-state.js";
 
 const theme = {
-  solid: "#3355ff",
-  solid_foreground: "#ffffff",
+  accent: "#3355ff",
+  accent_foreground: "#ffffff",
   raised: "#222222",
   foreground: "#e0e0e0",
   dim: "#888888",

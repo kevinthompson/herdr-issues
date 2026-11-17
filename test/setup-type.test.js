@@ -10,10 +10,10 @@ import { settingRow } from "../mod/setting-row.js";
 const FOREGROUND = "#ffffff";
 const MUTED = "#888888";
 const ERROR = "#ff0000";
-const SOLID = "#0000ff";
+const ACCENT = "#0000ff";
 const theme = new Proxy(
   {},
-  { get: (_, key) => ({ foreground: FOREGROUND, muted: MUTED, ansi1: ERROR, solid: SOLID })[key] ?? "#000000" },
+  { get: (_, key) => ({ foreground: FOREGROUND, muted: MUTED, ansi1: ERROR, accent: ACCENT })[key] ?? "#000000" },
 );
 const cx = {
   focus_handle: () => ({ focus() {}, is_focused: () => false }),
@@ -119,7 +119,7 @@ test("a problem's message is 14px semibold in the error color over a 12px muted 
   assert.equal(callArg(message, "text_color") ?? callArg(parentOf(page, message), "text_color"), ERROR);
   assert.equal(callArg(fix, "text_size"), 12);
   assert.equal(callArg(fix, "text_color"), MUTED);
-  assert.notEqual(callArg(byId(page, "setup-failure-check"), "bg"), SOLID);
+  assert.notEqual(callArg(byId(page, "setup-failure-check"), "bg"), ACCENT);
 });
 
 test("a review row draws the setting's name muted and its value semibold in the foreground, both 14px", (t) => {
