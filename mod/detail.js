@@ -34,6 +34,7 @@ import { AVATAR_PX } from "./avatars.js";
  * @property {Issue} issue
  * @property {string[]} blocking
  * @property {NativeElement | null} [assignee]
+ * @property {NativeElement | null} [creator]
  * @property {boolean} writable
  * @property {boolean} prioritized
  * @property {boolean} labelsEditable
@@ -331,10 +332,12 @@ function properties(view, t) {
       issue: { blockedBy, branch, project, pullRequests: attached },
       blocking,
       assignee,
+      creator,
     } = view,
     due = dueStatus(view.issue);
   const rows = [
     assignee && property("Assignee", assignee, t),
+    creator && property("Created by", creator, t),
     due && property("Due", div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text), t),
     project && property("Project", projectName(project), t),
     (view.issue.labels.length > 0 || view.labelsEditable) && property("Labels", labelsRow(view, t), t),

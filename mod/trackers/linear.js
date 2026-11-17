@@ -50,6 +50,7 @@ import {
  * @property {string | null} slaHighRiskAt
  * @property {{ id: string, name: string, avatarUrl: string | null } | null} assignee
  * @property {{ id: string, name: string, avatarUrl: string | null } | null} delegate
+ * @property {{ name: string, avatarUrl: string | null } | null} creator
  * @property {LinearState} state
  * @property {{ id: string }} team
  * @property {{ id: string, name: string, color: string } | null} [project]
@@ -106,6 +107,7 @@ const TEAM_TTL_MS = 10 * 60 * 1000;
 // Lists leave out descriptions, by far the largest field, and an issue's description loads when it opens.
 const ISSUE_FIELDS = `id identifier title priority sortOrder branchName createdAt updatedAt completedAt dueDate url
   slaBreachesAt slaMediumRiskAt slaHighRiskAt assignee { id name avatarUrl } delegate { id name avatarUrl }
+  creator { name avatarUrl }
   state { type name } team { id }
   project { id name color }
   labels(first: 10) { nodes { name color parent { name } } }
@@ -472,6 +474,8 @@ function toIssue(node, repoName) {
     assigneeId: node.assignee?.id ?? null,
     assignee: node.assignee?.name ?? "Unassigned",
     assigneeAvatar: node.assignee?.avatarUrl ?? null,
+    creator: node.creator?.name ?? null,
+    creatorAvatar: node.creator?.avatarUrl ?? null,
     due: node.dueDate ?? null,
     sla: node.slaBreachesAt
       ? { breachesAt: node.slaBreachesAt, mediumRiskAt: node.slaMediumRiskAt, highRiskAt: node.slaHighRiskAt }

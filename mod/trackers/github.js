@@ -41,6 +41,7 @@ import { refuseUnknownLabels } from "./labels.js";
  * @property {string | null} stateReason
  * @property {{ dueOn: string | null } | null} milestone
  * @property {{ nodes: { name: string, color: string }[] }} labels
+ * @property {{ login: string, name?: string | null, avatarUrl: string } | null} author Null for a deleted account.
  * @property {{ nodes: { login: string, name: string | null, avatarUrl: string }[] }} assignees
  * @property {{ nodes: { number: number, state: string, repository: { nameWithOwner: string } }[] }} blockedBy
  * @property {{ nodes: GitHubPullRequestNode[] }} closedByPullRequestsReferences
@@ -63,6 +64,7 @@ const COMMENTS = 100;
 
 const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateReason milestone { dueOn }
   labels(first: 20) { nodes { name color } }
+  author { login avatarUrl ... on User { name } }
   assignees(first: 10) { nodes { login name avatarUrl } }
   blockedBy(first: ${BLOCKERS}) { nodes { number state repository { nameWithOwner } } }
   closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
@@ -162,6 +164,8 @@ function toIssue(node, repo) {
     assignee: assignee ? assignee.name || assignee.login : "Unassigned",
     assigneeAvatar: assignee?.avatarUrl ?? null,
     assigneeLogins: node.assignees.nodes.map((each) => each.login),
+    creator: node.author ? node.author.name || node.author.login : null,
+    creatorAvatar: node.author?.avatarUrl ?? null,
     due: node.milestone?.dueOn?.slice(0, 10) ?? null,
     created: node.createdAt,
     completed: node.state === "CLOSED" ? node.closedAt : null,

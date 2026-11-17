@@ -8,9 +8,18 @@ const VIEWER = "me";
 
 const issueNode = (
   number,
-  { state = "OPEN", stateReason = null, labels = [], assignees = [], pullRequests = [], comments = [] } = {},
+  {
+    state = "OPEN",
+    stateReason = null,
+    labels = [],
+    assignees = [],
+    pullRequests = [],
+    comments = [],
+    author = null,
+  } = {},
 ) => ({
   comments: { nodes: comments },
+  author,
   number,
   title: `Issue ${number}`,
   url: `https://github.com/${REPO}/issues/${number}`,
@@ -206,5 +215,25 @@ describe("GitHub tracker comments", () => {
       issueNode(1, { comments: [comment("someone", "2026-01-02T00:00:00Z", "First")] }),
     ]);
     assert.equal((await tracker.list())[0].comments, null);
+  });
+});
+
+describe("GitHub tracker creator", () => {
+  test("names the issue's author, with their avatar", async (t) => {
+    const { tracker } = await trackerWith(t, [
+      issueNode(1, { author: { login: "ada", name: "Ada Lovelace", avatarUrl: "https://avatars.example/ada" } }),
+      issueNode(2, { author: { login: "octobot", avatarUrl: "https://avatars.example/octobot" } }),
+    ]);
+    const [named, unnamed] = await tracker.list();
+    assert.equal(named.creator, "Ada Lovelace");
+    assert.equal(named.creatorAvatar, "https://avatars.example/ada");
+    assert.equal(unnamed.creator, "octobot");
+  });
+
+  test("has no creator for an issue whose author's account was deleted", async (t) => {
+    const { tracker } = await trackerWith(t, [issueNode(1)]);
+    const [issue] = await tracker.list();
+    assert.equal(issue.creator, null);
+    assert.equal(issue.creatorAvatar, null);
   });
 });

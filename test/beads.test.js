@@ -170,6 +170,14 @@ describe("Beads tracker", () => {
     assert.deepEqual(issues["bd-2"].blockedBy, []);
   });
 
+  test("names who created an issue, without an avatar", async (t) => {
+    const { tracker } = await trackerWith(t, [{ ...record("bd-1"), created_by: "Ada Lovelace" }, record("bd-2")]);
+    const issues = byId(await tracker.list());
+    assert.equal(issues["bd-1"].creator, "Ada Lovelace");
+    assert.equal(issues["bd-1"].creatorAvatar, null);
+    assert.equal(issues["bd-2"].creator, null);
+  });
+
   test("saves a body only over the one it was read with", async (t) => {
     const records = [record("bd-1", { description: "First" })];
     const { tracker, commands } = await trackerWith(t, records);
