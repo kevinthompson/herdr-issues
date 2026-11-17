@@ -47,11 +47,18 @@ const STATUS_COLORS = {
 export const DUE_COLORS = { overdue: "ansi1", soon: "working", later: "dim" };
 
 // The opacity of a status color's fill, hover and border, as two hex digits, thin so fills stay calm on
-// dark backgrounds. On a light one the color is darkened toward the text and laid on thicker, or the
-// near-white statuses such as Todo would vanish.
-const DARK_STATUS_ALPHAS = { fill: "30", hover: "48", border: "60" };
-const LIGHT_STATUS_ALPHAS = { fill: "48", hover: "6c", border: "90" };
-const LIGHT_STATUS_DARKENING = 0.4;
+// dark backgrounds. A light theme mixes the same share of the color into its panel's color instead.
+const STATUS_ALPHAS = { fill: "30", hover: "48", border: "60" };
+// In a light theme, the least a fill, hover and border move from the panel's lightness, as a share of the
+// way to its text, so near-white statuses such as Todo still stand apart from the panel and its rows' hover.
+const LIGHT_STATUS_MIN_STEPS = { fill: 0.1, hover: 0.15, border: 0.2 };
+
+// A #rrggbb color's perceived lightness, from 0 to 255.
+/** @param {string} hex */
+const lightness = (hex) => {
+  const [red, green, blue] = channels(hex.slice(1));
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+};
 
 // A status's fill, hover and border colors in the theme `t`; null for a status without a color.
 /** @param {string} status @param {Theme} t */
@@ -67,10 +74,33 @@ export const labelTint = (color, t) => (color ? colorTints(color, t).fill : t.ho
 
 /** @param {string} color @param {Theme} t */
 function colorTints(color, t) {
-  const light = isLightTheme(t);
-  const base = light ? (mixColors(color, t.foreground, LIGHT_STATUS_DARKENING) ?? color) : color;
-  const alphas = light ? LIGHT_STATUS_ALPHAS : DARK_STATUS_ALPHAS;
-  return { fill: `${base}${alphas.fill}`, hover: `${base}${alphas.hover}`, border: `${base}${alphas.border}` };
+  const translucent = {
+    fill: `${color}${STATUS_ALPHAS.fill}`,
+    hover: `${color}${STATUS_ALPHAS.hover}`,
+    border: `${color}${STATUS_ALPHAS.border}`,
+  };
+  if (!isLightTheme(t) || !HEX.test(t.surface ?? "") || !HEX.test(color)) return translucent;
+  const tint = (/** @type {keyof typeof STATUS_ALPHAS} */ part) =>
+    lightTint(color, t, parseInt(STATUS_ALPHAS[part], 16) / 255, LIGHT_STATUS_MIN_STEPS[part]);
+  return { fill: tint("fill"), hover: tint("hover"), border: tint("border") };
+}
+
+// The light theme `t`'s panel color moved `share` of the way to `color`, or further, until it is at least
+// `minStep` of the way from the panel's lightness to its text's. When the color is too close to the panel's
+// lightness to get there, its `share` is darkened toward the text instead.
+/** @param {string} color @param {Theme} t @param {number} share @param {number} minStep */
+function lightTint(color, t, share, minStep) {
+  const panel = lightness(t.surface),
+    text = lightness(t.foreground),
+    leastDistance = Math.abs(panel - text) * minStep,
+    colorDistance = Math.abs(panel - lightness(color));
+  if (colorDistance >= leastDistance)
+    return /** @type {string} */ (mixColors(t.surface, color, Math.max(share, leastDistance / colorDistance)));
+  const tint = /** @type {string} */ (mixColors(t.surface, color, share)),
+    targetLightness = panel - leastDistance;
+  return /** @type {string} */ (
+    mixColors(tint, t.foreground, (lightness(tint) - targetLightness) / (lightness(tint) - text))
+  );
 }
 
 // A list row's hover. A dark theme's is half as strong as the theme's: half as opaque when it's
