@@ -36,6 +36,7 @@ import { refuseUnknownLabels } from "./labels.js";
  * @property {number} priority
  * @property {string[]} [labels]
  * @property {string} created_at
+ * @property {string} [created_by]
  * @property {string} updated_at
  * @property {string | null} [closed_at]
  * @property {string | null} [description]
@@ -100,6 +101,8 @@ function toIssue(record, blockedBy, { detailed = false } = {}) {
     blockedBy,
     branch: suggestedBranch(record),
     created: record.created_at,
+    creator: record.created_by || null,
+    creatorAvatar: null,
     updated: record.updated_at,
     completed: record.closed_at ?? null,
     body: detailed ? (record.description ?? "").trim() : null,

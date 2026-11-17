@@ -37,6 +37,8 @@
 //          assignee (a name, for Linear issues),
 //          assigneeId (the assignee's user ID, or null, for Linear issues),
 //          assigneeAvatar (an image URL, or null, for Linear issues),
+//          creator (the name of the person who created the issue, or null when the tracker doesn't say),
+//          creatorAvatar (their image URL, or null; Beads has none),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
 //          due (a YYYY-MM-DD date, or null: Linear's due date, or the due date of a GitHub issue's milestone),
 //          pullRequests ([{ url, title, repo, number, status, branch }] attached to Linear issues),
@@ -95,6 +97,8 @@
  * @property {string} [assignee]
  * @property {string | null} [assigneeId]
  * @property {string | null} [assigneeAvatar]
+ * @property {string | null} [creator]
+ * @property {string | null} [creatorAvatar]
  * @property {{ breachesAt: string, mediumRiskAt: string | null, highRiskAt: string | null } | null} [sla]
  * @property {string | null} [due]
  * @property {PullRequest[]} [pullRequests]
