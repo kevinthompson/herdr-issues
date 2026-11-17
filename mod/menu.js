@@ -4,7 +4,7 @@
 // { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
 // where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
-// scopes are { id, label, icon?, iconColor?, group?, subgroup?, subgroupIcon? }, and headings name each group and subgroup where it starts:
+// scopes are { id, label, icon?, iconColor?, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in muted, spaced capitals below a divider that spans the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick. In a menu where some options have icons, the others leave the
 // icon's room empty so every option's text lines up.
@@ -28,11 +28,10 @@ import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
  * @property {`#${string}`} [iconColor]
  * @property {string} [heading]
  * @property {string} [subheading]
- * @property {string | null} [subheadingIcon]
  * @property {boolean} [divider]
  */
 
-/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "iconColor" | "group" | "subgroupIcon"> &{ subgroup?: string }} ScopeOption */
+/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "iconColor" | "group"> & { subgroup?: string }} ScopeOption */
 
 const ROW = 28,
   PADDING = 5,
@@ -43,10 +42,7 @@ const ROW = 28,
   ICON_GAP = 6,
   CHECK_GAP = 9,
   HEADING_TEXT_SIZE = 11,
-  SUBHEADING_TEXT_SIZE = 11,
-  SUBHEADING_LINE_PX = 14,
-  SUBHEADING_ICON_PX = 12,
-  SUBHEADING_ICON_GAP = 5;
+  SUBHEADING_TEXT_SIZE = 11;
 // The text has no letter-spacing style, so a hair space between letters spaces the capitals.
 export const HAIR_SPACE = String.fromCodePoint(0x200a);
 /** @param {string} heading */
@@ -55,10 +51,9 @@ const spacedCapitals = (heading) => [...heading.toUpperCase()].join(HAIR_SPACE);
 /**
  * @param {string} path
  * @param {import("gpui-kit").Color} color An SVG's color.
- * @param {number} [size]
  */
-const optionIcon = (path, color, size = ICON_PX) =>
-  path.endsWith(".svg") ? svg(path).flex_none().size(size).text_color(color) : image(path).flex_none().size(size);
+const optionIcon = (path, color) =>
+  path.endsWith(".svg") ? svg(path).flex_none().size(ICON_PX).text_color(color) : image(path).flex_none().size(ICON_PX);
 
 /** @type {Record<string, MenuOption[]>} */
 const OPTIONS = {
@@ -146,20 +141,9 @@ function optionList(options, isChecked, onPick) {
                   .flex_none()
                   .flex()
                   .items_end()
-                  .gap(SUBHEADING_ICON_GAP)
                   .pb(4)
                   .text_size(SUBHEADING_TEXT_SIZE)
                   .text_color(t.dim)
-                  .when(Boolean(option.subheadingIcon), (e) =>
-                    e.child(
-                      div()
-                        .flex_none()
-                        .h(SUBHEADING_LINE_PX)
-                        .flex()
-                        .items_center()
-                        .child(optionIcon(/** @type {string} */ (option.subheadingIcon), t.dim, SUBHEADING_ICON_PX)),
-                    ),
-                  )
                   .child(option.subheading)
               : h_flex()
                   .id(`option-${option.value}`)
@@ -216,7 +200,7 @@ function scopeOptions(scopes) {
     const startsSubgroup = scope.subgroup && (startsGroup || scope.subgroup !== previous?.subgroup);
     return [
       ...(startsGroup ? [{ heading: scope.group }] : []),
-      ...(startsSubgroup ? [{ subheading: scope.subgroup, subheadingIcon: scope.subgroupIcon }] : []),
+      ...(startsSubgroup ? [{ subheading: scope.subgroup }] : []),
       { value: scope.id, label: scope.label, icon: scope.icon, iconColor: scope.iconColor },
     ];
   });
@@ -238,14 +222,13 @@ const menuHeight = (options) =>
  * @param {string} [store]
  */
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
-  const listed = scopes.map(({ id, label, icon, iconColor, group, subgroup, subgroupIcon }) => ({
+  const listed = scopes.map(({ id, label, icon, iconColor, group, subgroup }) => ({
     id,
     label,
     icon,
     iconColor,
     group,
     subgroup,
-    subgroupIcon,
   }));
   openOverlay({
     mod: "issues",

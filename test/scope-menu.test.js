@@ -89,33 +89,13 @@ test("a project's icon is tinted with its Linear color, or the theme's foregroun
   assert.equal(callArg(iconOf(byId(menu, "option-mine")), "text_color"), THEME.foreground);
 });
 
-test("each project status subheading shows its status's icon before its dimmed text", (t) => {
+test("each project status subheading shows only its dimmed text", (t) => {
   const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
-  const subheadings = ["started", "planned", "paused", "backlog"].map((status) => byId(menu, `subheading-${status}`));
-  assert.deepEqual(
-    subheadings.map((subheading) => callArg(iconOf(subheading), "path")),
-    [
-      "mods/issues/icons/in-progress.png",
-      "mods/issues/icons/todo.png",
-      "mods/issues/icons/blocked.png",
-      "mods/issues/icons/backlog.png",
-    ],
-  );
-  for (const subheading of subheadings) {
-    assert.equal(iconOf(subheading.kids[0]), iconOf(subheading));
-    assert.ok(callArg(iconOf(subheading), "size") < callArg(iconOf(byId(menu, "option-mine")), "size"));
+  for (const status of ["started", "planned", "paused", "backlog"]) {
+    const subheading = byId(menu, `subheading-${status}`);
+    assert.equal(iconOf(subheading), undefined);
+    assert.deepEqual(texts(subheading), [status]);
   }
-});
-
-test("subheadings without an icon show only their text", (t) => {
-  const scopes = [
-    { id: "a", label: "A", subgroup: "Plain" },
-    { id: "b", label: "B" },
-  ];
-  const { menu } = openAndRender(t, () => openScopeMenu(scopes, "a", "repo"));
-  const subheading = byId(menu, "subheading-Plain");
-  assert.equal(iconOf(subheading), undefined);
-  assert.deepEqual(texts(subheading), ["Plain"]);
 });
 
 test("the team's views line their text up with the options that have icons", (t) => {
