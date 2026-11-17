@@ -1,12 +1,13 @@
-// The footer the panel shows while its checkout has an update to offer, with Update and a dismiss control, or,
-// once an update finishes, the note that it did. update.js decides when there is an update and runs it.
-import { div } from "gpui-kit";
+// The footer the panel shows while its checkout has an update to offer, one line of a notice icon, the offer and
+// a link that starts the update, beside a dismiss control, or, once an update finishes, the note that it did.
+// update.js decides when there is an update and runs it.
+import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
-import { button } from "./detail.js";
 
 /** @import { Context } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
 
+const FOOTER_TEXT_PX = 11;
 const UPDATED_NOTE = "Updated. New Claude Code sessions pick up the plugin's update.";
 
 /**
@@ -40,15 +41,31 @@ export function updateFooter(t, { updateAvailable, onUpdate, onDismissUpdate, on
     .items_center()
     .border_t(1)
     .border_color(t.border)
-    .text_size(11)
+    .text_size(FOOTER_TEXT_PX)
     .text_color(t.dim);
   if (!updateAvailable) {
     return row
       .child(div().flex_1().min_w(0).truncate().child(UPDATED_NOTE))
       .child(dismiss("issues-updated-dismiss", onDismissUpdated));
   }
+  const updateLink = div()
+    .id("issues-update")
+    .flex_none()
+    .text_color(t.accent)
+    .cursor_pointer()
+    .hover((s) => s.underline())
+    .on_click((_e, cx) => onUpdate(cx))
+    .child("Click here to update");
   return row
-    .child(div().flex_1().min_w(0).truncate().child("Update available"))
-    .child(button("issues-update", "Update", onUpdate, t, { primary: true }).h(22).px(8).text_size(11))
+    .child(svg("mods/issues/icons/info.svg").flex_none().size(FOOTER_TEXT_PX).text_color(t.dim))
+    .child(
+      h_flex()
+        .flex_1()
+        .min_w(0)
+        .gap(4)
+        .items_center()
+        .child(div().flex_none().child("New version available."))
+        .child(updateLink),
+    )
     .child(dismiss("issues-update-dismiss", onDismissUpdate));
 }

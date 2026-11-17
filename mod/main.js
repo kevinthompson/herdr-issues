@@ -1279,7 +1279,7 @@ export default class Issues extends View {
       .child(div().min_w(0).truncate().child(status));
   }
 
-  // An available update, with Update and a dismiss control, or the note that an update finished.
+  // An available update, with a link that starts it and a dismiss control, or the note that an update finished.
   /** @param {Theme} t */
   updateFooter(t) {
     return updateFooter(t, {
