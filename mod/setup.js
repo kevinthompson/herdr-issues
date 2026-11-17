@@ -262,10 +262,9 @@ export function emptyListView(t) {
             .child(div().child("Run"))
             .child(codeChip("/issues:plan", t))
             .child(div().child("or"))
-            .child(codeChip("/issues:create", t))
-            .child(div().child("in Claude Code")),
+            .child(codeChip("/issues:create", t)),
         )
-        .child(div().whitespace_normal().text_center().child("to begin making issues.")),
+        .child(div().whitespace_normal().text_center().child("in Claude Code to begin making issues.")),
     },
     t,
   );
