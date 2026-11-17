@@ -3,13 +3,18 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
-import { callArg, walk } from "./support/gpui.js";
+import { byId, callArg, walk } from "./support/gpui.js";
 import { TrackerSetup } from "../mod/setup.js";
 import { settingRow } from "../mod/setting-row.js";
 
 const FOREGROUND = "#ffffff";
 const MUTED = "#888888";
-const theme = new Proxy({}, { get: (_, key) => ({ foreground: FOREGROUND, muted: MUTED })[key] ?? "#000000" });
+const ERROR = "#ff0000";
+const SOLID = "#0000ff";
+const theme = new Proxy(
+  {},
+  { get: (_, key) => ({ foreground: FOREGROUND, muted: MUTED, ansi1: ERROR, solid: SOLID })[key] ?? "#000000" },
+);
 const cx = {
   focus_handle: () => ({ focus() {}, is_focused: () => false }),
   notify() {},
@@ -27,6 +32,7 @@ function startedSetup() {
 
 // The element whose own children include `text`.
 const holding = (tree, text) => [...walk(tree)].find((node) => node.kids.includes(text));
+const parentOf = (tree, child) => [...walk(tree)].find((node) => node.kids.includes(child));
 const called = (node, name) => node.calls.some(([call]) => call === name);
 // The size an element's text is drawn at: its own, or the nearest one an ancestor sets.
 function sizeOf(tree, text) {
@@ -79,6 +85,22 @@ test("tracker and setting row labels are 16px semibold over 12px descriptions", 
   assert.equal(sizeOf(trackers, "Issues in the repository's GitHub repository, read and written with gh."), 12);
   assert.equal(sizeOf(row, "Empty uses the default."), 12);
   assert.equal(sizeOf(row, "After merging"), 12);
+});
+
+test("a problem's message is 14px semibold in the error color over a 12px muted fix, with a regular Check again", (t) => {
+  stubHerdr(t);
+  const setup = new TrackerSetup("/repo", () => {});
+  setup.showFailure({ message: "gh isn't logged in.", fix: "Run `gh auth login`." });
+  const page = render(setup);
+  const message = holding(page, "gh isn't logged in.");
+  const fix = holding(page, "Run `gh auth login`.");
+
+  assert.equal(sizeOf(page, "gh isn't logged in."), 14);
+  assert.ok(called(message, "font_semibold"));
+  assert.equal(callArg(message, "text_color") ?? callArg(parentOf(page, message), "text_color"), ERROR);
+  assert.equal(callArg(fix, "text_size"), 12);
+  assert.equal(callArg(fix, "text_color"), MUTED);
+  assert.notEqual(callArg(byId(page, "setup-failure-check"), "bg"), SOLID);
 });
 
 test("a review row draws the setting's name muted and its value semibold in the foreground, both 14px", (t) => {
