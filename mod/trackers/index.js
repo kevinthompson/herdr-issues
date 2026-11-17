@@ -41,7 +41,7 @@
 //          creatorAvatar (their image URL, or null; Beads has none),
 //          sla ({ breachesAt, mediumRiskAt, highRiskAt } ISO times, for Linear issues with an SLA),
 //          due (a YYYY-MM-DD date, or null: Linear's due date, or the due date of a GitHub issue's milestone),
-//          pullRequests ([{ url, title, repo, number, status, branch }] attached to Linear issues),
+//          pullRequests ([{ url, title, repo, number, status, branch, checksFailing }] attached to Linear issues),
 //          delegateId (the agent working it, or null, for Linear issues), delegate (its name, or null),
 //          delegateAvatar (an image URL, or null, for Linear issues) }
 // The Linear backend maps its workflow states onto STATUSES, its priorities onto the same scale, and
@@ -58,6 +58,7 @@
  * @property {number | null} number
  * @property {string} status
  * @property {string | null} branch
+ * @property {boolean | null} checksFailing Null when the tracker doesn't know, as Linear never does.
  * @property {string} [fullRepo]
  */
 

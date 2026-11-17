@@ -34,15 +34,19 @@ const issueNode = (
   assignees: { nodes: assignees.map((login) => ({ login, name: login, avatarUrl: null })) },
   blockedBy: { nodes: [] },
   closedByPullRequestsReferences: {
-    nodes: pullRequests.map((pullRequestState) => ({
-      number: 100,
-      title: "Fix",
-      url: `https://github.com/${REPO}/pull/100`,
-      state: pullRequestState,
-      isDraft: false,
-      headRefName: `${number}-fix`,
-      repository: { nameWithOwner: REPO },
-    })),
+    nodes: pullRequests.map((pullRequest) => {
+      const { state, checkState = null } = typeof pullRequest === "string" ? { state: pullRequest } : pullRequest;
+      return {
+        number: 100,
+        title: "Fix",
+        url: `https://github.com/${REPO}/pull/100`,
+        state,
+        isDraft: false,
+        headRefName: `${number}-fix`,
+        repository: { nameWithOwner: REPO },
+        commits: { nodes: [{ commit: { statusCheckRollup: checkState && { state: checkState } } }] },
+      };
+    }),
   },
 });
 
@@ -136,6 +140,21 @@ describe("GitHub tracker statuses", () => {
     const [issue] = await tracker.list();
     await tracker.update(issue, { status: "in-progress" });
     assert.deepEqual(restRequests, [`POST repos/${REPO}/issues/1/assignees`]);
+  });
+});
+
+describe("GitHub tracker pull request checks", () => {
+  test("report failing checks from the last commit's check rollup, or null without checks", async (t) => {
+    const { tracker } = await trackerWith(t, [
+      issueNode(1, { pullRequests: [{ state: "OPEN", checkState: "FAILURE" }] }),
+      issueNode(2, { pullRequests: [{ state: "OPEN", checkState: "ERROR" }] }),
+      issueNode(3, { pullRequests: [{ state: "OPEN", checkState: "PENDING" }] }),
+      issueNode(4, { pullRequests: [{ state: "OPEN", checkState: "SUCCESS" }] }),
+      issueNode(5, { pullRequests: ["OPEN"] }),
+    ]);
+    const checksOf = (issues) =>
+      Object.fromEntries(issues.map((issue) => [issue.id, issue.pullRequests[0].checksFailing]));
+    assert.deepEqual(checksOf(await tracker.list()), { "#1": true, "#2": true, "#3": false, "#4": false, "#5": null });
   });
 });
 

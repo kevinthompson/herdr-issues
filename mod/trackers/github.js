@@ -26,6 +26,7 @@ import { refuseUnknownLabels } from "./labels.js";
  * @property {boolean} isDraft
  * @property {string} headRefName
  * @property {{ nameWithOwner: string }} repository
+ * @property {{ nodes: { commit: { statusCheckRollup: { state: string } | null } }[] }} [commits]
  */
 
 /**
@@ -68,7 +69,8 @@ const ISSUE_FIELDS = `number title url createdAt updatedAt closedAt state stateR
   assignees(first: 10) { nodes { login name avatarUrl } }
   blockedBy(first: ${BLOCKERS}) { nodes { number state repository { nameWithOwner } } }
   closedByPullRequestsReferences(first: 10, includeClosedPrs: true) {
-    nodes { number title url state isDraft headRefName repository { nameWithOwner } } }`;
+    nodes { number title url state isDraft headRefName repository { nameWithOwner }
+      commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } }`;
 /**
  * @param {string} state
  * @param {string} orderBy
@@ -92,6 +94,15 @@ function pullRequestStatus({ state, isDraft }) {
   if (state === "MERGED") return "merged";
   if (state === "CLOSED") return "closed";
   return isDraft ? "draft" : "open";
+}
+
+/**
+ * Null when GitHub reports no checks on the pull request's last commit.
+ * @param {GitHubPullRequestNode} pullRequest
+ */
+function checksFailing({ commits }) {
+  const checkState = commits?.nodes[0]?.commit.statusCheckRollup?.state;
+  return checkState ? ["FAILURE", "ERROR"].includes(checkState) : null;
 }
 
 /**
@@ -144,6 +155,7 @@ function toIssue(node, repo) {
     number: pullRequest.number,
     status: pullRequestStatus(pullRequest),
     branch: pullRequest.headRefName,
+    checksFailing: checksFailing(pullRequest),
   }));
   const open = pullRequests.find(
     (pullRequest) => pullRequest.fullRepo === repo && ["open", "draft"].includes(pullRequest.status),

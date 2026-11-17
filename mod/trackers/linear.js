@@ -179,8 +179,9 @@ function statusOf(state) {
 /** @param {LinearState} state */
 const isFinished = (state) => ["done", "canceled"].includes(statusOf(state));
 
-// GitHub's pull requests attached to an issue: { url, title, repo, number, status, branch }, where status
-// is Linear's, such as "open", "draft", "inReview", "approved", "merged" or "closed".
+// GitHub's pull requests attached to an issue: { url, title, repo, number, status, branch, checksFailing },
+// where status is Linear's, such as "open", "draft", "inReview", "approved", "merged" or "closed". Linear's
+// attachment metadata carries no check state, so checksFailing is always null.
 /**
  * @param {LinearAttachments} attachments
  * @returns {PullRequest[]}
@@ -195,6 +196,7 @@ function pullRequestsOf(attachments) {
       number: metadata.number ?? null,
       status: metadata.draft && !["merged", "closed"].includes(metadata.status) ? "draft" : (metadata.status ?? "open"),
       branch: metadata.branch ?? null,
+      checksFailing: /** @type {boolean | null} */ (null),
     }));
 }
 
