@@ -159,6 +159,9 @@ const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 /** @type {Record<number, string>} */
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
 const PRIORITY_ICON_PX = 18;
+const PRIORITY_TO_PULL_REQUEST_GAP_PX = 6;
+const PULL_REQUEST_ICON_PX = 11;
+const PULL_REQUEST_ICON_TO_COUNT_GAP_PX = 3;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 /** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
@@ -234,10 +237,10 @@ const settingsButton = (onClick, t) =>
 const pullRequestBadge = (count, t) =>
   h_flex()
     .flex_none()
-    .gap(3)
+    .gap(PULL_REQUEST_ICON_TO_COUNT_GAP_PX)
     .items_center()
     .text_color(t.dim)
-    .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(11))
+    .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(PULL_REQUEST_ICON_PX))
     .child(div().child(String(count)));
 
 const STRIP_ICON_PX = 16;
@@ -1518,26 +1521,27 @@ export default class Issues extends View {
               .when(Boolean(due), (e) =>
                 e.child(div().whitespace_normal().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)),
               )
-              .when(issue.priority > 0, (e) =>
+              .when(issue.priority > 0 || pullRequestCount > 0, (e) =>
                 e.child(
                   h_flex()
-                    .gap(6)
+                    .gap(PRIORITY_TO_PULL_REQUEST_GAP_PX)
                     .items_center()
                     .child(
-                      div()
-                        .id(`priority-${issue.id}`)
-                        .flex_none()
-                        .tooltip(PRIORITIES[issue.priority])
-                        .child(
-                          svg(`mods/issues/icons/${PRIORITY_ICONS[issue.priority]}.svg`)
-                            .size(PRIORITY_ICON_PX)
-                            .text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim),
-                        ),
+                      issue.priority > 0
+                        ? div()
+                            .id(`priority-${issue.id}`)
+                            .flex_none()
+                            .tooltip(PRIORITIES[issue.priority])
+                            .child(
+                              svg(`mods/issues/icons/${PRIORITY_ICONS[issue.priority]}.svg`)
+                                .size(PRIORITY_ICON_PX)
+                                .text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim),
+                            )
+                        : div().flex_none().size(PRIORITY_ICON_PX),
                     )
                     .when(pullRequestCount > 0, (e) => e.child(pullRequestBadge(pullRequestCount, t))),
                 ),
-              )
-              .when(issue.priority <= 0 && pullRequestCount > 0, (e) => e.child(pullRequestBadge(pullRequestCount, t))),
+              ),
           )
           .child(
             v_flex()
