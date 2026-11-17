@@ -51,7 +51,7 @@ import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
 import { listedScopeName, headerTitleText, listsProject } from "./listed-scope.js";
 import { listFilters } from "./filters.js";
-import { filterRow } from "./filter-row.js";
+import { filterRow, ROW_PADDING_X_PX } from "./filter-row.js";
 import {
   groupIssues,
   groupCountText,
@@ -74,6 +74,7 @@ import {
   issueLinks,
   workButton,
   labelChips,
+  projectName,
   PROPERTY_TEXT_PX,
   button,
   COMPACT_BUTTON_WIDTH_PX,
@@ -97,7 +98,8 @@ import { isTextFile, openInEditor, prefetchEditor } from "./editor.js";
 import { avatarImage, AVATAR_PX } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
-import { DUE_COLORS, statusTints, rowHover } from "./colors.js";
+import { DUE_COLORS, rowHover, statusTints } from "./colors.js";
+import { card, CARD_RADIUS_PX } from "./section.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit, showFieldEdit, trackerFields } from "./edits.js";
 import { WorktreeDialog } from "./worktree-dialog.js";
 import { closeWorktreeSpace } from "./worktree-removal.js";
@@ -156,10 +158,11 @@ const PRIORITY_ICON_PX = 18;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 /** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
-// Wide enough for a five-digit ID such as CAL-12345 at the list's 11px.
-const ID_COLUMN_PX = 68;
-// Generous for any character of an ID at the list's 11px, so a short ID column never cuts an ID off.
-const ID_CHARACTER_PX = 7;
+// Wide enough for a five-digit ID such as CAL-12345 at the list's 11px, and the same in every repository so the
+// titles line up wherever the panel is. A longer ID is cut off.
+const ID_COLUMN_PX = 72;
+// An issue row's padding inside its group's card.
+const ROW_PADDING_PX = 14;
 // The row's work button, kept on rows without one so every title wraps at the same edge.
 const ACTION_COLUMN_PX = COMPACT_BUTTON_WIDTH_PX;
 /** @returns {string} */
@@ -238,6 +241,8 @@ const pullRequestBadge = (count, t) =>
 
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
+// The open and closed arrows differ in width, so a group's name would shift as it toggles without a fixed slot.
+const GROUP_ARROW_PX = 10;
 const GROUP_REFRESH_ICON_PX = 11,
   STRIP_REFRESH_ICON_PX = 10;
 const SYNC_SPIN_MS = 1000;
@@ -1484,43 +1489,31 @@ export default class Issues extends View {
     return isSectionOpen(this.scopeKey, group);
   }
 
-  // Room for SLA and priority under the ID when the tracker shows them, otherwise for the longest listed
-  // ID, and in either case for the longest due date.
-  /** @param {Group[]} groups */
-  idColumnWidth(groups) {
-    const listed = groups.flatMap((group) => group.issues);
-    /** @param {string[]} texts */
-    const widest = (texts) => Math.max(0, ...texts.map((text) => text.length)) * ID_CHARACTER_PX;
-    const dueWidth = widest(listed.map((issue) => dueStatus(issue)?.text ?? ""));
-    return Math.max(this.prioritized() ? ID_COLUMN_PX : widest(listed.map((issue) => issue.id)), dueWidth);
-  }
-
   prioritized() {
     return this.tracker?.prioritized !== false;
   }
 
   /**
    * @param {Issue} issue
-   * @param {number} idColumnWidth
    * @param {Theme} t
    */
-  row(issue, idColumnWidth, t) {
+  row(issue, t) {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues),
       sla = slaStatus(issue),
       due = dueStatus(issue),
       pullRequestCount = issue.pullRequests?.length ?? 0,
-      chips = labelChips(issue, t, { withProject: !listsProject(this.listedScope, issue.project) }).slice(0, 3);
+      project = listsProject(this.listedScope, issue.project) ? null : issue.project,
+      chips = labelChips(issue, t, { withProject: false }).slice(0, 3);
     const finishable = canFinishWork(issue),
       startable = canStartWork(issue, this.issues);
     const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
     return v_flex()
       .id(`issue-${issue.id}`)
       .flex_none()
-      .px(10)
-      .py(6)
+      .px(ROW_PADDING_PX)
+      .py(10)
       .gap(3)
-      .rounded(7)
       .cursor_pointer()
       .hover((s) => s.bg(/** @type {Color} */ (rowHover(t))))
       .on_mouse_up("left", (_e, cx) => {
@@ -1530,17 +1523,16 @@ export default class Issues extends View {
       })
       .child(
         h_flex()
-          .gap(8)
+          .gap(12)
           .items_start()
           .child(
             v_flex()
               .flex_none()
-              .min_w(idColumnWidth)
-              .when(this.prioritized(), (e) => e.w(idColumnWidth))
+              .w(ID_COLUMN_PX)
               .pt(1)
               .gap(3)
               .text_size(11)
-              .child(div().whitespace_nowrap().text_color(t.accent).child(issue.id))
+              .child(div().truncate().text_color(t.accent).child(issue.id))
               .when(Boolean(sla), (e) =>
                 e.child(
                   div()
@@ -1549,7 +1541,7 @@ export default class Issues extends View {
                 ),
               )
               .when(Boolean(due), (e) =>
-                e.child(div().whitespace_nowrap().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)),
+                e.child(div().whitespace_normal().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)),
               )
               .when(issue.priority > 0, (e) =>
                 e.child(
@@ -1578,6 +1570,13 @@ export default class Issues extends View {
               .min_w(0)
               .gap(3)
               .child(div().whitespace_normal().child(issue.title))
+              .when(Boolean(project), (e) =>
+                e.child(
+                  projectName(/** @type {import("./trackers/index.js").IssueProject} */ (project))
+                    .text_size(11)
+                    .text_color(t.dim),
+                ),
+              )
               .when(chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
                 e.child(
                   h_flex()
@@ -1720,30 +1719,49 @@ export default class Issues extends View {
     return svg("mods/issues/icons/rotate-cw.svg").flex_none().size(GROUP_REFRESH_ICON_PX).text_color(t.dim);
   }
 
-  // The group's header, and its first `shown` issues when it is expanded, then Show more for the rest.
+  // The group's heading, and when it is expanded, a card of its first `shown` issues, then Show more for the rest.
   /**
    * @param {Group} group
    * @param {number} shown
-   * @param {number} idColumnWidth
    * @param {Theme} t
    */
-  group(group, shown, idColumnWidth, t) {
+  group(group, shown, t) {
     const expanded = this.isExpanded(group),
       hidden = group.issues.length - shown;
     const icon = statusIcon(group.id);
-    const fill = /** @type {Color} */ (statusTints(group.id, t)?.fill ?? t.raised);
+    const rows = expanded ? group.issues.slice(0, shown).map((issue) => this.row(issue, t)) : [];
+    if (expanded && hidden > 0)
+      rows.push(
+        div()
+          .id(`show-more-${group.id}`)
+          .flex_none()
+          .px(ROW_PADDING_PX)
+          .py(8)
+          .cursor_pointer()
+          .text_size(12)
+          .text_color(t.accent)
+          .hover((s) => s.bg(/** @type {Color} */ (rowHover(t))))
+          .on_click((_e, cx) => {
+            this.rowLimit += ROW_LIMIT;
+            cx.notify();
+          })
+          .child(`Show ${hidden} more`),
+      );
+    const fill = /** @type {Color} */ (statusTints(group.id, t)?.fill ?? t.raised),
+      joined = rows.length > 0;
     return v_flex()
       .flex_none()
-      .gap(1)
       .child(
         h_flex()
           .id(`group-${group.id}`)
-          .mt(6)
           .px(10)
           .py(4)
           .gap(6)
           .items_center()
-          .rounded(6)
+          .border_1()
+          .border_color(t.border)
+          .when(joined, (e) => e.border_b(0).rounded_t(CARD_RADIUS_PX))
+          .when(!joined, (e) => e.rounded(CARD_RADIUS_PX))
           .cursor_pointer()
           .text_size(11)
           .bg(fill)
@@ -1751,6 +1769,10 @@ export default class Issues extends View {
           .on_click((_e, cx) => this.toggle(group, cx))
           .child(
             div()
+              .flex_none()
+              .w(GROUP_ARROW_PX)
+              .flex()
+              .justify_center()
               .opacity(0.7)
               .child(expanded ? "▾" : "▸"),
           )
@@ -1764,24 +1786,17 @@ export default class Issues extends View {
           .child(div().font_semibold().child(group.label))
           .child(this.groupCount(group, expanded, t)),
       )
-      .when(expanded, (e) => e.children(group.issues.slice(0, shown).map((issue) => this.row(issue, idColumnWidth, t))))
-      .when(expanded && hidden > 0, (e) =>
-        e.child(
-          div()
-            .id(`show-more-${group.id}`)
-            .flex_none()
-            .px(10)
-            .py(6)
-            .rounded(7)
-            .cursor_pointer()
-            .text_size(12)
-            .text_color(t.accent)
-            .hover((s) => s.bg(t.hover))
-            .on_click((_e, cx) => {
-              this.rowLimit += ROW_LIMIT;
-              cx.notify();
-            })
-            .child(`Show ${hidden} more`),
+      .when(joined, (e) =>
+        e.mb(14).child(
+          card(t)
+            .rounded_t(0)
+            .children(
+              rows.map((row, index) =>
+                row
+                  .when(index > 0, (e) => e.border_t(1).border_color(t.border))
+                  .when(index === rows.length - 1, (e) => e.rounded_b(CARD_RADIUS_PX - 1)),
+              ),
+            ),
         ),
       );
   }
@@ -1901,8 +1916,7 @@ export default class Issues extends View {
     const groups = this.groups(label),
       error = this.error ?? this.detailError,
       listsNoIssues = this.loaded && holdsNoIssues(groups);
-    const shown = this.shownCounts(groups),
-      idColumnWidth = this.idColumnWidth(groups);
+    const shown = this.shownCounts(groups);
     this.revealGroup(groups);
     return v_flex()
       .size_full()
@@ -1929,9 +1943,11 @@ export default class Issues extends View {
           .flex_1()
           .min_h(0)
           .overflow_y_scrollbar()
-          .p(6)
-          .gap(1)
-          .children(groups.map((group, index) => this.group(group, shown[index], idColumnWidth, t)))
+          .px(ROW_PADDING_X_PX)
+          .pt(16)
+          .pb(ROW_PADDING_X_PX)
+          .gap(6)
+          .children(groups.map((group, index) => this.group(group, shown[index], t)))
           .when(!this.loaded && !error, (e) => e.child(div().p(8).text_color(t.dim).child("Loading…")))
           .when(listsNoIssues && !error, (e) => e.child(emptyListView(t))),
       );
