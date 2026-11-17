@@ -100,9 +100,9 @@ test("rowHover halves a dark theme's hover", () => {
   assert.equal(rowHover({ ...graphite, hover: "#2c2e31" }), mixColors(graphite.surface, "#2c2e31", 0.5));
 });
 
-test("rowHover keeps a light theme's hover whole", () => {
-  assert.equal(rowHover(paper), paper.hover);
-  assert.equal(rowHover(win98), win98.hover);
+test("rowHover halves a light theme's hover", () => {
+  assert.equal(rowHover(paper), "#00000006");
+  assert.equal(rowHover(win98), mixColors(win98.surface, win98.hover, 0.5));
 });
 
 test("fieldBar is a shade lighter than a dark panel, and the theme's bar color in a light one", () => {

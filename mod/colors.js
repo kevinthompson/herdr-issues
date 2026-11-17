@@ -106,11 +106,10 @@ function lightTint(color, t, share, minStep) {
   );
 }
 
-// A list row's hover. A dark theme's is half as strong as the theme's: half as opaque when it's
-// translucent, otherwise halfway back to the panel's surface. A light theme's is already faint, so it stays whole.
+// A list row's hover, half as strong as the theme's: half as opaque when it's translucent, otherwise halfway
+// back to the panel's surface, so it stays lighter than a chosen option's selected color.
 /** @param {Theme} t */
 export function rowHover(t) {
-  if (isLightTheme(t)) return t.hover;
   const translucent = /^#([0-9a-f]{6})([0-9a-f]{2})$/i.exec(t.hover);
   if (translucent)
     return `#${translucent[1]}${Math.round(parseInt(translucent[2], 16) / 2)
