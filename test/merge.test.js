@@ -6,7 +6,14 @@ import { commitFile, createRepository, git, temporaryFolder } from "./support/re
 import { stubHerdr } from "./support/herdr.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
-import { canOfferMerge, checkMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "../mod/merge.js";
+import {
+  canOfferMerge,
+  checkMerge,
+  finishVerifiedMerge,
+  MergedWithProblems,
+  mergeIssue,
+  MergeRefusal,
+} from "../mod/merge.js";
 
 beforeEach(() => forgetLookups());
 
@@ -54,7 +61,11 @@ describe("mergeIssue", () => {
     const setup = setUp(t);
     const { repository, tracker, updates, counts, issue, project } = setup;
 
-    assert.deepEqual(await mergeIssue(issue, tracker, project), { mainBranch: "main", pushed: false });
+    assert.deepEqual(await mergeIssue(issue, tracker, project), {
+      mainBranch: "main",
+      pushed: false,
+      needsVerifying: false,
+    });
 
     assert.equal(git(repository, "log", "-1", "--format=%s"), "Merge branch 'feature'");
     assert.equal(git(repository, "rev-list", "--count", "--merges", "-1", "HEAD"), "1");
@@ -81,7 +92,23 @@ describe("mergeIssue", () => {
     assert.deepEqual(await mergeIssue(setup.issue, setup.tracker, setup.project), {
       mainBranch: "main",
       pushed: false,
+      needsVerifying: false,
     });
+  });
+
+  test("leaves the issue open when main moved on, so the merged tree needs verifying", async (t) => {
+    const { repository, tracker, updates, counts, issue, project } = setUp(t);
+    commitFile(repository, "other.txt", "from main\n");
+
+    assert.deepEqual(await mergeIssue(issue, tracker, project), {
+      mainBranch: "main",
+      pushed: false,
+      needsVerifying: true,
+    });
+
+    assert.equal(git(repository, "log", "-1", "--format=%s"), "Merge branch 'feature'");
+    assert.deepEqual(updates, []);
+    assert.equal(counts.announcements, 0);
   });
 
   test("refuses when the branch's worktree has uncommitted changes", async (t) => {
@@ -132,9 +159,27 @@ describe("mergeIssue with pushAfterMerge", () => {
   test("pushes main to its remote after the merge when it's true", async (t) => {
     const { repository, remote, tracker, issue, project } = setUpWithRemote(t, { pushAfterMerge: true });
 
-    assert.deepEqual(await mergeIssue(issue, tracker, project), { mainBranch: "main", pushed: true });
+    assert.deepEqual(await mergeIssue(issue, tracker, project), {
+      mainBranch: "main",
+      pushed: true,
+      needsVerifying: false,
+    });
 
     assert.equal(git(remote, "rev-parse", "main"), head(repository));
+  });
+
+  test("doesn't push main when the merged tree needs verifying", async (t) => {
+    const { repository, remote, tracker, issue, project } = setUpWithRemote(t, { pushAfterMerge: true });
+    commitFile(repository, "other.txt", "from main\n");
+    const before = git(remote, "rev-parse", "main");
+
+    assert.deepEqual(await mergeIssue(issue, tracker, project), {
+      mainBranch: "main",
+      pushed: false,
+      needsVerifying: true,
+    });
+
+    assert.equal(git(remote, "rev-parse", "main"), before);
   });
 
   for (const entry of [{ pushAfterMerge: false }, {}]) {
@@ -142,7 +187,11 @@ describe("mergeIssue with pushAfterMerge", () => {
       const { repository, remote, tracker, issue, project } = setUpWithRemote(t, entry);
       const before = git(remote, "rev-parse", "main");
 
-      assert.deepEqual(await mergeIssue(issue, tracker, project), { mainBranch: "main", pushed: false });
+      assert.deepEqual(await mergeIssue(issue, tracker, project), {
+        mainBranch: "main",
+        pushed: false,
+        needsVerifying: false,
+      });
 
       assert.notEqual(head(repository), before);
       assert.equal(git(remote, "rev-parse", "main"), before);
@@ -165,6 +214,46 @@ describe("mergeIssue with pushAfterMerge", () => {
 
     assert.equal(git(repository, "log", "-1", "--format=%s"), "Merge branch 'feature'");
     assert.deepEqual(updates, [{ id: "#7", status: "done" }]);
+  });
+
+  test("finishVerifiedMerge marks the issue done and pushes main once main is verified", async (t) => {
+    const { repository, remote, tracker, updates, counts, issue, project } = setUpWithRemote(t, {
+      pushAfterMerge: true,
+    });
+    commitFile(repository, "other.txt", "from main\n");
+    await mergeIssue(issue, tracker, project);
+
+    assert.deepEqual(await finishVerifiedMerge(issue, tracker, project), { mainBranch: "main", pushed: true });
+
+    assert.deepEqual(updates, [{ id: "#7", status: "done" }]);
+    assert.equal(counts.announcements, 1);
+    assert.equal(git(remote, "rev-parse", "main"), head(repository));
+  });
+});
+
+describe("finishVerifiedMerge", () => {
+  test("marks the issue done without pushing when pushAfterMerge is off", async (t) => {
+    const { repository, tracker, updates, issue, project } = setUp(t);
+    git(repository, "merge", "-q", "--no-ff", "-m", "merged already", "feature");
+
+    assert.deepEqual(await finishVerifiedMerge(issue, tracker, project), { mainBranch: "main", pushed: false });
+
+    assert.deepEqual(updates, [{ id: "#7", status: "done" }]);
+  });
+
+  test("refuses, changing nothing, when the branch isn't merged into main", async (t) => {
+    const { repository, tracker, updates, counts, issue, project } = setUp(t);
+    const before = head(repository);
+
+    await assert.rejects(finishVerifiedMerge(issue, tracker, project), (error) => {
+      assert.ok(error instanceof MergeRefusal, error.message);
+      assert.equal(error.message, "feature isn't merged into main yet: merge it first.");
+      return true;
+    });
+
+    assert.equal(head(repository), before);
+    assert.deepEqual(updates, []);
+    assert.equal(counts.announcements, 0);
   });
 });
 

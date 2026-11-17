@@ -7,5 +7,5 @@ Read this beside `SKILL.md` when the tracker is `beads`. A Beads ID looks like `
 - **Comments**: read them with `bd -C <main checkout> comments <id> --json`; in the first batch, `issues auth beads && bd -C "$(git worktree list --porcelain | sed -n '1s/^worktree //p')" comments <id> --json`. Post one with `bd -C <main checkout> comment <id> --stdin <<'EOF'`, the comment on standard input in the quoted heredoc rather than in a scratchpad file.
 - **Pull request**: like a Linear issue, read the current branch's pull request in the first batch with `gh pr view --json number,state,url,isDraft,reviewDecision,headRefName` and `gh pr checks`, which fail harmlessly when it has none.
 - **Review**: an issue waiting on review or on its pull request stays `in_progress`.
-- **Done**: once its branch is merged into main, mark it done yourself with `issues status <issue ID> done` unless `issues merge` already did; a merged pull request doesn't close it.
+- **Done**: once its branch is merged into main, mark it done yourself with `issues status <issue ID> done` unless `issues merge` or `issues merge --verified` already did; a merged pull request doesn't close it.
 - **Canceling**: Beads has no canceled status; close it with a reason, `bd -C <main checkout> close <id> --reason "<why>"`.

@@ -1357,7 +1357,8 @@ export default class Issues extends View {
   }
 
   // Merges the issue's branch into main and marks it done, through the same module as `issues merge`, then removes
-  // its worktree and closes the space showing it, through the removal dialog only when a check fails.
+  // its worktree and closes the space showing it, through the removal dialog only when a check fails. When main moved
+  // on and needs verifying, it keeps the issue open and the space, whose waiting session verifies main and finishes.
   /**
    * @param {Issue} issue
    * @param {Context} cx
@@ -1369,9 +1370,14 @@ export default class Issues extends View {
     this.showOpening(issue, `Merging ${issue.branch} into main…`, cx, { merging: true });
     cx.spawn(async (cx) => {
       try {
-        await mergeIssue(issue, tracker, project);
+        const { needsVerifying } = await mergeIssue(issue, tracker, project);
         const space = worktreeSpace(this.repository, issue.branch);
-        if (space)
+        if (needsVerifying)
+          notify({
+            title: `Merged ${issue.branch}; main needs verifying`,
+            body: `main moved on since the branch was tested, so ${issue.id} stays open until its session verifies main.`,
+          });
+        else if (space)
           closeWorktreeSpace(space.id, { sleep: (ms) => cx.sleep(ms) }).catch((error) =>
             notify({ title: "Could not remove the worktree", body: String(error) }),
           );
