@@ -117,6 +117,7 @@ import { Openings } from "./openings.js";
 import { canOfferMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 import { idColumnWidth } from "./id-column.js";
+import { groupSpacing } from "./group-spacing.js";
 
 /** @import { Context, AsyncContext, Color } from "gpui-kit" */
 /** @import { Issue, Tracker, Project } from "./trackers/index.js" */
@@ -1764,9 +1765,10 @@ export default class Issues extends View {
    * @param {Group} group
    * @param {number} shown
    * @param {number} idColumnPx
+   * @param {{ above: number, below: number }} spacing
    * @param {Theme} t
    */
-  group(group, shown, idColumnPx, t) {
+  group(group, shown, idColumnPx, spacing, t) {
     const expanded = this.isExpanded(group),
       hidden = group.issues.length - shown;
     const icon = statusIcon(group.id);
@@ -1792,6 +1794,8 @@ export default class Issues extends View {
       joined = rows.length > 0;
     return v_flex()
       .flex_none()
+      .mt(spacing.above)
+      .mb(spacing.below)
       .child(
         h_flex()
           .id(`group-${group.id}`)
@@ -1828,7 +1832,7 @@ export default class Issues extends View {
           .child(this.groupCount(group, expanded, t)),
       )
       .when(joined, (e) =>
-        e.mb(14).child(
+        e.child(
           card(t)
             .rounded_t(0)
             .children(
@@ -1958,6 +1962,7 @@ export default class Issues extends View {
       error = this.error ?? this.detailError,
       listsNoIssues = this.loaded && holdsNoIssues(groups);
     const shown = this.shownCounts(groups);
+    const spacing = groupSpacing(groups.map((group) => this.isExpanded(group) && group.issues.length > 0));
     const idColumnPx = idColumnWidth(
       groups.flatMap((group, index) =>
         this.isExpanded(group) ? group.issues.slice(0, shown[index]).map((issue) => issue.id) : [],
@@ -1993,7 +1998,7 @@ export default class Issues extends View {
           .pt(16)
           .pb(ROW_PADDING_X_PX)
           .gap(6)
-          .children(groups.map((group, index) => this.group(group, shown[index], idColumnPx, t)))
+          .children(groups.map((group, index) => this.group(group, shown[index], idColumnPx, spacing[index], t)))
           .when(!this.loaded && !error, (e) => e.child(div().p(8).text_color(t.dim).child("Loading…")))
           .when(listsNoIssues && !error, (e) => e.child(emptyListView(t))),
       );
