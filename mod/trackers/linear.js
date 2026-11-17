@@ -10,6 +10,7 @@ import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
 import { STATUSES, STATUS_LABELS as ISSUE_STATUS_LABELS, priorityRank, statusIcon } from "../issue.js";
 import { refuseUnknownLabels } from "./labels.js";
+import { projectIcon } from "./linear-project-icons.js";
 import {
   KEYCHAIN,
   linearKeyMissing,
@@ -69,6 +70,8 @@ import {
  * @property {string} name
  * @property {string} url
  * @property {number} [priority]
+ * @property {string | null} [icon]
+ * @property {`#${string}` | null} [color]
  * @property {{ name: string, type: string }} [status]
  * @property {{ nodes: { id: string, name: string, sortOrder: number }[] }} projectMilestones
  */
@@ -136,7 +139,7 @@ const FILTERED_ISSUES_IN_STATE = `query($filter: IssueFilter!, $state: WorkflowS
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { and: [$filter, { state: $state }] }) { ${PAGE} } }`;
 const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
   projects(first: 50, filter: { status: { type: { nin: ["completed", "canceled"] } } }) { nodes {
-    id name url priority status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
+    id name url priority icon color status { name type } projectMilestones(first: 50) { nodes { id name sortOrder } } } } } }`;
 
 const ISSUE = `query($id: String!) { issue(id: $id) { ${ISSUE_FIELDS} description
   comments(first: ${COMMENTS}, orderBy: createdAt) { nodes { user { name avatarUrl } botActor { name avatarUrl } createdAt body } } } }`;
@@ -349,7 +352,7 @@ const PROJECT_STATUS_ICONS = {
 /** @param {LinearProject} project */
 const projectStatusIcon = (project) => statusIcon(PROJECT_STATUS_ICONS[project.status?.type] ?? "");
 
-// The issue lists a repository can show: { id, label, team?, group?, subgroup?, subgroupIcon?, milestones? }, its default
+// The issue lists a repository can show: { id, label, icon?, iconColor?, team?, group?, subgroup?, subgroupIcon?, milestones? }, its default
 // first. My issues stands alone, then the team's lists and saved views under the team's name, then its
 // projects, grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
 /**
@@ -370,7 +373,8 @@ export function scopesFor({ views }, { name: teamName, projects }) {
   const projectScopes = byStatusAndPriority.map((project) => ({
     id: `project:${project.id}`,
     label: project.name,
-    icon: projectStatusIcon(project),
+    icon: projectIcon(project.icon),
+    iconColor: project.color ?? undefined,
     team: teamName,
     group: `${teamName} Projects`,
     subgroup: project.status?.name,
