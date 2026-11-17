@@ -1,4 +1,5 @@
 import { spaces, panes, focused, exec } from "herdr";
+import { readdir } from "fs/promises";
 import { cachedLookup } from "./lookups.js";
 /** @import { ExecResult } from "herdr" */
 
@@ -13,10 +14,23 @@ export function location() {
   return { cwd: pane?.cwd || f?.cwd || space?.folder || null, on };
 }
 
-// A folder's repository and a checkout's main checkout don't change, so each is looked up once. A folder found
-// outside a repository is asked again, since it may become one.
+// A folder's repository and a checkout's main checkout don't change while the repository is there, so each is
+// looked up once and kept until its folder's .git is gone. A folder found outside a repository is asked again,
+// since it may become one. A folder on another machine can't be checked here, so its answer is kept.
 const cachedRoot = cachedLookup(/** @param {string | null} root */ (root) => root !== null);
 const cachedMainCheckout = cachedLookup(/** @param {string | null} main */ (main) => main !== null);
+
+// Whether `folder` on this computer still holds a repository's .git, a directory in a main checkout and a file
+// in a linked worktree.
+/** @param {string | null} folder */
+export async function isRepositoryFolder(folder) {
+  if (folder === null) return false;
+  const names = await readdir(folder).catch(/** @returns {string[]} */ () => []);
+  return names.includes(".git");
+}
+
+/** @param {string | null | undefined} on */
+const stillThere = (on) => (on == null ? isRepositoryFolder : undefined);
 
 // Makes `folder` on this computer a git repository, throwing git's last error line when it can't.
 /** @param {string} folder */
@@ -30,22 +44,30 @@ export async function initializeRepository(folder) {
 // The git repository's top folder, or null outside a repository.
 /** @param {{ cwd: string, on?: string | null }} where */
 export function repositoryRoot({ cwd, on }) {
-  return cachedRoot(`${on}\n${cwd}`, async () => {
-    const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(
-      /** @returns {ExecResult | null} */ () => null,
-    );
-    return top?.code === 0 ? top.stdout.trim() : null;
-  });
+  return cachedRoot(
+    `${on}\n${cwd}`,
+    async () => {
+      const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on }).catch(
+        /** @returns {ExecResult | null} */ () => null,
+      );
+      return top?.code === 0 ? top.stdout.trim() : null;
+    },
+    stillThere(on),
+  );
 }
 
 // The repository's main checkout: the first `git worktree list` entry, which a linked worktree is not.
 /** @param {string} projectRoot @param {string | null} [on] */
 export async function mainCheckout(projectRoot, on) {
-  const main = await cachedMainCheckout(`${on}\n${projectRoot}`, async () => {
-    const listing = await exec("git", ["worktree", "list", "--porcelain"], { cwd: projectRoot, on }).catch(
-      /** @returns {ExecResult | null} */ () => null,
-    );
-    return (listing?.code === 0 && /^worktree (.*)$/m.exec(listing.stdout)?.[1]) || null;
-  });
+  const main = await cachedMainCheckout(
+    `${on}\n${projectRoot}`,
+    async () => {
+      const listing = await exec("git", ["worktree", "list", "--porcelain"], { cwd: projectRoot, on }).catch(
+        /** @returns {ExecResult | null} */ () => null,
+      );
+      return (listing?.code === 0 && /^worktree (.*)$/m.exec(listing.stdout)?.[1]) || null;
+    },
+    stillThere(on),
+  );
   return main ?? projectRoot;
 }

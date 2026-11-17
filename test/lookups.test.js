@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { beforeEach, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
@@ -96,4 +96,27 @@ test("saving the setup view's choices forgets the issues.json it read", async (t
 
   await saveSetupChoices(repository, { tracker: "github", repo: "owner/name" });
   assert.equal((await trackerSetting(project)).repo, "owner/name");
+});
+
+test("a repository whose .git is removed is looked up again and found gone", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  const where = { cwd: repository, on: null };
+  assert.equal(await repositoryRoot(where), repository);
+  assert.equal(await mainCheckout(repository, null), repository);
+
+  rmSync(join(repository, ".git"), { recursive: true, force: true });
+
+  assert.equal(await repositoryRoot(where), null);
+});
+
+test("a worktree whose main checkout's .git is removed no longer answers that main checkout", async (t) => {
+  const folder = temporaryFolder(t);
+  const repository = createRepository(folder);
+  const worktree = join(folder, "worktree");
+  git(repository, "worktree", "add", "-q", "-b", "feature", worktree);
+  assert.equal(await mainCheckout(worktree, null), repository);
+
+  rmSync(join(repository, ".git"), { recursive: true, force: true });
+
+  assert.equal(await mainCheckout(worktree, null), worktree);
 });
