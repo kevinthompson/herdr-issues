@@ -18,6 +18,7 @@ import { card, section, sectionHeading, SECTION_INSET_PX } from "./section.js";
 import { actionButton, textActionButton, ACTION_GAP_PX } from "./action-button.js";
 import { SPIN_MS } from "./action-button-state.js";
 import { AVATAR_PX } from "./avatars.js";
+import { PULL_REQUEST_STATUSES } from "./pull-request-status.js";
 
 /** @import { Context, Color, NativeElement } from "gpui-kit" */
 /** @import { EditorState } from "gpui-base" */
@@ -368,16 +369,6 @@ function properties(view, t) {
       ),
     );
 }
-
-/** @type {Record<string, [string, string]>} */
-const PULL_REQUEST_STATUSES = {
-  draft: ["Draft", "dim"],
-  open: ["Open", "ansi2"],
-  inReview: ["In review", "ansi2"],
-  approved: ["Approved", "ansi2"],
-  merged: ["Merged", "ansi5"],
-  closed: ["Closed", "ansi1"],
-};
 
 /**
  * A pull request's status, then its number and title, which open it in the browser when clicked.
