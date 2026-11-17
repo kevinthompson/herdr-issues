@@ -218,8 +218,16 @@ const ghIn = (root) => async (/** @type {string[]} */ args) => {
 
 // Throws the problem that stops the GitHub CLI from answering as the person: not installed, or not logged in.
 export async function checkGitHubLogin() {
+  await checkGhInstalled();
+  await checkGhLoggedIn();
+}
+
+export async function checkGhInstalled() {
   const installed = await exec("gh", ["--version"]).catch(noResult);
   if (installed?.code !== 0) throw await ghMissing();
+}
+
+export async function checkGhLoggedIn() {
   const auth = await exec("gh", ["auth", "status", "--hostname", "github.com"]).catch(noResult);
   if (auth?.code !== 0) throw ghLoggedOut();
 }
