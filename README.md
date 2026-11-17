@@ -1,6 +1,6 @@
 # Herdr Issues
 
-![A demo of the Issues panel in the Herdr app](docs/screenshots/demo.gif)
+https://github.com/user-attachments/assets/f4b5b476-f7ec-4f8a-888d-986df11839e8
 
 ## What it is
 
