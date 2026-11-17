@@ -1,10 +1,10 @@
 // The panel's view for a repository whose issues it can't list. With no tracker, it shows a blank state whose
-// Set Up Issues button walks through one question per page, with Back at the top left and the step and Cancel,
+// Set Up Issues button walks through its steps a page each, with Back at the top left and the step and Cancel,
 // which drops the answers and returns to the blank state, at the top right, as an open issue's view has its way
-// back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; whether
-// a session asks for approval of its work; how the branch then gets into main; for a pull request, whether the
-// session waits for its checks, and for a merge, whether main is pushed afterwards, each asked with the settings
-// view's dropdown (select.js) and a Next button; and a review of the choices, which points to the gear's settings
+// back: the tracker, GitHub Issues, Linear or Beads, which it checks (tracker-choice.js); Linear's team; on one
+// page, whether a session asks for approval of its work, how the branch then gets into main and, for a pull
+// request, whether the session waits for its checks, or for a merge, whether main is pushed afterwards, each
+// asked with the settings view's dropdown (select.js), then a Next button; and a review of the choices, which points to the gear's settings
 // (settings.js) for the rest. Only Save on the review writes the repository's entry in issues.json (setting.js),
 // and the panel lists the issues. Approval proposes the repository's current or default settings. A configured
 // tracker that fails to load with a SetupProblem (trackers/problems.js) shows the problem and its fix, with Check
@@ -274,21 +274,25 @@ export class TrackerSetup {
     if (!failure) this.choosingAnother = false;
   }
 
-  // The steps for the answers so far; before onApproval is chosen, the proposed choice decides whether waiting
-  // for checks or pushing after merging is asked.
   /**
    * @returns {string[]}
    */
   steps() {
-    const onApproval = this.answers.onApproval ?? this.proposed?.onApproval ?? "pull-request";
+    return ["tracker", ...(this.tracker.choice === "linear" ? ["team"] : []), "approval", "review"];
+  }
+
+  // The approval questions the approval step asks: onApproval's current value decides whether waiting for checks
+  // or pushing after merging follows it.
+  /**
+   * @returns {ApprovalKey[]}
+   */
+  approvalKeys() {
+    const onApproval = this.approvalValue("onApproval");
     return [
-      "tracker",
-      ...(this.tracker.choice === "linear" ? ["team"] : []),
       "approval",
       "onApproval",
-      ...(onApproval === "pull-request" ? ["waitForChecks"] : []),
-      ...(onApproval === "merge" ? ["pushAfterMerge"] : []),
-      "review",
+      ...(onApproval === "pull-request" ? /** @type {ApprovalKey[]} */ (["waitForChecks"]) : []),
+      ...(onApproval === "merge" ? /** @type {ApprovalKey[]} */ (["pushAfterMerge"]) : []),
     ];
   }
 
@@ -377,7 +381,7 @@ export class TrackerSetup {
     return this.answers[key] ?? this.proposed?.[key] ?? APPROVAL_QUESTIONS[key].choices[0].id;
   }
 
-  // Answers an approval question without leaving the step, so the step count follows onApproval.
+  // Answers an approval question without leaving the step, so the questions shown follow onApproval.
   /**
    * @param {ApprovalKey} key
    * @param {string} id
@@ -388,15 +392,14 @@ export class TrackerSetup {
     cx.notify();
   }
 
-  // Records the select's value for an approval question, and goes on to the next step.
+  // Records the shown approval questions' values, dropping an answer to a question no longer shown, and goes on
+  // to the review.
   /**
-   * @param {ApprovalKey} key
    * @param {Context} cx
    */
-  nextApproval(key, cx) {
-    this.answers = { ...this.answers, [key]: this.approvalValue(key) };
-    const steps = this.steps();
-    this.goTo(steps[steps.indexOf(key) + 1], cx);
+  nextApproval(cx) {
+    this.answers = Object.fromEntries(this.approvalKeys().map((key) => [key, this.approvalValue(key)]));
+    this.goTo("review", cx);
   }
 
   /**
@@ -484,15 +487,17 @@ export class TrackerSetup {
           ),
         );
     }
-    const page = /** @type {Record<string, ((content: NativeElement, t: Theme) => NativeElement) | undefined>} */ ({
+    const page = /** @type {Record<string, (content: NativeElement, t: Theme) => NativeElement>} */ ({
       tracker: this.trackerPage,
       team: this.teamPage,
+      approval: this.approvalPage,
       review: this.reviewPage,
     })[this.step];
-    const shown = page
-      ? page.call(this, content, t)
-      : this.approvalPage(/** @type {ApprovalKey} */ (this.step), content, t);
-    return v_flex().size_full().min_h(0).child(this.stepBar(t)).child(shown);
+    return v_flex()
+      .size_full()
+      .min_h(0)
+      .child(this.stepBar(t))
+      .child(page.call(this, content, t));
   }
 
   // The panel's header, then a row with the way back at the left and where the step falls beside it.
@@ -637,23 +642,32 @@ export class TrackerSetup {
       );
   }
 
-  // The page for an approval question: its select, the chosen option's detail, and Next.
+  // The approval questions, each with its select and the chosen option's detail, then one Next.
   /**
-   * @param {ApprovalKey} key
    * @param {NativeElement} content
    * @param {Theme} t
    */
-  approvalPage(key, content, t) {
+  approvalPage(content, t) {
+    return content
+      .gap(20)
+      .children(this.approvalKeys().map((key) => this.approvalQuestion(key, t)))
+      .child(
+        h_flex().child(button("setup-approval-next", "Next", (cx) => this.nextApproval(cx), t, { primary: true })),
+      );
+  }
+
+  /**
+   * @param {ApprovalKey} key
+   * @param {Theme} t
+   */
+  approvalQuestion(key, t) {
     const { title, sentence, choices } = APPROVAL_QUESTIONS[key];
     const select = /** @type {Record<ApprovalKey, SelectMenu>} */ (this.selects)[key];
     const value = this.approvalValue(key);
     const detail = choices.find(({ id }) => id === value)?.detail ?? "";
-    return this.question(content, title, sentence, t)
+    return this.question(v_flex().flex_none().gap(12), title, sentence, t)
       .child(select.render(t, { options: choices, value, onChoose: (id, cx) => this.chooseApproval(key, id, cx) }))
-      .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail))
-      .child(
-        h_flex().child(button(`setup-${key}-next`, "Next", (cx) => this.nextApproval(key, cx), t, { primary: true })),
-      );
+      .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(detail));
   }
 
   /**
