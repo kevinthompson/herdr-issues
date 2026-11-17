@@ -3,11 +3,12 @@
 // update.js decides when there is an update and runs it.
 import { div, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
+import { HEADER_TEXT_PX } from "./header.js";
 
 /** @import { Context } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
 
-const FOOTER_TEXT_PX = 11;
+const UPDATED_NOTE_TEXT_PX = 11;
 const UPDATED_NOTE = "Updated. New Claude Code sessions pick up the plugin's update.";
 
 /**
@@ -41,10 +42,10 @@ export function updateFooter(t, { updateAvailable, onUpdate, onDismissUpdate, on
     .items_center()
     .border_t(1)
     .border_color(t.border)
-    .text_size(FOOTER_TEXT_PX)
     .text_color(t.dim);
   if (!updateAvailable) {
     return row
+      .text_size(UPDATED_NOTE_TEXT_PX)
       .child(div().flex_1().min_w(0).truncate().child(UPDATED_NOTE))
       .child(dismiss("issues-updated-dismiss", onDismissUpdated));
   }
@@ -57,7 +58,8 @@ export function updateFooter(t, { updateAvailable, onUpdate, onDismissUpdate, on
     .on_click((_e, cx) => onUpdate(cx))
     .child("Click here to update");
   return row
-    .child(svg("mods/issues/icons/info.svg").flex_none().size(FOOTER_TEXT_PX).text_color(t.dim))
+    .text_size(HEADER_TEXT_PX)
+    .child(svg("mods/issues/icons/info.svg").flex_none().size(HEADER_TEXT_PX).text_color(t.dim))
     .child(
       h_flex()
         .flex_1()

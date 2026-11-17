@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { byId, callArg, texts, walk } from "./support/gpui.js";
 import { updateFooter } from "../mod/update-footer.js";
+import { HEADER_TEXT_PX } from "../mod/header.js";
 
 const theme = { accent: "#3355ff", dim: "#888888", border: "#333333", hover: "#444444" };
 const offer = (handlers = {}) =>
@@ -42,11 +43,15 @@ test("styles the link like the panel's other links", () => {
   assert.equal(hovered.underlined, true);
 });
 
-test("puts a notice icon in the footer's text color before the text", () => {
+test("sets the offer at the header's text size so it stands out", () => {
+  assert.equal(callArg(offer(), "text_size"), HEADER_TEXT_PX);
+});
+
+test("puts a notice icon at the offer's text size and in its color before the text", () => {
   const nodes = [...walk(offer())];
   const icon = nodes.find((node) => node.tag === "svg");
   assert.equal(callArg(icon, "path"), "mods/issues/icons/info.svg");
-  assert.equal(callArg(icon, "size"), 11);
+  assert.equal(callArg(icon, "size"), HEADER_TEXT_PX);
   assert.equal(callArg(icon, "text_color"), theme.dim);
   const firstText = nodes.findIndex((node) => node.kids.includes("New version available."));
   assert.ok(nodes.indexOf(icon) < firstText);
