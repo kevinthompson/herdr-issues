@@ -6,7 +6,7 @@ import { stubHerdr } from "./support/herdr.js";
 import { byId, callArg, texts, walk } from "./support/gpui.js";
 import { TrackerSetup } from "../mod/setup.js";
 import { BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM } from "../mod/trackers/problems.js";
-import { TEXT_SM_PX } from "../mod/type-scale.js";
+import { TEXT_XS_PX } from "../mod/type-scale.js";
 
 const theme = new Proxy({}, { get: () => "#000" });
 const cx = {
@@ -338,8 +338,8 @@ test("with bd missing, the Beads check fails its first step and skips the databa
       size,
     ]),
     [
-      ["The Beads CLI (bd) isn't installed", "circle-alert.svg", "ansi1", "ansi1", TEXT_SM_PX],
-      ["Beads database found", "circle-dashed.svg", "dim", "muted", TEXT_SM_PX],
+      ["The Beads CLI (bd) isn't installed", "circle-alert.svg", "ansi1", "ansi1", TEXT_XS_PX],
+      ["Beads database found", "circle-dashed.svg", "dim", "muted", TEXT_XS_PX],
     ],
   );
   assert.ok(byId(row, "setup-problem-check"));

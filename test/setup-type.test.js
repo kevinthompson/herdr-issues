@@ -106,7 +106,7 @@ test("tracker and setting row labels are 14px semibold over 12px descriptions", 
   assert.equal(sizeOf(row, "After merging"), 12);
 });
 
-test("a problem's message is 14px semibold in the error color over a 12px muted fix, with a regular Check again", (t) => {
+test("a problem's message is 12px semibold in the error color over a 12px muted fix, with a regular Check again", (t) => {
   stubHerdr(t);
   const setup = new TrackerSetup("/repo", () => {});
   setup.showFailure({ message: "gh isn't logged in.", fix: "Run `gh auth login`." });
@@ -114,7 +114,7 @@ test("a problem's message is 14px semibold in the error color over a 12px muted 
   const message = holding(page, "gh isn't logged in.");
   const fix = holding(page, "Run `gh auth login`.");
 
-  assert.equal(sizeOf(page, "gh isn't logged in."), 14);
+  assert.equal(sizeOf(page, "gh isn't logged in."), 12);
   assert.ok(called(message, "font_semibold"));
   assert.equal(callArg(message, "text_color") ?? callArg(parentOf(page, message), "text_color"), ERROR);
   assert.equal(callArg(fix, "text_size"), 12);
