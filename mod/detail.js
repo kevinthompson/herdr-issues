@@ -460,13 +460,13 @@ export function button(
   t,
   { primary = false, enabled = true, tooltip = null, primaryOnHover = false, width = null } = {},
 ) {
-  const solidOnHover = primaryOnHover && !primary;
+  const accentOnHover = primaryOnHover && !primary;
   /** @type {(style: NativeElement) => NativeElement} */
-  const hoverStyle = solidOnHover ? (s) => s.bg(t.solid).text_color(t.solid_foreground) : (s) => s.opacity(0.85);
+  const hoverStyle = accentOnHover ? (s) => s.bg(t.accent).text_color(t.accent_foreground) : (s) => s.opacity(0.85);
   const textColor = !enabled
     ? t.dim
-    : primary || (solidOnHover && hoveredButton === id)
-      ? t.solid_foreground
+    : primary || (accentOnHover && hoveredButton === id)
+      ? t.accent_foreground
       : t.foreground;
   return div()
     .id(id)
@@ -481,7 +481,7 @@ export function button(
     .when(tooltip, (e) => e.tooltip(tooltip))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
-    .bg(enabled && primary ? t.solid : t.raised)
+    .bg(enabled && primary ? t.accent : t.raised)
     .text_color(textColor)
     .when(!(enabled && primary), (e) => outlinedInLightTheme(e, t))
     .when(enabled, (e) =>
