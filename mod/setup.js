@@ -757,7 +757,13 @@ export class TrackerSetup {
           .items_center()
           .child(radioIndicator(`setup-tracker-${id}-radio`, chosen, t)),
       )
-      .child(chosen ? this.tracker.withCheckStatus(details, "setup-problem", t) : details)
+      .child(
+        chosen
+          ? this.tracker
+              .withCheckStatus(details, "setup-problem", t)
+              .when(this.chosenTrackerReady(), (e) => e.child(this.tracker.successView("setup-ready", t)))
+          : details,
+      )
       .when(first, (e) => e.rounded_t(CARD_RADIUS_PX - 1))
       .when(chosen, (e) => e.bg(/** @type {Color} */ (rowHover(t))))
       .when(enabled && !chosen, (e) =>

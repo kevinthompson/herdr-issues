@@ -258,3 +258,60 @@ test("a configured tracker that fails to load shows the problem under a page hea
   assert.ok(byId(page, "setup-failure-check"));
   assert.ok(byId(page, "setup-choose-another"));
 });
+
+test("once GitHub Issues' check passes, the tracker row lists what was checked and that it's ready", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "github";
+  assert.equal(byId(render(setup), "setup-ready"), undefined);
+
+  setup.ready(proposed, cx);
+  const success = texts(byId(byId(render(setup), "setup-tracker-github"), "setup-ready"));
+  for (const line of ["gh is installed", "gh is logged in", "origin is on GitHub", "GitHub Issues is ready"])
+    assert.ok(success.includes(line), line);
+});
+
+test("each tracker's success message names its own checks", (t) => {
+  stubHerdr(t);
+  for (const [choice, lines] of [
+    ["linear", ["The Linear API key works", "Linear is ready"]],
+    ["beads", ["bd is installed", "A Beads database is in the main checkout", "Beads is ready"]],
+  ]) {
+    const setup = startedSetup();
+    setup.tracker.choice = choice;
+    setup.ready(proposed, cx);
+    const success = texts(byId(byId(render(setup), `setup-tracker-${choice}`), "setup-ready"));
+    for (const line of lines) assert.ok(success.includes(line), line);
+  }
+});
+
+test("the success message hides while checking, with a problem, and after choosing another tracker", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "github";
+  setup.ready(proposed, cx);
+
+  setup.tracker.checking = true;
+  assert.equal(byId(render(setup), "setup-ready"), undefined);
+
+  setup.tracker.checking = false;
+  setup.tracker.problem = { code: null, message: "Not logged in.", fix: "Log in." };
+  assert.equal(byId(render(setup), "setup-ready"), undefined);
+
+  setup.tracker.problem = null;
+  setup.tracker.choose("beads", cx);
+  setup.tracker.checking = false;
+  assert.equal(byId(render(setup), "setup-ready"), undefined);
+});
+
+test("after bd init makes the missing database and the check passes, the Beads success message shows", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "beads";
+  setup.tracker.problem = { code: BEADS_NOT_INITIALIZED, message: "No Beads database.", fix: "Run `bd init`." };
+  assert.equal(byId(render(setup), "setup-ready"), undefined);
+
+  setup.tracker.problem = null;
+  setup.ready(proposed, cx);
+  assert.ok(texts(byId(byId(render(setup), "setup-tracker-beads"), "setup-ready")).includes("Beads is ready"));
+});
