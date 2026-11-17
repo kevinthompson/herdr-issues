@@ -4,7 +4,7 @@
 // { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
 // where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
-// scopes are { id, label, icon?, group?, subgroup? }, and headings name each group and subgroup where it starts:
+// scopes are { id, label, icon?, group?, subgroup?, subgroupIcon? }, and headings name each group and subgroup where it starts:
 // a group's in muted, spaced capitals below a divider that spans the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick. In a menu where some options have icons, the others leave the
 // icon's room empty so every option's text lines up.
@@ -27,10 +27,11 @@ import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
  * @property {string | null} [icon]
  * @property {string} [heading]
  * @property {string} [subheading]
+ * @property {string | null} [subheadingIcon]
  * @property {boolean} [divider]
  */
 
-/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "group"> & { subgroup?: string }} ScopeOption */
+/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "group" | "subgroupIcon"> & { subgroup?: string }} ScopeOption */
 
 const ROW = 28,
   PADDING = 5,
@@ -40,7 +41,11 @@ const ROW = 28,
   ICON_PX = 16,
   ICON_GAP = 6,
   CHECK_GAP = 9,
-  HEADING_TEXT_SIZE = 11;
+  HEADING_TEXT_SIZE = 11,
+  SUBHEADING_TEXT_SIZE = 11,
+  SUBHEADING_LINE_PX = 14,
+  SUBHEADING_ICON_PX = 12,
+  SUBHEADING_ICON_GAP = 5;
 // The text has no letter-spacing style, so a hair space between letters spaces the capitals.
 export const HAIR_SPACE = String.fromCodePoint(0x200a);
 /** @param {string} heading */
@@ -48,12 +53,11 @@ const spacedCapitals = (heading) => [...heading.toUpperCase()].join(HAIR_SPACE);
 
 /**
  * @param {string} path
- * @param {Theme} t
+ * @param {import("gpui-kit").Color} color An SVG's color.
+ * @param {number} [size]
  */
-const optionIcon = (path, t) =>
-  path.endsWith(".svg")
-    ? svg(path).flex_none().size(ICON_PX).text_color(t.foreground)
-    : image(path).flex_none().size(ICON_PX);
+const optionIcon = (path, color, size = ICON_PX) =>
+  path.endsWith(".svg") ? svg(path).flex_none().size(size).text_color(color) : image(path).flex_none().size(size);
 
 /** @type {Record<string, MenuOption[]>} */
 const OPTIONS = {
@@ -141,9 +145,20 @@ function optionList(options, isChecked, onPick) {
                   .flex_none()
                   .flex()
                   .items_end()
+                  .gap(SUBHEADING_ICON_GAP)
                   .pb(4)
-                  .text_size(11)
+                  .text_size(SUBHEADING_TEXT_SIZE)
                   .text_color(t.dim)
+                  .when(Boolean(option.subheadingIcon), (e) =>
+                    e.child(
+                      div()
+                        .flex_none()
+                        .h(SUBHEADING_LINE_PX)
+                        .flex()
+                        .items_center()
+                        .child(optionIcon(/** @type {string} */ (option.subheadingIcon), t.dim, SUBHEADING_ICON_PX)),
+                    ),
+                  )
                   .child(option.subheading)
               : h_flex()
                   .id(`option-${option.value}`)
@@ -157,7 +172,9 @@ function optionList(options, isChecked, onPick) {
                   .cursor_pointer()
                   .hover((s) => s.bg(t.selected))
                   .on_click((_e, cx) => onPick(option, cx))
-                  .when(Boolean(option.icon), (e) => e.child(optionIcon(/** @type {string} */ (option.icon), t)))
+                  .when(Boolean(option.icon), (e) =>
+                    e.child(optionIcon(/** @type {string} */ (option.icon), t.foreground)),
+                  )
                   .when(alignsTextPastIcons && !option.icon, (e) => e.child(div().flex_none().w(ICON_PX)))
                   .child(div().flex_1().truncate().child(option.label))
                   .child(
@@ -198,7 +215,7 @@ function scopeOptions(scopes) {
     const startsSubgroup = scope.subgroup && (startsGroup || scope.subgroup !== previous?.subgroup);
     return [
       ...(startsGroup ? [{ heading: scope.group }] : []),
-      ...(startsSubgroup ? [{ subheading: scope.subgroup }] : []),
+      ...(startsSubgroup ? [{ subheading: scope.subgroup, subheadingIcon: scope.subgroupIcon }] : []),
       { value: scope.id, label: scope.label, icon: scope.icon },
     ];
   });
@@ -220,7 +237,14 @@ const menuHeight = (options) =>
  * @param {string} [store]
  */
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
-  const listed = scopes.map(({ id, label, icon, group, subgroup }) => ({ id, label, icon, group, subgroup }));
+  const listed = scopes.map(({ id, label, icon, group, subgroup, subgroupIcon }) => ({
+    id,
+    label,
+    icon,
+    group,
+    subgroup,
+    subgroupIcon,
+  }));
   openOverlay({
     mod: "issues",
     kind: "popup",

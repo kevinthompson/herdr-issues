@@ -347,7 +347,7 @@ const PROJECT_STATUS_ICONS = {
 /** @param {LinearProject} project */
 const projectStatusIcon = (project) => statusIcon(PROJECT_STATUS_ICONS[project.status?.type] ?? "");
 
-// The issue lists a repository can show: { id, label, team?, group?, subgroup?, milestones? }, its default
+// The issue lists a repository can show: { id, label, team?, group?, subgroup?, subgroupIcon?, milestones? }, its default
 // first. My issues stands alone, then the team's lists and saved views under the team's name, then its
 // projects, grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
 /**
@@ -372,6 +372,7 @@ export function scopesFor({ views }, { name: teamName, projects }) {
     team: teamName,
     group: `${teamName} Projects`,
     subgroup: project.status?.name,
+    subgroupIcon: projectStatusIcon(project),
     url: project.url,
     milestones: [...project.projectMilestones.nodes]
       .sort((a, b) => a.sortOrder - b.sortOrder)

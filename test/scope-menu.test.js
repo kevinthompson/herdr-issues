@@ -52,6 +52,35 @@ test("each project shows the icon of the closest issue status", (t) => {
   ]);
 });
 
+test("each project status subheading shows its status's icon before its dimmed text", (t) => {
+  const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
+  const subheadings = ["started", "planned", "paused", "backlog"].map((status) => byId(menu, `subheading-${status}`));
+  assert.deepEqual(
+    subheadings.map((subheading) => callArg(iconOf(subheading), "path")),
+    [
+      "mods/issues/icons/in-progress.png",
+      "mods/issues/icons/todo.png",
+      "mods/issues/icons/blocked.png",
+      "mods/issues/icons/backlog.png",
+    ],
+  );
+  for (const subheading of subheadings) {
+    assert.equal(iconOf(subheading.kids[0]), iconOf(subheading));
+    assert.ok(callArg(iconOf(subheading), "size") < callArg(iconOf(byId(menu, "option-mine")), "size"));
+  }
+});
+
+test("subheadings without an icon show only their text", (t) => {
+  const scopes = [
+    { id: "a", label: "A", subgroup: "Plain" },
+    { id: "b", label: "B" },
+  ];
+  const { menu } = openAndRender(t, () => openScopeMenu(scopes, "a", "repo"));
+  const subheading = byId(menu, "subheading-Plain");
+  assert.equal(iconOf(subheading), undefined);
+  assert.deepEqual(texts(subheading), ["Plain"]);
+});
+
 test("the team's views line their text up with the options that have icons", (t) => {
   const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
   const iconWidth = callArg(iconOf(byId(menu, "option-mine")), "size");
