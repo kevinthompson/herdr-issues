@@ -73,6 +73,32 @@ test("a later step shows an enabled back button, drawn with the other buttons' h
   assert.match(setup.stepBarState().stepText, /^Step [2-9] of \d+$/);
 });
 
+// The step bar's segments, as the colors they're filled with.
+const segmentFills = (setup, palette) => {
+  const bar = setup.stepBar(palette);
+  return setup
+    .steps()
+    .map((_, index) => callArg(byId(bar, `setup-step-segment-${index}`), "bg"))
+    .map((fill) => (fill === palette.accent ? "accent" : fill));
+};
+
+test("the step bar fills one segment per step up to the current one in the accent", (t) => {
+  stubHerdr(t);
+  const palette = { ...theme, accent: "#3366ff", surface: "#101010", muted: "#909090", foreground: "#eeeeee" };
+  const muted = "#434343";
+
+  assert.deepEqual(segmentFills(setupAt("tracker"), palette), ["accent", muted, muted]);
+  assert.deepEqual(segmentFills(setupAt("approval"), palette), ["accent", "accent", muted]);
+  assert.deepEqual(segmentFills(setupAt("review"), palette), ["accent", "accent", "accent"]);
+
+  const linear = setupAt("team");
+  linear.tracker.choice = "linear";
+  assert.deepEqual(segmentFills(linear, palette), ["accent", "accent", muted, muted]);
+  linear.step = "review";
+  assert.deepEqual(segmentFills(linear, palette), ["accent", "accent", "accent", "accent"]);
+  assert.equal(linear.stepBarState().stepText, "Step 4 of 4");
+});
+
 test("the back button is disabled while checking or saving", (t) => {
   stubHerdr(t);
   assert.equal(setupAt("approval", { checking: true }).stepBarState().backEnabled, false);

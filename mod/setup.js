@@ -14,6 +14,7 @@
 import { div, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { settings } from "herdr";
+import { mixColors } from "./colors.js";
 import { button, icon } from "./detail.js";
 import { collapseButton, headerBar, iconButton } from "./header.js";
 import { yesNoChoiceId, yesNoValue } from "./settings-fields.js";
@@ -21,7 +22,7 @@ import { approvalSettings, resolveApprovalSettings, saveSetupChoices } from "./t
 import { SelectMenu } from "./select.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 
-/** @import { Context, NativeElement } from "gpui-kit" */
+/** @import { Color, Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
 /** @import { SelectOption } from "./select.js" */
 /** @import { SetupProblem } from "./trackers/problems.js" */
@@ -31,6 +32,12 @@ import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 /** @typedef {{ approval: string, onApproval: string, waitForChecks: string | null, pushAfterMerge: string | null }} ProposedApproval */
 
 const TEAM_PICKS = "issues.setupTeams";
+const STEP_SEGMENT_WIDTH_PX = 20;
+const STEP_SEGMENT_HEIGHT_PX = 4;
+const STEP_SEGMENT_GAP_PX = 4;
+// A step not yet reached: the panel's color moved toward its muted text, so it shows in light and dark themes.
+/** @param {Theme} t */
+const unreachedSegmentFill = (t) => mixColors(t.surface, t.muted, 0.4) ?? t.border;
 const ANSWER_LABEL_PX = 80;
 const GEAR_HINT = "Change this repository's other settings later with the gear in the panel's header.";
 // Approval, which the settings view (settings.js) asks too: the question, a sentence under it or null, and
@@ -506,7 +513,7 @@ export class TrackerSetup {
    * @param {Theme} t
    */
   stepBar(t) {
-    const { backShown, backEnabled, stepText } = this.stepBarState();
+    const { backShown, backEnabled, stepText, segments } = this.stepBarState();
     return v_flex()
       .w_full()
       .flex_none()
@@ -543,11 +550,27 @@ export class TrackerSetup {
               }),
             ),
           )
-          .child(div().text_size(12).text_color(t.dim).child(stepText)),
+          .child(div().flex_1().text_size(12).text_color(t.dim).child(stepText))
+          .child(
+            h_flex()
+              .flex_none()
+              .gap(STEP_SEGMENT_GAP_PX)
+              .children(
+                segments.map((reached, index) =>
+                  div()
+                    .id(`setup-step-segment-${index}`)
+                    .w(STEP_SEGMENT_WIDTH_PX)
+                    .h(STEP_SEGMENT_HEIGHT_PX)
+                    .rounded(STEP_SEGMENT_HEIGHT_PX / 2)
+                    .bg(/** @type {Color} */ (reached ? t.accent : unreachedSegmentFill(t))),
+                ),
+              ),
+          ),
       );
   }
 
   // Back shows when a step has a previous one or a failure is showing, and does nothing while checking or saving.
+  // Each step's segment is reached once the person is on that step or a later one.
   stepBarState() {
     const steps = this.steps(),
       index = steps.indexOf(this.step);
@@ -555,6 +578,7 @@ export class TrackerSetup {
       backShown: index > 0 || Boolean(this.failure),
       backEnabled: !(this.tracker.checking || this.saving),
       stepText: `Step ${index + 1} of ${steps.length}`,
+      segments: steps.map((_, segment) => segment <= index),
     };
   }
 
