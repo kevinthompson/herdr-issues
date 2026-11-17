@@ -727,7 +727,7 @@ export class TrackerSetup {
       .child(
         div()
           .text_size(TEXT_MD_PX)
-          .line_height(TRACKER_LABEL_LINE_HEIGHT_PX)
+          .line_height(`${TRACKER_LABEL_LINE_HEIGHT_PX}px`)
           .font_semibold()
           .text_color(t.foreground)
           .child(label),
