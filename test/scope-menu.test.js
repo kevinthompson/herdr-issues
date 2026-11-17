@@ -36,6 +36,31 @@ function openAndRender(t, open) {
 const iconOf = (option) =>
   [...walk(option)].find((node) => node !== option && ["svg", "image"].includes(node.tag) && callArg(node, "path"));
 
+test("My issues shows the person icon", (t) => {
+  const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
+  assert.equal(callArg(iconOf(byId(menu, "option-mine")), "path"), "mods/issues/icons/user.svg");
+});
+
+test("each project shows the icon of the closest issue status", (t) => {
+  const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
+  const icons = ["p1", "p2", "p3", "p4"].map((id) => callArg(iconOf(byId(menu, `option-project:${id}`)), "path"));
+  assert.deepEqual(icons, [
+    "mods/issues/icons/in-progress.png",
+    "mods/issues/icons/todo.png",
+    "mods/issues/icons/blocked.png",
+    "mods/issues/icons/backlog.png",
+  ]);
+});
+
+test("the team's views line their text up with the options that have icons", (t) => {
+  const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
+  const iconWidth = callArg(iconOf(byId(menu, "option-mine")), "size");
+  for (const id of ["triage", "team", "view:v1"]) {
+    const [spacer] = byId(menu, `option-${id}`).kids;
+    assert.equal(callArg(spacer, "w"), iconWidth, id);
+  }
+});
+
 test("group headings are muted semibold capitals without a band, divided from the section above", (t) => {
   const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
   for (const heading of ["heading-Web", "heading-Web Projects"]) {

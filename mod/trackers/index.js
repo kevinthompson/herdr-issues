@@ -112,6 +112,7 @@
  * @typedef {object} TrackerScope
  * @property {string} [id]
  * @property {string} [label]
+ * @property {string | null} [icon]
  * @property {string} [group]
  * @property {string} [team]
  * @property {string} [url]

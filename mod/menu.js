@@ -4,10 +4,11 @@
 // { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
 // where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
-// scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
+// scopes are { id, label, icon?, group?, subgroup? }, and headings name each group and subgroup where it starts:
 // a group's in muted, spaced capitals below a divider that spans the menu, and a subgroup's dimmed,
-// so neither looks like an option to pick.
-import { div, image } from "gpui-kit";
+// so neither looks like an option to pick. In a menu where some options have icons, the others leave the
+// icon's room empty so every option's text lines up.
+import { div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herdr";
 import { requestFieldEdit } from "./edits.js";
@@ -29,7 +30,7 @@ import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
  * @property {boolean} [divider]
  */
 
-/** @typedef {Pick<TrackerScope, "id" | "label" | "group"> & { subgroup?: string }} ScopeOption */
+/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "group"> & { subgroup?: string }} ScopeOption */
 
 const ROW = 28,
   PADDING = 5,
@@ -44,6 +45,15 @@ const ROW = 28,
 export const HAIR_SPACE = String.fromCodePoint(0x200a);
 /** @param {string} heading */
 const spacedCapitals = (heading) => [...heading.toUpperCase()].join(HAIR_SPACE);
+
+/**
+ * @param {string} path
+ * @param {Theme} t
+ */
+const optionIcon = (path, t) =>
+  path.endsWith(".svg")
+    ? svg(path).flex_none().size(ICON_PX).text_color(t.foreground)
+    : image(path).flex_none().size(ICON_PX);
 
 /** @type {Record<string, MenuOption[]>} */
 const OPTIONS = {
@@ -97,6 +107,7 @@ export function openMenu(field, issue, project, statuses) {
  */
 function optionList(options, isChecked, onPick) {
   const t = /** @type {Theme} */ (theme());
+  const alignsTextPastIcons = options.some((option) => option.icon);
   return v_flex()
     .id("issue-field-menu")
     .size_full()
@@ -146,7 +157,8 @@ function optionList(options, isChecked, onPick) {
                   .cursor_pointer()
                   .hover((s) => s.bg(t.selected))
                   .on_click((_e, cx) => onPick(option, cx))
-                  .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
+                  .when(Boolean(option.icon), (e) => e.child(optionIcon(/** @type {string} */ (option.icon), t)))
+                  .when(alignsTextPastIcons && !option.icon, (e) => e.child(div().flex_none().w(ICON_PX)))
                   .child(div().flex_1().truncate().child(option.label))
                   .child(
                     div()
@@ -187,7 +199,7 @@ function scopeOptions(scopes) {
     return [
       ...(startsGroup ? [{ heading: scope.group }] : []),
       ...(startsSubgroup ? [{ subheading: scope.subgroup }] : []),
-      { value: scope.id, label: scope.label },
+      { value: scope.id, label: scope.label, icon: scope.icon },
     ];
   });
 }
@@ -208,7 +220,7 @@ const menuHeight = (options) =>
  * @param {string} [store]
  */
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
-  const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
+  const listed = scopes.map(({ id, label, icon, group, subgroup }) => ({ id, label, icon, group, subgroup }));
   openOverlay({
     mod: "issues",
     kind: "popup",
