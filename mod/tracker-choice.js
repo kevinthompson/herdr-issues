@@ -275,7 +275,7 @@ export class TrackerChoice {
               .min_w(0)
               .whitespace_normal()
               .text_size(TEXT_SM_PX)
-              .line_height(PROBLEM_MESSAGE_LINE_HEIGHT_PX)
+              .line_height(`${PROBLEM_MESSAGE_LINE_HEIGHT_PX}px`)
               .font_semibold()
               .child(problem.message),
           ),

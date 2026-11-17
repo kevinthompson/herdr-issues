@@ -66,7 +66,26 @@ test("the step bar's step text is 14px", (t) => {
   assert.equal(sizeOf(render(startedSetup()), "Step 1 of 3"), 14);
 });
 
-test("tracker and setting row labels are 16px semibold over 12px descriptions", (t) => {
+// A bare number passed to `line_height` is a multiple of the text size, not pixels.
+const isPxLength = (lineHeight) => typeof lineHeight === "string" && /^\d+px$/.test(lineHeight);
+
+test("a tracker's label sets its line height in pixels", (t) => {
+  stubHerdr(t);
+  const label = holding(render(startedSetup()), "GitHub Issues");
+
+  assert.ok(isPxLength(callArg(label, "line_height")), `line_height was ${callArg(label, "line_height")}`);
+});
+
+test("a problem's message sets its line height in pixels", (t) => {
+  stubHerdr(t);
+  const setup = new TrackerSetup("/repo", () => {});
+  setup.showFailure({ message: "gh isn't logged in.", fix: "Run `gh auth login`." });
+  const message = holding(render(setup), "gh isn't logged in.");
+
+  assert.ok(isPxLength(callArg(message, "line_height")), `line_height was ${callArg(message, "line_height")}`);
+});
+
+test("tracker and setting row labels are 14px semibold over 12px descriptions", (t) => {
   stubHerdr(t);
   const trackers = render(startedSetup());
   const row = settingRow(
@@ -79,7 +98,7 @@ test("tracker and setting row labels are 16px semibold over 12px descriptions", 
     [trackers, "GitHub Issues"],
     [row, "Model"],
   ]) {
-    assert.equal(sizeOf(tree, label), 16);
+    assert.equal(sizeOf(tree, label), 14);
     assert.ok(called(holding(tree, label), "font_semibold"));
   }
   assert.equal(sizeOf(trackers, "Issues in the repository's GitHub repository, read and written with gh."), 12);
