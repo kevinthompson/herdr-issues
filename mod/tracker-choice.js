@@ -4,7 +4,7 @@
 // to make), and Linear's team. A Linear API key that is missing, unreadable or refused comes with a masked field
 // that saves a key Linear accepts (linear.js), and a link to the page where Linear creates one. Linear's team
 // dropdown is a scope menu popup (menu.js), whose pick comes back through the shared state its owner names.
-import { div } from "gpui-kit";
+import { div, svg } from "gpui-kit";
 import { v_flex, h_flex, TextView, Input, InputState } from "gpui-base";
 import { exec, shared, setShared } from "herdr";
 import { button } from "./detail.js";
@@ -14,6 +14,7 @@ import { checkGitHubLogin } from "./trackers/github.js";
 import { checkBeads, initializeBeads } from "./trackers/beads.js";
 import { forgetLookups } from "./lookups.js";
 import { originNotOnGitHub, BEADS_NOT_INITIALIZED, LINEAR_KEY_PROBLEM, LINEAR_KEY_PAGE } from "./trackers/problems.js";
+import { TEXT_SM_PX, TEXT_XS_PX } from "./type-scale.js";
 
 /** @import { AsyncContext, Color, Context, NativeElement } from "gpui-kit" */
 /** @import { Theme } from "./menu.js" */
@@ -28,6 +29,8 @@ export const TRACKERS = [
 ];
 const TEAMS = "query { teams(first: 250) { nodes { key name } } }";
 const TEAM_DROPDOWN_MAX_PX = 280;
+const PROBLEM_ICON_PX = 14;
+const PROBLEM_MESSAGE_LINE_HEIGHT_PX = 18;
 
 // What each tracker checks before it's ready; Linear's check answers with the teams the key can see.
 /** @type {Record<string, (main: string) => Promise<Team[] | void>>} */
@@ -59,7 +62,8 @@ async function linearTeams() {
  * @param {string} text
  * @param {Color} color
  */
-export const markdown = (id, text, color) => TextView.markdown(id, text).flex_none().text_size(12).text_color(color);
+export const markdown = (id, text, color) =>
+  TextView.markdown(id, text).flex_none().text_size(TEXT_XS_PX).text_color(color);
 
 /**
  * @template A
@@ -238,7 +242,8 @@ export class TrackerChoice {
       );
   }
 
-  // A problem with its fix. A Linear key problem asks for the key, and saving one runs onCheckAgain.
+  // A problem with its fix: the message marked with an error icon, the fix beneath it, then the buttons. A Linear
+  // key problem asks for the key, and saving one runs onCheckAgain.
   /**
    * @param {string} id
    * @param {SetupProblem} problem
@@ -252,15 +257,37 @@ export class TrackerChoice {
     return v_flex()
       .flex_none()
       .gap(8)
-      .child(div().whitespace_normal().text_size(12).text_color(t.ansi1).child(problem.message))
+      .child(
+        h_flex()
+          .items_start()
+          .gap(6)
+          .text_color(t.ansi1)
+          .child(
+            h_flex()
+              .flex_none()
+              .h(PROBLEM_MESSAGE_LINE_HEIGHT_PX)
+              .items_center()
+              .child(svg("mods/issues/icons/circle-alert.svg").size(PROBLEM_ICON_PX).text_color(t.ansi1)),
+          )
+          .child(
+            div()
+              .flex_1()
+              .min_w(0)
+              .whitespace_normal()
+              .text_size(TEXT_SM_PX)
+              .line_height(PROBLEM_MESSAGE_LINE_HEIGHT_PX)
+              .font_semibold()
+              .child(problem.message),
+          ),
+      )
       .when(asksForKey, (e) => e.child(this.keyForm(id, t)))
       .when(Boolean(problem.fix), (e) =>
-        e.child(markdown(`${id}-fix`, problem.fix ?? "", t.foreground).on_link_click((url, cx) => cx.open_url(url))),
+        e.child(markdown(`${id}-fix`, problem.fix ?? "", t.muted).on_link_click((url, cx) => cx.open_url(url))),
       )
       .child(
         h_flex()
           .gap(6)
-          .child(button(`${id}-check`, "Check again", onCheckAgain, t, { primary: true }))
+          .child(button(`${id}-check`, "Check again", onCheckAgain, t))
           .when(Boolean(extra), (e) => e.child(extra)),
       );
   }
@@ -273,7 +300,7 @@ export class TrackerChoice {
    */
   withCheckStatus(content, id, t) {
     return content
-      .when(this.checking, (e) => e.child(div().text_size(12).text_color(t.dim).child("Checking…")))
+      .when(this.checking, (e) => e.child(div().text_size(TEXT_XS_PX).text_color(t.dim).child("Checking…")))
       .when(!this.checking && Boolean(this.problem), (e) =>
         e.child(
           this.problemView(

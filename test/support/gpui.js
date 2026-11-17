@@ -33,7 +33,11 @@ export const InputState = classStub;
 export const TextareaState = classStub;
 export const EditorState = classStub;
 export const ScrollHandle = classStub;
-export const TextView = classStub;
+export const TextView = class extends classStub {
+  static markdown(id, text) {
+    return element("markdown").id(id).child(text);
+  }
+};
 export const Editor = classStub;
 export const Input = classStub;
 export const Textarea = classStub;
