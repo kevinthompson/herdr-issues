@@ -75,6 +75,7 @@ import {
   workButton,
   labelChips,
   projectName,
+  PANEL_TEXT_PX,
   PROPERTY_TEXT_PX,
   button,
   COMPACT_BUTTON_WIDTH_PX,
@@ -1975,7 +1976,7 @@ export default class Issues extends View {
       .border_1()
       .border_color(t.border)
       .text_color(t.foreground)
-      .text_size(13)
+      .text_size(PANEL_TEXT_PX)
       .on_size_change((size, cx) => this.noticeWidth(size.width, cx));
   }
 

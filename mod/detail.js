@@ -158,6 +158,11 @@ export function issueLinks(key, ids, { hasIssue, onOpen }, t, color) {
     );
 }
 
+/** The text size the panel's frame sets, which the description's Markdown inherits as its body size. */
+export const PANEL_TEXT_PX = 13;
+// gpui-component's TextView draws a level-two Markdown heading at 4/3 of the body size it inherits.
+const LEVEL_TWO_HEADING_SCALE = 4 / 3;
+const TITLE_TEXT_PX = PANEL_TEXT_PX * LEVEL_TWO_HEADING_SCALE;
 export const PROPERTY_TEXT_PX = 11;
 // The terminal's monospace font looks larger than the UI font at the same size.
 const BRANCH_TEXT_PX = 10;
@@ -844,7 +849,7 @@ function titleBlock(view, t) {
     .px(SECTION_INSET_PX)
     .gap(4)
     .child(issueIdLine(view, t))
-    .child(div().whitespace_normal().text_size(16).font_semibold().child(view.issue.title));
+    .child(div().whitespace_normal().text_size(TITLE_TEXT_PX).font_semibold().child(view.issue.title));
 }
 
 /**
