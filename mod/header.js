@@ -8,6 +8,7 @@ import { h_flex } from "gpui-base";
 /** @import { Theme } from "./menu.js" */
 
 export const HEADER_HEIGHT_PX = 30;
+export const HEADER_TEXT_PX = 12;
 const HEADER_ICON_PX = 14;
 const ICON_BUTTON_PADDING_PX = 3;
 export const ICON_BUTTON_PX = HEADER_ICON_PX + 2 * ICON_BUTTON_PADDING_PX;
@@ -57,7 +58,7 @@ export function headerBar({ icon, title, secondary, trailing = [] }, t) {
     .bg(t.background)
     .border_b(1)
     .border_color(t.border)
-    .text_size(12)
+    .text_size(HEADER_TEXT_PX)
     .when(Boolean(icon), (e) =>
       e.child(svg(`mods/issues/icons/${icon}.svg`).size(HEADER_ICON_PX).flex_none().text_color(t.dim)),
     )

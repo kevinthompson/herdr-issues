@@ -46,6 +46,7 @@ import {
   DEFAULT_UPDATE_CHECK_HOURS,
 } from "./trackers/setting.js";
 import { offeredUpdate, dismissUpdate, installTab, finishedUpdate } from "./update.js";
+import { updateFooter } from "./update-footer.js";
 import { findScope, linearKeyPath } from "./trackers/linear.js";
 import { forgetLookups } from "./lookups.js";
 import { publishScope, publishOpenIssue } from "./scope-context.js";
@@ -77,7 +78,6 @@ import {
   projectName,
   PANEL_TEXT_PX,
   PROPERTY_TEXT_PX,
-  button,
   COMPACT_BUTTON_WIDTH_PX,
 } from "./detail.js";
 import { collapseButton, headerBar, iconButton, HEADER_HEIGHT_PX, ICON_BUTTON_PX } from "./header.js";
@@ -146,7 +146,6 @@ const REFRESH_CHECK_MS = 10 * 1000;
 // Reading terminals' labels and statuses asks nothing of the machine, so close requests are checked often.
 const CLOSE_REQUEST_CHECK_MS = 1000;
 const HOUR_MS = 60 * 60 * 1000;
-const UPDATED_NOTE = "Updated. New Claude Code sessions pick up the plugin's update.";
 // A remote list at least this old refreshes when the person comes back to the panel or Herdr's window.
 const STALE_ON_RETURN_MS = 10 * 1000;
 // A Claude hook (claude-plugin/hooks/herdr-issues-changed.mjs) touches this file after Claude creates or changes a remote issue.
@@ -1280,54 +1279,18 @@ export default class Issues extends View {
       .child(div().min_w(0).truncate().child(status));
   }
 
-  // An available update, with Update and a dismiss control, or the note that an update finished.
+  // An available update, with a link that starts it and a dismiss control, or the note that an update finished.
   /** @param {Theme} t */
   updateFooter(t) {
-    /**
-     * @param {string} id
-     * @param {(cx: Context) => void} onDismiss
-     */
-    const dismiss = (id, onDismiss) =>
-      div()
-        .id(id)
-        .flex_none()
-        .size(20)
-        .flex()
-        .items_center()
-        .justify_center()
-        .rounded(5)
-        .tooltip("Dismiss")
-        .cursor_pointer()
-        .hover((s) => s.bg(t.hover))
-        .on_click((_e, cx) => onDismiss(cx))
-        .child("×");
-    const row = h_flex()
-      .flex_none()
-      .h(30)
-      .px(14)
-      .gap(8)
-      .items_center()
-      .border_t(1)
-      .border_color(t.border)
-      .text_size(11)
-      .text_color(t.dim);
-    if (!this.availableUpdate) {
-      return row.child(div().flex_1().min_w(0).truncate().child(UPDATED_NOTE)).child(
-        dismiss("issues-updated-dismiss", (cx) => {
-          this.updated = false;
-          cx.notify();
-        }),
-      );
-    }
-    return row
-      .child(div().flex_1().min_w(0).truncate().child("Update available"))
-      .child(
-        button("issues-update", "Update", (cx) => this.startUpdate(cx), t, { primary: true })
-          .h(22)
-          .px(8)
-          .text_size(11),
-      )
-      .child(dismiss("issues-update-dismiss", (cx) => this.dismissUpdate(cx)));
+    return updateFooter(t, {
+      updateAvailable: Boolean(this.availableUpdate),
+      onUpdate: (cx) => this.startUpdate(cx),
+      onDismissUpdate: (cx) => this.dismissUpdate(cx),
+      onDismissUpdated: (cx) => {
+        this.updated = false;
+        cx.notify();
+      },
+    });
   }
 
   // Whether the issue view offers Merge for the open issue, checked again for each list the panel reads. The last
