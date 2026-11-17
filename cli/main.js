@@ -23,7 +23,7 @@ import {
   spaceNameEndsWith,
   unmarkedSpaceName,
 } from "../mod/space-name.js";
-import { checkMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
+import { checkMerge, finishVerifiedMerge, mergeIssue, MergeRefusal } from "../mod/merge.js";
 import { nextIssues } from "../mod/next.js";
 import { openWorktree } from "./worktree.js";
 import { finishedWork, finishInstructions } from "./finish.js";
@@ -108,9 +108,14 @@ Commands:
                            Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done, then push
                            main when pushAfterMerge is true; refuse, changing nothing, when it can't merge cleanly or
-                           onApproval is pull-request
+                           onApproval is pull-request. When main moved on, so the merged tree differs from the
+                           branch's, stop after the merge and print that main needs verifying, leaving the issue open
+                           and main unpushed for merge --verified
   merge --check <id>       Make every check merge makes, including a trial merge that changes no checkout, and change
                            nothing: exit 0 when merge would go through, else print merge's refusal and exit 1
+  merge --verified <id>    Once main is verified after a merge that needed it, mark the issue done, refresh the panels
+                           and push main when pushAfterMerge is true; refuse, changing nothing, unless the issue's
+                           branch is merged into main
   status <id> <status>     Set the issue's status and refresh the panels; refuse a status its tracker can't set.
                            The statuses: ${STATUSES.join(", ")}. On GitHub, done closes the issue as completed,
                            canceled closes it as not planned, and any other status reopens it. done and canceled also
@@ -505,18 +510,33 @@ async function worktree(args) {
 }
 
 async function merge(args) {
-  const checkOnly = args[0] === "--check";
-  const [id, ...rest] = checkOnly ? args.slice(1) : args;
+  const option = ["--check", "--verified"].includes(args[0]) ? args[0] : null;
+  const [id, ...rest] = option ? args.slice(1) : args;
   if (!id || rest.length || id.startsWith("-"))
-    throw new UsageError(checkOnly ? "merge --check needs one issue ID" : "merge needs one issue ID");
+    throw new UsageError(`merge ${option ? `${option} ` : ""}needs one issue ID`);
   const issue = await issueToWork(id);
   try {
-    if (checkOnly) {
+    if (option === "--check") {
       const main = await checkMerge(issue, await currentProject());
       console.log(`${issue.branch} merges cleanly into ${main.branch}`);
       return;
     }
-    const { mainBranch, pushed } = await mergeIssue(issue, await currentTracker(), await currentProject());
+    const tracker = await currentTracker(),
+      project = await currentProject();
+    if (option === "--verified") {
+      const { mainBranch, pushed } = await finishVerifiedMerge(issue, tracker, project);
+      console.log(`Marked ${issue.id} done${pushed ? ` and pushed ${mainBranch}` : ""}`);
+      return;
+    }
+    const { mainBranch, pushed, needsVerifying } = await mergeIssue(issue, tracker, project);
+    if (needsVerifying) {
+      console.log(
+        `Merged ${issue.branch} into ${mainBranch}, which moved on since the branch was tested, so ${mainBranch} ` +
+          `needs verifying: once it passes, run \`issues merge --verified ${issue.id}\` to mark ${issue.id} done` +
+          ((await approvalSettings(project)).pushAfterMerge ? ` and push ${mainBranch}` : ""),
+      );
+      return;
+    }
     console.log(
       `Merged ${issue.branch} into ${mainBranch}${pushed ? `, pushed ${mainBranch}` : ""} and marked ${issue.id} done`,
     );

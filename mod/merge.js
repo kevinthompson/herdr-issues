@@ -1,8 +1,10 @@
 // Merges an issue's branch into main in the repository's main checkout and marks the issue done, for repositories
 // whose approved work merges locally (onApproval "merge"). `issues merge` and the issue view's Merge button both run
 // mergeIssue, which changes nothing and throws a MergeRefusal saying why when the merge can't go cleanly. With
-// pushAfterMerge, it then pushes main to the remote main tracks. Once the merge is made it stays, and a failure to
-// mark the issue done or to push main throws a MergedWithProblems saying the branch was merged.
+// pushAfterMerge, it then pushes main to the remote main tracks. When main moved on, so the merged tree differs from
+// the branch's, mergeIssue stops after the merge: the issue stays open and main unpushed until main is verified and
+// `issues merge --verified` runs finishVerifiedMerge. Once the merge is made it stays, and a failure to mark the
+// issue done or to push main throws a MergedWithProblems saying the branch was merged.
 // `issues merge --check` runs checkMerge, mergeIssue's checks alone, so a session can confirm before asking for
 // approval that approving will merge: it tests the merge with git merge-tree and changes no checkout or ref.
 /**
@@ -125,9 +127,10 @@ export async function checkMerge(issue, project) {
   return main;
 }
 
-// Merges the issue's branch into main with a merge commit, then marks the issue done, tells every panel, and with
-// pushAfterMerge pushes main. A conflicting merge is aborted, leaving the main checkout as it was. Returns
-// { mainBranch, pushed }, the main branch's name and whether it was pushed.
+// Merges the issue's branch into main with a merge commit. When the merged tree matches the branch's, it then marks
+// the issue done, tells every panel, and with pushAfterMerge pushes main; otherwise main moved on and holds a tree
+// the branch never tested, so it leaves the issue open and main unpushed for finishVerifiedMerge. A conflicting merge
+// is aborted, leaving the main checkout as it was. Returns { mainBranch, pushed, needsVerifying }.
 /**
  * @param {Issue} issue
  * @param {Tracker} tracker
@@ -145,19 +148,53 @@ export async function mergeIssue(issue, tracker, project) {
     await git(main.path, ["merge", "--abort"], on);
     throw uncleanMerge(branch, main, conflicts, merged.err);
   }
+  const needsVerifying = !(await git(main.path, ["diff", "--quiet", branch, "HEAD"], on)).ok;
+  if (needsVerifying) return { mainBranch: main.branch, pushed: false, needsVerifying };
+  return { ...(await markDoneAndPush(issue, tracker, project, main)), needsVerifying };
+}
+
+// Finishes a merge that needed verifying, once main passes: marks the issue done, tells every panel, and with
+// pushAfterMerge pushes main. Refuses, changing nothing, unless the issue's branch is merged into main. Returns
+// { mainBranch, pushed }.
+/**
+ * @param {Issue} issue
+ * @param {Tracker} tracker
+ * @param {Project} project
+ */
+export async function finishVerifiedMerge(issue, tracker, project) {
+  const { branch } = issue,
+    { on } = project;
+  if (!branch) throw new MergeRefusal(`${issue.id} has no branch.`);
+  const [main] = await checkouts(project.root, on);
+  if (!main) throw new MergeRefusal("Could not list the repository's checkouts.");
+  if (!MAIN_BRANCHES.includes(main.branch)) {
+    throw new MergeRefusal(`The main checkout (${main.path}) is on ${main.branch ?? "a detached HEAD"}, not main.`);
+  }
+  if (!(await git(main.path, ["merge-base", "--is-ancestor", `refs/heads/${branch}`, main.branch], on)).ok)
+    throw new MergeRefusal(`${branch} isn't merged into ${main.branch} yet: merge it first.`);
+  return markDoneAndPush(issue, tracker, project, main);
+}
+
+/**
+ * @param {Issue} issue
+ * @param {Tracker} tracker
+ * @param {Project} project
+ * @param {Checkout} main
+ */
+async function markDoneAndPush(issue, tracker, project, main) {
   const marking = await tracker.update(issue, { status: "done" }).then(
     /** @returns {Error | null} */ () => null,
     (error) => error,
   );
   await announceIssueChange();
   const { pushAfterMerge } = await approvalSettings(project);
-  const pushProblem = pushAfterMerge ? await pushMain(main, on) : null;
+  const pushProblem = pushAfterMerge ? await pushMain(main, project.on) : null;
   const problems = [
     ...(marking ? [`could not mark ${issue.id} done: ${marking.message ?? marking}`] : []),
     ...(pushProblem ? [`could not push ${main.branch}: ${pushProblem}`] : []),
   ];
   if (problems.length)
-    throw new MergedWithProblems(`Merged ${branch} into ${main.branch}, but ${problems.join("; and ")}`);
+    throw new MergedWithProblems(`Merged ${issue.branch} into ${main.branch}, but ${problems.join("; and ")}`);
   return { mainBranch: main.branch, pushed: pushAfterMerge };
 }
 
