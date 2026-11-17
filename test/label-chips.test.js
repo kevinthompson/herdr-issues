@@ -2,9 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { callArg, texts } from "./support/gpui.js";
 import { labelChips } from "../mod/detail.js";
+import { labelTint } from "../mod/colors.js";
 
 const darkTheme = { foreground: "#e0e0e0", hover: "#ffffff14", border: "#333333", muted: "#999999" };
-const lightTheme = { ...darkTheme, foreground: "#202020", hover: "#00000010" };
+const lightTheme = { ...darkTheme, surface: "#ffffff", foreground: "#202020", hover: "#00000010" };
 
 const parts = (chip) => chip.kids.filter((kid) => typeof kid === "object");
 
@@ -25,7 +26,7 @@ test("draws a label in a group as one bordered chip, its group on a tint of the 
   assert.equal(callArg(value, "bg"), undefined);
 });
 
-test("tints the group part in a light theme too, darkened toward the text", () => {
+test("tints the group part in a light theme too, as the label's color mixed into the panel's", () => {
   const [chip] = labelChips(
     {
       labels: ["cloud-agent > one-shot"],
@@ -35,8 +36,8 @@ test("tints the group part in a light theme too, darkened toward the text", () =
     lightTheme,
   );
   const [group] = parts(chip);
-  assert.match(callArg(group, "bg"), /^#[0-9a-f]{8}$/);
-  assert.doesNotMatch(callArg(group, "bg"), /^#4ea7fc/);
+  assert.equal(callArg(group, "bg"), labelTint("#4ea7fc", lightTheme));
+  assert.match(callArg(group, "bg"), /^#[0-9a-f]{6}$/);
 });
 
 test("gives a grouped label without a color the theme's neutral shade", () => {
