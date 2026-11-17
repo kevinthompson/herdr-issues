@@ -1,7 +1,7 @@
 // One issue, drawn inside the panel in place of the list: a way back, then its ID and title above sections
-// (section.js) that scroll together. Properties is a card of its status and priority (each a dropdown) above
-// its other details, among them its labels (with a dropdown that adds and removes them) and its branch, which
-// copies when clicked. Description is its Markdown body, which Edit swaps for an editor. Merge shows when the
+// (section.js) that scroll together. Properties is a card of its status and, beneath it, its priority (each a
+// dropdown on its own line, lined up with the rows below) above its other details, among them its labels (with a
+// dropdown that adds and removes them) and its branch, which copies when clicked. Description is its Markdown body, which Edit swaps for an editor. Merge shows when the
 // issue's finished branch can merge into main from here (merge.js).
 // Task-list items in the body are checkboxes that check off in place. A Linear or GitHub issue's comments follow
 // the body, read-only, each a card headed by its author's avatar, name and date, and hide while it is edited.
@@ -84,13 +84,7 @@ function dropdown(field, label, { issue, writable, onMenu }, t) {
   return h_flex()
     .gap(PROPERTY_GAP_PX)
     .items_center()
-    .child(
-      div()
-        .flex_none()
-        .text_color(t.dim)
-        .when(field === "status", (e) => e.w(PROPERTY_LABEL_PX))
-        .child(label),
-    )
+    .child(div().flex_none().w(PROPERTY_LABEL_PX).text_color(t.dim).child(label))
     .child(
       h_flex()
         .id(`field-${field}`)
@@ -322,7 +316,7 @@ export function projectName({ name, color }) {
 }
 
 /**
- * The issue's properties in a card: its status and priority dropdowns above a divider, then a row for each other
+ * The issue's properties in a card: its status dropdown with its priority dropdown beneath it, above a divider, then a row for each other
  * property it has. `blocking`: the IDs of issues that list this one in their blocked_by.
  * @param {DetailView} view
  * @param {Theme} t
@@ -348,13 +342,10 @@ function properties(view, t) {
     .text_size(PROPERTY_TEXT_PX)
     .text_color(t.foreground)
     .child(
-      h_flex()
-        .flex_wrap()
+      v_flex()
         .px(CARD_PADDING_X_PX)
         .py(10)
-        .gap_x(32)
-        .gap_y(8)
-        .items_center()
+        .gap(8)
         .when(rows.length > 0, (e) => e.border_b(1).border_color(t.border))
         .child(dropdown("status", "Status", view, t))
         .when(view.prioritized, (e) => e.child(dropdown("priority", "Priority", view, t))),
