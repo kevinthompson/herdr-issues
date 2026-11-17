@@ -107,7 +107,7 @@ import { issueIdOfSpace, panelIssueSpaceName } from "./space-name.js";
 import { panelVisible } from "./visibility.js";
 import { collapseState } from "./collapse.js";
 import { isSectionOpen, setSectionOpen } from "./open-sections.js";
-import { TrackerSetup, untrackableView, notARepositoryView, emptyListView } from "./setup.js";
+import { KeptSetups, untrackableView, notARepositoryView, emptyListView } from "./setup.js";
 import { SettingsView } from "./settings.js";
 import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
 import { openBehindArgs } from "./open-behind.js";
@@ -123,6 +123,7 @@ import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 /** @typedef {Awaited<ReturnType<typeof repositoryState>>} Repository */
 /** @typedef {ReturnType<typeof fieldEdits>[string]} FieldEdit */
 /** @import { SetupProblem } from "./trackers/problems.js" */
+/** @import { TrackerSetup } from "./setup.js" */
 /**
  * @typedef {object} Shown
  * @property {Project} project
@@ -291,6 +292,7 @@ export default class Issues extends View {
     this.untrackedFolder = null;
     /** @type {Map<string, Shown>} */
     this.shownByContext = new Map();
+    this.keptSetups = new KeptSetups((/** @type {Context} */ cx) => this.refresh(cx));
     this.editing = null;
     this.saving = false;
     this.detailError = null;
@@ -440,17 +442,15 @@ export default class Issues extends View {
   }
 
   // The setup view in place of the list: choosing a tracker, or `failure`, the problem that stops the
-  // configured one loading. It survives polls, so a choice in progress isn't lost.
+  // configured one loading. Each repository's setup is kept, so progress survives polls and other repositories.
   /**
    * @param {string} main
    * @param {SetupProblem | null} failure
    * @param {Context} cx
    */
   showSetup(main, failure, cx) {
-    if (this.setup?.main !== main) {
-      /** @type {TrackerSetup | null} */
-      this.setup = new TrackerSetup(main, (/** @type {Context} */ cx) => this.refresh(cx));
-    }
+    /** @type {TrackerSetup | null} */
+    this.setup = this.keptSetups.forRepository(main);
     this.setup.showFailure(failure);
     Object.assign(this, {
       tracker: null,

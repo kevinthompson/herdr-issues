@@ -6,7 +6,8 @@
 // request, whether the session waits for its checks, or for a merge, whether main is pushed afterwards, each
 // asked with the settings view's dropdown (select.js), then a Next button; and a review of the choices, which points to the gear's settings
 // (settings.js) for the rest. Only Save on the review writes the repository's entry in issues.json (setting.js),
-// and the panel lists the issues. Approval proposes the repository's current or default settings. A configured
+// and the panel lists the issues. Each repository's setup is kept while the panel shows another repository, and
+// resumes on its step with its answers until it's saved, for as long as the panel runs. Approval proposes the repository's current or default settings. A configured
 // tracker that fails to load with a SetupProblem (trackers/problems.js) shows the problem and its fix, with Check
 // again and a way to choose a different tracker. A Linear API key that is missing, unreadable or refused, at
 // either point, comes with a masked field that saves a key Linear accepts.
@@ -727,5 +728,34 @@ export class TrackerSetup {
         e.child(h_flex().child(button("setup-save", "Save", (cx) => this.save(cx), t, { primary: true }))),
       )
       .child(div().whitespace_normal().text_size(12).text_color(t.dim).child(GEAR_HINT));
+  }
+}
+
+// Each repository's setup by its main checkout, kept while the panel shows other repositories so the person
+// resumes where they left off. Saving forgets it, so a later setup of the repository starts fresh.
+export class KeptSetups {
+  // onSaved(cx) runs once any repository's setup is saved.
+  /**
+   * @param {(cx: Context) => void} onSaved
+   */
+  constructor(onSaved) {
+    this.onSaved = onSaved;
+    /** @type {Map<string, TrackerSetup>} */
+    this.byMain = new Map();
+  }
+
+  /**
+   * @param {string} main
+   * @returns {TrackerSetup}
+   */
+  forRepository(main) {
+    const kept = this.byMain.get(main);
+    if (kept) return kept;
+    const setup = new TrackerSetup(main, (cx) => {
+      if (this.byMain.get(main) === setup) this.byMain.delete(main);
+      this.onSaved(cx);
+    });
+    this.byMain.set(main, setup);
+    return setup;
   }
 }
