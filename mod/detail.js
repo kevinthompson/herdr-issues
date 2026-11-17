@@ -11,7 +11,7 @@ import { settings } from "herdr";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, shortDate, statusIcon } from "./issue.js";
-import { DUE_COLORS, isLightTheme, labelTint, softText } from "./colors.js";
+import { DUE_COLORS, labelTint, secondaryButtonFill, softText } from "./colors.js";
 import { collapseButton, headerBar } from "./header.js";
 import { rowBeneathHeader, ROW_PADDING_X_PX } from "./filter-row.js";
 import { card, section, sectionHeading, SECTION_INSET_PX } from "./section.js";
@@ -438,13 +438,6 @@ function pullRequests({ issue: { id, pullRequests }, onLink }, t) {
 let hoveredButton = null;
 
 /**
- * A light theme's raised fill barely differs from the panel, so a button there is outlined too.
- * @param {NativeElement} element
- * @param {Theme} t
- */
-const outlinedInLightTheme = (element, t) => element.when(isLightTheme(t), (e) => e.border_1().border_color(t.border));
-
-/**
  * Buttons stop the pointer events a list row would otherwise take as an open. A label may be a
  * function of the button's text color, for an icon.
  * @param {string} id
@@ -481,9 +474,9 @@ export function button(
     .when(tooltip, (e) => e.tooltip(tooltip))
     .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
     .on_mouse_up("left", (_e, cx) => cx.stop_propagation())
-    .bg(enabled && primary ? t.accent : t.raised)
+    .bg(enabled && primary ? t.accent : /** @type {Color} */ (secondaryButtonFill(t)))
     .text_color(textColor)
-    .when(!(enabled && primary), (e) => outlinedInLightTheme(e, t))
+    .when(!(enabled && primary), (e) => e.border_1().border_color(t.border))
     .when(enabled, (e) =>
       e
         .cursor_pointer()

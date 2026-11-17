@@ -128,6 +128,12 @@ export const cardFill = (t) => mixColors(t.surface, t.foreground, 0.03) ?? t.rai
 /** @param {Theme} t */
 export const chipFill = (t) => mixColors(t.surface, t.foreground, 0.1) ?? t.raised;
 
+// A secondary button's fill. A dark theme's raised color matches its selected one, so a button on a chosen
+// option is moved a step toward the text there.
+/** @param {Theme} t */
+export const secondaryButtonFill = (t) =>
+  isLightTheme(t) ? t.raised : (mixColors(t.raised, t.foreground, 0.08) ?? t.raised);
+
 // Text a step softer than the theme's text color, so a heading over it in that color stands out without the
 // theme offering a brighter one.
 /** @param {Theme} t */
