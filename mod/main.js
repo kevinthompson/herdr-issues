@@ -1686,7 +1686,7 @@ export default class Issues extends View {
       )
       .when(Boolean(issue.delegate), (e) =>
         e
-          .child(div().flex_none().child(">"))
+          .child(div().flex_none().child("›"))
           .child(
             delegateAvatar
               ? image(delegateAvatar)
