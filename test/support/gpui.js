@@ -25,7 +25,7 @@ const classStub = class {
 };
 export const div = () => element("div");
 export const svg = (path) => element("svg").path(path);
-export const image = () => element("image");
+export const image = (path) => element("image").path(path);
 export const v_flex = () => element("v_flex");
 export const h_flex = () => element("h_flex");
 export const View = classStub;

@@ -4,10 +4,11 @@
 // { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
 // where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
-// scopes are { id, label, group?, subgroup? }, and headings name each group and subgroup where it starts:
-// a group's in capitals on a tinted band between dividers that span the menu, and a subgroup's dimmed,
-// so neither looks like an option to pick.
-import { div, image } from "gpui-kit";
+// scopes are { id, label, icon?, group?, subgroup? }, and headings name each group and subgroup where it starts:
+// a group's in muted, spaced capitals below a divider that spans the menu, and a subgroup's dimmed,
+// so neither looks like an option to pick. In a menu where some options have icons, the others leave the
+// icon's room empty so every option's text lines up.
+import { div, image, svg } from "gpui-kit";
 import { v_flex, h_flex } from "gpui-base";
 import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herdr";
 import { requestFieldEdit } from "./edits.js";
@@ -29,7 +30,7 @@ import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
  * @property {boolean} [divider]
  */
 
-/** @typedef {Pick<TrackerScope, "id" | "label" | "group"> & { subgroup?: string }} ScopeOption */
+/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "group"> & { subgroup?: string }} ScopeOption */
 
 const ROW = 28,
   PADDING = 5,
@@ -38,15 +39,21 @@ const ROW = 28,
   DIVIDER_GAP = 4,
   ICON_PX = 16,
   ICON_GAP = 6,
-  CHECK_GAP = 9;
-// The theme's text color at this opacity, so the band follows light and dark themes.
-const HEADING_TINT_ALPHA = "0a";
+  CHECK_GAP = 9,
+  HEADING_TEXT_SIZE = 11;
+// The text has no letter-spacing style, so a hair space between letters spaces the capitals.
+export const HAIR_SPACE = String.fromCodePoint(0x200a);
+/** @param {string} heading */
+const spacedCapitals = (heading) => [...heading.toUpperCase()].join(HAIR_SPACE);
+
 /**
+ * @param {string} path
  * @param {Theme} t
- * @returns {`#${string}`}
  */
-const headingTint = (t) =>
-  /^#[0-9a-f]{6}$/i.test(t.foreground) ? `${t.foreground}${HEADING_TINT_ALPHA}` : "#00000000";
+const optionIcon = (path, t) =>
+  path.endsWith(".svg")
+    ? svg(path).flex_none().size(ICON_PX).text_color(t.foreground)
+    : image(path).flex_none().size(ICON_PX);
 
 /** @type {Record<string, MenuOption[]>} */
 const OPTIONS = {
@@ -100,6 +107,7 @@ export function openMenu(field, issue, project, statuses) {
  */
 function optionList(options, isChecked, onPick) {
   const t = /** @type {Theme} */ (theme());
+  const alignsTextPastIcons = options.some((option) => option.icon);
   return v_flex()
     .id("issue-field-menu")
     .size_full()
@@ -120,15 +128,11 @@ function optionList(options, isChecked, onPick) {
                 .flex_none()
                 .flex()
                 .items_center()
-                .mb(DIVIDER_GAP)
-                .bg(headingTint(t))
-                .border_b(1)
-                .border_color(t.border)
-                .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1))
-                .text_size(10.5)
+                .when(index > 0, (e) => e.mt(DIVIDER_GAP).border_t(1).border_color(t.border))
+                .text_size(HEADING_TEXT_SIZE)
                 .font_semibold()
                 .text_color(t.muted)
-                .child(option.heading.toUpperCase())
+                .child(spacedCapitals(option.heading))
             : option.subheading
               ? div()
                   .id(`subheading-${option.subheading}`)
@@ -153,7 +157,8 @@ function optionList(options, isChecked, onPick) {
                   .cursor_pointer()
                   .hover((s) => s.bg(t.selected))
                   .on_click((_e, cx) => onPick(option, cx))
-                  .when(Boolean(option.icon), (e) => e.child(image(option.icon).flex_none().size(ICON_PX)))
+                  .when(Boolean(option.icon), (e) => e.child(optionIcon(/** @type {string} */ (option.icon), t)))
+                  .when(alignsTextPastIcons && !option.icon, (e) => e.child(div().flex_none().w(ICON_PX)))
                   .child(div().flex_1().truncate().child(option.label))
                   .child(
                     div()
@@ -194,7 +199,7 @@ function scopeOptions(scopes) {
     return [
       ...(startsGroup ? [{ heading: scope.group }] : []),
       ...(startsSubgroup ? [{ subheading: scope.subgroup }] : []),
-      { value: scope.id, label: scope.label },
+      { value: scope.id, label: scope.label, icon: scope.icon },
     ];
   });
 }
@@ -204,7 +209,7 @@ const DIVIDER_HEIGHT = DIVIDER_GAP * 2 + 1;
 const menuHeight = (options) =>
   options.reduce(
     (height, option, index) =>
-      height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading ? DIVIDER_GAP * (index > 0 ? 2 : 1) : 0)),
+      height + (option.divider ? DIVIDER_HEIGHT : ROW + (option.heading && index > 0 ? DIVIDER_GAP : 0)),
     PADDING * 2,
   );
 
@@ -215,7 +220,7 @@ const menuHeight = (options) =>
  * @param {string} [store]
  */
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
-  const listed = scopes.map(({ id, label, group, subgroup }) => ({ id, label, group, subgroup }));
+  const listed = scopes.map(({ id, label, icon, group, subgroup }) => ({ id, label, icon, group, subgroup }));
   openOverlay({
     mod: "issues",
     kind: "popup",

@@ -8,7 +8,7 @@
 import { appHome, exec, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
-import { STATUSES, STATUS_LABELS as ISSUE_STATUS_LABELS, priorityRank } from "../issue.js";
+import { STATUSES, STATUS_LABELS as ISSUE_STATUS_LABELS, priorityRank, statusIcon } from "../issue.js";
 import { refuseUnknownLabels } from "./labels.js";
 import {
   KEYCHAIN,
@@ -334,6 +334,19 @@ const statusRank = (project) => {
   return rank === -1 ? PROJECT_STATUS_ORDER.length : rank;
 };
 
+// The issue status whose icon stands for each Linear project status type.
+/** @type {Record<string, string>} */
+const PROJECT_STATUS_ICONS = {
+  backlog: "backlog",
+  planned: "todo",
+  started: "in-progress",
+  paused: "blocked",
+  completed: "done",
+  canceled: "canceled",
+};
+/** @param {LinearProject} project */
+const projectStatusIcon = (project) => statusIcon(PROJECT_STATUS_ICONS[project.status?.type] ?? "");
+
 // The issue lists a repository can show: { id, label, team?, group?, subgroup?, milestones? }, its default
 // first. My issues stands alone, then the team's lists and saved views under the team's name, then its
 // projects, grouped under their status. A project scope lists its milestones as scopes of their own: { id, label }.
@@ -343,7 +356,7 @@ const statusRank = (project) => {
  * @returns {TrackerScope[]}
  */
 export function scopesFor({ views }, { name: teamName, projects }) {
-  const mine = { id: "mine", label: "My issues" };
+  const mine = { id: "mine", label: "My issues", icon: "mods/issues/icons/user.svg" };
   const teamScopes = [
     { id: "triage", label: "Triage" },
     { id: "team", label: "Issues" },
@@ -355,6 +368,7 @@ export function scopesFor({ views }, { name: teamName, projects }) {
   const projectScopes = byStatusAndPriority.map((project) => ({
     id: `project:${project.id}`,
     label: project.name,
+    icon: projectStatusIcon(project),
     team: teamName,
     group: `${teamName} Projects`,
     subgroup: project.status?.name,
