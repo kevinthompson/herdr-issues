@@ -23,6 +23,10 @@ function startedSetup() {
 
 const render = (setup) => setup.render(theme, { onRetry() {}, header: null, onCollapse() {} });
 
+// The tracker step's Next, and whether pressing it would do anything.
+const trackerNext = (setup) => byId(render(setup), "setup-tracker-next");
+const pressable = (button) => button.calls.some(([name]) => name === "on_click");
+
 // Whether a tracker row's radio indicator is filled.
 const radioFilled = (page, id) => Boolean(callArg(byId(page, `setup-tracker-${id}-radio`), "bg"));
 
@@ -82,7 +86,7 @@ test("a failed check shows its problem, fix and buttons inside the chosen tracke
   assert.ok([...walk(row)].some((node) => callArg(node, "path") === "mods/issues/icons/circle-alert.svg"));
   assert.ok(byId(row, "setup-problem-check"));
   assert.ok(byId(row, "setup-problem-beads-init"));
-  assert.equal(byId(render(setup), "setup-tracker-next"), undefined);
+  assert.equal(pressable(trackerNext(setup)), false);
 });
 
 test("a Linear key problem puts the key form in the Linear row", (t) => {
@@ -94,24 +98,80 @@ test("a Linear key problem puts the key form in the Linear row", (t) => {
   assert.ok(byId(byId(render(setup), "setup-tracker-linear"), "setup-problem-save-key"));
 });
 
+test("once the chosen tracker's check passes, setup stays on the tracker step with Next enabled", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "github";
+  setup.ready(proposed, cx);
+
+  assert.equal(setup.step, "tracker");
+  assert.ok(setup.selects);
+  assert.ok(pressable(trackerNext(setup)));
+});
+
+test("the tracker step's Next goes to the approval step, or for Linear to the team step", (t) => {
+  stubHerdr(t);
+  for (const [choice, step] of [
+    ["github", "approval"],
+    ["linear", "team"],
+  ]) {
+    const setup = startedSetup();
+    setup.tracker.choice = choice;
+    setup.ready(proposed, cx);
+
+    callArg(trackerNext(setup), "on_click")(null, cx);
+    assert.equal(setup.step, step);
+  }
+});
+
 test("back on the tracker step, Next goes on with the tracker that passed its check", (t) => {
   stubHerdr(t);
   const setup = startedSetup();
   setup.tracker.choice = "github";
   setup.ready(proposed, cx);
+  setup.leaveTrackerStep(cx);
   setup.back(cx);
   assert.equal(setup.step, "tracker");
 
-  callArg(byId(render(setup), "setup-tracker-next"), "on_click")(null, cx);
+  callArg(trackerNext(setup), "on_click")(null, cx);
   assert.equal(setup.step, "approval");
 });
 
-test("the tracker step has no Next before a tracker's check passes", (t) => {
+test("the tracker step's Next shows disabled before a choice, while checking and after a failed check", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  assert.equal(pressable(trackerNext(setup)), false);
+
+  setup.tracker.choice = "github";
+  setup.tracker.checking = true;
+  assert.equal(pressable(trackerNext(setup)), false);
+
+  setup.tracker.checking = false;
+  setup.tracker.problem = BEADS_NOT_INITIALIZED;
+  assert.equal(pressable(trackerNext(setup)), false);
+});
+
+test("a disabled Next leaves setup on the tracker step", (t) => {
   stubHerdr(t);
   const setup = startedSetup();
   setup.tracker.choice = "github";
 
-  assert.equal(byId(render(setup), "setup-tracker-next"), undefined);
+  setup.leaveTrackerStep(cx);
+  assert.equal(setup.step, "tracker");
+});
+
+test("choosing another tracker after one passed disables Next until the new one's check passes", (t) => {
+  stubHerdr(t);
+  const setup = startedSetup();
+  setup.tracker.choice = "github";
+  setup.ready(proposed, cx);
+
+  setup.tracker.choose("beads", cx);
+  setup.tracker.checking = false;
+  assert.equal(pressable(trackerNext(setup)), false);
+
+  setup.ready(proposed, cx);
+  assert.ok(pressable(trackerNext(setup)));
 });
 
 test("Linear's team step shows the team dropdown in a card under a Team heading", (t) => {
@@ -119,6 +179,7 @@ test("Linear's team step shows the team dropdown in a card under a Team heading"
   const setup = startedSetup();
   setup.tracker.choice = "linear";
   setup.ready(proposed, cx);
+  setup.leaveTrackerStep(cx);
   setup.tracker.teams = [{ key: "ENG", name: "Engineering" }];
   const page = render(setup);
   const card = [...walk(page)].find(
