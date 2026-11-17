@@ -18,6 +18,7 @@ function readySetup(proposed = { approval: "ask", onApproval: "merge", waitForCh
   setup.tracker.choice = "github";
   setup.settingUp = true;
   setup.ready(proposed, cx);
+  setup.leaveTrackerStep(cx);
   return setup;
 }
 

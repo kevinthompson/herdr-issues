@@ -25,11 +25,12 @@ function context() {
 
 const proposed = { approval: "ask", onApproval: "merge", waitForChecks: "no", pushAfterMerge: "no" };
 
-// Starts a repository's setup, chooses GitHub Issues as though its check passed, and answers approval.
+// Starts a repository's setup, chooses GitHub Issues as though its check passed, presses Next and answers approval.
 function advance(setup, approval, cx) {
   setup.settingUp = true;
   setup.tracker.choice = "github";
   setup.ready(proposed, cx);
+  setup.leaveTrackerStep(cx);
   setup.chooseApproval("approval", approval, cx);
 }
 
@@ -122,7 +123,7 @@ test("a tracker check that finishes after another repository is shown applies to
   await cx.settle();
 
   assert.equal(kept.forRepository(a.main), a);
-  assert.equal(a.step, "approval");
+  assert.equal(a.readyTracker, "github");
   assert.equal(a.tracker.checking, false);
   assert.equal(b.step, "tracker");
   assert.equal(b.tracker.choice, null);

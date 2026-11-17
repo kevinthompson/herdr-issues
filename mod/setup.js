@@ -431,8 +431,8 @@ export class TrackerSetup {
     this.tracker.takePickedTeam(cx);
   }
 
-  // The chosen tracker checked out: the approval questions' selects, made once since they need a cx, and the step
-  // after the tracker.
+  // The chosen tracker checked out: the approval questions' selects, made once since they need a cx, and the
+  // tracker step's Next enabled.
   /**
    * @param {ProposedApproval} proposed
    * @param {Context} cx
@@ -445,7 +445,19 @@ export class TrackerSetup {
         Object.entries(APPROVAL_QUESTIONS).map(([key, { title }]) => [key, new SelectMenu(`setup-${key}`, title, cx)]),
       )
     );
-    this.goTo(this.stepAfterTracker(), cx);
+    cx.notify();
+  }
+
+  chosenTrackerReady() {
+    const tracker = this.tracker;
+    return Boolean(tracker.choice) && this.readyTracker === tracker.choice && !tracker.checking && !tracker.problem;
+  }
+
+  /**
+   * @param {Context} cx
+   */
+  leaveTrackerStep(cx) {
+    if (this.chosenTrackerReady()) this.goTo(this.stepAfterTracker(), cx);
   }
 
   stepAfterTracker() {
@@ -703,12 +715,13 @@ export class TrackerSetup {
    * @param {string} label
    * @param {(cx: Context) => void} onClick
    * @param {Theme} t
+   * @param {{ enabled?: boolean }} [options]
    */
-  nextButton(id, label, onClick, t) {
+  nextButton(id, label, onClick, t, { enabled = true } = {}) {
     return h_flex()
       .flex_none()
       .justify_end()
-      .child(button(id, label, onClick, t, { primary: true }));
+      .child(button(id, label, onClick, t, { primary: true, enabled }));
   }
 
   // A tracker's row in the tracker card: a radio indicator beside its label, its description, and for the answer
@@ -766,7 +779,6 @@ export class TrackerSetup {
       ? "Choose a different issue tracker for this repository."
       : "This repository has no issue tracker yet. Choose where its issues live.";
     const chosen = tracker.choice;
-    const status = tracker.checking || Boolean(tracker.problem);
     return content
       .child(this.pageHeading("Where do this repository's issues live?", sentence, t))
       .child(
@@ -778,8 +790,10 @@ export class TrackerSetup {
           t,
         ),
       )
-      .when(!status && Boolean(chosen) && this.readyTracker === chosen, (e) =>
-        e.child(this.nextButton("setup-tracker-next", "Next", (cx) => this.goTo(this.stepAfterTracker(), cx), t)),
+      .child(
+        this.nextButton("setup-tracker-next", "Next", (cx) => this.leaveTrackerStep(cx), t, {
+          enabled: this.chosenTrackerReady(),
+        }),
       );
   }
 
