@@ -110,7 +110,7 @@ const BLANK_STATE_ICON_PX = 40;
 // Centered in place of the list: an icon, why there are no issues, the button that fixes it when there is
 // one, and how to put the panel away instead.
 /**
- * @param {{ sentence: string, action?: { id: string, label: string, enabled?: boolean, onClick: (cx: Context) => void }, error?: string | null }} props
+ * @param {{ sentence: string | NativeElement, action?: { id: string, label: string, enabled?: boolean, onClick: (cx: Context) => void }, error?: string | null }} props
  * @param {Theme} t
  */
 function blankState({ sentence, action, error = null }, t) {
@@ -122,7 +122,11 @@ function blankState({ sentence, action, error = null }, t) {
     .items_center()
     .justify_center()
     .child(svg("mods/issues/icons/file-text.svg").size(BLANK_STATE_ICON_PX).text_color(t.dim))
-    .child(div().whitespace_normal().text_center().text_color(t.muted).child(sentence))
+    .child(
+      typeof sentence === "string"
+        ? div().whitespace_normal().text_center().text_color(t.muted).child(sentence)
+        : sentence,
+    )
     .children(
       action
         ? [button(action.id, action.label, action.onClick, t, { primary: true, enabled: action.enabled ?? true })]
@@ -141,13 +145,13 @@ function blankState({ sentence, action, error = null }, t) {
     .child(collapseHint(t));
 }
 
-// The chord sits in a monospace chip because the UI font draws a capital I like a lowercase l, and ⌘⇧L changes
-// the Herdr layout instead.
 /**
+ * Text set as code in a sentence: a key chord or a command.
+ * @param {string} text
  * @param {Theme} t
  */
-function collapseHint(t) {
-  const keyChip = div()
+const codeChip = (text, t) =>
+  div()
     .flex_none()
     .px(4)
     .rounded(4)
@@ -155,7 +159,14 @@ function collapseHint(t) {
     .text_color(t.foreground)
     .text_size(11)
     .font_family(/** @type {string} */ (settings().font_family))
-    .child("CMD + Shift + I");
+    .child(text);
+
+// The chord sits in a monospace chip because the UI font draws a capital I like a lowercase l, and ⌘⇧L changes
+// the Herdr layout instead.
+/**
+ * @param {Theme} t
+ */
+function collapseHint(t) {
   return h_flex()
     .flex_wrap()
     .justify_center()
@@ -164,7 +175,7 @@ function collapseHint(t) {
     .text_size(12)
     .text_color(t.dim)
     .child(div().child("Press"))
-    .child(keyChip)
+    .child(codeChip("CMD + Shift + I", t))
     .child(div().whitespace_normal().text_center().child("to collapse this panel."));
 }
 
@@ -192,7 +203,25 @@ export function notARepositoryView({ initializing, error, onInitialize }, t) {
 // For a loaded scope with no issues, pointing at the skills that write them.
 /** @param {Theme} t */
 export function emptyListView(t) {
-  return blankState({ sentence: "Run /issues:plan or /issues:create in Claude Code to begin making issues." }, t);
+  const line = () => h_flex().flex_wrap().justify_center().items_center().gap_x(4);
+  return blankState(
+    {
+      sentence: v_flex()
+        .items_center()
+        .gap(4)
+        .text_color(t.muted)
+        .child(
+          line()
+            .child(div().child("Run"))
+            .child(codeChip("/issues:plan", t))
+            .child(div().child("or"))
+            .child(codeChip("/issues:create", t))
+            .child(div().child("in Claude Code")),
+        )
+        .child(div().whitespace_normal().text_center().child("to begin making issues.")),
+    },
+    t,
+  );
 }
 
 /**
