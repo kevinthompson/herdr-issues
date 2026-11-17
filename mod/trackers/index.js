@@ -117,6 +117,7 @@
  * @property {string} [team]
  * @property {string} [url]
  * @property {string} [subgroup]
+ * @property {string | null} [subgroupIcon]
  * @property {TrackerScope[]} [milestones]
  */
 
