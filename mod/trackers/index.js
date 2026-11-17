@@ -114,6 +114,7 @@
  * @property {string} [id]
  * @property {string} [label]
  * @property {string | null} [icon]
+ * @property {`#${string}`} [iconColor]
  * @property {string} [group]
  * @property {string} [team]
  * @property {string} [url]

@@ -4,7 +4,7 @@
 // { menu: "labels", root, on, id, groups, current }, listing the applied labels above a divider and the rest below,
 // where picking a label checks or unchecks it.
 // The panel's scope, milestone and label dropdowns, and the settings view's scope, are popups too, with props { menu: "scope", scopes, current, key, store }:
-// scopes are { id, label, icon?, group?, subgroup?, subgroupIcon? }, and headings name each group and subgroup where it starts:
+// scopes are { id, label, icon?, iconColor?, group?, subgroup?, subgroupIcon? }, and headings name each group and subgroup where it starts:
 // a group's in muted, spaced capitals below a divider that spans the menu, and a subgroup's dimmed,
 // so neither looks like an option to pick. In a menu where some options have icons, the others leave the
 // icon's room empty so every option's text lines up.
@@ -25,13 +25,14 @@ import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
  * @property {string | number} [value]
  * @property {string} [label]
  * @property {string | null} [icon]
+ * @property {`#${string}`} [iconColor]
  * @property {string} [heading]
  * @property {string} [subheading]
  * @property {string | null} [subheadingIcon]
  * @property {boolean} [divider]
  */
 
-/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "group" | "subgroupIcon"> & { subgroup?: string }} ScopeOption */
+/** @typedef {Pick<TrackerScope, "id" | "label" | "icon" | "iconColor" | "group" | "subgroupIcon"> &{ subgroup?: string }} ScopeOption */
 
 const ROW = 28,
   PADDING = 5,
@@ -173,7 +174,7 @@ function optionList(options, isChecked, onPick) {
                   .hover((s) => s.bg(t.selected))
                   .on_click((_e, cx) => onPick(option, cx))
                   .when(Boolean(option.icon), (e) =>
-                    e.child(optionIcon(/** @type {string} */ (option.icon), t.foreground)),
+                    e.child(optionIcon(/** @type {string} */ (option.icon), option.iconColor ?? t.foreground)),
                   )
                   .when(alignsTextPastIcons && !option.icon, (e) => e.child(div().flex_none().w(ICON_PX)))
                   .child(div().flex_1().truncate().child(option.label))
@@ -216,7 +217,7 @@ function scopeOptions(scopes) {
     return [
       ...(startsGroup ? [{ heading: scope.group }] : []),
       ...(startsSubgroup ? [{ subheading: scope.subgroup, subheadingIcon: scope.subgroupIcon }] : []),
-      { value: scope.id, label: scope.label, icon: scope.icon },
+      { value: scope.id, label: scope.label, icon: scope.icon, iconColor: scope.iconColor },
     ];
   });
 }
@@ -237,10 +238,11 @@ const menuHeight = (options) =>
  * @param {string} [store]
  */
 export function openScopeMenu(scopes, current, key, store = SCOPES) {
-  const listed = scopes.map(({ id, label, icon, group, subgroup, subgroupIcon }) => ({
+  const listed = scopes.map(({ id, label, icon, iconColor, group, subgroup, subgroupIcon }) => ({
     id,
     label,
     icon,
+    iconColor,
     group,
     subgroup,
     subgroupIcon,

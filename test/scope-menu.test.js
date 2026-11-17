@@ -41,15 +41,52 @@ test("My issues shows the person icon", (t) => {
   assert.equal(callArg(iconOf(byId(menu, "option-mine")), "path"), "mods/issues/icons/user.svg");
 });
 
-test("each project shows the icon of the closest issue status", (t) => {
-  const { menu } = openAndRender(t, () => openScopeMenu(linearScopes, "mine", "repo"));
-  const icons = ["p1", "p2", "p3", "p4"].map((id) => callArg(iconOf(byId(menu, `option-project:${id}`)), "path"));
-  assert.deepEqual(icons, [
-    "mods/issues/icons/in-progress.png",
-    "mods/issues/icons/todo.png",
-    "mods/issues/icons/blocked.png",
-    "mods/issues/icons/backlog.png",
-  ]);
+test("a project with a mapped Linear icon name shows that icon's file, ignoring case", () => {
+  const scopes = scopesFor(
+    { views: [] },
+    {
+      name: "Web",
+      projects: [
+        { ...project("cal", "started"), icon: "Calendar" },
+        { ...project("bug", "started"), icon: "bug" },
+      ],
+    },
+  );
+  const icons = ["cal", "bug"].map((id) => scopes.find((scope) => scope.id === `project:${id}`)?.icon);
+  assert.deepEqual(icons, ["mods/issues/icons/calendar.svg", "mods/issues/icons/bug.svg"]);
+});
+
+test("a project with an unmapped icon name, an emoji shortcode or no icon shows the generic project icon", () => {
+  const scopes = scopesFor(
+    { views: [] },
+    {
+      name: "Web",
+      projects: [
+        { ...project("odd", "started"), icon: "NoSuchIcon" },
+        { ...project("emoji", "started"), icon: ":rotating_light:" },
+        { ...project("none", "started"), icon: null },
+      ],
+    },
+  );
+  const icons = ["odd", "emoji", "none"].map((id) => scopes.find((scope) => scope.id === `project:${id}`)?.icon);
+  assert.deepEqual(icons, Array(3).fill("mods/issues/icons/box.svg"));
+});
+
+test("a project's icon is tinted with its Linear color, or the theme's foreground without one", (t) => {
+  const scopes = scopesFor(
+    { views: [] },
+    {
+      name: "Web",
+      projects: [
+        { ...project("red", "started"), icon: "Calendar", color: "#eb5757" },
+        { ...project("plain", "started"), icon: "Calendar" },
+      ],
+    },
+  );
+  const { menu } = openAndRender(t, () => openScopeMenu(scopes, "mine", "repo"));
+  const colors = ["red", "plain"].map((id) => callArg(iconOf(byId(menu, `option-project:${id}`)), "text_color"));
+  assert.deepEqual(colors, ["#eb5757", THEME.foreground]);
+  assert.equal(callArg(iconOf(byId(menu, "option-mine")), "text_color"), THEME.foreground);
 });
 
 test("each project status subheading shows its status's icon before its dimmed text", (t) => {
