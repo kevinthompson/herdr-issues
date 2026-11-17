@@ -11,7 +11,6 @@ export const HEADER_HEIGHT_PX = 30;
 export const HEADER_TEXT_PX = 12;
 const HEADER_ICON_PX = 14;
 const ICON_BUTTON_PADDING_PX = 3;
-export const ICON_BUTTON_PX = HEADER_ICON_PX + 2 * ICON_BUTTON_PADDING_PX;
 const TITLE_MAX_WIDTH_PX = 260;
 
 /**
@@ -43,21 +42,22 @@ export const collapseButton = (onCollapse, t) =>
   iconButton({ id: "issues-collapse", icon: "panel-right-close", tooltip: "Collapse panel", onClick: onCollapse }, t);
 
 /**
+ * The header's full-width bar with its background and bottom line, empty, which the collapsed strip also draws
+ * around its expand button.
+ * @param {Theme} t
+ */
+export const headerCell = (t) =>
+  h_flex().h(HEADER_HEIGHT_PX).w_full().flex_none().items_center().bg(t.background).border_b(1).border_color(t.border);
+
+/**
  * @param {{ icon?: string, title: string, secondary?: string | null, trailing?: (NativeElement | null)[] }} props
  *   `icon` is the leading icon's name in mod/icons.
  * @param {Theme} t
  */
 export function headerBar({ icon, title, secondary, trailing = [] }, t) {
-  return h_flex()
-    .h(HEADER_HEIGHT_PX)
-    .w_full()
-    .flex_none()
+  return headerCell(t)
     .px(10)
     .gap(8)
-    .items_center()
-    .bg(t.background)
-    .border_b(1)
-    .border_color(t.border)
     .text_size(HEADER_TEXT_PX)
     .when(Boolean(icon), (e) =>
       e.child(svg(`mods/issues/icons/${icon}.svg`).size(HEADER_ICON_PX).flex_none().text_color(t.dim)),
