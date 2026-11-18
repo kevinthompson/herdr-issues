@@ -81,8 +81,8 @@ The uninstall script removes:
 It asks before each of these, and keeps them unless you answer yes:
 
 - removing the Issues panel from your layouts that show it; Herdr's shipped layouts are never changed;
-- deleting `~/.config/herdr-app/issues.json`, each repository's tracker and merge settings, along with the Linear API key a system without the macOS Keychain keeps beside it;
-- deleting your Linear API key from the macOS Keychain;
+- deleting `~/.config/herdr-app/issues.json`, each repository's tracker and merge settings, along with `linear.json` beside it, which holds your Linear API key;
+- deleting a Linear API key an earlier version left in the macOS Keychain;
 - deleting the cached lists and avatars in `~/.config/herdr-app/data/issues/`.
 
 Without a terminal to ask in, it keeps all four and prints how to remove each. Running it again is safe, and says when there is nothing left to remove.

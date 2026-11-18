@@ -18,13 +18,9 @@ It asks which tracker to use, checks the credentials it needs, and saves the cho
 
 Each tracker needs:
 
-- **Linear**: a personal API key, created in Linear under Settings → Account → Security & access ([linear.app/settings/account/security](https://linear.app/settings/account/security)). Choosing Linear in the panel's setup view without a key shows a field for it, with a link to that page: paste the key and choose **Save key**. The panel checks the key with Linear, saves it in the macOS Keychain, where a dotfiles repository tracking `~/.config/herdr-app/` can't commit it, and moves on to choosing the team. A repository whose key goes missing or stops working shows the same field. The panel never shows the key again once it's saved. A key an earlier version saved in a file in `~/.config/herdr-app/` moves to the Keychain the first time the panel reads it, and the file goes away. On a system without the Keychain's `security` command, the panel keeps the key in that file instead, readable only by you.
+- **Linear**: a personal API key, created in Linear under Settings → Account → Security & access ([linear.app/settings/account/security](https://linear.app/settings/account/security)). Choosing Linear in the panel's setup view without a key shows a field for it, with a link to that page: paste the key and choose **Save key**. The panel checks the key with Linear, saves it as `"apiKey"` in `~/.config/herdr-app/linear.json`, readable only by you and keeping the file's other fields, and moves on to choosing the team. Other Herdr mods that call Linear read the key from the same file. A repository whose key goes missing or stops working shows the same field. The panel never shows the key again once it's saved. A key an earlier version saved in the macOS Keychain moves to `linear.json` the first time the panel reads it, and the Keychain item goes away.
 
-  To save the key in the Keychain yourself instead, run this command, which asks for the key:
-
-  ```sh
-  security add-generic-password -U -s herdr-issues -a linear -w
-  ```
+  To save the key yourself instead, add it to that file: `{ "apiKey": "lin_api_…" }`. If a dotfiles repository tracks `~/.config/herdr-app/`, add `linear.json` to its `.gitignore` so it never commits the key.
 
   The Claude skills reach Linear through its MCP server instead, so add that to Claude Code as well, for every project:
 
@@ -39,7 +35,7 @@ Each tracker needs:
 
 ## The `issues.json` entry
 
-`~/.config/herdr-app/issues.json` holds one entry per repository under `repos`, keyed by the path of the repository's main checkout, with `~` for your home folder. The file holds no secrets; Linear's API key stays in the macOS Keychain.
+`~/.config/herdr-app/issues.json` holds one entry per repository under `repos`, keyed by the path of the repository's main checkout, with `~` for your home folder. The file holds no secrets; Linear's API key stays in `linear.json` beside it.
 
 ```json
 {

@@ -6,7 +6,7 @@
 #   - the mod's keys in $HERDR_APP_HOME/keys.json still bound to the mod's actions
 #   - the issues@herdr-issues plugin and the herdr-issues marketplace
 # It asks before removing the Issues panel from personal layouts, the issues.json settings (and linear.json,
-# where a system without the Keychain keeps the Linear API key), the Linear API key in the macOS Keychain, and
+# which holds the Linear API key), a Linear API key an earlier version left in the macOS Keychain, and
 # the cached lists and avatars; the default answer is no, and without a terminal it keeps all four.
 # Run from ~/.local/share/herdr-issues, where the install command keeps its checkout, it deletes that
 # checkout last; it leaves any other checkout in place.
