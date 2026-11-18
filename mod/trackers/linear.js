@@ -1,5 +1,5 @@
 // Issues in Linear, for repositories whose entry in issues.json names a team (setting.js). The API key is the
-// one secret, kept in the app folder's linear.json, which other mods that call Linear share.
+// one secret, kept in the app folder's linear.json, which other mods that call Linear share, or else in LINEAR_API_KEY.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
 // default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
 // open projects are scopes too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
@@ -10,7 +10,14 @@ import { cachedLookup, forgetLookups } from "../lookups.js";
 import { STATUSES, STATUS_LABELS as ISSUE_STATUS_LABELS, priorityRank } from "../issue.js";
 import { refuseUnknownLabels } from "./labels.js";
 import { projectIcon } from "./linear-project-icons.js";
-import { linearKeyMissing, linearKeyUnreadable, linearKeyInvalid, LINEAR_KEY_PROBLEM } from "./problems.js";
+import {
+  linearKeyMissing,
+  linearKeyUnreadable,
+  linearKeyInvalid,
+  LINEAR_KEY_FILE,
+  LINEAR_KEY_PROBLEM,
+  LINEAR_KEY_VARIABLE,
+} from "./problems.js";
 
 /** @typedef {import("./index.js").Issue} Issue */
 /** @typedef {import("./index.js").Tracker} Tracker */
@@ -265,26 +272,44 @@ async function saveInKeyFile(apiKey, { text, fields }) {
     throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
 }
 
-// The key from the key file, after moving a key an earlier version saved in the Keychain there, or null.
+const FIELD = "\x1e";
+const PRINT_KEY_VARIABLE = `printf '${FIELD}%s${FIELD}' "$LINEAR_API_KEY"`;
+// An app started from the Dock doesn't load the shell profile, so a variable missing from its own environment
+// comes from the person's interactive login shell.
+const ASK_FOR_KEY_VARIABLE = `[ -n "$LINEAR_API_KEY" ] && exec /bin/sh -c "$1"; exec "\${SHELL:-/bin/sh}" -lic "$1"`;
+
+// The key in LINEAR_API_KEY, or null when it's unset.
+async function keyVariable() {
+  const result = await exec("sh", ["-c", ASK_FOR_KEY_VARIABLE, "sh", PRINT_KEY_VARIABLE]).catch(noResult);
+  const fields = result?.stdout.split(FIELD) ?? [];
+  return (fields.length >= 3 && fields.at(-2)?.trim()) || null;
+}
+
+// The key and the store it came from, `apiKey` in the key file else LINEAR_API_KEY, after moving a key an
+// earlier version saved in the Keychain to the key file when neither has one; null when there's none.
+/** @typedef {{ apiKey: string, store: string }} StoredKey */
 const cachedApiKey = cachedLookup();
 const readApiKey = () =>
   cachedApiKey("apiKey", async () => {
     const keyFile = await readKeyFile();
     if (!keyFile.valid) throw linearKeyUnreadable("it isn't valid JSON");
-    if (keyFile.fields.apiKey) return keyFile.fields.apiKey;
+    if (keyFile.fields.apiKey) return { apiKey: keyFile.fields.apiKey, store: LINEAR_KEY_FILE };
+    const variableKey = await keyVariable();
+    if (variableKey) return { apiKey: variableKey, store: LINEAR_KEY_VARIABLE };
     const movedKey = await keychainKey();
     if (!movedKey) return null;
     await saveInKeyFile(movedKey, keyFile);
     await security(["delete-generic-password", ...KEYCHAIN_ITEM]);
-    return movedKey;
+    return { apiKey: movedKey, store: LINEAR_KEY_FILE };
   });
 
 // A function that asks Linear's API a query with the person's API key: (query, variables) → its data.
 /** @returns {Promise<LinearClient>} */
 export async function linearClient() {
-  const apiKey = await readApiKey();
-  if (!apiKey) throw linearKeyMissing();
-  return (query, variables = {}) => request(apiKey, query, variables);
+  const storedKey = /** @type {StoredKey | null} */ (await readApiKey());
+  if (!storedKey) throw linearKeyMissing();
+  const { apiKey, store } = storedKey;
+  return (query, variables = {}) => request(apiKey, query, variables, store);
 }
 
 // Saves the API key in the key file once Linear accepts it. A key Linear refuses rejects and saves nothing.
@@ -363,17 +388,18 @@ export function findScope(scopes, scopeId) {
  * @param {string} apiKey
  * @param {string} query
  * @param {Record<string, any>} variables
+ * @param {string} [store]
  */
-async function request(apiKey, query, variables) {
+async function request(apiKey, query, variables, store = LINEAR_KEY_FILE) {
   const response = await fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: apiKey },
     body: JSON.stringify({ query, variables }),
   });
-  if (response.status === 401) throw linearKeyInvalid();
+  if (response.status === 401) throw linearKeyInvalid(store);
   const json = /** @type {any} */ (JSON.parse(await response.text()));
   const error = json?.errors?.[0];
-  if (error?.extensions?.code === "AUTHENTICATION_ERROR") throw linearKeyInvalid();
+  if (error?.extensions?.code === "AUTHENTICATION_ERROR") throw linearKeyInvalid(store);
   if (error) throw new Error(error.extensions?.userPresentableMessage ?? error.message);
   if (!response.ok) throw new Error(`Linear answered ${response.status}`);
   return json.data;

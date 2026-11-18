@@ -18,7 +18,7 @@ The settings are the repository's entry in `~/.config/herdr-app/issues.json`, un
 }
 ```
 
-Linear's API key lives apart from it, in `~/.config/herdr-app/linear.json`.
+Linear's API key lives apart from it, in `~/.config/herdr-app/linear.json` or the `LINEAR_API_KEY` environment variable.
 
 `views` is optional: saved Linear views the panel offers as lists beside the team's, a map from each view's name, the label the panel's list dropdown shows, to the view's URL (`https://linear.app/<workspace>/view/<slug>-<id>`). Only a `linear` entry has it. `repo` is optional too: without it, GitHub issues come from origin's repository.
 

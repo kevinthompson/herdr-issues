@@ -64,6 +64,14 @@ describe("issues auth linear", () => {
     assert.equal(readLinearKey(), API_KEY);
   });
 
+  test("passes silently with LINEAR_API_KEY and no key in linear.json", async (t) => {
+    process.env.LINEAR_API_KEY = API_KEY;
+    t.after(() => delete process.env.LINEAR_API_KEY);
+    const { code, output } = await auth(t, "linear");
+    assert.equal(code, 0);
+    assert.ok(!output.includes(API_KEY));
+  });
+
   test("moves a key in the Keychain to linear.json and passes silently", async (t) => {
     saveKeychainPassword("herdr-issues", "linear", API_KEY);
     const { code, output } = await auth(t, "linear");

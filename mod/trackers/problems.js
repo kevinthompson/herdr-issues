@@ -17,11 +17,14 @@ export class SetupProblem extends Error {
 }
 
 export const LINEAR_KEY_PAGE = "https://linear.app/settings/account/security";
-const LINEAR_KEY_FILE = "~/.config/herdr-app/linear.json";
+export const LINEAR_KEY_FILE = "~/.config/herdr-app/linear.json";
+export const LINEAR_KEY_VARIABLE = "LINEAR_API_KEY";
 const LINEAR_KEY_FIX =
   `Create a personal API key in Linear under **Settings → Account → Security & access** (${LINEAR_KEY_PAGE}), paste it in the Issues panel's API key field ` +
   `and choose **Save key**, which keeps it in \`${LINEAR_KEY_FILE}\`. Or add it to that file yourself as ` +
-  '`"apiKey"`, such as `{ "apiKey": "lin_api_…" }`, then check again.';
+  '`"apiKey"`, such as `{ "apiKey": "lin_api_…" }`, or set `' +
+  LINEAR_KEY_VARIABLE +
+  "` in your shell profile, then check again. A key in the file takes precedence over the variable.";
 
 // Installing a missing tool with the person's package managers, or as `instructions` say when they have none.
 /**
@@ -68,7 +71,11 @@ export const bdFailed = (message) =>
   new SetupProblem(message, "Check that `bd list` works in the repository's main checkout, then check again.");
 export const LINEAR_KEY_PROBLEM = "linear-key";
 export const linearKeyMissing = () =>
-  new SetupProblem(`No Linear API key in ${LINEAR_KEY_FILE}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+  new SetupProblem(
+    `No Linear API key in ${LINEAR_KEY_FILE} or ${LINEAR_KEY_VARIABLE}`,
+    LINEAR_KEY_FIX,
+    LINEAR_KEY_PROBLEM,
+  );
 /** @param {string} reason */
 export const linearKeyUnreadable = (reason) =>
   new SetupProblem(
@@ -76,8 +83,10 @@ export const linearKeyUnreadable = (reason) =>
     LINEAR_KEY_FIX,
     LINEAR_KEY_PROBLEM,
   );
-export const linearKeyInvalid = () =>
-  new SetupProblem(`Linear refused the API key in ${LINEAR_KEY_FILE}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+// `store` is LINEAR_KEY_FILE or LINEAR_KEY_VARIABLE, whichever the refused key came from.
+/** @param {string} store */
+export const linearKeyInvalid = (store) =>
+  new SetupProblem(`Linear refused the API key in ${store}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
 /** @param {string} message */
 export const badSetting = (message) =>
   new SetupProblem(

@@ -2,7 +2,8 @@
 // which wraps the issues CLI's shim, and its `gpui-kit` and `gpui-base` imports at test/support/gpui.js, and
 // gives the process a temporary home so neither the tests nor the git they run read or write the person's home
 // folder, git configuration or ~/.config/herdr-app. A stand-in for
-// macOS's `security` comes first on the PATH, so nothing they run reads or writes the person's Keychain.
+// macOS's `security` comes first on the PATH, so nothing they run reads or writes the person's Keychain, and
+// LINEAR_API_KEY is unset with /bin/sh as the login shell, so the person's Linear key never reaches a test.
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { tmpdir } from "node:os";
@@ -15,6 +16,7 @@ process.on("exit", () => rmSync(temporaryHome, { recursive: true, force: true })
 Object.assign(process.env, {
   PATH: [fakeSecurityFolder, process.env.PATH].join(delimiter),
   HOME: temporaryHome,
+  SHELL: "/bin/sh",
   HERDR_APP_HOME: join(temporaryHome, ".config/herdr-app"),
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_NOSYSTEM: "1",
@@ -23,6 +25,7 @@ Object.assign(process.env, {
   GIT_COMMITTER_NAME: "Test",
   GIT_COMMITTER_EMAIL: "test@example.com",
 });
+delete process.env.LINEAR_API_KEY;
 
 const herdrForTests = new URL("./herdr.js", import.meta.url).href;
 const gpuiForTests = new URL("./gpui.js", import.meta.url).href;

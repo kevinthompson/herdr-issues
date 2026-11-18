@@ -20,7 +20,7 @@ Each tracker needs:
 
 - **Linear**: a personal API key, created in Linear under Settings → Account → Security & access ([linear.app/settings/account/security](https://linear.app/settings/account/security)). Choosing Linear in the panel's setup view without a key shows a field for it, with a link to that page: paste the key and choose **Save key**. The panel checks the key with Linear, saves it as `"apiKey"` in `~/.config/herdr-app/linear.json`, readable only by you and keeping the file's other fields, and moves on to choosing the team. Other Herdr mods that call Linear read the key from the same file. A repository whose key goes missing or stops working shows the same field. The panel never shows the key again once it's saved. A key an earlier version saved in the macOS Keychain moves to `linear.json` the first time the panel reads it, and the Keychain item goes away.
 
-  To save the key yourself instead, add it to that file: `{ "apiKey": "lin_api_…" }`. If a dotfiles repository tracks `~/.config/herdr-app/`, add `linear.json` to its `.gitignore` so it never commits the key.
+  To save the key yourself instead, add it to that file, `{ "apiKey": "lin_api_…" }`, or set `LINEAR_API_KEY` in your shell profile; the panel reads the variable from your login shell when Herdr was started from the Dock, and a key in the file takes precedence over it. If a dotfiles repository tracks `~/.config/herdr-app/`, add `linear.json` to its `.gitignore` so it never commits the key.
 
   The Claude skills reach Linear through its MCP server instead, so add that to Claude Code as well, for every project:
 

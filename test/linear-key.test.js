@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { dirname, join } from "node:path";
 import { beforeEach, describe, test } from "node:test";
 import { linearClient, linearKeyPath, saveLinearKey } from "../mod/trackers/linear.js";
 import { forgetLookups } from "../mod/lookups.js";
@@ -161,16 +161,73 @@ describe("linearClient", () => {
     });
   });
 
-  test("reports a missing key in the key file", async () => {
+  describe("with LINEAR_API_KEY", () => {
+    const setKeyVariable = (t, apiKey) => {
+      process.env.LINEAR_API_KEY = apiKey;
+      t.after(() => delete process.env.LINEAR_API_KEY);
+    };
+
+    test("asks Linear with the variable's key when the key file has none", async (t) => {
+      setKeyVariable(t, "lin_api_variable");
+      writeKeyFile(JSON.stringify({ note: "kept" }));
+      assert.equal(await authorizationSent(t), "lin_api_variable");
+      assert.deepEqual(keyFile(), { note: "kept" });
+    });
+
+    test("prefers the key file's key to the variable's", async (t) => {
+      setKeyVariable(t, "lin_api_variable");
+      writeKeyFile(JSON.stringify({ apiKey: "lin_api_file" }));
+      assert.equal(await authorizationSent(t), "lin_api_file");
+    });
+
+    test("prefers the variable's key to one left in the Keychain, leaving the Keychain item", async (t) => {
+      setKeyVariable(t, "lin_api_variable");
+      saveKeychainKey("lin_api_keychain");
+      assert.equal(await authorizationSent(t), "lin_api_variable");
+      assert.equal(existsSync(linearKeyPath()), false);
+      assert.equal(keychainKey(), "lin_api_keychain");
+    });
+
+    test("reads the variable from the login shell's profile when the app's environment lacks it", async (t) => {
+      writeFileSync(join(process.env.HOME, ".profile"), "export LINEAR_API_KEY=lin_api_profile\n");
+      t.after(() => rmSync(join(process.env.HOME, ".profile")));
+      assert.equal(await authorizationSent(t), "lin_api_profile");
+    });
+
+    test("asks the login shell once until the lookups are forgotten", async (t) => {
+      setKeyVariable(t, "lin_api_variable");
+      let lookups = 0;
+      stubHerdr(t, {
+        exec: async (command, ...rest) => {
+          if (command === "sh") lookups++;
+          return defaults.exec(command, ...rest);
+        },
+      });
+      await linearClient();
+      await linearClient();
+      assert.equal(lookups, 1);
+    });
+
+    test("reports a key Linear refuses as the one in LINEAR_API_KEY", async (t) => {
+      setKeyVariable(t, "lin_api_wrong");
+      stubLinear(t, { accepts: false });
+      const linear = await linearClient();
+      await assert.rejects(linear("query { viewer { id } }"), {
+        message: "Linear refused the API key in LINEAR_API_KEY",
+      });
+    });
+  });
+
+  test("reports a missing key in the key file and LINEAR_API_KEY", async () => {
     await assert.rejects(linearClient(), {
-      message: "No Linear API key in ~/.config/herdr-app/linear.json",
-      fix: /"apiKey"/,
+      message: "No Linear API key in ~/.config/herdr-app/linear.json or LINEAR_API_KEY",
+      fix: /"apiKey".*LINEAR_API_KEY/,
     });
   });
 
   test("reports a missing key when the Keychain can't be read", async (t) => {
     stubSecurity(t, { code: 51, stdout: "", stderr: "User interaction is not allowed." });
-    await assert.rejects(linearClient(), { message: "No Linear API key in ~/.config/herdr-app/linear.json" });
+    await assert.rejects(linearClient(), { message: /^No Linear API key in/ });
   });
 
   test("reports a key file that isn't valid JSON", async () => {
