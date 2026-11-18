@@ -134,7 +134,11 @@ const MY_ISSUES = `query($state: WorkflowStateFilter, $first: Int!, $after: Stri
   assignedIssues(first: $first, after: $after, orderBy: updatedAt, filter: { state: $state }) { ${PAGE} } } }`;
 const TEAM_ISSUES = `query($team: String!, $state: WorkflowStateFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { team: { key: { eq: $team } }, state: $state }) { ${PAGE} } }`;
-const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData } }`;
+const VIEW_FILTER = `query($view: String!) { customView(id: $view) { filterData team { id } } }`;
+/** @param {string} teamId */
+const teamOrSubTeam = (teamId) => ({
+  team: { or: [{ id: { eq: teamId } }, { ancestors: { some: { id: { eq: teamId } } } }] },
+});
 const FILTERED_ISSUES_IN_STATE = `query($filter: IssueFilter!, $state: WorkflowStateFilter, $first: Int!, $after: String) {
   issues(first: $first, after: $after, orderBy: updatedAt, filter: { and: [$filter, { state: $state }] }) { ${PAGE} } }`;
 const TEAM_PROJECTS = `query($team: String!) { team(id: $team) { name
@@ -583,17 +587,20 @@ export async function linearTracker({ root: projectRoot, on }, setting = null) {
     return lists.flat();
   }
 
-  // A view's saved filter decides which issues it holds, finished ones included. Running the filter
-  // ourselves, rather than asking for the view's issues, keeps a view filed under one team from
-  // limiting another team's issues to that team.
+  // A view's saved filter decides which issues it holds, finished ones included. Linear keeps the
+  // team a view belongs to out of that filter, and a team's view includes its sub-teams' issues, so
+  // a view filed under a parent team still lists the sub-team its filter names.
   /** @param {string} viewId */
   async function viewFilter(viewId) {
     const cached = viewFilters.get(viewId);
     if (cached && Date.now() - cached.at < VIEW_FILTER_TTL_MS) return cached.filter;
     const { customView } = await linear(VIEW_FILTER, { view: viewId });
     if (!customView) throw new Error(`Linear has no view ${viewId}`);
-    viewFilters.set(viewId, { filter: customView.filterData, at: Date.now() });
-    return customView.filterData;
+    const filter = customView.team
+      ? { and: [customView.filterData, teamOrSubTeam(customView.team.id)] }
+      : customView.filterData;
+    viewFilters.set(viewId, { filter, at: Date.now() });
+    return filter;
   }
 
   // Every issue the view holds in the states listed: open ones, and finished ones whose group is expanded.
