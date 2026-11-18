@@ -45,7 +45,7 @@
 // workSettings resolves all three.
 // Any model or effort the mod or its skills choose is a setting like these, with a default. Keys it doesn't know,
 // such as retired settings, are ignored and kept when an entry is saved.
-// The file holds no secrets, so it can be shared between machines; Linear's API key stays in the macOS Keychain.
+// The file holds no secrets, so it can be shared between machines; Linear's API key stays in linear.json beside it.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
 // tracker with saveTrackerChoice, its approval settings and pushAfterMerge with saveApprovalSettings, its close with saveCloseSetting, its

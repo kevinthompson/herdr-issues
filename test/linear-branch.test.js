@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { linearTracker } from "../mod/trackers/linear.js";
 import { forgetLookups } from "../mod/lookups.js";
-import { clearKeychain, saveKeychainPassword } from "./support/keychain.js";
+import { saveLinearKeyFile } from "./support/linear-key.js";
 import { createRepository, git, temporaryFolder } from "./support/repository.js";
 
 // An issue whose open pull request, in the repository `prRepo`, works on `prBranch`.
@@ -52,8 +52,7 @@ async function branchOf(t, prRepo) {
 }
 
 beforeEach(() => {
-  clearKeychain();
-  saveKeychainPassword("herdr-issues", "linear", "lin_api_test");
+  saveLinearKeyFile("lin_api_test");
   forgetLookups();
 });
 

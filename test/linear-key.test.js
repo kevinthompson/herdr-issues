@@ -55,38 +55,45 @@ describe("saveLinearKey", () => {
     );
   });
 
-  test("saves a key Linear accepts in the Keychain and writes no key file", async (t) => {
+  test("writes a key Linear accepts to the key file, readable only by the person, and not the Keychain", async (t) => {
     stubLinear(t, { accepts: true });
     await saveLinearKey("lin_api_new");
-    assert.equal(keychainKey(), "lin_api_new");
-    assert.equal(existsSync(linearKeyPath()), false);
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_new" });
+    assert.equal(keyFileMode(), "600");
+    assert.equal(keychainKey(), null);
   });
 
-  test("takes an older key out of the key file, keeping its other fields", async (t) => {
+  test("keeps the key file's other fields and replaces its key", async (t) => {
     stubLinear(t, { accepts: true });
     writeKeyFile(JSON.stringify({ apiKey: "lin_api_old", note: "kept" }));
     await saveLinearKey("lin_api_new");
-    assert.equal(keychainKey(), "lin_api_new");
-    assert.deepEqual(keyFile(), { note: "kept" });
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_new", note: "kept" });
+    assert.equal(keyFileMode(), "600");
+  });
+
+  test("replaces a key file that isn't valid JSON", async (t) => {
+    stubLinear(t, { accepts: true });
+    writeKeyFile("{ not json");
+    await saveLinearKey("lin_api_new");
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_new" });
   });
 
   test("saves nothing for a key Linear refuses", async (t) => {
     stubLinear(t, { accepts: false });
     await assert.rejects(saveLinearKey("lin_api_wrong"), /refused this API key/);
-    assert.equal(keychainKey(), null);
     assert.equal(existsSync(linearKeyPath()), false);
   });
 
   test("leaves the saved key alone when Linear refuses a new one", async (t) => {
     stubLinear(t, { accepts: false });
-    saveKeychainKey("lin_api_old");
+    writeKeyFile(JSON.stringify({ apiKey: "lin_api_old" }));
     await assert.rejects(saveLinearKey("lin_api_wrong"));
-    assert.equal(keychainKey(), "lin_api_old");
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_old" });
   });
 
   test("makes the saved key the one Linear's client uses at once", async (t) => {
     const requests = stubLinear(t, { accepts: true });
-    saveKeychainKey("lin_api_old");
+    writeKeyFile(JSON.stringify({ apiKey: "lin_api_old" }));
     await linearClient();
     await saveLinearKey("lin_api_new");
     const linear = await linearClient();
@@ -94,37 +101,11 @@ describe("saveLinearKey", () => {
     assert.equal(requests.at(-1).authorization, "lin_api_new");
   });
 
-  test("reports a Keychain that won't save the key", async (t) => {
+  test("saves the key without `security` installed", async (t) => {
     stubLinear(t, { accepts: true });
-    stubSecurity(t, { code: 51, stdout: "", stderr: "User interaction is not allowed." });
-    await assert.rejects(saveLinearKey("lin_api_new"), /Couldn't save the Linear API key in the macOS Keychain/);
-  });
-
-  describe("without the Keychain", () => {
-    test("writes the key to the key file, readable only by the person", async (t) => {
-      stubLinear(t, { accepts: true });
-      stubSecurity(t);
-      await saveLinearKey("lin_api_new");
-      assert.deepEqual(keyFile(), { apiKey: "lin_api_new" });
-      assert.equal(keyFileMode(), "600");
-    });
-
-    test("keeps the key file's other fields and replaces its key", async (t) => {
-      stubLinear(t, { accepts: true });
-      stubSecurity(t);
-      writeKeyFile(JSON.stringify({ apiKey: "lin_api_old", note: "kept" }));
-      await saveLinearKey("lin_api_new");
-      assert.deepEqual(keyFile(), { apiKey: "lin_api_new", note: "kept" });
-      assert.equal(keyFileMode(), "600");
-    });
-
-    test("replaces a key file that isn't valid JSON", async (t) => {
-      stubLinear(t, { accepts: true });
-      stubSecurity(t);
-      writeKeyFile("{ not json");
-      await saveLinearKey("lin_api_new");
-      assert.deepEqual(keyFile(), { apiKey: "lin_api_new" });
-    });
+    stubSecurity(t);
+    await saveLinearKey("lin_api_new");
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_new" });
   });
 });
 
@@ -136,66 +117,75 @@ describe("linearClient", () => {
     return requests.at(-1).authorization;
   };
 
-  test("asks Linear with the key in the Keychain", async (t) => {
-    saveKeychainKey("lin_api_saved");
-    assert.equal(await authorizationSent(t), "lin_api_saved");
+  test("asks Linear with the key in the key file and leaves the file alone", async (t) => {
+    writeKeyFile(JSON.stringify({ apiKey: "lin_api_file", note: "kept" }));
+    assert.equal(await authorizationSent(t), "lin_api_file");
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_file", note: "kept" });
   });
 
-  test("moves a key in the key file to the Keychain and deletes the file", async (t) => {
-    writeKeyFile(JSON.stringify({ apiKey: "lin_api_old" }));
-    assert.equal(await authorizationSent(t), "lin_api_old");
-    assert.equal(keychainKey(), "lin_api_old");
-    assert.equal(existsSync(linearKeyPath()), false);
+  test("prefers the key file's key to one left in the Keychain", async (t) => {
+    writeKeyFile(JSON.stringify({ apiKey: "lin_api_file" }));
+    saveKeychainKey("lin_api_keychain");
+    assert.equal(await authorizationSent(t), "lin_api_file");
+    assert.deepEqual(keyFile(), { apiKey: "lin_api_file" });
   });
 
-  test("moves only the key out of a key file holding other fields", async (t) => {
-    writeKeyFile(JSON.stringify({ apiKey: "lin_api_old", note: "kept" }));
-    assert.equal(await authorizationSent(t), "lin_api_old");
-    assert.equal(keychainKey(), "lin_api_old");
-    assert.deepEqual(keyFile(), { note: "kept" });
+  test("reads the key file without `security` installed", async (t) => {
+    stubSecurity(t);
+    writeKeyFile(JSON.stringify({ apiKey: "lin_api_file" }));
+    assert.equal(await authorizationSent(t), "lin_api_file");
   });
 
-  test("reports a missing key in the Keychain", async () => {
-    await assert.rejects(linearClient(), { message: "No Linear API key in the macOS Keychain", fix: /Keychain/ });
-  });
+  describe("with a key an earlier version saved in the Keychain", () => {
+    test("moves it to the key file, readable only by the person, and deletes the Keychain item", async (t) => {
+      saveKeychainKey("lin_api_keychain");
+      assert.equal(await authorizationSent(t), "lin_api_keychain");
+      assert.deepEqual(keyFile(), { apiKey: "lin_api_keychain" });
+      assert.equal(keyFileMode(), "600");
+      assert.equal(keychainKey(), null);
+    });
 
-  test("reports a Keychain it can't read", async (t) => {
-    stubSecurity(t, { code: 51, stdout: "", stderr: "User interaction is not allowed." });
-    await assert.rejects(linearClient(), {
-      message: "Couldn't read the Linear API key from the macOS Keychain (User interaction is not allowed.)",
-      fix: /Keychain/,
+    test("keeps the key file's other fields", async (t) => {
+      writeKeyFile(JSON.stringify({ note: "kept" }));
+      saveKeychainKey("lin_api_keychain");
+      assert.equal(await authorizationSent(t), "lin_api_keychain");
+      assert.deepEqual(keyFile(), { note: "kept", apiKey: "lin_api_keychain" });
+    });
+
+    test("leaves a key file that isn't valid JSON and the Keychain item alone", async () => {
+      writeKeyFile("{ not json");
+      saveKeychainKey("lin_api_keychain");
+      await assert.rejects(linearClient(), { message: /isn't valid JSON/ });
+      assert.equal(readFileSync(linearKeyPath(), "utf8"), "{ not json");
+      assert.equal(keychainKey(), "lin_api_keychain");
     });
   });
 
-  test("reports a key Linear refuses as the one in the Keychain", async (t) => {
-    saveKeychainKey("lin_api_wrong");
+  test("reports a missing key in the key file", async () => {
+    await assert.rejects(linearClient(), {
+      message: "No Linear API key in ~/.config/herdr-app/linear.json",
+      fix: /"apiKey"/,
+    });
+  });
+
+  test("reports a missing key when the Keychain can't be read", async (t) => {
+    stubSecurity(t, { code: 51, stdout: "", stderr: "User interaction is not allowed." });
+    await assert.rejects(linearClient(), { message: "No Linear API key in ~/.config/herdr-app/linear.json" });
+  });
+
+  test("reports a key file that isn't valid JSON", async () => {
+    writeKeyFile("{ not json");
+    await assert.rejects(linearClient(), {
+      message: "Couldn't read the Linear API key from ~/.config/herdr-app/linear.json (it isn't valid JSON)",
+    });
+  });
+
+  test("reports a key Linear refuses as the one in the key file, never naming the Keychain", async (t) => {
+    writeKeyFile(JSON.stringify({ apiKey: "lin_api_wrong" }));
     stubLinear(t, { accepts: false });
     const linear = await linearClient();
-    await assert.rejects(linear("query { viewer { id } }"), {
-      message: "Linear refused the API key in the macOS Keychain",
-      fix: /Keychain/,
-    });
-  });
-
-  describe("without the Keychain", () => {
-    test("asks Linear with the key in the key file and leaves the file alone", async (t) => {
-      stubSecurity(t);
-      writeKeyFile(JSON.stringify({ apiKey: "lin_api_file" }));
-      assert.equal(await authorizationSent(t), "lin_api_file");
-      assert.deepEqual(keyFile(), { apiKey: "lin_api_file" });
-    });
-
-    test("reports a missing key in the key file", async (t) => {
-      stubSecurity(t);
-      await assert.rejects(linearClient(), { message: "No Linear API key in ~/.config/herdr-app/linear.json" });
-    });
-
-    test("reports a key file that isn't valid JSON", async (t) => {
-      stubSecurity(t);
-      writeKeyFile("{ not json");
-      await assert.rejects(linearClient(), {
-        message: /Couldn't read the Linear API key from ~\/\.config\/herdr-app\/linear\.json/,
-      });
-    });
+    const refused = await linear("query { viewer { id } }").catch((e) => e);
+    assert.equal(refused.message, "Linear refused the API key in ~/.config/herdr-app/linear.json");
+    assert.doesNotMatch(refused.fix, /Keychain|security add/);
   });
 });

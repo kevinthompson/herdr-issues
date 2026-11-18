@@ -17,15 +17,11 @@ export class SetupProblem extends Error {
 }
 
 export const LINEAR_KEY_PAGE = "https://linear.app/settings/account/security";
-export const KEYCHAIN = "the macOS Keychain";
+const LINEAR_KEY_FILE = "~/.config/herdr-app/linear.json";
 const LINEAR_KEY_FIX =
   `Create a personal API key in Linear under **Settings → Account → Security & access** (${LINEAR_KEY_PAGE}), paste it in the Issues panel's API key field ` +
-  "and choose **Save key**, which keeps it in the macOS Keychain. Or save it in the Keychain yourself with " +
-  "`security add-generic-password -U -s herdr-issues -a linear -w`, which asks for the key, then check again.";
-const KEYCHAIN_ACCESS_FIX =
-  "Unlock the macOS Keychain, or allow access when it asks, then check again. If the item is damaged, " +
-  "delete it with `security delete-generic-password -s herdr-issues -a linear` and save the key again: " +
-  LINEAR_KEY_FIX;
+  `and choose **Save key**, which keeps it in \`${LINEAR_KEY_FILE}\`. Or add it to that file yourself as ` +
+  '`"apiKey"`, such as `{ "apiKey": "lin_api_…" }`, then check again.';
 
 // Installing a missing tool with the person's package managers, or as `instructions` say when they have none.
 /**
@@ -71,27 +67,17 @@ export const beadsNotInitialized = () =>
 export const bdFailed = (message) =>
   new SetupProblem(message, "Check that `bd list` works in the repository's main checkout, then check again.");
 export const LINEAR_KEY_PROBLEM = "linear-key";
-export const linearKeyMissing = (store = KEYCHAIN) =>
-  new SetupProblem(`No Linear API key in ${store}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
-/**
- * @param {string} reason
- * @param {string} [store]
- */
-export const linearKeyUnreadable = (reason, store = KEYCHAIN) =>
-  new SetupProblem(
-    `Couldn't read the Linear API key from ${store}${reason ? ` (${reason})` : ""}`,
-    store === KEYCHAIN ? KEYCHAIN_ACCESS_FIX : LINEAR_KEY_FIX,
-    LINEAR_KEY_PROBLEM,
-  );
+export const linearKeyMissing = () =>
+  new SetupProblem(`No Linear API key in ${LINEAR_KEY_FILE}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
 /** @param {string} reason */
-export const linearKeyUnsaved = (reason) =>
+export const linearKeyUnreadable = (reason) =>
   new SetupProblem(
-    `Couldn't save the Linear API key in ${KEYCHAIN}${reason ? ` (${reason})` : ""}`,
-    KEYCHAIN_ACCESS_FIX,
+    `Couldn't read the Linear API key from ${LINEAR_KEY_FILE} (${reason})`,
+    LINEAR_KEY_FIX,
     LINEAR_KEY_PROBLEM,
   );
-export const linearKeyInvalid = (store = KEYCHAIN) =>
-  new SetupProblem(`Linear refused the API key in ${store}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
+export const linearKeyInvalid = () =>
+  new SetupProblem(`Linear refused the API key in ${LINEAR_KEY_FILE}`, LINEAR_KEY_FIX, LINEAR_KEY_PROBLEM);
 /** @param {string} message */
 export const badSetting = (message) =>
   new SetupProblem(
