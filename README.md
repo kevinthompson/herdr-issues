@@ -36,6 +36,8 @@ Run the same command again to update. Start a new Claude Code session to load th
 
 A repository with no tracker shows a setup view in the panel: choose **GitHub Issues**, **Linear** or **Beads**, and how work gets into main. The panel checks what that tracker needs and says how to fix anything missing. Once it's set up, the gear in the panel's header opens its settings, for the focused repository or for all of them. `/issues:config` covers the options the panel doesn't offer.
 
+The panel finds a Linear API key where other Herdr mods that call Linear do: in `~/.config/herdr-app/linear.json`, where its setup view saves it, or else in the `LINEAR_API_KEY` environment variable. If your dotfiles repository tracks `~/.config/herdr-app/`, add `linear.json` to its `.gitignore` so you never commit the key.
+
 ## Remove
 
 ```sh

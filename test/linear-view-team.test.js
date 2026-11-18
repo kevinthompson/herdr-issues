@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { linearTracker } from "../mod/trackers/linear.js";
 import { forgetLookups } from "../mod/lookups.js";
-import { clearKeychain, saveKeychainPassword } from "./support/keychain.js";
+import { saveLinearKeyFile } from "./support/linear-key.js";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 
 // The issue filters a view's list sends to Linear, when the view belongs to `viewTeam` and saves `filterData`.
@@ -32,8 +32,7 @@ const teamOrSubTeam = (teamId) => ({
 });
 
 beforeEach(() => {
-  clearKeychain();
-  saveKeychainPassword("herdr-issues", "linear", "lin_api_test");
+  saveLinearKeyFile("lin_api_test");
   forgetLookups();
 });
 

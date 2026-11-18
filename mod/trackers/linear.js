@@ -1,6 +1,5 @@
 // Issues in Linear, for repositories whose entry in issues.json names a team (setting.js). The API key is the
-// one secret, kept in the macOS Keychain, where
-// a dotfiles repository tracking the app's folder can't commit it.
+// one secret, kept in the app folder's linear.json, which other mods that call Linear share, or else in LINEAR_API_KEY.
 // A repository lists one scope of issues at a time, every open issue assigned to you, across teams, by
 // default. The team's issues waiting in triage, its other issues and its saved views are scopes, and its
 // open projects are scopes too, each narrowed further to one of its milestones. Scopes other than a view and triage add the issues
@@ -12,12 +11,12 @@ import { STATUSES, STATUS_LABELS as ISSUE_STATUS_LABELS, priorityRank } from "..
 import { refuseUnknownLabels } from "./labels.js";
 import { projectIcon } from "./linear-project-icons.js";
 import {
-  KEYCHAIN,
   linearKeyMissing,
   linearKeyUnreadable,
-  linearKeyUnsaved,
   linearKeyInvalid,
+  LINEAR_KEY_FILE,
   LINEAR_KEY_PROBLEM,
+  LINEAR_KEY_VARIABLE,
 } from "./problems.js";
 
 /** @typedef {import("./index.js").Issue} Issue */
@@ -228,12 +227,11 @@ function repoConfig(root, { team, views = {} }) {
   return { teamKey: team, path: root, views: Object.entries(views).map(([name, url]) => ({ name, id: viewId(url) })) };
 }
 
-// The key file: where the key lived before the Keychain, and where it lives on a system without `security`.
+// The key file, which other Herdr mods that call Linear read the key from too.
 export const linearKeyPath = () => `${appHome()}/linear.json`;
-const KEY_FILE_NAME = "~/.config/herdr-app/linear.json";
 
+// Where an earlier version kept the key, which reading the key moves to the key file.
 const KEYCHAIN_ITEM = ["-s", "herdr-issues", "-a", "linear"];
-const KEYCHAIN_ITEM_NOT_FOUND = 44;
 
 // Runs macOS's `security` with `args`, resolving with its result, or null where it isn't installed.
 /** @param {string[]} args */
@@ -242,23 +240,10 @@ async function security(args) {
   return !result || result.code === 127 ? null : result;
 }
 
-// Saves the key in the Keychain, resolving false where there's no Keychain. Herdr's exec can't pass standard
-// input, so the key is briefly in the command's arguments, visible only to processes running as the person.
-/** @param {string} apiKey */
-async function saveInKeychain(apiKey) {
-  const saved = await security(["add-generic-password", "-U", ...KEYCHAIN_ITEM, "-w", apiKey]);
-  if (!saved) return false;
-  if (saved.code !== 0) throw linearKeyUnsaved(saved.stderr.trim());
-  return true;
-}
-
-// The key in the Keychain, null when it holds none, or undefined where there's no Keychain.
+// The key an earlier version saved in the Keychain, or null when there's none or the Keychain can't be read.
 async function keychainKey() {
   const found = await security(["find-generic-password", ...KEYCHAIN_ITEM, "-w"]);
-  if (!found) return undefined;
-  if (found.code === KEYCHAIN_ITEM_NOT_FOUND) return null;
-  if (found.code !== 0) throw linearKeyUnreadable(found.stderr.trim());
-  return found.stdout.trim() || null;
+  return (found?.code === 0 && found.stdout.trim()) || null;
 }
 
 // The key file's text and fields, which are none when it's missing or isn't a JSON object.
@@ -271,14 +256,6 @@ async function readKeyFile() {
   } catch {
     return { text, fields: {}, valid: false };
   }
-}
-
-// Takes the key out of the key file, deleting the file when the key is all it holds.
-/** @param {{ text: string | null, fields: Record<string, any> }} keyFile */
-async function removeKeyFromFile({ text, fields: { apiKey, ...otherFields } }) {
-  if (apiKey === undefined) return;
-  if (!Object.keys(otherFields).length) await exec("rm", ["-f", linearKeyPath()]);
-  else await writeTextFile(linearKeyPath(), `${JSON.stringify(otherFields, null, 2)}\n`, text);
 }
 
 // Writes the key to the key file, keeping its other fields, readable only by the person.
@@ -295,30 +272,47 @@ async function saveInKeyFile(apiKey, { text, fields }) {
     throw new Error(`Could not make ${path} readable only by you: ${restricted.stderr.trim()}`);
 }
 
-// The key from the Keychain, after moving a key the key file still holds there, or from the key file where
-// there's no Keychain: { apiKey, store }, where store names where it's kept.
+const FIELD = "\x1e";
+const PRINT_KEY_VARIABLE = `printf '${FIELD}%s${FIELD}' "$LINEAR_API_KEY"`;
+// An app started from the Dock doesn't load the shell profile, so a variable missing from its own environment
+// comes from the person's interactive login shell.
+const ASK_FOR_KEY_VARIABLE = `[ -n "$LINEAR_API_KEY" ] && exec /bin/sh -c "$1"; exec "\${SHELL:-/bin/sh}" -lic "$1"`;
+
+// The key in LINEAR_API_KEY, or null when it's unset.
+async function keyVariable() {
+  const result = await exec("sh", ["-c", ASK_FOR_KEY_VARIABLE, "sh", PRINT_KEY_VARIABLE]).catch(noResult);
+  const fields = result?.stdout.split(FIELD) ?? [];
+  return (fields.length >= 3 && fields.at(-2)?.trim()) || null;
+}
+
+// The key and the store it came from, `apiKey` in the key file else LINEAR_API_KEY, after moving a key an
+// earlier version saved in the Keychain to the key file when neither has one; null when there's none.
+/** @typedef {{ apiKey: string, store: string }} StoredKey */
 const cachedApiKey = cachedLookup();
 const readApiKey = () =>
   cachedApiKey("apiKey", async () => {
     const keyFile = await readKeyFile();
-    const { apiKey: fileKey } = keyFile.fields;
-    if (fileKey && (await saveInKeychain(fileKey))) await removeKeyFromFile(keyFile);
-    const apiKey = await keychainKey();
-    if (apiKey !== undefined) return { apiKey, store: KEYCHAIN };
-    if (!keyFile.valid) throw linearKeyUnreadable("it isn't valid JSON", KEY_FILE_NAME);
-    return { apiKey: fileKey ?? null, store: KEY_FILE_NAME };
+    if (!keyFile.valid) throw linearKeyUnreadable("it isn't valid JSON");
+    if (keyFile.fields.apiKey) return { apiKey: keyFile.fields.apiKey, store: LINEAR_KEY_FILE };
+    const variableKey = await keyVariable();
+    if (variableKey) return { apiKey: variableKey, store: LINEAR_KEY_VARIABLE };
+    const movedKey = await keychainKey();
+    if (!movedKey) return null;
+    await saveInKeyFile(movedKey, keyFile);
+    await security(["delete-generic-password", ...KEYCHAIN_ITEM]);
+    return { apiKey: movedKey, store: LINEAR_KEY_FILE };
   });
 
 // A function that asks Linear's API a query with the person's API key: (query, variables) → its data.
 /** @returns {Promise<LinearClient>} */
 export async function linearClient() {
-  const { apiKey, store } = await readApiKey();
-  if (!apiKey) throw linearKeyMissing(store);
+  const storedKey = /** @type {StoredKey | null} */ (await readApiKey());
+  if (!storedKey) throw linearKeyMissing();
+  const { apiKey, store } = storedKey;
   return (query, variables = {}) => request(apiKey, query, variables, store);
 }
 
-// Saves the API key in the Keychain once Linear accepts it, taking any key out of the key file so it can't
-// replace this one, or in the key file where there's no Keychain. A key Linear refuses rejects and saves nothing.
+// Saves the API key in the key file once Linear accepts it. A key Linear refuses rejects and saves nothing.
 /** @param {string} apiKey */
 export async function saveLinearKey(apiKey) {
   try {
@@ -326,9 +320,7 @@ export async function saveLinearKey(apiKey) {
   } catch (/** @type {any} */ e) {
     throw e.code === LINEAR_KEY_PROBLEM ? new Error("Linear refused this API key, so it wasn't saved.") : e;
   }
-  const keyFile = await readKeyFile();
-  if (await saveInKeychain(apiKey)) await removeKeyFromFile(keyFile);
-  else await saveInKeyFile(apiKey, keyFile);
+  await saveInKeyFile(apiKey, await readKeyFile());
   forgetLookups();
 }
 
@@ -398,7 +390,7 @@ export function findScope(scopes, scopeId) {
  * @param {Record<string, any>} variables
  * @param {string} [store]
  */
-async function request(apiKey, query, variables, store = KEYCHAIN) {
+async function request(apiKey, query, variables, store = LINEAR_KEY_FILE) {
   const response = await fetch(API_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: apiKey },

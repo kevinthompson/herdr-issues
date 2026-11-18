@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import { linearTracker } from "../mod/trackers/linear.js";
 import { forgetLookups } from "../mod/lookups.js";
-import { clearKeychain, saveKeychainPassword } from "./support/keychain.js";
+import { saveLinearKeyFile } from "./support/linear-key.js";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 
 // The team's labels as Linear lists them: workspace and team labels, a label group and the labels in it.
@@ -60,8 +60,7 @@ async function trackerWith(t) {
 }
 
 beforeEach(() => {
-  clearKeychain();
-  saveKeychainPassword("herdr-issues", "linear", "lin_api_test");
+  saveLinearKeyFile("lin_api_test");
   forgetLookups();
 });
 

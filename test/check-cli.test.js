@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
-import { clearKeychain, saveKeychainPassword } from "./support/keychain.js";
+import { saveLinearKeyFile } from "./support/linear-key.js";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
 import { settingsPath } from "../mod/trackers/setting.js";
@@ -100,8 +100,7 @@ const TRACKERS = {
   },
 
   linear(t) {
-    clearKeychain();
-    saveKeychainPassword("herdr-issues", "linear", "lin_api_test");
+    saveLinearKeyFile("lin_api_test");
     const node = {
       id: "uuid-1",
       identifier: "WEB-1",

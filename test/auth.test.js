@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { beforeEach, describe, test } from "node:test";
 import { stubHerdr } from "./support/herdr.js";
@@ -46,6 +46,7 @@ function stubGh(t, { installed = true, loggedIn = true } = {}) {
 }
 
 const keychainKey = () => keychainPassword("herdr-issues", "linear");
+const readLinearKey = () => JSON.parse(readFileSync(linearKeyPath(), "utf8")).apiKey;
 
 beforeEach(() => {
   rmSync(linearKeyPath(), { force: true });
@@ -54,20 +55,30 @@ beforeEach(() => {
 });
 
 describe("issues auth linear", () => {
-  test("passes silently when the Keychain holds an API key", async (t) => {
-    saveKeychainPassword("herdr-issues", "linear", API_KEY);
+  test("passes silently when linear.json holds an API key, whatever the Keychain holds", async (t) => {
+    writeLinearKey(JSON.stringify({ apiKey: API_KEY }));
+    saveKeychainPassword("herdr-issues", "linear", "lin_api_other");
+    const { code, output } = await auth(t, "linear");
+    assert.equal(code, 0);
+    assert.ok(!output.includes(API_KEY));
+    assert.equal(readLinearKey(), API_KEY);
+  });
+
+  test("passes silently with LINEAR_API_KEY and no key in linear.json", async (t) => {
+    process.env.LINEAR_API_KEY = API_KEY;
+    t.after(() => delete process.env.LINEAR_API_KEY);
     const { code, output } = await auth(t, "linear");
     assert.equal(code, 0);
     assert.ok(!output.includes(API_KEY));
   });
 
-  test("moves a key in linear.json to the Keychain and passes silently", async (t) => {
-    writeLinearKey(JSON.stringify({ apiKey: API_KEY }));
+  test("moves a key in the Keychain to linear.json and passes silently", async (t) => {
+    saveKeychainPassword("herdr-issues", "linear", API_KEY);
     const { code, output } = await auth(t, "linear");
     assert.equal(code, 0);
     assert.ok(!output.includes(API_KEY));
-    assert.equal(keychainKey(), API_KEY);
-    assert.equal(existsSync(linearKeyPath()), false);
+    assert.equal(readLinearKey(), API_KEY);
+    assert.equal(keychainKey(), null);
   });
 
   for (const [situation, text] of [
@@ -76,13 +87,14 @@ describe("issues auth linear", () => {
     ["the apiKey is empty", JSON.stringify({ apiKey: "" })],
     ["linear.json isn't valid JSON", `{ "apiKey": "${API_KEY}"`],
   ]) {
-    test(`reports the missing key in the Keychain and its fix when ${situation}`, async (t) => {
+    test(`reports the missing key in linear.json and its fix when ${situation}`, async (t) => {
       if (text !== null) writeLinearKey(text);
       const { code, output } = await auth(t, "linear");
       assert.equal(code, 1);
-      assert.match(output, /No Linear API key in the macOS Keychain/);
+      assert.match(output, /Linear API key (in|from) ~\/\.config\/herdr-app\/linear\.json/);
       assert.match(output, /Settings → Account → Security & access/);
-      assert.match(output, /security add-generic-password -U -s herdr-issues -a linear -w/);
+      assert.match(output, /add it to that file yourself as `"apiKey"`/);
+      assert.doesNotMatch(output, /Keychain|security add/);
       assert.ok(!output.includes(API_KEY));
     });
   }
