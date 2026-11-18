@@ -42,6 +42,9 @@ const STATUS_COLORS = {
   done: "#5e6ad2",
   canceled: "#95a2b3",
 };
+// A status's color, which its icon is drawn in; undefined for a status without one.
+/** @param {string} status */
+export const statusColor = (status) => /** @type {`#${string}` | undefined} */ (STATUS_COLORS[status]);
 // A due date's theme color by its urgency (dueStatus in issue.js), matching the SLA's colors in the list.
 /** @type {Record<string, string>} */
 export const DUE_COLORS = { overdue: "ansi1", soon: "working", later: "dim" };

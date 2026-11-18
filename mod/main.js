@@ -99,7 +99,7 @@ import { isTextFile, openInEditor, prefetchEditor } from "./editor.js";
 import { avatarImage, AVATAR_PX } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
-import { DUE_COLORS, rowHover, statusTints } from "./colors.js";
+import { DUE_COLORS, rowHover, statusColor, statusTints } from "./colors.js";
 import { pullRequestBadgeColor } from "./pull-request-status.js";
 import { card, CARD_RADIUS_PX } from "./section.js";
 import { fieldEdits, markEditFailed, forgetEdits, claimEdit, showFieldEdit, trackerFields } from "./edits.js";
@@ -1789,9 +1789,10 @@ export default class Issues extends View {
           )
           .when(Boolean(icon), (e) =>
             e.child(
-              image(icon ?? "")
+              svg(icon ?? "")
                 .flex_none()
-                .size(STATUS_ICON_PX),
+                .size(STATUS_ICON_PX)
+                .text_color(statusColor(group.id) ?? t.muted),
             ),
           )
           .child(div().font_semibold().child(group.label))
@@ -2031,7 +2032,13 @@ export default class Issues extends View {
       .cursor_pointer()
       .hover((s) => s.bg(t.hover))
       .on_click((_e, cx) => this.expandToGroup(id, cx, { unloaded }))
-      .when(Boolean(icon), (e) => e.child(image(icon ?? "").size(STRIP_ICON_PX)))
+      .when(Boolean(icon), (e) =>
+        e.child(
+          svg(icon ?? "")
+            .size(STRIP_ICON_PX)
+            .text_color(statusColor(id) ?? t.muted),
+        ),
+      )
       .child(
         div()
           .text_size(10)

@@ -14,6 +14,7 @@ import { props, openOverlay, closeOverlay, theme, shared, setShared } from "herd
 import { requestFieldEdit } from "./edits.js";
 import { labelGroups } from "./label-order.js";
 import { STATUSES, STATUS_LABELS, PRIORITIES, statusIcon } from "./issue.js";
+import { statusColor } from "./colors.js";
 
 /** @import { Issue, Project, TrackerScope } from "./trackers/index.js" */
 /** @import { Context } from "gpui-kit" */
@@ -61,6 +62,7 @@ const OPTIONS = {
     value,
     label: /** @type {Record<string, string>} */ (STATUS_LABELS)[value],
     icon: statusIcon(value),
+    iconColor: statusColor(value),
   })),
   priority: [1, 2, 3, 4, 0].map((value) => ({ value, label: PRIORITIES[value] })),
 };
