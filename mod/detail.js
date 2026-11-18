@@ -11,7 +11,7 @@ import { settings } from "herdr";
 import { optionLabel } from "./menu.js";
 import { bodySegments } from "./tasks.js";
 import { dueStatus, shortDate, statusIcon } from "./issue.js";
-import { DUE_COLORS, labelTint, secondaryButtonFill, softText } from "./colors.js";
+import { DUE_COLORS, labelTint, secondaryButtonFill, softText, statusColor } from "./colors.js";
 import { collapseButton, headerBar } from "./header.js";
 import { rowBeneathHeader, ROW_PADDING_X_PX } from "./filter-row.js";
 import { card, section, sectionHeading, SECTION_INSET_PX } from "./section.js";
@@ -107,9 +107,10 @@ function dropdown(field, label, { issue, writable, onMenu }, t) {
         )
         .when(Boolean(icon), (e) =>
           e.child(
-            image(icon ?? "")
+            svg(icon ?? "")
               .flex_none()
-              .size(STATUS_ICON_PX),
+              .size(STATUS_ICON_PX)
+              .text_color(statusColor(issue.status) ?? t.muted),
           ),
         )
         .child(optionLabel(field, issue[field]))
