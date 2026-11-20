@@ -3,11 +3,28 @@ import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { closeWorktreeSpace, removalInFlight, forgetRemoval } from "../mod/worktree-removal.js";
+import { WorktreeDialog } from "../mod/worktree-dialog.js";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { commitFile, createRepository, git, temporaryFolder } from "./support/repository.js";
 
 const never = () => new Promise(() => {});
 const immediately = () => Promise.resolve();
+
+// A context whose spawned tasks are collected, so a test can wait for them.
+function context() {
+  const tasks = [];
+  const cx = {
+    focus_handle: () => ({ focus() {}, is_focused: () => false }),
+    timer: { after() {} },
+    notify() {},
+    stop_propagation() {},
+    spawn: (task) => tasks.push(task(cx)),
+    settle: async () => {
+      while (tasks.length) await tasks.shift();
+    },
+  };
+  return cx;
+}
 
 async function waitFor(condition) {
   for (let tries = 0; tries < 500 && !condition(); tries++) await new Promise((resolve) => setTimeout(resolve, 5));
@@ -46,6 +63,7 @@ function worktreeSpace(t, { spaceId, nested = false, unmerged = false }) {
     openOverlay: (overlay) => {
       calls.overlays.push(overlay);
     },
+    props: () => calls.overlays.at(-1)?.props,
     exec: async (command, args, options) => {
       if (command === "git") {
         calls.git.push(args);
@@ -103,6 +121,36 @@ describe("closeWorktreeSpace", () => {
     assert.equal(removal.checks.dirty, false);
     assert.equal(statusRuns(), 1);
     assert.deepEqual(closes(), [], "the dialog removes it, not the silent close");
+  });
+
+  test("a dialog left open removes the worktree once its running checks pass", async (t) => {
+    const { worktree, calls, holdGit, closes } = worktreeSpace(t, { spaceId: "kept-open" });
+    const release = holdGit("status");
+    const closing = closeWorktreeSpace("kept-open", { sleep: immediately });
+    await waitFor(() => calls.overlays.length === 1);
+    const cx = context();
+    new WorktreeDialog(cx);
+    release();
+    await closing;
+    await cx.settle();
+    assert.deepEqual(closes(), [["space.close", { id: "kept-open", confirmed: true }]]);
+    assert.equal(existsSync(worktree), false);
+  });
+
+  test("a dialog closed with Escape while its checks run leaves the worktree and its space", async (t) => {
+    const { worktree, calls, holdGit, closes } = worktreeSpace(t, { spaceId: "escaped" });
+    const release = holdGit("status");
+    const closing = closeWorktreeSpace("escaped", { sleep: immediately });
+    await waitFor(() => calls.overlays.length === 1);
+    const cx = context();
+    const dialog = new WorktreeDialog(cx);
+    await waitFor(() => dialog.removal !== null);
+    dialog.key({ key: "escape" }, cx);
+    release();
+    await closing;
+    await cx.settle();
+    assert.deepEqual(closes(), []);
+    assert.equal(existsSync(worktree), true);
   });
 
   test("opens the dialog at once when a check fails", async (t) => {
