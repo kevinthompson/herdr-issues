@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
-import { closeWorktreeSpace, removalInFlight, forgetRemoval } from "../mod/worktree-removal.js";
+import { closeWorktreeSpace, forgetRemoval, openRemovalDialog, removalInFlight } from "../mod/worktree-removal.js";
 import { WorktreeDialog } from "../mod/worktree-dialog.js";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { commitFile, createRepository, git, temporaryFolder } from "./support/repository.js";
@@ -201,5 +201,58 @@ describe("closeWorktreeSpace", () => {
     assert.equal(calls.git.filter((args) => args.includes("--show-toplevel")).length, 1);
     assert.equal(closes().length, 1);
     assert.deepEqual(calls.overlays, []);
+  });
+});
+
+// Herdr closes a dialog itself on Escape or a click beside it, without the dialog's key handler, and then calls the
+// mod's close, which calls the dialog's dismissed.
+describe("the remove-worktree dialog closed by Herdr", () => {
+  test("after its checks answered, lets the next close start a fresh removal", async (t) => {
+    const { calls } = worktreeSpace(t, { spaceId: "dismissed", unmerged: true });
+    await closeWorktreeSpace("dismissed", { sleep: never });
+    const first = removalInFlight("dismissed");
+    const cx = context();
+    const dialog = new WorktreeDialog(cx);
+    await cx.settle();
+    assert.equal(dialog.removal, first);
+    dialog.dismissed();
+    assert.equal(removalInFlight("dismissed"), undefined);
+    await closeWorktreeSpace("dismissed", { sleep: never });
+    assert.equal(calls.git.filter((args) => args.includes("--show-toplevel")).length, 2);
+    assert.equal(calls.overlays.length, 2);
+    assert.ok(removalInFlight("dismissed"));
+    assert.notEqual(removalInFlight("dismissed"), first);
+  });
+
+  test("while its checks run, ends the removal and leaves the worktree", async (t) => {
+    const { worktree, calls, holdGit, closes } = worktreeSpace(t, { spaceId: "dismissed-early" });
+    const release = holdGit("status");
+    const closing = closeWorktreeSpace("dismissed-early", { sleep: immediately });
+    await waitFor(() => calls.overlays.length === 1);
+    const cx = context();
+    const dialog = new WorktreeDialog(cx);
+    await waitFor(() => dialog.removal !== null);
+    dialog.dismissed();
+    assert.equal(removalInFlight("dismissed-early"), undefined);
+    release();
+    await closing;
+    await cx.settle();
+    assert.equal(removalInFlight("dismissed-early"), undefined);
+    assert.deepEqual(closes(), []);
+    assert.equal(existsSync(worktree), true);
+  });
+
+  test("before its setup finishes, starts no removal afterward", async (t) => {
+    const { holdGit, statusRuns } = worktreeSpace(t, { spaceId: "dismissed-unset-up" });
+    const release = holdGit("--show-toplevel");
+    openRemovalDialog("dismissed-unset-up");
+    const cx = context();
+    const dialog = new WorktreeDialog(cx);
+    dialog.dismissed();
+    release();
+    await cx.settle();
+    assert.equal(dialog.removal, null);
+    assert.equal(removalInFlight("dismissed-unset-up"), undefined);
+    assert.equal(statusRuns(), 0);
   });
 });

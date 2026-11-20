@@ -219,6 +219,7 @@ export class WorktreeDialog {
         this.repo = repo;
         cx.notify();
         if (repo?.linked && this.props.action === "remove") {
+          if (this.closed) return;
           this.removal = inFlight ?? startRemoval(/** @type {SpaceInfo} */ (this.space()), repo);
           await this.followChecks(cx);
           if (this.removal.removesWithoutAsking({ ask: this.props.ask, warning: this.props.warning }))
@@ -257,9 +258,18 @@ export class WorktreeDialog {
   }
 
   close() {
-    this.closed = true;
-    if (this.removal) forgetRemoval(this.props.space, this.removal);
+    this.dismissed();
     closeOverlay(this.props.overlay);
+  }
+
+  // Ends the space's removal however the dialog closed, Herdr closing it on Escape or a click beside it included, so
+  // the next close starts afresh and the dialog's own setup starts nothing more.
+  dismissed() {
+    if (this.closed) return;
+    this.closed = true;
+    if (this.props?.action !== "remove") return;
+    const removal = this.removal ?? removalInFlight(this.props.space);
+    if (removal) forgetRemoval(this.props.space, removal);
   }
 
   /** @param {Context} cx */
