@@ -4,8 +4,9 @@
 // repository's name setting (trackers/setting.js).
 // Remove takes an optional { warning }: work outside the checkout that removing it would leave behind, and { ask }
 // to wait for Enter whatever the checks find. It removes the checkout without asking when removesWithoutAsking
-// (removal.js) says so, and otherwise waits for Enter. It carries on with the checks of a removal closeWorktreeSpace
-// (worktree-removal.js) already started for the space, and starts them itself otherwise.
+// (removal.js) says so, and otherwise waits for Enter; closing it cancels, even while the checks run. It carries on
+// with the checks of a removal closeWorktreeSpace (worktree-removal.js) already started for the space, and starts them
+// itself otherwise.
 
 /**
  * @import { AsyncContext, Context, KeyEvent } from "gpui-kit"
@@ -178,6 +179,7 @@ export class WorktreeDialog {
       cx.timer.after(600, () => this.input.focus());
     }
     this.busy = false;
+    this.closed = false;
     this.error = "";
     this.failed = false; // preparing the dialog threw: the error is shown, whatever the repo is
     /** @type {Repo | null | undefined} */
@@ -255,6 +257,7 @@ export class WorktreeDialog {
   }
 
   close() {
+    this.closed = true;
     if (this.removal) forgetRemoval(this.props.space, this.removal);
     closeOverlay(this.props.overlay);
   }
@@ -267,7 +270,7 @@ export class WorktreeDialog {
 
   /** @param {Context} cx */
   async work(cx) {
-    if (this.busy || !this.repo || this.checking()) return;
+    if (this.closed || this.busy || !this.repo || this.checking()) return;
     this.busy = true;
     this.error = "";
     cx.notify();
