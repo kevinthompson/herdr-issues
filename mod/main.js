@@ -2059,6 +2059,10 @@ export default class Issues extends View {
     } else this.refreshOnReturn(cx);
   }
 
+  close() {
+    this.worktreeDialog?.dismissed();
+  }
+
   /** @param {Context} cx */
   render(cx) {
     if (this.menu) return this.menu.render();
