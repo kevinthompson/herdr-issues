@@ -5,8 +5,10 @@
 //
 // Beads statuses map onto STATUSES (issue.js):
 //   open → todo, in_progress → in-progress, blocked → todo (its blockers in blockedBy), deferred → backlog,
-//   closed → done
+//   in_review → in-review, closed → done
 // and the panel sets backlog, todo, in-progress and done as deferred, open, in_progress and closed.
+// `in_review` isn't built into Beads: only a database whose `bd config set status.custom` names it lists its
+// issues and offers In review, which the panel then sets as in_review.
 // Beads priorities P0–P4 map onto the panel's scale as P0 → Urgent (1), P1 → High (2), P2 → Medium (3),
 // P3 → Low (4) and P4 → None (0). An issue blocks another through a `blocks` dependency.
 import { exec, readTextFile } from "herdr";
@@ -59,10 +61,12 @@ const STATUS_FROM_BEADS = {
   in_progress: "in-progress",
   blocked: "todo",
   deferred: "backlog",
+  in_review: "in-review",
   closed: "done",
 };
 /** @type {Record<string, string>} */
 const STATUS_TO_BEADS = { backlog: "deferred", todo: "open", "in-progress": "in_progress", done: "closed" };
+const REVIEW_STATUS = "in_review";
 const PRIORITY_FROM_BEADS = [1, 2, 3, 4, 0];
 const PRIORITY_TO_BEADS = [4, 0, 1, 2, 3];
 
@@ -108,6 +112,16 @@ function toIssue(record, blockedBy, { detailed = false } = {}) {
     body: detailed ? (record.description ?? "").trim() : null,
     due: record.due_at?.slice(0, 10) ?? null,
   };
+}
+
+// Whether the database's custom statuses, `bd config get status.custom`, name in_review. Each entry is a name,
+// optionally followed by a colon and its category, such as "in_review:frozen"; the entries are separated by commas.
+/** @param {(args: string[]) => Promise<any>} bd */
+async function hasReviewStatus(bd) {
+  const config = await bd(["config", "get", "status.custom"]).catch(noResult);
+  /** @type {string} */
+  const value = typeof config?.value === "string" ? config.value : "";
+  return value.split(",").some((entry) => entry.split(":")[0].trim() === REVIEW_STATUS);
 }
 
 // Runs `bd` in the main checkout `root`, resolving with its parsed JSON output.
@@ -160,6 +174,10 @@ export async function beadsTracker({ root: projectRoot, on }) {
   const root = await mainCheckout(projectRoot, on);
   await checkBeads(root);
   const bd = bdIn(root);
+  const reviewable = await hasReviewStatus(bd);
+  /** @type {Record<string, string>} */
+  const toBeads = reviewable ? { ...STATUS_TO_BEADS, "in-review": REVIEW_STATUS } : STATUS_TO_BEADS;
+  const unfinished = reviewable ? `${UNFINISHED_STATUSES},${REVIEW_STATUS}` : UNFINISHED_STATUSES;
 
   // Each record's open blockers, read with `bd show` only for the records that have dependencies.
   /** @param {BeadsRecord[]} records */
@@ -200,11 +218,11 @@ export async function beadsTracker({ root: projectRoot, on }) {
     name: "Beads",
     writable: true,
     prioritized: true,
-    statuses: Object.keys(STATUS_TO_BEADS),
+    statuses: reviewable ? ["backlog", "todo", "in-progress", "in-review", "done"] : Object.keys(STATUS_TO_BEADS),
     // Every issue that isn't closed, and once Done is expanded, the most recently closed ones.
     async list(_scopeId, loads = new Set()) {
       const lists = await Promise.all([
-        bd(["list", "--status", UNFINISHED_STATUSES, "--limit", "0"]),
+        bd(["list", "--status", unfinished, "--limit", "0"]),
         loads.has("done")
           ? bd(["list", "--status", "closed", "--sort", "closed", "--limit", String(RECENTLY_CLOSED)])
           : [],
@@ -217,7 +235,7 @@ export async function beadsTracker({ root: projectRoot, on }) {
     // A new body only saves over the body `issue` was read with, so edits made with `bd` meanwhile are never
     // overwritten. Order has nowhere to go.
     async update(issue, { status, priority, body, addLabels = [], removeLabels = [] }) {
-      if (status !== undefined && !STATUS_TO_BEADS[status]) throw new Error(`Beads issues can't be set to ${status}`);
+      if (status !== undefined && !toBeads[status]) throw new Error(`Beads issues can't be set to ${status}`);
       if (addLabels.length || removeLabels.length) await changeLabels(issue, addLabels, removeLabels);
       if (body !== undefined) {
         const current = await get(issue.id);
@@ -225,7 +243,7 @@ export async function beadsTracker({ root: projectRoot, on }) {
         if (current.body !== issue.body) throw new Error(`${issue.id} changed in Beads while you were editing it`);
       }
       const args = [
-        ...(status !== undefined ? ["--status", STATUS_TO_BEADS[status]] : []),
+        ...(status !== undefined ? ["--status", toBeads[status]] : []),
         ...(priority !== undefined ? ["--priority", String(PRIORITY_TO_BEADS[priority])] : []),
         ...(body !== undefined ? [`--description=${body}`] : []),
       ];

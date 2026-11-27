@@ -58,7 +58,7 @@ The examples below show one entry each.
 "~/Code/notes": { "tracker": "beads" }
 ```
 
-Beads keeps its database out of git, so changing an issue's status, priority or body, or starting it, never makes a commit. Its statuses show as todo (`open` and `blocked`), in progress, backlog (`deferred`) and done (`closed`), and its priorities P0 to P4 as Urgent, High, Medium, Low and None.
+Beads keeps its database out of git, so changing an issue's status, priority or body, or starting it, never makes a commit. Its statuses show as todo (`open` and `blocked`), in progress, backlog (`deferred`) and done (`closed`), plus in review (`in_review`) when the database adds that custom status with `bd config set status.custom "in_review:frozen"`, and its priorities P0 to P4 as Urgent, High, Medium, Low and None.
 
 ### `views`
 
