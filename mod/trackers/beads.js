@@ -45,7 +45,6 @@ import { refuseUnknownLabels } from "./labels.js";
  * @property {string | null} [closed_at]
  * @property {string | null} [description]
  * @property {string | null} [due_at]
- * @property {number} [dependency_count]
  * @property {BeadsDependency[]} [dependencies]
  */
 
@@ -206,14 +205,14 @@ export async function beadsTracker({ root: projectRoot, on }) {
     ? [ALL_ISSUES_SCOPE, ...epics.map((epic) => ({ id: `${EPIC_SCOPE_PREFIX}${epic.id}`, label: epic.title }))]
     : undefined;
 
-  // Each record's open blockers, read with `bd show` only for the records that have dependencies.
-  /** @param {BeadsRecord[]} records */
-  async function withBlockers(records) {
-    const dependent = records.filter((record) => record.dependency_count > 0).map((record) => record.id);
-    /** @type {BeadsRecord[]} */
-    const details = dependent.length ? await bd(["show", ...dependent]) : [];
-    const blockers = new Map(details.map((detail) => [detail.id, openBlockers(detail.dependencies)]));
-    return records.map((record) => toIssue(record, blockers.get(record.id) ?? []));
+  // Each unfinished issue an open issue blocks, with the IDs of those blockers. `bd show` would read them too, but
+  // it records the issue it shows in `.beads/last-touched`, which database-watch.js takes as a change, so a list
+  // read that way would refresh itself in a loop.
+  /** @returns {Promise<Map<string, string[]>>} */
+  async function openBlockersById() {
+    /** @type {{ id: string, blocked_by?: string[] }[]} */
+    const blocked = (await bd(["blocked"])) ?? [];
+    return new Map(blocked.map((issue) => [issue.id, issue.blocked_by ?? []]));
   }
 
   /** @param {string} id */
@@ -252,13 +251,16 @@ export async function beadsTracker({ root: projectRoot, on }) {
     async list(scopeId, loads = new Set()) {
       const epic = scopes?.find((scope) => scope.id === scopeId && scope !== ALL_ISSUES_SCOPE);
       const parent = epic ? ["--parent", epic.id.slice(EPIC_SCOPE_PREFIX.length)] : [];
-      const lists = await Promise.all([
+      const [unfinishedRecords, closedRecords, blockers] = await Promise.all([
         bd(["list", "--status", unfinished, ...parent, "--limit", "0"]),
         loads.has("done")
           ? bd(["list", "--status", "closed", ...parent, "--sort", "closed", "--limit", String(RECENTLY_CLOSED)])
           : [],
+        openBlockersById(),
       ]);
-      return withBlockers(lists.flatMap((list) => list ?? []));
+      /** @type {BeadsRecord[]} */
+      const records = [...(unfinishedRecords ?? []), ...(closedRecords ?? [])];
+      return records.map((record) => toIssue(record, blockers.get(record.id) ?? []));
     },
     deferred: () => ["done"],
     recentlyClosed: RECENTLY_CLOSED,

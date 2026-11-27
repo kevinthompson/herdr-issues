@@ -1,7 +1,7 @@
 // Refreshes a listed Beads repository the moment its database changes, rather than at the next poll. `bd` rewrites
 // its Dolt store under `.beads/embeddeddolt/` on every read as well as every write, so watching that would let the
-// panel's own `bd list` set off a refresh in a loop. Only a write touches `.beads/last-touched`, from the main
-// checkout or any worktree, so that file alone counts as a change. A batch holding only the folder itself means the
+// panel's own `bd list` set off a refresh in a loop. Only a write or a `bd show` touches `.beads/last-touched`, from
+// the main checkout or any worktree, so that file alone counts as a change, and listing issues never runs `bd show`. A batch holding only the folder itself means the
 // watcher dropped paths; the reads' churn can cause that, so it's ignored and the poll catches anything missed.
 import { exec, watchFolder } from "herdr";
 

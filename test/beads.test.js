@@ -75,6 +75,17 @@ async function trackerWith(t, records, { installed = true, initialized = true, c
             }),
         );
       }
+      if (subcommand === "blocked") {
+        const openBlockers = (each) =>
+          (each.dependencies ?? [])
+            .filter((dependency) => dependency.dependency_type === "blocks" && dependency.status !== "closed")
+            .map((dependency) => dependency.id);
+        return ok(
+          records
+            .filter((each) => each.status !== "closed" && openBlockers(each).length)
+            .map((each) => ({ id: each.id, blocked_by: openBlockers(each) })),
+        );
+      }
       if (subcommand === "show") {
         const found = records.filter((each) => rest.includes(each.id));
         return found.length
@@ -241,6 +252,19 @@ describe("Beads tracker", () => {
     assert.deepEqual(issues["bd-1"].labels, ["ui"]);
     assert.deepEqual(issues["bd-1"].blockedBy, ["bd-2"]);
     assert.deepEqual(issues["bd-2"].blockedBy, []);
+  });
+
+  // `bd show` records the issue it shows in .beads/last-touched, which the panel watches for changes.
+  test("lists blockers without bd show, so listing doesn't look like a change to the database", async (t) => {
+    const { tracker, commands } = await trackerWith(t, [
+      record("bd-1", { dependencies: [blocking("bd-2")] }),
+      record("bd-2"),
+    ]);
+    await tracker.list(null, new Set(["done"]));
+    assert.deepEqual(
+      commands.filter(({ args }) => args[0] === "show"),
+      [],
+    );
   });
 
   test("names who created an issue, without an avatar", async (t) => {
