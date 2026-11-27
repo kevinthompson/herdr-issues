@@ -11,6 +11,8 @@
 // issues and offers In review, which the panel then sets as in_review.
 // Beads priorities P0–P4 map onto the panel's scale as P0 → Urgent (1), P1 → High (2), P2 → Medium (3),
 // P3 → Low (4) and P4 → None (0). An issue blocks another through a `blocks` dependency.
+// A database with epics that aren't closed offers them as scopes after the default one, which lists every issue:
+// an epic's scope lists only its own children, not theirs.
 import { exec, readTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup } from "../lookups.js";
@@ -54,6 +56,8 @@ const RECENTLY_CLOSED = 20;
 const BRANCH_SLUG_LENGTH = 50;
 const UNFINISHED_STATUSES = "open,in_progress,blocked,deferred";
 const BD_INIT_TIMEOUT_MS = 120_000;
+const ALL_ISSUES_SCOPE = { id: "all", label: "All issues" };
+const EPIC_SCOPE_PREFIX = "epic:";
 
 /** @type {Record<string, string>} */
 const STATUS_FROM_BEADS = {
@@ -178,6 +182,11 @@ export async function beadsTracker({ root: projectRoot, on }) {
   /** @type {Record<string, string>} */
   const toBeads = reviewable ? { ...STATUS_TO_BEADS, "in-review": REVIEW_STATUS } : STATUS_TO_BEADS;
   const unfinished = reviewable ? `${UNFINISHED_STATUSES},${REVIEW_STATUS}` : UNFINISHED_STATUSES;
+  /** @type {BeadsRecord[]} */
+  const epics = (await bd(["list", "--type", "epic", "--status", unfinished, "--limit", "0"])) ?? [];
+  const scopes = epics.length
+    ? [ALL_ISSUES_SCOPE, ...epics.map((epic) => ({ id: `${EPIC_SCOPE_PREFIX}${epic.id}`, label: epic.title }))]
+    : undefined;
 
   // Each record's open blockers, read with `bd show` only for the records that have dependencies.
   /** @param {BeadsRecord[]} records */
@@ -219,12 +228,16 @@ export async function beadsTracker({ root: projectRoot, on }) {
     writable: true,
     prioritized: true,
     statuses: reviewable ? ["backlog", "todo", "in-progress", "in-review", "done"] : Object.keys(STATUS_TO_BEADS),
-    // Every issue that isn't closed, and once Done is expanded, the most recently closed ones.
-    async list(_scopeId, loads = new Set()) {
+    scopes,
+    // Every issue in the scope that isn't closed, and once Done is expanded, the most recently closed ones. An
+    // unknown scope, such as an epic closed since, lists the default.
+    async list(scopeId, loads = new Set()) {
+      const epic = scopes?.find((scope) => scope.id === scopeId && scope !== ALL_ISSUES_SCOPE);
+      const parent = epic ? ["--parent", epic.id.slice(EPIC_SCOPE_PREFIX.length)] : [];
       const lists = await Promise.all([
-        bd(["list", "--status", unfinished, "--limit", "0"]),
+        bd(["list", "--status", unfinished, ...parent, "--limit", "0"]),
         loads.has("done")
-          ? bd(["list", "--status", "closed", "--sort", "closed", "--limit", String(RECENTLY_CLOSED)])
+          ? bd(["list", "--status", "closed", ...parent, "--sort", "closed", "--limit", String(RECENTLY_CLOSED)])
           : [],
       ]);
       return withBlockers(lists.flatMap((list) => list ?? []));

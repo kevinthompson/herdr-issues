@@ -141,6 +141,28 @@ test("the scope hook names `issues scopes` for a scope published without its ID"
   );
 });
 
+test("the scope hook names a Beads epic's scope", (t) => {
+  const folder = temporaryFolder(t);
+  const repository = createRepository(folder);
+  const appHome = join(folder, "herdr-app");
+  const env = { HERDR_APP_HOME: appHome, HC_TERMINAL_ID: "terminal-1", TMPDIR: join(folder, "tmp") };
+  mkdirSync(join(appHome, "data/issues/scope"), { recursive: true });
+  writeFileSync(
+    join(appHome, "data/issues/scope/a.json"),
+    JSON.stringify({
+      repo: repository,
+      tracker: "beads",
+      team: null,
+      scope: { id: "epic:bd-1", kind: "epic", label: "Launch" },
+    }),
+  );
+
+  const { stdout } = runHook("herdr-issues-scope.mjs", { session_id: "session-1", cwd: repository }, env);
+
+  assert.match(stdout, /lists the open child issues of the epic "Launch" in Beads\. /);
+  assert.match(stdout, /`issues list epic:bd-1` prints its open issues/);
+});
+
 test("the scope hook stays quiet outside a Herdr terminal", (t) => {
   const repository = createRepository(temporaryFolder(t));
 

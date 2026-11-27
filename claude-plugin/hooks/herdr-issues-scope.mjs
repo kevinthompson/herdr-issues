@@ -38,6 +38,8 @@ function scopeText(published) {
       mine: () => "the open issues assigned to me, across every team",
       team: () => `the ${team} team's open issues outside its Triage state`,
       triage: () => `the ${team} team's issues in its Triage state`,
+      all: () => "every open issue",
+      epic: () => `the open child issues of the epic "${scope.label}"`,
     }[scope.kind]?.() ?? `the saved view "${scope.label}"`;
   const trackerName = tracker ? tracker[0].toUpperCase() + tracker.slice(1) : "";
   const teamClause = team && scope.kind !== "mine" ? `, team ${team}` : "";

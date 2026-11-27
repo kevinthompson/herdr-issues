@@ -15,7 +15,8 @@ const folder = () => `${appHome()}/data/issues/scope`;
 /** @param {Tracker} tracker @param {string} [scopeId] */
 function describe(tracker, scopeId) {
   const { scope, project, milestone } = findScope(tracker.scopes, scopeId) ?? { scope: tracker.scopes[0] };
-  const kind = milestone ? "milestone" : project ? "project" : scope.id.startsWith("view:") ? "view" : scope.id;
+  const prefix = scope.id.match(/^(view|epic):/)?.[1];
+  const kind = milestone ? "milestone" : project ? "project" : (prefix ?? scope.id);
   return {
     id: scope.id,
     kind,
