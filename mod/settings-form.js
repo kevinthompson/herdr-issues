@@ -1,28 +1,20 @@
 // What the settings view's forms (settings.js) share: the labels of the settings both forms show, each setting's
 // row, typed fields, the line saying why its last save failed, saving as the form changes (autosave.js), where a
-// picked choice or Enter in a field saves at once and typing saves once it pauses, the issue sessions' model and
-// effort, and each section's card under its heading. Those two are select menus (select.js) of their allowed values
-// led by a choice that removes the setting, labeled with what then applies; workModel's Other takes another model
-// alias or full name typed in. Each form gives saveRequest(), what to write and how its saved values change once
+// picked choice or Enter in a field saves at once and typing saves once it pauses, and each section's card under its
+// heading. Each form gives saveRequest(), what to write and how its saved values change once
 // written, or null when nothing can be saved yet. Rows and cards are laid out by setting-row.js.
 import { div } from "gpui-kit";
-import { Input, InputState, Textarea } from "gpui-base";
+import { Input } from "gpui-base";
 import { AutosaveQueue } from "./autosave.js";
-import { SelectMenu } from "./select.js";
 import { cardSection, settingRow } from "./setting-row.js";
-import { CLEAR_CHOICE, OTHER_WORK_MODEL, isTypedWorkModel, workModelChoice } from "./settings-fields.js";
-import { AGENT_DEFAULTS, EFFORTS, SUGGESTED_WORK_MODELS } from "./trackers/setting.js";
 
 /** @import { AsyncContext, Context, NativeElement } from "gpui-kit" */
-/** @import { InputState as InputStateType, TextareaState } from "gpui-base" */
+/** @import { InputState as InputStateType } from "gpui-base" */
 /** @import { Theme } from "./menu.js" */
-/** @import { SelectOption } from "./select.js" */
+/** @import { SelectMenu, SelectOption } from "./select.js" */
 /** @import { SettingsSection } from "./settings-fields.js" */
 
-/** @typedef {"workModel" | "workEffort"} AgentKey */
-/** @typedef {{ key: AgentKey, title: string, sentence: string | null, choices: string[] }} AgentQuestion */
 /** @typedef {import("./setting-row.js").SettingLabel} SettingLabel */
-/** @typedef {{ workModel?: string | null, workEffort?: string | null }} AgentValues */
 /** @typedef {{ write: () => Promise<unknown>, written: () => void }} SaveRequest */
 
 /** @type {SelectOption[]} */
@@ -82,34 +74,6 @@ export const worktreeCommandLabel = (sentence) => ({
   tokens: [SPACE_NAME_TOKENS[0]],
 });
 
-/**
- * @param {string} sentence
- * @returns {SettingLabel}
- */
-export const workPromptLabel = (sentence) => ({ title: "Work prompt", sentence, wide: true });
-
-/** @type {AgentQuestion[]} */
-export const AGENT_QUESTIONS = [
-  {
-    key: "workModel",
-    title: "Model",
-    sentence: "The model issue sessions use. Inherit uses your own Claude Code model.",
-    choices: SUGGESTED_WORK_MODELS,
-  },
-  {
-    key: "workEffort",
-    title: "Effort",
-    sentence: "The effort issue sessions use.",
-    choices: EFFORTS,
-  },
-];
-const OTHER_WORK_MODEL_OPTION = {
-  id: OTHER_WORK_MODEL,
-  label: "Other…",
-  detail: "Another model alias or full name, typed in.",
-};
-export const WORK_PROMPT_ROWS = 6;
-
 export class SettingsForm {
   // onSaved(cx) runs after each save is written; onSettled(cx), which the view sets, once none is running.
   /**
@@ -121,11 +85,6 @@ export class SettingsForm {
     this.onSettled = () => {};
     /** @type {Record<string, SelectMenu>} */
     this.selects = null;
-    /** @type {AgentValues | null} */
-    this.savedAgent = null;
-    /** @type {AgentValues} */
-    this.agentValues = {};
-    this.otherWorkModelPicked = false;
     this.loading = true;
     /** @type {string | null} */
     this.error = null;
@@ -147,11 +106,6 @@ export class SettingsForm {
         cx.notify();
       },
     });
-    this.workModelInput = InputState.new({
-      placeholder: "Another model alias or full name",
-    });
-    this.workModelInput.on("change", (_e, cx) => this.typeWorkModel(this.workModelInput.value().trim(), cx));
-    this.workModelInput.on("submit", (_e, cx) => this.saveNow(cx));
   }
 
   get saving() {
@@ -192,97 +146,6 @@ export class SettingsForm {
    */
   flush(cx) {
     this.autosave.flush(cx);
-  }
-
-  // A select for each of workModel and workEffort, with ids led by `prefix`.
-  /**
-   * @param {string} prefix
-   * @param {Context} cx
-   */
-  agentSelects(prefix, cx) {
-    return Object.fromEntries(
-      AGENT_QUESTIONS.map(({ key, title }) => [key, new SelectMenu(`${prefix}-${key}`, title, cx)]),
-    );
-  }
-
-  // Opens workModel and workEffort on `saved`, each its value or null where unset.
-  /**
-   * @param {AgentValues} saved
-   */
-  openAgent(saved) {
-    this.savedAgent = saved;
-    this.agentValues = { ...saved };
-    if (isTypedWorkModel(saved.workModel)) this.workModelInput.set_value(saved.workModel);
-  }
-
-  // The value for `key`, or null to remove it. workModel's Other keeps the value until a model is typed; a listed
-  // model clears the typed one.
-  /**
-   * @param {AgentKey} key
-   * @param {string | null} value
-   * @param {Context} cx
-   */
-  chooseAgent(key, value, cx) {
-    if (key === "workModel") {
-      this.otherWorkModelPicked = value === OTHER_WORK_MODEL;
-      if (!this.otherWorkModelPicked && isTypedWorkModel(this.workModelInput.value().trim()))
-        this.workModelInput.set_value("");
-    }
-    if (value !== OTHER_WORK_MODEL) this.agentValues = { ...this.agentValues, [key]: value };
-    this.saveNow(cx);
-  }
-
-  // Emptying the field of a typed model removes workModel.
-  /**
-   * @param {string} text
-   * @param {Context} cx
-   */
-  typeWorkModel(text, cx) {
-    if (text) this.agentValues = { ...this.agentValues, workModel: text };
-    else if (isTypedWorkModel(this.agentValues.workModel)) this.agentValues = { ...this.agentValues, workModel: null };
-    this.edited(cx);
-  }
-
-  /**
-   * @returns {AgentValues}
-   */
-  agentChanges() {
-    return Object.fromEntries(
-      /** @type {AgentKey[]} */ (Object.keys(AGENT_DEFAULTS))
-        .filter((key) => this.savedAgent && (this.agentValues[key] ?? null) !== this.savedAgent[key])
-        .map((key) => [key, this.agentValues[key] ?? null]),
-    );
-  }
-
-  // A select of the setting's values led by the one that removes it, labeled `clearLabel`; workModel's ends with
-  // Other, which shows the typed model.
-  /**
-   * @param {AgentQuestion} question
-   * @param {string} clearLabel
-   * @param {boolean} showTypedModel
-   * @param {Theme} t
-   */
-  agentQuestion({ key, title, sentence, choices }, clearLabel, showTypedModel, t) {
-    const isWorkModel = key === "workModel";
-    const options = [
-      { id: CLEAR_CHOICE, label: clearLabel },
-      ...choices.map((id) => ({ id, label: id })),
-      ...(isWorkModel ? [OTHER_WORK_MODEL_OPTION] : []),
-    ];
-    const chosen = isWorkModel
-      ? workModelChoice(this.agentValues.workModel, this.otherWorkModelPicked)
-      : (this.agentValues[key] ?? CLEAR_CHOICE);
-    return this.question({ title, sentence }, t, (controls) =>
-      controls
-        .child(
-          this.selects[key].render(t, {
-            options,
-            value: chosen,
-            onChoose: (id, cx) => this.chooseAgent(key, id === CLEAR_CHOICE ? null : id, cx),
-          }),
-        )
-        .when(isWorkModel && showTypedModel, (e) => e.child(this.textField(this.workModelInput, t))),
-    );
   }
 
   // Why the last save failed, leading the form.
@@ -347,24 +210,6 @@ export class SettingsForm {
       .h(26)
       .px(8)
       .items_center()
-      .rounded(7)
-      .border(1)
-      .border_color(t.input)
-      .bg(t.surface)
-      .text_size(12)
-      .text_color(t.foreground);
-  }
-
-  /**
-   * @param {TextareaState} state
-   * @param {Theme} t
-   */
-  textareaField(state, t) {
-    return Textarea.new(state)
-      .w_full()
-      .min_w(0)
-      .px(8)
-      .py(6)
       .rounded(7)
       .border(1)
       .border_color(t.input)

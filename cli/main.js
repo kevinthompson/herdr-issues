@@ -9,7 +9,6 @@ import {
   nameSettings,
   pollSettings,
   updateSettings,
-  workSettings,
   worktreeCommandTemplate,
 } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
@@ -62,8 +61,8 @@ Commands:
   branch <id> [--json]     Print the branch an issue is worked on; refuse an issue an unfinished issue blocks
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: approval, onApproval,
-                           waitForChecks, pushAfterMerge, close, name, pollSeconds, updateCheckHours, workModel,
-                           workEffort, workPrompt or worktreeCommand
+                           waitForChecks, pushAfterMerge, close, name, pollSeconds, updateCheckHours or
+                           worktreeCommand
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
@@ -237,9 +236,6 @@ const SETTINGS = {
   name: nameSettings,
   pollSeconds: pollSettings,
   updateCheckHours: updateSettings,
-  workModel: workSettings,
-  workEffort: workSettings,
-  workPrompt: workSettings,
   worktreeCommand: async (project) => ({ worktreeCommand: (await worktreeCommandTemplate(project)) ?? "" }),
 };
 

@@ -8,7 +8,7 @@
 // one writes; switching scope leaves the hidden form's waiting save to run. Back writes any save still waiting for
 // typing to pause, then returns to the list once every save is done, or stays on the form whose save failed to
 // show its error. Each form groups its settings in one scrolling column of sections, each a small capitalized heading
-// above a bordered card of rows, in the order Tracker, Approval, Worktrees, Issue sessions and Panel, showing only
+// above a bordered card of rows, in the order Tracker, Approval, Worktrees and Panel, showing only
 // the sections it has (settings-fields.js); nothing is collapsed. Each row (settings-form.js) puts a setting's label
 // and description beside its controls: a select menu (select.js) whose open list says what each option means, or a
 // typed field.

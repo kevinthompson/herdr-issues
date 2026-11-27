@@ -32,7 +32,7 @@ test("saving changes only the given top-level keys and keeps repos and every oth
     approval: "auto",
     onApproval: "pull-request",
     waitForChecks: true,
-    workPrompt: "  House rules.\n",
+    worktreeCommand: "  agent <issueId>\n",
   });
 
   assert.deepEqual(readSettings(), {
@@ -42,7 +42,7 @@ test("saving changes only the given top-level keys and keeps repos and every oth
     approval: "auto",
     onApproval: "pull-request",
     waitForChecks: true,
-    workPrompt: "House rules.",
+    worktreeCommand: "agent <issueId>",
     repos,
   });
   assert.deepEqual(Object.keys(readSettings()).at(-1), "repos");
@@ -50,9 +50,9 @@ test("saving changes only the given top-level keys and keeps repos and every oth
 });
 
 test("a null or blank value removes the key", async () => {
-  writeSettings({ workModel: "opus", spaceName: "<repo><issueId>", updateCheckHours: 12, repos });
+  writeSettings({ worktreeCommand: "agent", spaceName: "<repo><issueId>", updateCheckHours: 12, repos });
 
-  await saveTopLevelSettings({ workModel: null, spaceName: "  ", updateCheckHours: undefined });
+  await saveTopLevelSettings({ worktreeCommand: null, spaceName: "  ", updateCheckHours: undefined });
 
   assert.deepEqual(readSettings(), { repos });
 });
@@ -60,9 +60,9 @@ test("a null or blank value removes the key", async () => {
 test("saving without a file creates one with only the given keys", async () => {
   rmSync(settingsPath(), { force: true });
 
-  await saveTopLevelSettings({ workEffort: "high", pollSeconds: 120 });
+  await saveTopLevelSettings({ spaceName: "<issueId>", pollSeconds: 120 });
 
-  assert.deepEqual(readSettings(), { workEffort: "high", pollSeconds: 120 });
+  assert.deepEqual(readSettings(), { spaceName: "<issueId>", pollSeconds: 120 });
 });
 
 test("a value or pair the top level couldn't hold, or a repository-only key, writes nothing", async () => {
@@ -77,8 +77,6 @@ test("a value or pair the top level couldn't hold, or a repository-only key, wri
     [{ merge: "auto" }, /merge isn't a setting for every repository/],
     [{ pollSeconds: 5 }, /pollSeconds that's a whole number of seconds, 10 or more/],
     [{ updateCheckHours: 0.5 }, /updateCheckHours that's a whole number of hours/],
-    [{ workModel: "two words" }, /needs a workModel of inherit/],
-    [{ workEffort: "extreme" }, /needs a workEffort of/],
     [{ tracker: "beads" }, /tracker isn't a setting for every repository/],
   ];
   for (const [changes, message] of refusals) {

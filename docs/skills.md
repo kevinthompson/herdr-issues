@@ -16,9 +16,9 @@ Run without arguments, it asks which tracker to use: a Linear team, GitHub Issue
 - whether finished sessions close their worktrees: `close <ask|auto>`;
 - the repository's space name: `name <name>`;
 - the command run in each new worktree: `worktreeSetup <command>`;
-- the model and effort of the sessions that work issues: `workModel <model>` and `workEffort <effort>`.
+- the interactive command each new issue space runs: `worktreeCommand <command>`.
 
-`clear <setting>` removes a setting, `--all` applies the approval and session settings to every repository, and `show` prints the current settings.
+`clear <setting>` removes a setting, `--all` applies the approval settings and `worktreeCommand` to every repository, and `show` prints the current settings.
 
 ```
 /issues:config github

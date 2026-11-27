@@ -4,7 +4,7 @@
 
 A repository with no entry in `issues.json` shows a setup view in the panel: choose **GitHub Issues**, **Linear** (then a team) or **Beads**, and the panel checks what that tracker needs, asks about approval (see [`approval`, `onApproval` and `waitForChecks`](#approval-onapproval-and-waitforchecks)), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
 
-Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `approval`, `onApproval`, `waitForChecks`, `pushAfterMerge`, `close`, `worktreeCommand`, `spaceName`, `pollSeconds`, `updateCheckHours`, `workModel`, `workEffort` and `workPrompt`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
+Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `approval`, `onApproval`, `waitForChecks`, `pushAfterMerge`, `close`, `worktreeCommand`, `spaceName`, `pollSeconds` and `updateCheckHours`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
 
 For saved Linear views, a GitHub repository other than origin's, and the other options the panel doesn't offer, run this in a Claude Code session in the repository:
 
@@ -161,6 +161,14 @@ You don't need `worktreeSetup` to carry your own Claude Code settings into workt
 { "worktreeCommand": "claude \"/issues:work <issueId>\"" }
 ```
 
+The command chooses the agent's own options, such as a Claude session's model, effort and appended system prompt, which replace the retired `workModel`, `workEffort` and `workPrompt` settings:
+
+```json
+{
+  "worktreeCommand": "claude --model sonnet --effort high --append-system-prompt \"Run npm test before each commit.\" \"/issues:work <issueId>\""
+}
+```
+
 The settings view's **Issue space command**, under Worktrees, sets it too.
 
 ### `pollSeconds`
@@ -183,25 +191,3 @@ How often the panel checks the checkout it runs from for an update, in whole hou
 ```json
 { "updateCheckHours": 24 }
 ```
-
-### `workModel` and `workEffort`
-
-`/issues:start`, through `issues worktree --claude`, opens a Claude session that works the issue. These two settings choose that session's model and effort, at the top level or in a repository's entry, which overrides the top level's. Without them, the session runs on your own Claude Code model and effort.
-
-- `workModel`: a model alias such as `sonnet`, `opus` or `haiku`, a model's full name, or `inherit` (the default) for your own model. It's passed to `claude --model`.
-- `workEffort`: `low`, `medium`, `high`, `xhigh` or `max`, or `default` (the default) for your own effort. It's passed to `claude --effort`.
-
-```json
-{
-  "workEffort": "high",
-  "repos": {
-    "~/Code/notes": { "tracker": "beads", "workModel": "sonnet" }
-  }
-}
-```
-
-`issues setting workModel` and `issues setting workEffort` print a repository's settings, with their defaults applied, and `/issues:config` shows and changes them. A change applies to sessions started after it.
-
-### `workPrompt`
-
-Instructions appended to the system prompt of those sessions with `claude --append-system-prompt`, such as house rules for tests. Set it at the top level of `issues.json` for every repository, in a repository's entry, or both: a session gets the top level's prompt, then the repository's after a blank line. A blank prompt counts as unset. `issues setting workPrompt` prints what a repository's sessions get.

@@ -5,7 +5,7 @@
 // keeps its name. The worktree is the branch's existing one, else a new
 // checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. A new space on an issue's
 // branch runs the repository's worktreeCommand for the issue (worktree-command.js); with --claude, it opens a
-// Claude session on the repository's workModel and workEffort settings instead. A new worktree gets a copy of the main
+// Claude session given the first message instead. A new worktree gets a copy of the main
 // checkout's .claude/settings.local.json before the repository's worktreeSetup command runs. Given an issue rather
 // than a branch, `issues worktree` first marks it in progress when it's in triage, backlog or todo (main.js).
 import { spawn } from "node:child_process";
@@ -15,7 +15,6 @@ import { basename, dirname, join } from "node:path";
 import { exec, home, readLayout } from "./herdr.js";
 import { spaceShowing, worktreeFor } from "../mod/worktree.js";
 import { nameSettings, trackerSetting } from "../mod/trackers/setting.js";
-import { workSessionArgv } from "../mod/work-session.js";
 import { worktreeCommandTab } from "../mod/worktree-command.js";
 import { openBehindArgs } from "../mod/open-behind.js";
 
@@ -229,9 +228,8 @@ async function herdrVersion() {
 // which the Herdr sidebar nests worktree spaces under. Concurrent runs would each see no space on the main
 // checkout and open one, so they take turns.
 async function spaceTab({ main, issueId, claudeMessage }) {
-  const project = { root: main, on: null };
-  if (claudeMessage) return { tab: "Claude", argv: await workSessionArgv(project), task: claudeMessage };
-  return issueId ? worktreeCommandTab(project, issueId) : {};
+  if (claudeMessage) return { tab: "Claude", argv: ["claude"], task: claudeMessage };
+  return issueId ? worktreeCommandTab({ root: main, on: null }, issueId) : {};
 }
 
 async function showInSpace({ branch, path, main, common, name, issueId, claudeMessage }) {
