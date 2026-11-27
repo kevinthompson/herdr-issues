@@ -117,7 +117,6 @@ import { stillWaitingForSpace } from "./opening-wait.js";
 import { Openings } from "./openings.js";
 import { canOfferMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
-import { idColumnWidth } from "./id-column.js";
 import { groupSpacing } from "./group-spacing.js";
 
 /** @import { Context, AsyncContext, Color } from "gpui-kit" */
@@ -159,10 +158,7 @@ const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 // Lucide icons for Urgent, High, Medium and Low, as Linear shows priority.
 /** @type {Record<number, string>} */
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
-const PRIORITY_ICON_PX = 18;
-const PRIORITY_TO_PULL_REQUEST_GAP_PX = 6;
-const PULL_REQUEST_ICON_PX = 11;
-const PULL_REQUEST_ICON_TO_COUNT_GAP_PX = 3;
+const ROW_PILL_ICON_PX = 11;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 /** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
@@ -231,18 +227,41 @@ function withLoadedBodies(issues, previous) {
 const settingsButton = (onClick, t) =>
   iconButton({ id: "issues-settings-open", icon: "settings", tooltip: "Settings", onClick }, t);
 
+// A compact bordered pill in an issue row, drawn like the detail view's label chips.
+/**
+ * @param {string} icon
+ * @param {Color} iconColor
+ * @param {string} text
+ * @param {Theme} t
+ */
+const rowPill = (icon, iconColor, text, t) =>
+  h_flex()
+    .flex_none()
+    .px(5)
+    .gap(4)
+    .items_center()
+    .rounded(4)
+    .border_1()
+    .border_color(t.border)
+    .text_color(t.muted)
+    .child(svg(`mods/issues/icons/${icon}.svg`).flex_none().size(ROW_PILL_ICON_PX).text_color(iconColor))
+    .child(text);
+
+/**
+ * @param {number} priority
+ * @param {Theme} t
+ */
+const priorityPill = (priority, t) =>
+  rowPill(PRIORITY_ICONS[priority], t[PRIORITY_COLORS[priority]] ?? t.dim, PRIORITIES[priority], t);
+
 /**
  * @param {PullRequest[]} pullRequests
  * @param {Theme} t
  */
-const pullRequestBadge = (pullRequests, t) =>
-  h_flex()
-    .flex_none()
-    .gap(PULL_REQUEST_ICON_TO_COUNT_GAP_PX)
-    .items_center()
-    .text_color(t[pullRequestBadgeColor(pullRequests)])
-    .child(svg("mods/issues/icons/pull-request.svg").flex_none().size(PULL_REQUEST_ICON_PX))
-    .child(div().child(String(pullRequests.length)));
+const pullRequestPill = (pullRequests, t) => {
+  const color = t[pullRequestBadgeColor(pullRequests)];
+  return rowPill("pull-request", color, String(pullRequests.length), t).text_color(color);
+};
 
 const STRIP_ICON_PX = 16;
 const STATUS_ICON_PX = 14;
@@ -1471,10 +1490,9 @@ export default class Issues extends View {
 
   /**
    * @param {Issue} issue
-   * @param {number} idColumnPx
    * @param {Theme} t
    */
-  row(issue, idColumnPx, t) {
+  row(issue, t) {
     const blockers = holdingBlockers(issue, this.issues);
     const waiting = waitingIssues(issue, this.issues),
       sla = slaStatus(issue),
@@ -1482,6 +1500,8 @@ export default class Issues extends View {
       pullRequestCount = issue.pullRequests?.length ?? 0,
       project = listsProject(this.listedScope, issue.project) ? null : issue.project,
       chips = labelChips(issue, t, { withProject: false }).slice(0, 3);
+    const showsPriority = this.prioritized() && issue.priority > 0,
+      hasDetails = Boolean(sla) || Boolean(due) || showsPriority || pullRequestCount > 0;
     const finishable = canFinishWork(issue),
       startable = canStartWork(issue, this.issues);
     const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
@@ -1504,49 +1524,10 @@ export default class Issues extends View {
           .items_start()
           .child(
             v_flex()
-              .flex_none()
-              .w(idColumnPx)
-              .pt(1)
-              .gap(3)
-              .text_size(11)
-              .child(div().truncate().text_color(t.accent).child(issue.id))
-              .when(Boolean(sla), (e) =>
-                e.child(
-                  div()
-                    .text_color(t[SLA_COLORS[sla.risk]])
-                    .child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" ")),
-                ),
-              )
-              .when(Boolean(due), (e) =>
-                e.child(div().whitespace_normal().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)),
-              )
-              .when(issue.priority > 0 || pullRequestCount > 0, (e) =>
-                e.child(
-                  h_flex()
-                    .gap(PRIORITY_TO_PULL_REQUEST_GAP_PX)
-                    .items_center()
-                    .child(
-                      issue.priority > 0
-                        ? div()
-                            .id(`priority-${issue.id}`)
-                            .flex_none()
-                            .tooltip(PRIORITIES[issue.priority])
-                            .child(
-                              svg(`mods/issues/icons/${PRIORITY_ICONS[issue.priority]}.svg`)
-                                .size(PRIORITY_ICON_PX)
-                                .text_color(t[PRIORITY_COLORS[issue.priority]] ?? t.dim),
-                            )
-                        : div().flex_none().size(PRIORITY_ICON_PX),
-                    )
-                    .when(pullRequestCount > 0, (e) => e.child(pullRequestBadge(issue.pullRequests, t))),
-                ),
-              ),
-          )
-          .child(
-            v_flex()
               .flex_1()
               .min_w(0)
               .gap(3)
+              .child(div().truncate().text_size(11).text_color(t.accent).child(issue.id))
               .child(div().whitespace_normal().child(issue.title))
               .when(Boolean(project), (e) =>
                 e.child(
@@ -1555,7 +1536,7 @@ export default class Issues extends View {
                     .text_color(t.dim),
                 ),
               )
-              .when(chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
+              .when(hasDetails || chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
                 e.child(
                   h_flex()
                     .flex_wrap()
@@ -1565,6 +1546,26 @@ export default class Issues extends View {
                     .text_size(11)
                     .text_color(t.dim)
                     .overflow_hidden()
+                    .when(hasDetails, (e) =>
+                      e.child(
+                        h_flex()
+                          .flex_none()
+                          .gap(8)
+                          .items_center()
+                          .when(Boolean(sla), (e) =>
+                            e.child(
+                              div()
+                                .text_color(t[SLA_COLORS[sla.risk]])
+                                .child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" ")),
+                            ),
+                          )
+                          .when(Boolean(due), (e) =>
+                            e.child(div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)),
+                          )
+                          .when(showsPriority, (e) => e.child(priorityPill(issue.priority, t)))
+                          .when(pullRequestCount > 0, (e) => e.child(pullRequestPill(issue.pullRequests, t))),
+                      ),
+                    )
                     .children(chips)
                     .when(blockers.length > 0, (e) =>
                       e.child(
@@ -1730,15 +1731,14 @@ export default class Issues extends View {
   /**
    * @param {Group} group
    * @param {number} shown
-   * @param {number} idColumnPx
    * @param {{ above: number, below: number }} spacing
    * @param {Theme} t
    */
-  group(group, shown, idColumnPx, spacing, t) {
+  group(group, shown, spacing, t) {
     const expanded = this.isExpanded(group),
       hidden = group.issues.length - shown;
     const icon = statusIcon(group.id);
-    const rows = expanded ? group.issues.slice(0, shown).map((issue) => this.row(issue, idColumnPx, t)) : [];
+    const rows = expanded ? group.issues.slice(0, shown).map((issue) => this.row(issue, t)) : [];
     if (expanded && hidden > 0)
       rows.push(
         div()
@@ -1931,11 +1931,6 @@ export default class Issues extends View {
       listsNoIssues = this.loaded && holdsNoIssues(groups);
     const shown = this.shownCounts(groups);
     const spacing = groupSpacing(groups.map((group) => this.isExpanded(group) && group.issues.length > 0));
-    const idColumnPx = idColumnWidth(
-      groups.flatMap((group, index) =>
-        this.isExpanded(group) ? group.issues.slice(0, shown[index]).map((issue) => issue.id) : [],
-      ),
-    );
     this.revealGroup(groups);
     return v_flex()
       .size_full()
@@ -1966,7 +1961,7 @@ export default class Issues extends View {
           .pt(16)
           .pb(ROW_PADDING_X_PX)
           .gap(6)
-          .children(groups.map((group, index) => this.group(group, shown[index], idColumnPx, spacing[index], t)))
+          .children(groups.map((group, index) => this.group(group, shown[index], spacing[index], t)))
           .when(!this.loaded && !error, (e) => e.child(div().p(8).text_color(t.dim).child("Loading…")))
           .when(listsNoIssues && !error, (e) => e.child(emptyListView(t))),
       );
