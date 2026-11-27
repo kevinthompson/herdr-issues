@@ -99,6 +99,7 @@ import { isTextFile, openInEditor, prefetchEditor } from "./editor.js";
 import { avatarImage, AVATAR_PX } from "./avatars.js";
 import { lastList, fetchList, rememberedList } from "./lists.js";
 import { issuesChangedAt, announceIssueChange } from "./changes.js";
+import { databaseFolder, watchDatabase } from "./database-watch.js";
 import { DUE_COLORS, rowHover, statusColor, statusTints } from "./colors.js";
 import { pullRequestBadgeColor } from "./pull-request-status.js";
 import { card, CARD_RADIUS_PX } from "./section.js";
@@ -456,6 +457,7 @@ export default class Issues extends View {
         else this.error = String(e.message ?? e);
       } finally {
         if (generation === this.generation) {
+          this.followDatabase(cx);
           this.loaded = true;
           this.refreshing = false;
           cx.notify();
@@ -800,6 +802,15 @@ export default class Issues extends View {
         this.watchingAppFiles = false;
       }
     });
+  }
+
+  // Keeps one watch on the listed repository's Beads database, moving or cancelling it when the list changes.
+  /** @param {Context} cx */
+  followDatabase(cx) {
+    const folder = databaseFolder(this);
+    if (this.databaseWatch?.running && this.databaseWatch.folder === folder) return;
+    this.databaseWatch?.cancel();
+    this.databaseWatch = folder ? watchDatabase(folder, () => this.refresh(cx), { sleep: (ms) => cx.sleep(ms) }) : null;
   }
 
   // Keeps the issue as it was read, so saving can tell whether it changed underneath the edit.
