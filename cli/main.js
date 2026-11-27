@@ -13,7 +13,7 @@ import {
 } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
-import { checkBeads } from "../mod/trackers/beads.js";
+import { checkBeads, checkBeadsDatabase, checkBeadsInstalled, initializeBeads } from "../mod/trackers/beads.js";
 import { isUnstarted, needsNewBranch, STATUSES } from "../mod/issue.js";
 import {
   issueSpaceName,
@@ -65,6 +65,8 @@ Commands:
                            worktreeCommand
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
+  auth beads --init        Make the main checkout's Beads database when it has none, as the panel's setup view does,
+                           named with the initials of the checkout's folder name, then check as auth beads does
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
                            credentials as auth does, its labels (Linear's and GitHub's; null for Beads) and up to 10
                            of its listed issues whose titles share the most words with <words>
@@ -387,7 +389,21 @@ const AUTH_CHECKS = {
   },
 };
 
+// Makes the main checkout's Beads database as the panel's setup view does, leaving one that exists as it is.
+async function initializeMissingBeads() {
+  const { root, on } = await currentProject();
+  const main = await mainCheckout(root, on);
+  await checkBeadsInstalled(main);
+  const hasDatabase = await checkBeadsDatabase(main).then(
+    () => true,
+    () => false,
+  );
+  if (!hasDatabase) await initializeBeads(main);
+  await checkBeads(main);
+}
+
 async function auth([kind, ...rest]) {
+  if (kind === "beads" && rest.length === 1 && rest[0] === "--init") return initializeMissingBeads();
   const check = AUTH_CHECKS[kind];
   if (!check || rest.length) throw new UsageError(`auth needs one tracker: ${Object.keys(AUTH_CHECKS).join(", ")}`);
   await check();

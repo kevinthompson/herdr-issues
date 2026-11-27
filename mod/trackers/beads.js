@@ -159,11 +159,29 @@ export async function checkBeadsDatabase(root) {
   if (metadata === null) throw beadsNotInitialized();
 }
 
-// Makes a Beads database in the main checkout `root`, kept out of git through .git/info/exclude, without the
-// agent instructions or git hooks `bd init` adds by default.
+/**
+ * The issue prefix a new database takes from its folder's name: the initials of its words, or a single word whole,
+ * in lower case. Null, leaving `bd init` its own default, when the name has no letters or digits.
+ * @param {string} folderName
+ * @returns {string | null}
+ */
+export function beadsPrefix(folderName) {
+  const words = folderName
+    .toLowerCase()
+    .split(/[-_. ]+/)
+    .map((word) => word.replace(/[^a-z0-9]/g, ""))
+    .filter(Boolean);
+  if (words.length === 0) return null;
+  return words.length === 1 ? words[0] : words.map((word) => word[0]).join("");
+}
+
+// Makes a Beads database in the main checkout `root`, named with beadsPrefix and kept out of git through
+// .git/info/exclude, without the agent instructions or git hooks `bd init` adds by default.
 /** @param {string} root */
 export async function initializeBeads(root) {
+  const prefix = beadsPrefix(root.split("/").filter(Boolean).pop() ?? "");
   const args = ["init", "--non-interactive", "--quiet", "--skip-agents", "--skip-hooks", "--setup-exclude"];
+  if (prefix) args.push("--prefix", prefix);
   const result = await exec("bd", args, { cwd: root, timeout: BD_INIT_TIMEOUT_MS }).catch(noResult);
   if (!result || result.code === 127) throw await bdMissing();
   if (result.code !== 0) throw bdFailed(result.stderr.trim().split("\n").pop() || "bd init failed");

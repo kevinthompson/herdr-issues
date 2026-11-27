@@ -94,3 +94,44 @@ test("--help lists auth beads", async (t) => {
   assert.equal(await main(["--help"]), 0);
   assert.match(out.join("\n"), /auth <tracker>[\s\S]*beads/);
 });
+
+async function authInit(t) {
+  const err = [];
+  t.mock.method(console, "error", (line) => err.push(line));
+  const code = await main(["auth", "beads", "--init"]);
+  return { code, err: err.join("\n") };
+}
+
+// Stubs `bd`, whose init makes the database's metadata, recording each command it runs.
+function stubBdInit(t) {
+  const commands = [];
+  stubHerdr(t, {
+    exec: async (command, args, options) => {
+      if (command !== "bd") return defaults.exec(command, args, options);
+      commands.push(args);
+      if (args[0] === "init") initializeBeads(options.cwd);
+      return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
+    },
+  });
+  return commands;
+}
+
+test("auth beads --init makes a missing database named with the main checkout's folder initials", async (t) => {
+  const repository = createRepository(temporaryFolder(t), { name: "astro-escape" });
+  const commands = stubBdInit(t);
+  runIn(t, repository);
+  const { code, err } = await authInit(t);
+  assert.equal(code, 0, err);
+  const init = commands.find((args) => args[0] === "init");
+  assert.deepEqual(init.slice(-2), ["--prefix", "ae"]);
+});
+
+test("auth beads --init leaves an existing database as it is", async (t) => {
+  const repository = createRepository(temporaryFolder(t));
+  initializeBeads(repository);
+  const commands = stubBdInit(t);
+  runIn(t, repository);
+  const { code } = await authInit(t);
+  assert.equal(code, 0);
+  assert.ok(!commands.some((args) => args[0] === "init"));
+});
