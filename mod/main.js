@@ -78,7 +78,7 @@ import {
   projectName,
   PANEL_TEXT_PX,
   PROPERTY_TEXT_PX,
-  COMPACT_BUTTON_WIDTH_PX,
+  COMPACT_BUTTON_HEIGHT_PX,
 } from "./detail.js";
 import { collapseButton, headerBar, headerCell, iconButton } from "./header.js";
 import {
@@ -165,8 +165,6 @@ const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
 // An issue row's padding inside its group's card.
 const ROW_PADDING_PX = 14;
-// The row's work button, kept on rows without one so every title wraps at the same edge.
-const ACTION_COLUMN_PX = COMPACT_BUTTON_WIDTH_PX;
 /** @returns {string} */
 const contextKey = () => JSON.stringify(location());
 
@@ -1532,105 +1530,90 @@ export default class Issues extends View {
       .child(
         h_flex()
           .gap(12)
-          .items_start()
-          .child(
-            v_flex()
-              .flex_1()
-              .min_w(0)
-              .gap(3)
-              .child(div().truncate().text_size(11).text_color(t.accent).child(issue.id))
-              .child(div().whitespace_normal().child(issue.title))
-              .when(Boolean(project), (e) =>
-                e.child(
-                  projectName(/** @type {import("./trackers/index.js").IssueProject} */ (project))
-                    .text_size(11)
-                    .text_color(t.dim),
-                ),
-              )
-              .when(hasDetails || chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
-                e.child(
-                  h_flex()
-                    .flex_wrap()
-                    .gap_x(8)
-                    .gap_y(2)
-                    .items_center()
-                    .text_size(11)
-                    .text_color(t.dim)
-                    .overflow_hidden()
-                    .when(hasDetails, (e) =>
-                      e.child(
-                        h_flex()
-                          .flex_none()
-                          .gap(8)
-                          .items_center()
-                          .when(Boolean(sla), (e) =>
-                            e.child(
-                              div()
-                                .text_color(t[SLA_COLORS[sla.risk]])
-                                .child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" ")),
-                            ),
-                          )
-                          .when(Boolean(due), (e) =>
-                            e.child(div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)),
-                          )
-                          .when(showsPriority, (e) => e.child(priorityPill(issue.priority, t)))
-                          .when(pullRequestCount > 0, (e) => e.child(pullRequestPill(issue.pullRequests, t))),
-                      ),
-                    )
-                    .children(chips)
-                    .when(blockers.length > 0, (e) =>
-                      e.child(
-                        h_flex()
-                          .flex_none()
-                          .gap(4)
-                          .items_center()
-                          .text_color(t.blocked)
-                          .child(div().flex_none().child("Blocked by"))
-                          .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked)),
-                      ),
-                    )
-                    .when(waiting.length > 0, (e) =>
-                      e.child(
-                        h_flex()
-                          .flex_none()
-                          .gap(4)
-                          .items_center()
-                          .child(div().flex_none().child("Blocking"))
-                          .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)),
-                      ),
-                    ),
-                ),
-              )
-              .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t))),
-          )
-          .when(Boolean(this.tracker?.writable), (e) =>
+          .items_center()
+          .when(Boolean(this.tracker?.writable), (e) => e.min_h(COMPACT_BUTTON_HEIGHT_PX))
+          .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.accent).child(issue.id))
+          .when(Boolean(this.tracker?.writable) && (finishable || startable || inSpace), (e) =>
             e.child(
-              h_flex()
-                .flex_none()
-                .w(ACTION_COLUMN_PX)
-                .justify_end()
-                .when(finishable || startable || inSpace, (e) =>
-                  e.child(
-                    workButton(
-                      `row-${issue.id}`,
-                      {
-                        finishable,
-                        startable,
-                        inSpace,
-                        inActiveSpace,
-                        opening: Boolean(this.openings.get(issue.id)),
-                        loading: this.openings.get(issue.id)?.merging === false,
-                        onStart: (cx) => this.startWork(issue, cx),
-                        onContinue: (cx) => this.continueWork(issue, cx),
-                      },
-                      t,
-                      { primary: false, compact: true },
-                    ),
-                  ),
-                ),
+              workButton(
+                `row-${issue.id}`,
+                {
+                  finishable,
+                  startable,
+                  inSpace,
+                  inActiveSpace,
+                  opening: Boolean(this.openings.get(issue.id)),
+                  loading: this.openings.get(issue.id)?.merging === false,
+                  onStart: (cx) => this.startWork(issue, cx),
+                  onContinue: (cx) => this.continueWork(issue, cx),
+                },
+                t,
+                { primary: false, compact: true },
+              ),
             ),
           ),
-      );
+      )
+      .child(div().whitespace_normal().child(issue.title))
+      .when(Boolean(project), (e) =>
+        e.child(
+          projectName(/** @type {import("./trackers/index.js").IssueProject} */ (project))
+            .text_size(11)
+            .text_color(t.dim),
+        ),
+      )
+      .when(hasDetails || chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
+        e.child(
+          h_flex()
+            .flex_wrap()
+            .gap_x(8)
+            .gap_y(2)
+            .items_center()
+            .text_size(11)
+            .text_color(t.dim)
+            .overflow_hidden()
+            .when(hasDetails, (e) =>
+              e.child(
+                h_flex()
+                  .flex_none()
+                  .gap(8)
+                  .items_center()
+                  .when(Boolean(sla), (e) =>
+                    e.child(
+                      div()
+                        .text_color(t[SLA_COLORS[sla.risk]])
+                        .child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" ")),
+                    ),
+                  )
+                  .when(Boolean(due), (e) => e.child(div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
+                  .when(showsPriority, (e) => e.child(priorityPill(issue.priority, t)))
+                  .when(pullRequestCount > 0, (e) => e.child(pullRequestPill(issue.pullRequests, t))),
+              ),
+            )
+            .children(chips)
+            .when(blockers.length > 0, (e) =>
+              e.child(
+                h_flex()
+                  .flex_none()
+                  .gap(4)
+                  .items_center()
+                  .text_color(t.blocked)
+                  .child(div().flex_none().child("Blocked by"))
+                  .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked)),
+              ),
+            )
+            .when(waiting.length > 0, (e) =>
+              e.child(
+                h_flex()
+                  .flex_none()
+                  .gap(4)
+                  .items_center()
+                  .child(div().flex_none().child("Blocking"))
+                  .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)),
+              ),
+            ),
+        ),
+      )
+      .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t)));
   }
 
   // Whether a space shows the issue's worktree, and whether it is the active space.
