@@ -68,7 +68,6 @@ import {
   waitingIssues,
   slaStatus,
   dueStatus,
-  PRIORITIES,
 } from "./issue.js";
 import {
   issueDetail,
@@ -161,6 +160,7 @@ const PRIORITY_COLORS = { 1: "ansi1", 2: "working" };
 /** @type {Record<number, string>} */
 const PRIORITY_ICONS = { 1: "circle-alert", 2: "signal-high", 3: "signal-medium", 4: "signal-low" };
 const ROW_PILL_ICON_PX = 11;
+const ROW_PRIORITY_ICON_PX = 12;
 const SLA_COLORS = { breached: "ansi1", high: "ansi1", medium: "working", low: "dim" };
 /** @type {Record<string, string>} */
 const SLA_ICONS = { breached: "🚨", high: "🔥", medium: "⚠️" };
@@ -251,8 +251,11 @@ const rowPill = (icon, iconColor, text, t) =>
  * @param {number} priority
  * @param {Theme} t
  */
-const priorityPill = (priority, t) =>
-  rowPill(PRIORITY_ICONS[priority], t[PRIORITY_COLORS[priority]] ?? t.dim, PRIORITIES[priority], t);
+const priorityIcon = (priority, t) =>
+  svg(`mods/issues/icons/${PRIORITY_ICONS[priority]}.svg`)
+    .flex_none()
+    .size(ROW_PRIORITY_ICON_PX)
+    .text_color(t[PRIORITY_COLORS[priority]] ?? t.dim);
 
 /**
  * @param {PullRequest[]} pullRequests
@@ -1513,7 +1516,7 @@ export default class Issues extends View {
     const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
     const writable = Boolean(this.tracker?.writable);
     const pills = [
-      ...(this.prioritized() && issue.priority > 0 ? [priorityPill(issue.priority, t)] : []),
+      ...(this.prioritized() && issue.priority > 0 ? [priorityIcon(issue.priority, t)] : []),
       ...(issue.pullRequests?.length ? [pullRequestPill(issue.pullRequests, t)] : []),
     ];
     const button =
