@@ -42,8 +42,8 @@ function checkout({ initialized = true } = {}) {
 }
 
 // A tracker whose `bd` answers from `records`, recording each command it runs. Unless `installed` is false, when
-// `bd` can't start.
-async function trackerWith(t, records, { installed = true, initialized = true } = {}) {
+// `bd` can't start. `customStatuses` is the database's status.custom setting.
+async function trackerWith(t, records, { installed = true, initialized = true, customStatuses } = {}) {
   const commands = [];
   const ok = (value) => ({ code: 0, stdout: JSON.stringify(value), stderr: "" });
   stubHerdr(t, {
@@ -53,6 +53,7 @@ async function trackerWith(t, records, { installed = true, initialized = true } 
       commands.push({ args, cwd: options.cwd });
       const [subcommand, ...rest] = args;
       if (subcommand === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
+      if (subcommand === "config") return ok({ key: rest[1], value: customStatuses ?? "" });
       if (subcommand === "list") {
         const statuses = rest[rest.indexOf("--status") + 1].split(",");
         return ok(
@@ -112,6 +113,31 @@ describe("Beads tracker", () => {
       ["deferred", "open", "in_progress", "closed"].map((status) => ["bd-1", "--status", status]),
     );
     await assert.rejects(tracker.update(issue, { status: "canceled" }), /can't be set to canceled/);
+  });
+
+  test("lists, maps and sets in_review as In review when status.custom names it", async (t) => {
+    const { tracker, commands } = await trackerWith(t, [record("bd-1"), record("bd-2", { status: "in_review" })], {
+      customStatuses: "qa, in_review:frozen",
+    });
+    const issues = byId(await tracker.list());
+    assert.equal(issues["bd-2"].status, "in-review");
+    assert.deepEqual(tracker.statuses, ["backlog", "todo", "in-progress", "in-review", "done"]);
+    await tracker.update(issues["bd-1"], { status: "in-review" });
+    assert.deepEqual(updates(commands), [["bd-1", "--status", "in_review"]]);
+  });
+
+  test("neither lists nor offers in_review when status.custom doesn't name it", async (t) => {
+    const { tracker, commands } = await trackerWith(t, [record("bd-1"), record("bd-2", { status: "in_review" })], {
+      customStatuses: "in_reviewing",
+    });
+    assert.deepEqual(
+      (await tracker.list()).map((issue) => issue.id),
+      ["bd-1"],
+    );
+    const unfinished = commands.find(({ args }) => args[0] === "list");
+    assert.equal(unfinished.args[2], "open,in_progress,blocked,deferred");
+    assert.ok(!tracker.statuses.includes("in-review"));
+    await assert.rejects(tracker.update(record("bd-1"), { status: "in-review" }), /can't be set to in-review/);
   });
 
   test("maps priorities P0 to P4 onto Urgent, High, Medium, Low and None, and back", async (t) => {
