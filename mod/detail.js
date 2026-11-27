@@ -436,14 +436,14 @@ let hoveredButton = null;
  * @param {string | ((color: Color) => NativeElement)} label
  * @param {(cx: Context) => void} onClick
  * @param {Theme} t
- * @param {{ primary?: boolean, enabled?: boolean, tooltip?: string | null, primaryOnHover?: boolean, width?: number | null }} [options]
+ * @param {{ primary?: boolean, enabled?: boolean, tooltip?: string | null, primaryOnHover?: boolean, width?: number | null, height?: number }} [options]
  */
 export function button(
   id,
   label,
   onClick,
   t,
-  { primary = false, enabled = true, tooltip = null, primaryOnHover = false, width = null } = {},
+  { primary = false, enabled = true, tooltip = null, primaryOnHover = false, width = null, height = 26 } = {},
 ) {
   const accentOnHover = primaryOnHover && !primary;
   /** @type {(style: NativeElement) => NativeElement} */
@@ -456,7 +456,7 @@ export function button(
   return div()
     .id(id)
     .flex_none()
-    .h(26)
+    .h(height)
     .when(width === null, (e) => e.px(10))
     .when(width !== null, (e) => e.w(width).justify_center())
     .flex()
@@ -486,7 +486,9 @@ export function button(
 }
 
 // The list's compact work button keeps this width through its branch icon, spinner and go-to-space arrow.
-export const COMPACT_BUTTON_WIDTH_PX = 32;
+export const COMPACT_BUTTON_WIDTH_PX = 24;
+export const COMPACT_BUTTON_HEIGHT_PX = 20;
+const COMPACT_ICON_PX = 12;
 
 /**
  * Continue for an issue in progress, otherwise Start, which is disabled until work can start. An issue
@@ -504,20 +506,20 @@ export function workButton(
   t,
   { primary = true, compact = false } = {},
 ) {
-  const width = compact ? COMPACT_BUTTON_WIDTH_PX : null;
+  const size = compact ? { width: COMPACT_BUTTON_WIDTH_PX, height: COMPACT_BUTTON_HEIGHT_PX } : {};
   if (inSpace) {
     const tooltip = inActiveSpace ? "Already in this issue's space" : "Switch to this issue's worktree space";
     return button(`${key}-space`, compact ? "↗" : "Go to space", onContinue, t, {
       primary: true,
       enabled: !opening && !inActiveSpace,
       tooltip,
-      width,
+      ...size,
     });
   }
-  const style = { primary, primaryOnHover: compact, enabled: !opening, width };
-  const branchIcon = icon("git-branch-plus");
+  const style = { primary, primaryOnHover: compact, enabled: !opening, ...size };
+  const branchIcon = icon("git-branch-plus", COMPACT_ICON_PX);
   /** @param {Color} color */
-  const spinner = (color) => icon("rotate-cw")(color).spin(SPIN_MS);
+  const spinner = (color) => icon("rotate-cw", COMPACT_ICON_PX)(color).spin(SPIN_MS);
   if (finishable) {
     const label = loading ? (compact ? spinner : "Opening…") : compact ? branchIcon : "Continue";
     return button(`${key}-continue`, label, onContinue, t, {
@@ -536,9 +538,13 @@ export function workButton(
 /**
  * A button's label that is an icon, redrawn in the button's text color.
  * @param {string} name
+ * @param {number} [size]
  * @returns {(color: Color) => NativeElement}
  */
-export const icon = (name) => (color) => svg(`mods/issues/icons/${name}.svg`).size(14).text_color(color);
+export const icon =
+  (name, size = 14) =>
+  (color) =>
+    svg(`mods/issues/icons/${name}.svg`).size(size).text_color(color);
 
 /**
  * Continue for an issue in progress, otherwise Start, or Go to space when a space already shows the

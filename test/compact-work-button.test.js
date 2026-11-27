@@ -57,3 +57,20 @@ test("a compact work button's loading tooltips are unchanged", () => {
     "Opening this issue's worktree…",
   );
 });
+
+test("a compact work button is 20px tall and 24px wide with a 12px icon", () => {
+  for (const button of [
+    compactButton({}),
+    compactButton({ opening: true, loading: true }),
+    compactButton({ inSpace: true }),
+  ]) {
+    assert.equal(callArg(button, "h"), 20);
+    assert.equal(callArg(button, "w"), 24);
+    for (const svg of icons(button)) assert.equal(callArg(svg, "size"), 12);
+  }
+});
+
+test("the detail view's work button keeps its 26px height", () => {
+  const button = workButton("issue", { ...idle, ...handlers }, theme);
+  assert.equal(callArg(button, "h"), 26);
+});
