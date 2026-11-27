@@ -10,11 +10,16 @@ import { beadsTracker } from "../mod/trackers/beads.js";
 import { trackerFor } from "../mod/trackers/index.js";
 import { settingsPath } from "../mod/trackers/setting.js";
 
-const record = (id, { status = "open", priority = 2, labels, description, dependencies, closedAt } = {}) => ({
+const record = (
+  id,
+  { status = "open", priority = 2, labels, description, dependencies, closedAt, type = "task", parent } = {},
+) => ({
   id,
   title: `Issue ${id}`,
   status,
   priority,
+  issue_type: type,
+  ...(parent && { parent }),
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
   ...(labels && { labels }),
@@ -55,10 +60,13 @@ async function trackerWith(t, records, { installed = true, initialized = true, c
       if (subcommand === "version") return { code: 0, stdout: "bd version 1.3.4\n", stderr: "" };
       if (subcommand === "config") return ok({ key: rest[1], value: customStatuses ?? "" });
       if (subcommand === "list") {
-        const statuses = rest[rest.indexOf("--status") + 1].split(",");
+        const option = (name) => (rest.includes(name) ? rest[rest.indexOf(name) + 1] : undefined);
+        const statuses = option("--status").split(",");
+        const [type, parent] = [option("--type"), option("--parent")];
         return ok(
           records
             .filter((each) => statuses.includes(each.status))
+            .filter((each) => (!type || each.issue_type === type) && (!parent || each.parent === parent))
             .map((each) => {
               const listed = { ...each };
               delete listed.description;
@@ -134,7 +142,7 @@ describe("Beads tracker", () => {
       (await tracker.list()).map((issue) => issue.id),
       ["bd-1"],
     );
-    const unfinished = commands.find(({ args }) => args[0] === "list");
+    const unfinished = commands.find(({ args }) => args[0] === "list" && !args.includes("--type"));
     assert.equal(unfinished.args[2], "open,in_progress,blocked,deferred");
     assert.ok(!tracker.statuses.includes("in-review"));
     await assert.rejects(tracker.update(record("bd-1"), { status: "in-review" }), /can't be set to in-review/);
@@ -169,6 +177,45 @@ describe("Beads tracker", () => {
     );
     const closedList = commands.find(({ args }) => args.includes("closed"));
     assert.deepEqual(closedList.args, ["list", "--status", "closed", "--sort", "closed", "--limit", "20", "--json"]);
+  });
+
+  test("has a single list when the database has no epics that aren't closed", async (t) => {
+    const { tracker } = await trackerWith(t, [record("bd-1"), record("bd-2", { type: "epic", status: "closed" })]);
+    assert.equal(tracker.scopes, undefined);
+  });
+
+  test("offers every issue first, then each epic that isn't closed, by its title", async (t) => {
+    const { tracker } = await trackerWith(t, [
+      { ...record("bd-1", { type: "epic" }), title: "Launch" },
+      { ...record("bd-2", { type: "epic", status: "in_progress" }), title: "Polish" },
+      record("bd-3", { type: "epic", status: "closed" }),
+      record("bd-4"),
+    ]);
+    assert.deepEqual(tracker.scopes, [
+      { id: "all", label: "All issues" },
+      { id: "epic:bd-1", label: "Launch" },
+      { id: "epic:bd-2", label: "Polish" },
+    ]);
+  });
+
+  test("lists only an epic's children in its scope, with its recently closed ones once Done is expanded", async (t) => {
+    const { tracker, commands } = await trackerWith(t, [
+      record("bd-1", { type: "epic" }),
+      record("bd-2", { parent: "bd-1", dependencies: [blocking("bd-4")] }),
+      record("bd-3", { parent: "bd-1", status: "closed" }),
+      record("bd-4"),
+      record("bd-5", { status: "closed" }),
+    ]);
+    const ids = (issues) => issues.map((issue) => issue.id);
+    assert.deepEqual(ids(await tracker.list("epic:bd-1")), ["bd-2"]);
+    assert.deepEqual((await tracker.list("epic:bd-1"))[0].blockedBy, ["bd-4"]);
+    assert.deepEqual(ids(await tracker.list("epic:bd-1", new Set(["done"]))), ["bd-2", "bd-3"]);
+    assert.deepEqual(ids(await tracker.list("all")), ["bd-1", "bd-2", "bd-4"]);
+    assert.deepEqual(ids(await tracker.list("epic:bd-9")), ["bd-1", "bd-2", "bd-4"]);
+    const closedList = commands.find(({ args }) => args.includes("closed") && args.includes("--parent"));
+    assert.deepEqual(closedList.args, [
+      ...["list", "--status", "closed", "--parent", "bd-1", "--sort", "closed", "--limit", "20", "--json"],
+    ]);
   });
 
   test("names a branch after the issue's ID and title", async (t) => {
