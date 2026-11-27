@@ -28,7 +28,10 @@
 // its other values false. Saving any of approval, onApproval and waitForChecks removes merge and complete there;
 // approvalSettings resolves them all.
 // worktreeSetup is a shell command `issues
-// worktree` runs in each new checkout (cli/worktree.js). close is what a finished /issues:work session does about
+// worktree` runs in each new checkout (cli/worktree.js). worktreeCommand, optional at the top level and in any
+// entry, an entry's winning, is an interactive shell command that a new issue space opens running in its tab
+// (worktree-command.js), where <issueId> is the issue's ID; without it, the space opens a plain shell.
+// worktreeCommandTemplate resolves it. close is what a finished /issues:work session does about
 // its worktree: ask asks whether to close it now, mentioning cmd+shift+w, and auto closes it, both with `issues
 // close`; closeSettings resolves it, ask without it. The retired manual, which only told the person to press
 // cmd+shift+w, still loads and reads as ask, but isn't saved.
@@ -49,7 +52,8 @@
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
 // tracker with saveTrackerChoice, its approval settings and pushAfterMerge with saveApprovalSettings, its close with saveCloseSetting, its
-// name with saveNameSetting, its pollSeconds, spaceName and worktreeSetup with saveRepositorySettings, its model
+// name with saveNameSetting, its pollSeconds, spaceName, worktreeSetup and worktreeCommand with
+// saveRepositorySettings, its model
 // and effort settings with saveAgentSettings, and its workPrompt with saveWorkPrompt; it changes the top level
 // with saveTopLevelSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
@@ -65,6 +69,7 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  * @property {Record<string, string>} [views]
  * @property {string} [repo]
  * @property {string} [spaceName]
+ * @property {string} [worktreeCommand]
  * @property {string} [approval]
  * @property {string} [onApproval]
  * @property {boolean} [waitForChecks]
@@ -90,6 +95,7 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  * @property {boolean} [pushAfterMerge]
  * @property {string} [close]
  * @property {string} [spaceName]
+ * @property {string} [worktreeCommand]
  * @property {string} [workModel]
  * @property {string} [workEffort]
  * @property {string} [workPrompt]
@@ -99,7 +105,7 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  */
 
 /**
- * @typedef {{ pollSeconds?: number | string | null, spaceName?: string | null, worktreeSetup?: string | null }} RepositoryChanges
+ * @typedef {{ pollSeconds?: number | string | null, spaceName?: string | null, worktreeSetup?: string | null, worktreeCommand?: string | null }} RepositoryChanges
  * @typedef {{ workModel?: string | null, workEffort?: string | null }} AgentChanges
  * @import { Project } from "./index.js"
  */
@@ -243,6 +249,8 @@ function checkSharedSettings(settings, where) {
   checkWorkSettings(settings, where);
   if (settings?.spaceName != null && typeof settings.spaceName !== "string")
     throw badSetting(`${where} has a spaceName that isn't text`);
+  if (settings?.worktreeCommand != null && typeof settings.worktreeCommand !== "string")
+    throw badSetting(`${where} has a worktreeCommand that isn't text`);
   checkChoice(closeChoice(settings?.close), "close", CLOSES, where);
   checkApproval(settings ?? {}, where);
 }
@@ -464,6 +472,17 @@ export async function spaceNameTemplate(project) {
   return setting?.spaceName?.trim() || settings.spaceName?.trim() || null;
 }
 
+// The command a new issue space runs (worktree-command.js): the entry's worktreeCommand, else the top level's, null
+// without either or when it's blank.
+/**
+ * @param {Project} project
+ */
+export async function worktreeCommandTemplate(project) {
+  const setting = await trackerSetting(project),
+    settings = await topLevelSettings();
+  return setting?.worktreeCommand?.trim() || settings.worktreeCommand?.trim() || null;
+}
+
 // The repository's name without its owner: the GitHub repository's for GitHub, else the main checkout's folder's.
 /**
  * @param {string} main
@@ -616,10 +635,11 @@ export async function saveNameSetting(main, name) {
   });
 }
 
-export const REPOSITORY_KEYS = ["pollSeconds", "spaceName", "worktreeSetup"];
+export const REPOSITORY_KEYS = ["pollSeconds", "spaceName", "worktreeSetup", "worktreeCommand"];
 
-// The entry's own pollSeconds, spaceName and worktreeSetup, null where unset or blank, and topLevelPollSeconds and
-// topLevelSpaceName, the top level's, which apply without the entry's, null where unset or blank.
+// The entry's own pollSeconds, spaceName, worktreeSetup and worktreeCommand, null where unset or blank, and
+// topLevelPollSeconds, topLevelSpaceName and topLevelWorktreeCommand, the top level's, which apply without the
+// entry's, null where unset or blank.
 /**
  * @param {Project} project
  */
@@ -630,8 +650,10 @@ export async function repositorySettings(project) {
     pollSeconds: setting?.pollSeconds ?? null,
     spaceName: setting?.spaceName?.trim() || null,
     worktreeSetup: setting?.worktreeSetup?.trim() || null,
+    worktreeCommand: setting?.worktreeCommand?.trim() || null,
     topLevelPollSeconds: settings?.pollSeconds ?? null,
     topLevelSpaceName: settings?.spaceName?.trim() || null,
+    topLevelWorktreeCommand: settings?.worktreeCommand?.trim() || null,
   };
 }
 
@@ -682,14 +704,14 @@ export function parseUpdateCheckHours(text) {
  */
 function checkRepositoryChanges(changes) {
   for (const [key, value] of Object.entries(changes)) {
-    if (!REPOSITORY_KEYS.includes(key)) throw badSetting(`${key} isn't a poll, space name or worktree setup setting`);
+    if (!REPOSITORY_KEYS.includes(key)) throw badSetting(`${key} isn't a poll, space name or worktree setting`);
     if (value == null) continue;
     if (key === "pollSeconds") checkPollSeconds(value, "This repository");
     else if (typeof value !== "string") throw badSetting(`${key} must be text`);
   }
 }
 
-// Sets the settings in `changes`, { pollSeconds, spaceName, worktreeSetup } or any of them, in the existing entry of
+// Sets the settings in `changes`, { pollSeconds, spaceName, worktreeSetup, worktreeCommand } or any of them, in the existing entry of
 // the repository whose main checkout is `main`. A null or blank value removes the key, so the top level's
 // pollSeconds or the default applies. It changes no other key, and writes nothing for a value trackerSetting
 // would refuse or a repository without an entry.
@@ -768,6 +790,7 @@ export const TOP_LEVEL_KEYS = [
   ...APPROVAL_QUESTION_KEYS,
   "close",
   "spaceName",
+  "worktreeCommand",
   "pollSeconds",
   "updateCheckHours",
   "workModel",

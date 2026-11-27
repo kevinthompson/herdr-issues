@@ -3,8 +3,9 @@
 // repository's name setting, when no space shows the main checkout. The new space takes the name it's given, which
 // for an issue is its space name marked working (space-name.js); a space already showing the worktree is selected and
 // keeps its name. The worktree is the branch's existing one, else a new
-// checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. With --claude, the space
-// opens a Claude session on the repository's workModel and workEffort settings. A new worktree gets a copy of the main
+// checkout at ~/.herdr/worktrees/<repository>/<branch>, where the Herdr app makes its own. A new space on an issue's
+// branch runs the repository's worktreeCommand for the issue (worktree-command.js); with --claude, it opens a
+// Claude session on the repository's workModel and workEffort settings instead. A new worktree gets a copy of the main
 // checkout's .claude/settings.local.json before the repository's worktreeSetup command runs. Given an issue rather
 // than a branch, `issues worktree` first marks it in progress when it's in triage, backlog or todo (main.js).
 import { spawn } from "node:child_process";
@@ -15,6 +16,7 @@ import { exec, home, readLayout } from "./herdr.js";
 import { spaceShowing, worktreeFor } from "../mod/worktree.js";
 import { nameSettings, trackerSetting } from "../mod/trackers/setting.js";
 import { workSessionArgv } from "../mod/work-session.js";
+import { worktreeCommandTab } from "../mod/worktree-command.js";
 import { openBehindArgs } from "../mod/open-behind.js";
 
 const GIT_TIMEOUT_MS = 10 * 60 * 1000;
@@ -226,7 +228,13 @@ async function herdrVersion() {
 // Selects the space already showing the worktree, or opens one on it behind what's shown, after a space on the main checkout,
 // which the Herdr sidebar nests worktree spaces under. Concurrent runs would each see no space on the main
 // checkout and open one, so they take turns.
-async function showInSpace({ branch, path, main, common, name, claudeMessage }) {
+async function spaceTab({ main, issueId, claudeMessage }) {
+  const project = { root: main, on: null };
+  if (claudeMessage) return { tab: "Claude", argv: await workSessionArgv(project), task: claudeMessage };
+  return issueId ? worktreeCommandTab(project, issueId) : {};
+}
+
+async function showInSpace({ branch, path, main, common, name, issueId, claudeMessage }) {
   await withLock(join(common, SPACES_LOCK), async () => {
     await readLayout();
     const worktreeSpace = spaceShowing(path, null);
@@ -241,15 +249,21 @@ async function showInSpace({ branch, path, main, common, name, claudeMessage }) 
       await herdrDo("space.new", { folder: main, name: mainName, ...behind });
       console.log(`opened a space on ${main}`);
     }
-    const claudeTab = claudeMessage
-      ? { tab: "Claude", argv: await workSessionArgv({ root: main, on: null }), task: claudeMessage }
-      : {};
-    await herdrDo("space.new", { folder: path, name, ...claudeTab, ...behind });
-    console.log(`opened ${branch} in a Herdr space${claudeMessage ? " with Claude" : ""}`);
+    const tab = await spaceTab({ main, issueId, claudeMessage });
+    await herdrDo("space.new", { folder: path, name, ...tab, ...behind });
+    const running = claudeMessage ? " with Claude" : tab.argv ? " running worktreeCommand" : "";
+    console.log(`opened ${branch} in a Herdr space${running}`);
   });
 }
 
-export async function openWorktree({ cwd, branch, isNew = false, name = branch, claudeMessage = null }) {
+export async function openWorktree({
+  cwd,
+  branch,
+  isNew = false,
+  name = branch,
+  issueId = null,
+  claudeMessage = null,
+}) {
   const commonDir = await git(cwd, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
   if (!commonDir.ok) throw new Error("not in a git repository");
   const common = commonDir.out,
@@ -261,6 +275,6 @@ export async function openWorktree({ cwd, branch, isNew = false, name = branch, 
   }
   await allowEnvrc(path, main);
   if ((await isInstalled("herdr-app")) && (await isInstalled("hc")))
-    await showInSpace({ branch, path, main, common, name, claudeMessage });
+    await showInSpace({ branch, path, main, common, name, issueId, claudeMessage });
   console.log(`cd ${path}`);
 }

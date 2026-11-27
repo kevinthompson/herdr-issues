@@ -10,6 +10,7 @@ import {
   pollSettings,
   updateSettings,
   workSettings,
+  worktreeCommandTemplate,
 } from "../mod/trackers/setting.js";
 import { linearClient } from "../mod/trackers/linear.js";
 import { checkGitHubLogin } from "../mod/trackers/github.js";
@@ -62,7 +63,7 @@ Commands:
   space-name <id>          Print the name of the issue's worktree space, from the repository's spaceName setting
   setting <key>            Print one of the repository's settings, with its default applied: approval, onApproval,
                            waitForChecks, pushAfterMerge, close, name, pollSeconds, updateCheckHours, workModel,
-                           workEffort or workPrompt
+                           workEffort, workPrompt or worktreeCommand
   auth <tracker>           Check the credentials a tracker needs are present: linear (an API key), github (gh logged in)
                            or beads (bd installed and a database in the main checkout); print the fix when they aren't
   context [<words>...]     Print, as JSON, what /issues:create checks before writing: the tracker, after checking its
@@ -103,9 +104,12 @@ Commands:
   worktree <id> [--name <space name>] [--claude <first message>]
                            Open the issue's branch in a worktree, in a new Herdr space named after the issue and
                            marked working, as mark working does: 󰄱 <space name>. An issue in triage, backlog or todo
-                           is first marked in progress, as start does; a refused start only warns
-  worktree --branch <branch> [--new] [--name <space name>] [--claude <first message>]
-                           Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch
+                           is first marked in progress, as start does; a refused start only warns. The space runs
+                           the repository's worktreeCommand setting, or with --claude, a Claude session given the
+                           first message
+  worktree --branch <branch> [--new] [--name <space name>] [--issue <id>] [--claude <first message>]
+                           Open a branch in a worktree; --new: it can't be on origin yet, so don't fetch; --issue: the
+                           branch is the issue's, so the space runs the repository's worktreeCommand for it
   merge <id>               Merge the issue's branch into main in the main checkout and mark the issue done, then push
                            main when pushAfterMerge is true; refuse, changing nothing, when it can't merge cleanly or
                            onApproval is pull-request. When main moved on, so the merged tree differs from the
@@ -236,6 +240,7 @@ const SETTINGS = {
   workModel: workSettings,
   workEffort: workSettings,
   workPrompt: workSettings,
+  worktreeCommand: async (project) => ({ worktreeCommand: (await worktreeCommandTemplate(project)) ?? "" }),
 };
 
 async function setting([key]) {
@@ -469,7 +474,7 @@ async function next(args) {
 }
 
 function worktreeOptions(args) {
-  const options = { id: null, branch: null, isNew: false, name: null, claudeMessage: null };
+  const options = { id: null, branch: null, isNew: false, name: null, issueId: null, claudeMessage: null };
   const valueAfter = (index) => {
     if (index + 1 >= args.length) throw new Error(`worktree: ${args[index]} needs a value`);
     return args[index + 1];
@@ -479,6 +484,7 @@ function worktreeOptions(args) {
     if (arg === "--new") options.isNew = true;
     else if (arg === "--branch") options.branch = valueAfter(index++);
     else if (arg === "--name") options.name = valueAfter(index++);
+    else if (arg === "--issue") options.issueId = valueAfter(index++);
     else if (arg === "--claude") options.claudeMessage = valueAfter(index++);
     else if (arg.startsWith("--") || options.id) throw new Error(`worktree: unexpected ${arg}`);
     else options.id = arg;
@@ -486,6 +492,7 @@ function worktreeOptions(args) {
   if (Boolean(options.id) === Boolean(options.branch))
     throw new Error("worktree needs an issue ID or --branch <branch>");
   if (options.id && options.isNew) throw new Error("worktree: --new goes with --branch; an issue decides it itself");
+  if (options.id && options.issueId) throw new Error("worktree: --issue goes with --branch");
   return options;
 }
 
@@ -499,14 +506,21 @@ async function startBeforeOpening(issue) {
 }
 
 async function worktree(args) {
-  const { id, branch, isNew, name, claudeMessage } = worktreeOptions(args);
+  const { id, branch, isNew, name, issueId, claudeMessage } = worktreeOptions(args);
   const cwd = process.cwd();
-  if (!id) return openWorktree({ cwd, branch, isNew, name: name ?? branch, claudeMessage });
+  if (!id) return openWorktree({ cwd, branch, isNew, name: name ?? branch, issueId, claudeMessage });
   const issue = await issueToWork(id);
   console.log(`${issue.id} is on ${issue.branch}`);
   if (isUnstarted(issue)) await startBeforeOpening(issue);
   const spaceName = newIssueSpaceName(name ?? (await issueSpaceName(await currentProject(), issue.id)));
-  return openWorktree({ cwd, branch: issue.branch, isNew: needsNewBranch(issue), name: spaceName, claudeMessage });
+  return openWorktree({
+    cwd,
+    branch: issue.branch,
+    isNew: needsNewBranch(issue),
+    name: spaceName,
+    issueId: issue.id,
+    claudeMessage,
+  });
 }
 
 async function merge(args) {

@@ -6,7 +6,7 @@ test("the Repository form groups its questions under all five sections", () => {
   assert.deepEqual(REPOSITORY_SECTIONS, [
     { title: "Tracker", keys: ["name", "tracker"] },
     { title: "Approval", keys: ["approval", "onApproval", "waitForChecks", "pushAfterMerge"] },
-    { title: "Worktrees", keys: ["worktreeSetup", "spaceName", "close"] },
+    { title: "Worktrees", keys: ["worktreeSetup", "worktreeCommand", "spaceName", "close"] },
     { title: "Issue sessions", keys: ["workModel", "workEffort", "workPrompt"] },
     { title: "Panel", keys: ["pollSeconds"] },
   ]);
@@ -15,7 +15,7 @@ test("the Repository form groups its questions under all five sections", () => {
 test("the Global form has no Tracker section and its Panel section adds the update check", () => {
   assert.deepEqual(GLOBAL_SECTIONS, [
     { title: "Approval", keys: ["approval", "onApproval", "waitForChecks", "pushAfterMerge"] },
-    { title: "Worktrees", keys: ["spaceName", "close"] },
+    { title: "Worktrees", keys: ["worktreeCommand", "spaceName", "close"] },
     { title: "Issue sessions", keys: ["workModel", "workEffort", "workPrompt"] },
     { title: "Panel", keys: ["pollSeconds", "updateCheckHours"] },
   ]);

@@ -5,7 +5,7 @@
 // with props { menu } (menu.js), and the worktree dialog is a dialog of it with props { action }
 // (worktree-dialog.js). Edit swaps an open issue's body for a Markdown editor; Save,
 // Cmd-Enter or the issues.save key command writes it back to the tracker. Start and Continue open the
-// issue's worktree, with a Claude session working it when `claude` runs (work-session.js), and Merge brings a
+// issue's worktree, running the repository's worktreeCommand when it has one (worktree-command.js), and Merge brings a
 // finished branch in main (merge.js) and removes its worktree. A finished session's `issues close` closes its space
 // through the removal dialog once the session is idle (close-request.js). Clicking a task-list
 // checkbox in the body saves that one change at once. A repository with no tracker, or one whose tracker
@@ -111,7 +111,7 @@ import { collapseState } from "./collapse.js";
 import { isSectionOpen, setSectionOpen } from "./open-sections.js";
 import { KeptSetups, untrackableView, notARepositoryView, emptyListView } from "./setup.js";
 import { SettingsView } from "./settings.js";
-import { workIssueSession, issuesWorktreeArgs } from "./work-session.js";
+import { worktreeCommandTab, issuesWorktreeArgs } from "./worktree-command.js";
 import { openBehindArgs } from "./open-behind.js";
 import { stillWaitingForSpace } from "./opening-wait.js";
 import { Openings } from "./openings.js";
@@ -1041,7 +1041,7 @@ export default class Issues extends View {
     cx.notify();
   }
 
-  // A fresh Claude session, or a shell without Claude Code, in a new worktree space on the issue's branch, working the issue with /issues:work.
+  // A new worktree space on the issue's branch, running the repository's worktreeCommand, or else a plain shell.
   // Without a branch, the worktree dialog asks for one. The tracker saves the start while the worktree opens, and the
   // list shows it as soon as it's saved, since opening can take many seconds.
   /**
@@ -1386,7 +1386,7 @@ export default class Issues extends View {
               name: spaceName,
               folder: worktree.path,
               machine: worktree.on,
-              ...(await workIssueSession(issue, project)),
+              ...(await worktreeCommandTab(project, issue.id)),
               ...openBehindArgs(updates().app.version),
             });
           else await this.openWorktreeDialog(issue, spaceName);
@@ -1400,7 +1400,7 @@ export default class Issues extends View {
   }
 
   // Opens the issue's branch with issues worktree, which switches to the space already showing it, or opens one
-  // nested under the repository's space with Claude working the issue when it runs. Returns an error message, or null.
+  // nested under the repository's space running its worktreeCommand. Returns an error message, or null.
   // Without issues installed, the worktree dialog opens instead.
   /**
    * @param {Issue} issue
@@ -1408,7 +1408,7 @@ export default class Issues extends View {
    */
   async openWithIssuesWorktree(issue) {
     const spaceName = await this.spaceName(issue);
-    const args = await issuesWorktreeArgs(issue, { spaceName, isNew: needsNewBranch(issue) });
+    const args = issuesWorktreeArgs(issue, { spaceName, isNew: needsNewBranch(issue) });
     const result = await exec("issues", args, { cwd: this.project.root, timeout: ISSUES_WORKTREE_TIMEOUT_MS }).catch(
       () => NONE,
     );
@@ -1432,7 +1432,7 @@ export default class Issues extends View {
    */
   async openWorktreeDialog(issue, spaceName) {
     const project = this.project;
-    const session = await workIssueSession(issue, project);
+    const session = await worktreeCommandTab(project, issue.id);
     openOverlay({
       mod: "issues",
       kind: "dialog",

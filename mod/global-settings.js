@@ -5,7 +5,8 @@
 // its pull request's checks, waitForChecks, shown for a pull request or the default onApproval, which is a pull
 // request for a repository on GitHub; and whether main is pushed after merging, pushAfterMerge, shown for a merge
 // or the default onApproval (settings-fields.js). A retired merge and complete open as the values they mean, and
-// any change to the four saves all four. Worktrees: the name of each issue's space, spaceName; and
+// any change to the four saves all four. Worktrees: the command each new issue space runs, worktreeCommand; the
+// name of each issue's space, spaceName; and
 // what a finished session does about its worktree, close. Issue sessions: their model and effort, workModel and
 // workEffort; and the prompt appended to their system prompt, workPrompt, before any repository's own. Panel: how
 // often the panel polls each tracker, pollSeconds, and checks for its own update, updateCheckHours, each a whole
@@ -26,6 +27,7 @@ import {
   WORK_PROMPT_ROWS,
   spaceNameLabel,
   workPromptLabel,
+  worktreeCommandLabel,
 } from "./settings-form.js";
 import {
   AGENT_DEFAULTS,
@@ -68,6 +70,14 @@ const choiceLabel = (choices, id) => choices.find((choice) => choice.id === id)?
 
 /** @type {TypedQuestion[]} */
 const TYPED_QUESTIONS = [
+  {
+    key: "worktreeCommand",
+    label: worktreeCommandLabel(
+      "Runs in the tab of each new issue space, such as an agent given the issue. Empty opens a shell.",
+    ),
+    placeholder: "No command",
+    parse: (/** @type {string} */ text) => text.trim() || null,
+  },
   {
     key: "spaceName",
     label: spaceNameLabel("Empty uses the issue's ID."),

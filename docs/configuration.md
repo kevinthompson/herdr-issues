@@ -4,7 +4,7 @@
 
 A repository with no entry in `issues.json` shows a setup view in the panel: choose **GitHub Issues**, **Linear** (then a team) or **Beads**, and the panel checks what that tracker needs, asks about approval (see [`approval`, `onApproval` and `waitForChecks`](#approval-onapproval-and-waitforchecks)), one question per page, then shows the choices to review and save. When a configured tracker can't load, the same view says what's wrong and how to fix it, with **Check again** and a way to choose a different tracker.
 
-Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `approval`, `onApproval`, `waitForChecks`, `pushAfterMerge`, `close`, `spaceName`, `pollSeconds`, `updateCheckHours`, `workModel`, `workEffort` and `workPrompt`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
+Once a repository has a tracker, the gear in the panel's header opens its settings. The **Settings** row under its header chooses the scope, as the **Label** row chooses the list's label: **Repository** edits the repository's entry, and **Global** edits the settings at the top level of `issues.json`, which apply to every repository without its own: `approval`, `onApproval`, `waitForChecks`, `pushAfterMerge`, `close`, `worktreeCommand`, `spaceName`, `pollSeconds`, `updateCheckHours`, `workModel`, `workEffort` and `workPrompt`. Each form keeps its unsaved changes while the other is shown, and Save writes only the shown one.
 
 For saved Linear views, a GitHub repository other than origin's, and the other options the panel doesn't offer, run this in a Claude Code session in the repository:
 
@@ -153,6 +153,16 @@ A repository whose own git hook already sets up new worktrees leaves `worktreeSe
 
 You don't need `worktreeSetup` to carry your own Claude Code settings into worktrees: before it runs, `issues worktree` copies the main checkout's `.claude/settings.local.json`, which git ignores, into each worktree it creates. A worktree it reuses keeps the copy it got when it was created.
 
+### `worktreeCommand`
+
+`worktreeCommand` is an interactive command that each new issue space runs in its tab, such as an agent given the issue. The panel's Start and Continue run it, and so does `issues worktree` when it's given an issue, unless `--claude` asks for a Claude session instead. `<issueId>` stands for the issue's ID; quote it, as in `"<issueId>"`, since an ID such as `#41` would otherwise start a shell comment. The command runs through your login shell, so it finds the tools on your profile's `PATH`, and the tab carries on as a shell once it exits. Without it, the space opens a shell. Set it at the top level of `issues.json` for every repository, or in an entry for one repository, which overrides the top level's. For example, a Claude session working each issue:
+
+```json
+{ "worktreeCommand": "claude \"/issues:work <issueId>\"" }
+```
+
+The settings view's **Issue space command**, under Worktrees, sets it too.
+
 ### `pollSeconds`
 
 How often the panel asks the tracker for its list of issues, in whole seconds, 10 or more; without it, every 60 seconds. Set it at the top level of `issues.json` for every repository, or in an entry for one repository, which overrides the top level's:
@@ -176,7 +186,7 @@ How often the panel checks the checkout it runs from for an update, in whole hou
 
 ### `workModel` and `workEffort`
 
-The panel's Start and Continue, and `/issues:start` through `issues worktree --claude`, open a Claude session that works the issue. These two settings choose that session's model and effort, at the top level or in a repository's entry, which overrides the top level's. Without them, the session runs on your own Claude Code model and effort.
+`/issues:start`, through `issues worktree --claude`, opens a Claude session that works the issue. These two settings choose that session's model and effort, at the top level or in a repository's entry, which overrides the top level's. Without them, the session runs on your own Claude Code model and effort.
 
 - `workModel`: a model alias such as `sonnet`, `opus` or `haiku`, a model's full name, or `inherit` (the default) for your own model. It's passed to `claude --model`.
 - `workEffort`: `low`, `medium`, `high`, `xhigh` or `max`, or `default` (the default) for your own effort. It's passed to `claude --effort`.
