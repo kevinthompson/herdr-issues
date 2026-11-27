@@ -10,60 +10,43 @@
 // space runs in its tab, its worktreeCommand; the name of each issue's space, its spaceName; and what a finished session does about its worktree, its close. The approval
 // selects and close each lead with a choice that removes it from the entry, labeled with what applies in its place,
 // such as "Global (Open a pull request)" or "Default (Ask me)", where the default onApproval is a pull request for
-// an origin on GitHub. Issue sessions: the model and effort of the sessions that work its issues, its workModel and
-// workEffort, whose choice that removes them from the entry is labeled with the global value, such as
-// "Global (opus)", or the default; and the text appended to those sessions' system prompt after the global prompt,
-// its workPrompt, in a soft-wrapped textarea several rows tall, where emptying it removes it from the entry. Panel:
+// an origin on GitHub. Panel:
 // how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10 seconds
 // before it can be saved. Each of worktreeSetup, worktreeCommand, spaceName and pollSeconds is typed in as name is, with what
 // applies without it as the placeholder, naming the global value where one is set. It opens on the entry's own
 // settings, with each
 // select the entry doesn't set on its choice that removes it; an entry's retired merge and complete show as the
 // approval, onApproval and waitForChecks they mean. Each change saves as it's made (settings-form.js), writing only
-// the changed keys (saveTrackerChoice, saveApprovalSettings, saveCloseSetting, saveNameSetting, saveRepositorySettings,
-// saveAgentSettings and saveWorkPrompt in setting.js); a different tracker saves once its check passes and, for
+// the changed keys (saveTrackerChoice, saveApprovalSettings, saveCloseSetting, saveNameSetting and
+// saveRepositorySettings in setting.js); a different tracker saves once its check passes and, for
 // Linear, once a team is picked, and a poll interval that can't be saved is written once it's fixed.
 import { div } from "gpui-kit";
-import { InputState, TextareaState } from "gpui-base";
+import { InputState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, REPOSITORY_SECTIONS, yesNoChoiceId, settingsFields, yesNoValue } from "./settings-fields.js";
-import {
-  AGENT_QUESTIONS,
-  CLOSE_CHOICES,
-  SETTING_LABELS,
-  SettingsForm,
-  WORK_PROMPT_ROWS,
-  spaceNameLabel,
-  workPromptLabel,
-  worktreeCommandLabel,
-} from "./settings-form.js";
+import { CLOSE_CHOICES, SETTING_LABELS, SettingsForm, spaceNameLabel, worktreeCommandLabel } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
-  AGENT_DEFAULTS,
   DEFAULT_APPROVAL,
   DEFAULT_CLOSE,
   DEFAULT_POLL_SECONDS,
   DEFAULT_WAIT_FOR_CHECKS,
   DEFAULT_PUSH_AFTER_MERGE,
   REPOSITORY_KEYS,
-  agentSettings,
   approvalSources,
   nameSettings,
   parsePollSeconds,
   repositorySettings,
-  saveAgentSettings,
   saveCloseSetting,
   saveApprovalSettings,
   saveNameSetting,
   saveRepositorySettings,
   saveTrackerChoice,
-  saveWorkPrompt,
-  workPromptSettings,
 } from "./trackers/setting.js";
 
 /** @import { AsyncContext, Context, NativeElement } from "gpui-kit" */
-/** @import { InputState as InputStateType, TextareaState as TextareaStateType } from "gpui-base" */
+/** @import { InputState as InputStateType } from "gpui-base" */
 /** @import { Theme } from "./menu.js" */
 /** @import { SelectOption } from "./select.js" */
 /** @import { ApprovalKey } from "./setup.js" */
@@ -106,10 +89,6 @@ const REPOSITORY_LABELS = {
     sentence: "Seconds between checks of the tracker, 10 or more. Empty uses the global interval or the default.",
   },
 };
-
-const WORK_PROMPT_LABEL = workPromptLabel(
-  "Added after the global prompt to the system prompt of each session that works this repository's issues. Empty uses only the global prompt.",
-);
 
 // Where the listed issues come from now, such as "Linear team WEB".
 /**
@@ -161,12 +140,6 @@ export class RepositorySettings extends SettingsForm {
     this.savedRepository = null;
     /** @type {Record<RepositoryKey, InputStateType> | null} */
     this.repositoryInputs = null;
-    /** @type {Awaited<ReturnType<typeof agentSettings>> | null} */
-    this.agentSources = null;
-    /** @type {string | null} */
-    this.savedWorkPrompt = null;
-    /** @type {TextareaStateType | null} */
-    this.workPromptInput = null;
   }
 
   /**
@@ -182,16 +155,13 @@ export class RepositorySettings extends SettingsForm {
         ]),
       ),
       close: new SelectMenu("settings-close", SETTING_LABELS.close.title, cx),
-      ...this.agentSelects("settings", cx),
     };
     cx.spawn(async (cx) => {
       try {
-        const [approvalSettings, name, repository, agent, workPrompt] = await Promise.all([
+        const [approvalSettings, name, repository] = await Promise.all([
           approvalSources(this.project),
           nameSettings(this.project),
           repositorySettings(this.project),
-          agentSettings(this.project),
-          workPromptSettings(this.project),
         ]);
         this.approvalSettings = approvalSettings;
         this.savedApproval = {
@@ -206,16 +176,6 @@ export class RepositorySettings extends SettingsForm {
         this.nameInput.on("submit", (_e, cx) => this.saveNow(cx));
         this.savedRepository = repository;
         this.repositoryInputs = this.newRepositoryInputs(repository);
-        this.agentSources = agent;
-        this.openAgent(Object.fromEntries(Object.entries(agent).map(([key, { entry }]) => [key, entry])));
-        this.savedWorkPrompt = workPrompt.entry;
-        this.workPromptInput = TextareaState.new({
-          placeholder: "No prompt for this repository",
-          value: workPrompt.entry ?? "",
-          rows: WORK_PROMPT_ROWS,
-        });
-        this.workPromptInput.set_soft_wrap(true);
-        this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
       } catch (/** @type {any} */ e) {
         this.error = String(e.message ?? e);
       } finally {
@@ -404,15 +364,6 @@ export class RepositorySettings extends SettingsForm {
     return this.repositoryInputs ? (this.typedPollSeconds().problem ?? null) : null;
   }
 
-  // The typed prompt, trimmed, or null when the textarea is empty, so only the global prompt applies.
-  typedWorkPrompt() {
-    return this.workPromptInput?.value().trim() || null;
-  }
-
-  workPromptChanged() {
-    return Boolean(this.workPromptInput) && this.typedWorkPrompt() !== this.savedWorkPrompt;
-  }
-
   // The changed keys, after which they're the saved values, or null when nothing changed. A tracker not yet checked
   // or without its team, and a poll interval that can't be saved, aren't changes yet.
   /**
@@ -427,22 +378,9 @@ export class RepositorySettings extends SettingsForm {
       close = this.chosenApproval.close;
     const nameChanged = this.nameChanged(),
       name = this.typedName();
-    const repositoryChanges = this.repositoryChanges(),
-      agentChanges = this.agentChanges();
-    const workPromptChanged = this.workPromptChanged(),
-      workPrompt = this.typedWorkPrompt();
-    const hasRepositoryChanges = Object.keys(repositoryChanges).length > 0,
-      hasAgentChanges = Object.keys(agentChanges).length > 0;
-    if (
-      !trackerChoice &&
-      !approvalChanged &&
-      !closeChanged &&
-      !nameChanged &&
-      !hasRepositoryChanges &&
-      !hasAgentChanges &&
-      !workPromptChanged
-    )
-      return null;
+    const repositoryChanges = this.repositoryChanges();
+    const hasRepositoryChanges = Object.keys(repositoryChanges).length > 0;
+    if (!trackerChoice && !approvalChanged && !closeChanged && !nameChanged && !hasRepositoryChanges) return null;
     return {
       write: async () => {
         if (trackerChoice) await saveTrackerChoice(this.main, trackerChoice);
@@ -455,8 +393,6 @@ export class RepositorySettings extends SettingsForm {
         if (closeChanged) await saveCloseSetting(this.main, close);
         if (nameChanged) await saveNameSetting(this.main, name);
         if (hasRepositoryChanges) await saveRepositorySettings(this.main, repositoryChanges);
-        if (hasAgentChanges) await saveAgentSettings(this.main, agentChanges);
-        if (workPromptChanged) await saveWorkPrompt(this.main, workPrompt);
       },
       written: () => {
         if (trackerChoice)
@@ -469,8 +405,6 @@ export class RepositorySettings extends SettingsForm {
         if (closeChanged) this.savedApproval = { ...this.savedApproval, close };
         if (nameChanged) this.savedName = name;
         this.savedRepository = { ...this.savedRepository, ...repositoryChanges };
-        this.savedAgent = { ...this.savedAgent, ...agentChanges };
-        if (workPromptChanged) this.savedWorkPrompt = workPrompt;
       },
     };
   }
@@ -481,8 +415,6 @@ export class RepositorySettings extends SettingsForm {
       trackerReady: this.trackerReady,
       onApproval: this.chosenApproval.onApproval,
       fallbackOnApproval: this.approvalSettings ? this.approvalFallbacks().onApproval.value : null,
-      workModel: this.agentValues.workModel,
-      otherWorkModelPicked: this.otherWorkModelPicked,
     });
   }
 
@@ -515,15 +447,9 @@ export class RepositorySettings extends SettingsForm {
       waitForChecks: () => (fallbacks && fields.waitForChecksSelect ? approvalQuestion("waitForChecks") : null),
       pushAfterMerge: () => (fallbacks && fields.pushAfterMergeSelect ? approvalQuestion("pushAfterMerge") : null),
       close: () => fallbacks && this.approvalSelect("close", CLOSE_CHOICES, fallbacks, t),
-      workPrompt: () =>
-        this.workPromptInput &&
-        this.question(WORK_PROMPT_LABEL, t, (controls) => controls.child(this.textareaField(this.workPromptInput, t))),
     };
     for (const key of REPOSITORY_FIELDS)
       questions[key] = () => this.repositoryInputs && this.repositoryQuestion(key, REPOSITORY_LABELS[key], t);
-    for (const question of AGENT_QUESTIONS)
-      questions[question.key] = () =>
-        this.agentSources && this.agentQuestion(question, this.agentClearLabel(question.key), fields.workModelInput, t);
     return (key) => questions[key]?.() ?? null;
   }
 
@@ -546,15 +472,6 @@ export class RepositorySettings extends SettingsForm {
         }),
       ),
     );
-  }
-
-  // What applies without the entry's model or effort.
-  /**
-   * @param {import("./settings-form.js").AgentKey} key
-   */
-  agentClearLabel(key) {
-    const { topLevel } = this.agentSources[key];
-    return topLevel != null ? `Global (${topLevel})` : `Default (${AGENT_DEFAULTS[key]})`;
   }
 
   // The tracker in use, the chosen one's check, and Linear's team once Linear is checked.

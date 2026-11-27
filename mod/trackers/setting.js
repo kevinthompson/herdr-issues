@@ -38,24 +38,14 @@
 // name, also optional in any entry, names the space `issues worktree` and the worktree dialog open on the main
 // checkout, which the sidebar nests worktree spaces under; nameSettings resolves it, the repository's name without
 // its owner without it or when it's blank.
-// workModel and workEffort, at the top level and in any entry, an entry's winning, are the model and effort of the
-// Claude sessions Start, Continue and `issues worktree --claude` open to work an issue: workModel is inherit (the
-// person's own Claude Code model), a model alias such as sonnet, or a model's full name; workEffort is default
-// (left unset), low, medium, high, xhigh or max; inherit and default without either. workPrompt, also at the top
-// level and in any entry, is text appended to those sessions' system prompt with --append-system-prompt, standing
-// instructions such as house rules for tests: the top level's, then the entry's after a blank line, so an entry's
-// adds to the top level's; none without either, or when both are blank.
-// workSettings resolves all three.
-// Any model or effort the mod or its skills choose is a setting like these, with a default. Keys it doesn't know,
-// such as retired settings, are ignored and kept when an entry is saved.
+// Keys it doesn't know, such as the retired workModel, workEffort and workPrompt, are ignored and kept when an entry
+// is saved.
 // The file holds no secrets, so it can be shared between machines; Linear's API key stays in linear.json beside it.
 // Without an entry, a repository uses Linear. Only this computer's repositories have entries. The panel's setup
 // view (setup.js) writes an entry too, with saveSetupChoices, and its settings view (settings.js) changes an entry's
 // tracker with saveTrackerChoice, its approval settings and pushAfterMerge with saveApprovalSettings, its close with saveCloseSetting, its
-// name with saveNameSetting, its pollSeconds, spaceName, worktreeSetup and worktreeCommand with
-// saveRepositorySettings, its model
-// and effort settings with saveAgentSettings, and its workPrompt with saveWorkPrompt; it changes the top level
-// with saveTopLevelSettings.
+// name with saveNameSetting, and its pollSeconds, spaceName, worktreeSetup and worktreeCommand with
+// saveRepositorySettings; it changes the top level with saveTopLevelSettings.
 import { appHome, home, readTextFile, writeTextFile } from "herdr";
 import { mainCheckout } from "../location.js";
 import { cachedLookup, forgetLookups } from "../lookups.js";
@@ -78,9 +68,6 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  * @property {string} [worktreeSetup]
  * @property {number} [pollSeconds]
  * @property {string} [name]
- * @property {string} [workModel]
- * @property {string} [workEffort]
- * @property {string} [workPrompt]
  * @property {string} [merge]
  * @property {string} [complete]
  */
@@ -96,9 +83,6 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
  * @property {string} [close]
  * @property {string} [spaceName]
  * @property {string} [worktreeCommand]
- * @property {string} [workModel]
- * @property {string} [workEffort]
- * @property {string} [workPrompt]
  * @property {string} [merge]
  * @property {string} [complete]
  * @property {Record<string, Setting>} [repos]
@@ -106,7 +90,6 @@ import { badApprovalSetting, badSetting, settingsUnreadable } from "./problems.j
 
 /**
  * @typedef {{ pollSeconds?: number | string | null, spaceName?: string | null, worktreeSetup?: string | null, worktreeCommand?: string | null }} RepositoryChanges
- * @typedef {{ workModel?: string | null, workEffort?: string | null }} AgentChanges
  * @import { Project } from "./index.js"
  */
 
@@ -131,10 +114,6 @@ export const DEFAULT_POLL_SECONDS = 60;
 const MIN_POLL_SECONDS = 10;
 export const DEFAULT_UPDATE_CHECK_HOURS = 6;
 const MIN_UPDATE_CHECK_HOURS = 1;
-export const EFFORTS = ["default", "low", "medium", "high", "xhigh", "max"];
-export const SUGGESTED_WORK_MODELS = ["inherit", "sonnet", "opus", "haiku"];
-export const DEFAULT_WORK_MODEL = "inherit";
-export const DEFAULT_WORK_EFFORT = "default";
 /**
  * @param {string} path
  */
@@ -198,26 +177,6 @@ function checkChoice(value, name, choices, where) {
 }
 
 /**
- * @param {unknown} model
- * @returns {boolean}
- */
-const isModelName = (model) => typeof model === "string" && /^\S+$/.test(model);
-
-/**
- * @param {Setting | Settings | null | undefined} settings
- * @param {string} where
- */
-function checkWorkSettings(settings, where) {
-  const model = settings?.workModel;
-  if (model != null && !isModelName(model)) {
-    throw badSetting(`${where} needs a workModel of inherit, a model alias such as sonnet, or a model's full name`);
-  }
-  checkChoice(settings?.workEffort, "workEffort", EFFORTS, where);
-  if (settings?.workPrompt != null && typeof settings.workPrompt !== "string")
-    throw badSetting(`${where} has a workPrompt that isn't text`);
-}
-
-/**
  * @param {Setting | Settings} settings
  * @param {string} where
  */
@@ -246,7 +205,6 @@ function checkApproval(
  */
 function checkSharedSettings(settings, where) {
   checkPollSeconds(settings?.pollSeconds, where);
-  checkWorkSettings(settings, where);
   if (settings?.spaceName != null && typeof settings.spaceName !== "string")
     throw badSetting(`${where} has a spaceName that isn't text`);
   if (settings?.worktreeCommand != null && typeof settings.worktreeCommand !== "string")
@@ -315,52 +273,6 @@ export async function pollSettings(project) {
 export async function updateSettings() {
   const settings = await readCheckedSettings();
   return { updateCheckHours: settings?.updateCheckHours ?? DEFAULT_UPDATE_CHECK_HOURS };
-}
-
-// The model, effort and appended system prompt of the Claude sessions that work the repository's issues: the
-// entry's workModel and workEffort, else the top level's, else inherit and default; and the top level's workPrompt
-// followed by the entry's, a blank line apart, either alone, or no prompt (""). A blank workPrompt counts as unset.
-/**
- * @param {Project} project
- */
-export async function workSettings(project) {
-  const setting = await trackerSetting(project),
-    settings = await readCheckedSettings();
-  return {
-    workModel: setting?.workModel ?? settings?.workModel ?? DEFAULT_WORK_MODEL,
-    workEffort: setting?.workEffort ?? settings?.workEffort ?? DEFAULT_WORK_EFFORT,
-    workPrompt: [settings?.workPrompt?.trim(), setting?.workPrompt?.trim()].filter(Boolean).join("\n\n"),
-  };
-}
-
-// The repository entry's own workPrompt and the top level's, each null where unset or blank.
-/**
- * @param {Project} project
- */
-export async function workPromptSettings(project) {
-  const setting = await trackerSetting(project),
-    settings = await readCheckedSettings();
-  return { entry: setting?.workPrompt?.trim() || null, topLevel: settings?.workPrompt?.trim() || null };
-}
-
-export const AGENT_DEFAULTS = { workModel: DEFAULT_WORK_MODEL, workEffort: DEFAULT_WORK_EFFORT };
-
-// The agent settings, each as { value, source, entry, topLevel }: the value workSettings resolves, where it comes from ("repository", "top level" or "default"), and the repository's entry's and the
-// top level's own values, null where unset.
-/**
- * @param {Project} project
- */
-export async function agentSettings(project) {
-  const setting = await trackerSetting(project),
-    settings = await readCheckedSettings();
-  return Object.fromEntries(
-    /** @type {[keyof typeof AGENT_DEFAULTS, string][]} */ (Object.entries(AGENT_DEFAULTS)).map(([key, fallback]) => {
-      const entry = setting?.[key] ?? null,
-        topLevel = settings?.[key] ?? null;
-      const source = entry != null ? "repository" : topLevel != null ? "top level" : "default";
-      return [key, { value: entry ?? topLevel ?? fallback, source, entry, topLevel }];
-    }),
-  );
 }
 
 /**
@@ -735,57 +647,6 @@ export async function saveRepositorySettings(main, changes) {
   });
 }
 
-/**
- * @param {AgentChanges} changes
- */
-function checkAgentChanges(changes) {
-  for (const [key, value] of Object.entries(changes)) {
-    if (!(key in AGENT_DEFAULTS)) throw badSetting(`${key} isn't a model or effort setting`);
-    if (value == null) continue;
-    if (key === "workModel") {
-      if (!isModelName(value))
-        throw badSetting("workModel must be inherit, a model alias such as sonnet, or a model's full name");
-      continue;
-    }
-    if (!EFFORTS.includes(value)) throw badSetting(`${key} must be one of ${EFFORTS.join(", ")}`);
-  }
-}
-
-// Sets the model and effort settings in `changes`, { workModel, workEffort } or either of them, in the existing entry of the repository whose main checkout is `main`. A null value removes the key, so the
-// top level's value or the default applies. It changes no other key, and writes nothing for a value
-// trackerSetting would refuse or a repository without an entry.
-/**
- * @param {string} main
- * @param {AgentChanges} changes
- */
-export async function saveAgentSettings(main, changes) {
-  checkAgentChanges(changes);
-  await changeEntry(main, (entry) => {
-    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
-    const changed = /** @type {Record<string, unknown>} */ ({ ...entry, ...changes });
-    for (const [key, value] of Object.entries(changes)) if (value == null) delete changed[key];
-    return changed;
-  });
-}
-
-// Sets the workPrompt, trimmed, in the existing entry of the repository whose main checkout is `main`. A blank or
-// null prompt removes the key, so the top level's prompt, if any, applies. It changes no other key, and writes
-// nothing for a prompt that isn't text or a repository without an entry.
-/**
- * @param {string} main
- * @param {string | null | undefined} prompt
- */
-export async function saveWorkPrompt(main, prompt) {
-  if (prompt != null && typeof prompt !== "string") throw badSetting("workPrompt must be text");
-  const trimmed = prompt?.trim() || null;
-  await changeEntry(main, (entry) => {
-    if (!entry) throw badSetting("This repository has no entry in issues.json, so choose its tracker first");
-    const changed = { ...entry, workPrompt: trimmed };
-    if (!trimmed) delete changed.workPrompt;
-    return changed;
-  });
-}
-
 export const TOP_LEVEL_KEYS = [
   ...APPROVAL_QUESTION_KEYS,
   "close",
@@ -793,9 +654,6 @@ export const TOP_LEVEL_KEYS = [
   "worktreeCommand",
   "pollSeconds",
   "updateCheckHours",
-  "workModel",
-  "workEffort",
-  "workPrompt",
 ];
 
 // Sets the settings in `changes`, any of TOP_LEVEL_KEYS, at the top level of issues.json, creating the file if

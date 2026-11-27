@@ -6,31 +6,19 @@
 // request for a repository on GitHub; and whether main is pushed after merging, pushAfterMerge, shown for a merge
 // or the default onApproval (settings-fields.js). A retired merge and complete open as the values they mean, and
 // any change to the four saves all four. Worktrees: the command each new issue space runs, worktreeCommand; the
-// name of each issue's space, spaceName; and
-// what a finished session does about its worktree, close. Issue sessions: their model and effort, workModel and
-// workEffort; and the prompt appended to their system prompt, workPrompt, before any repository's own. Panel: how
+// name of each issue's space, spaceName; and what a finished session does about its worktree, close. Panel: how
 // often the panel polls each tracker, pollSeconds, and checks for its own update, updateCheckHours, each a whole
 // number before it can be saved. Each opens on the top level's value. Each select leads with a Default choice and each field
 // shows the default as placeholder, and either removes the key, so the default applies. Each change saves as it's
 // made (settings-form.js), writing only the changed keys with saveTopLevelSettings (setting.js); a field holding a
 // value that can't be saved writes nothing until it's fixed.
 import { div } from "gpui-kit";
-import { InputState, TextareaState } from "gpui-base";
+import { InputState } from "gpui-base";
 import { APPROVAL_QUESTIONS } from "./setup.js";
 import { SelectMenu } from "./select.js";
 import { CLEAR_CHOICE, GLOBAL_SECTIONS, yesNoChoiceId, globalSettingsFields, yesNoValue } from "./settings-fields.js";
+import { CLOSE_CHOICES, SETTING_LABELS, SettingsForm, spaceNameLabel, worktreeCommandLabel } from "./settings-form.js";
 import {
-  AGENT_QUESTIONS,
-  CLOSE_CHOICES,
-  SETTING_LABELS,
-  SettingsForm,
-  WORK_PROMPT_ROWS,
-  spaceNameLabel,
-  workPromptLabel,
-  worktreeCommandLabel,
-} from "./settings-form.js";
-import {
-  AGENT_DEFAULTS,
   DEFAULT_APPROVAL,
   DEFAULT_CLOSE,
   DEFAULT_POLL_SECONDS,
@@ -47,11 +35,11 @@ import {
 } from "./trackers/setting.js";
 
 /** @import { AsyncContext, Context, NativeElement } from "gpui-kit" */
-/** @import { InputState as InputStateType, TextareaState as TextareaStateType } from "gpui-base" */
+/** @import { InputState as InputStateType } from "gpui-base" */
 /** @import { Theme } from "./menu.js" */
 /** @import { SelectOption } from "./select.js" */
 /** @import { ApprovalKey } from "./setup.js" */
-/** @import { AgentKey, AgentValues, SaveRequest, SettingLabel } from "./settings-form.js" */
+/** @import { SaveRequest, SettingLabel } from "./settings-form.js" */
 
 /** @typedef {{ key: string, label: SettingLabel, placeholder: string, parse: (text: string) => string | number | null }} TypedQuestion */
 /** @typedef {Record<string, string | number | boolean | null>} SavedValues */
@@ -104,9 +92,6 @@ const TYPED_QUESTIONS = [
   },
 ];
 const SELECT_KEYS = [...APPROVAL_QUESTION_KEYS, "close"];
-const WORK_PROMPT_LABEL = workPromptLabel(
-  "Added to the system prompt of each session that works an issue. A repository's own prompt follows it.",
-);
 
 export class GlobalSettings extends SettingsForm {
   /**
@@ -120,8 +105,6 @@ export class GlobalSettings extends SettingsForm {
     this.chosen = {};
     /** @type {Record<string, InputStateType> | null} */
     this.typedInputs = null;
-    /** @type {TextareaStateType | null} */
-    this.workPromptInput = null;
   }
 
   /**
@@ -136,7 +119,6 @@ export class GlobalSettings extends SettingsForm {
         ]),
       ),
       close: new SelectMenu("global-close", SETTING_LABELS.close.title, cx),
-      ...this.agentSelects("global", cx),
     };
     cx.spawn(async (cx) => {
       try {
@@ -147,9 +129,7 @@ export class GlobalSettings extends SettingsForm {
           return typeof raw === "string" ? raw.trim() || null : (raw ?? null);
         };
         this.saved = {
-          ...Object.fromEntries(
-            [...TYPED_QUESTIONS.map(({ key }) => key), "workPrompt"].map((key) => [key, value(key)]),
-          ),
+          ...Object.fromEntries(TYPED_QUESTIONS.map(({ key }) => [key, value(key)])),
           close: closeChoice(/** @type {string | null} */ (value("close"))),
           ...ownApproval(settings),
         };
@@ -169,16 +149,6 @@ export class GlobalSettings extends SettingsForm {
             return [key, input];
           }),
         );
-        this.openAgent(
-          /** @type {AgentValues} */ (Object.fromEntries(Object.keys(AGENT_DEFAULTS).map((key) => [key, value(key)]))),
-        );
-        this.workPromptInput = TextareaState.new({
-          placeholder: "No prompt",
-          value: String(this.saved.workPrompt ?? ""),
-          rows: WORK_PROMPT_ROWS,
-        });
-        this.workPromptInput.set_soft_wrap(true);
-        this.workPromptInput.on("change", (_e, cx) => this.edited(cx));
       } catch (/** @type {any} */ e) {
         this.error = String(e.message ?? e);
       } finally {
@@ -200,11 +170,7 @@ export class GlobalSettings extends SettingsForm {
   }
 
   fields() {
-    return globalSettingsFields({
-      onApproval: this.chosen.onApproval,
-      workModel: this.agentValues.workModel,
-      otherWorkModelPicked: this.otherWorkModelPicked,
-    });
+    return globalSettingsFields({ onApproval: this.chosen.onApproval });
   }
 
   // Each typed setting's value, or its problem when it can't be saved.
@@ -249,18 +215,10 @@ export class GlobalSettings extends SettingsForm {
     const approvalChanged = APPROVAL_QUESTION_KEYS.some(
       (key) => (shown[key] ?? true) && approvalSettings[/** @type {ApprovalKey} */ (key)] !== this.saved[key],
     );
-    const current = {
-      close: this.chosen.close,
-      ...this.typed().values,
-      ...this.agentValues,
-      workPrompt: this.workPromptInput?.value().trim() || null,
-    };
-    /** @param {string} key */
-    const savedFor = (key) =>
-      key in AGENT_DEFAULTS ? this.savedAgent[/** @type {AgentKey} */ (key)] : this.saved[key];
+    const current = { close: this.chosen.close, ...this.typed().values };
     const changed = Object.fromEntries(
       Object.entries(current)
-        .filter(([key, value]) => (value ?? null) !== savedFor(key))
+        .filter(([key, value]) => (value ?? null) !== this.saved[key])
         .map(([key, value]) => [key, value ?? null]),
     );
     return approvalChanged ? { ...changed, ...approvalSettings } : changed;
@@ -277,10 +235,7 @@ export class GlobalSettings extends SettingsForm {
     return {
       write: () => saveTopLevelSettings(changes),
       written: () => {
-        const agent = Object.entries(changes).filter(([key]) => key in AGENT_DEFAULTS);
-        const others = Object.entries(changes).filter(([key]) => !(key in AGENT_DEFAULTS));
-        this.savedAgent = { ...this.savedAgent, .../** @type {AgentValues} */ (Object.fromEntries(agent)) };
-        this.saved = { ...this.saved, ...Object.fromEntries(others) };
+        this.saved = { ...this.saved, ...changes };
       },
     };
   }
@@ -342,9 +297,6 @@ export class GlobalSettings extends SettingsForm {
           [{ id: CLEAR_CHOICE, label: `Default (${choiceLabel(CLOSE_CHOICES, DEFAULT_CLOSE)})` }, ...CLOSE_CHOICES],
           t,
         ),
-      workPrompt: () =>
-        this.workPromptInput &&
-        this.question(WORK_PROMPT_LABEL, t, (controls) => controls.child(this.textareaField(this.workPromptInput, t))),
     };
     for (const { key, label } of TYPED_QUESTIONS)
       questions[key] = () =>
@@ -360,10 +312,6 @@ export class GlobalSettings extends SettingsForm {
             ),
           ),
         );
-    for (const question of AGENT_QUESTIONS)
-      questions[question.key] = () =>
-        this.savedAgent &&
-        this.agentQuestion(question, `Default (${AGENT_DEFAULTS[question.key]})`, fields.workModelInput, t);
     return (key) => questions[key]?.() ?? null;
   }
 
