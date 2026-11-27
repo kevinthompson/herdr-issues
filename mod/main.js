@@ -119,6 +119,7 @@ import { Openings } from "./openings.js";
 import { canOfferMerge, MergedWithProblems, mergeIssue, MergeRefusal } from "./merge.js";
 import { CLOSE_LABEL, readyCloseRequests } from "./close-request.js";
 import { groupSpacing } from "./group-spacing.js";
+import { idLine, detailLines } from "./row-lines.js";
 
 /** @import { Context, AsyncContext, Color } from "gpui-kit" */
 /** @import { Issue, Tracker, Project, PullRequest } from "./trackers/index.js" */
@@ -1506,14 +1507,62 @@ export default class Issues extends View {
     const waiting = waitingIssues(issue, this.issues),
       sla = slaStatus(issue),
       due = dueStatus(issue),
-      pullRequestCount = issue.pullRequests?.length ?? 0,
-      project = listsProject(this.listedScope, issue.project) ? null : issue.project,
-      chips = labelChips(issue, t, { withProject: false }).slice(0, 3);
-    const showsPriority = this.prioritized() && issue.priority > 0,
-      hasDetails = Boolean(sla) || Boolean(due) || showsPriority || pullRequestCount > 0;
+      project = listsProject(this.listedScope, issue.project) ? null : issue.project;
     const finishable = canFinishWork(issue),
       startable = canStartWork(issue, this.issues);
     const { inSpace, inActiveSpace } = this.spaceShowingWorktree(issue);
+    const writable = Boolean(this.tracker?.writable);
+    const pills = [
+      ...(this.prioritized() && issue.priority > 0 ? [priorityPill(issue.priority, t)] : []),
+      ...(issue.pullRequests?.length ? [pullRequestPill(issue.pullRequests, t)] : []),
+    ];
+    const button =
+      writable && (finishable || startable || inSpace)
+        ? workButton(
+            `row-${issue.id}`,
+            {
+              finishable,
+              startable,
+              inSpace,
+              inActiveSpace,
+              opening: Boolean(this.openings.get(issue.id)),
+              loading: this.openings.get(issue.id)?.merging === false,
+              onStart: (cx) => this.startWork(issue, cx),
+              onContinue: (cx) => this.continueWork(issue, cx),
+            },
+            t,
+            { primary: false, compact: true },
+          )
+        : null;
+    const schedule = [
+      ...(sla
+        ? [div().text_color(t[SLA_COLORS[sla.risk]]).child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" "))]
+        : []),
+      ...(due ? [div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)] : []),
+    ];
+    const links = [
+      ...(blockers.length > 0
+        ? [
+            h_flex()
+              .flex_none()
+              .gap(4)
+              .items_center()
+              .text_color(t.blocked)
+              .child(div().flex_none().child("Blocked by"))
+              .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked)),
+          ]
+        : []),
+      ...(waiting.length > 0
+        ? [
+            h_flex()
+              .flex_none()
+              .gap(4)
+              .items_center()
+              .child(div().flex_none().child("Blocking"))
+              .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)),
+          ]
+        : []),
+    ];
     return v_flex()
       .id(`issue-${issue.id}`)
       .flex_none()
@@ -1527,32 +1576,7 @@ export default class Issues extends View {
         this.openId = issue.id;
         cx.notify();
       })
-      .child(
-        h_flex()
-          .gap(12)
-          .items_center()
-          .when(Boolean(this.tracker?.writable), (e) => e.min_h(COMPACT_BUTTON_HEIGHT_PX))
-          .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.accent).child(issue.id))
-          .when(Boolean(this.tracker?.writable) && (finishable || startable || inSpace), (e) =>
-            e.child(
-              workButton(
-                `row-${issue.id}`,
-                {
-                  finishable,
-                  startable,
-                  inSpace,
-                  inActiveSpace,
-                  opening: Boolean(this.openings.get(issue.id)),
-                  loading: this.openings.get(issue.id)?.merging === false,
-                  onStart: (cx) => this.startWork(issue, cx),
-                  onContinue: (cx) => this.continueWork(issue, cx),
-                },
-                t,
-                { primary: false, compact: true },
-              ),
-            ),
-          ),
-      )
+      .child(idLine(issue.id, pills, button, t).when(writable, (e) => e.min_h(COMPACT_BUTTON_HEIGHT_PX)))
       .child(div().whitespace_normal().child(issue.title))
       .when(Boolean(project), (e) =>
         e.child(
@@ -1561,58 +1585,7 @@ export default class Issues extends View {
             .text_color(t.dim),
         ),
       )
-      .when(hasDetails || chips.length > 0 || blockers.length > 0 || waiting.length > 0, (e) =>
-        e.child(
-          h_flex()
-            .flex_wrap()
-            .gap_x(8)
-            .gap_y(2)
-            .items_center()
-            .text_size(11)
-            .text_color(t.dim)
-            .overflow_hidden()
-            .when(hasDetails, (e) =>
-              e.child(
-                h_flex()
-                  .flex_none()
-                  .gap(8)
-                  .items_center()
-                  .when(Boolean(sla), (e) =>
-                    e.child(
-                      div()
-                        .text_color(t[SLA_COLORS[sla.risk]])
-                        .child([SLA_ICONS[sla.risk], sla.text].filter(Boolean).join(" ")),
-                    ),
-                  )
-                  .when(Boolean(due), (e) => e.child(div().text_color(t[DUE_COLORS[due.urgency]]).child(due.text)))
-                  .when(showsPriority, (e) => e.child(priorityPill(issue.priority, t)))
-                  .when(pullRequestCount > 0, (e) => e.child(pullRequestPill(issue.pullRequests, t))),
-              ),
-            )
-            .children(chips)
-            .when(blockers.length > 0, (e) =>
-              e.child(
-                h_flex()
-                  .flex_none()
-                  .gap(4)
-                  .items_center()
-                  .text_color(t.blocked)
-                  .child(div().flex_none().child("Blocked by"))
-                  .child(issueLinks(`row-blocker-${issue.id}`, blockers, this.links, t, t.blocked)),
-              ),
-            )
-            .when(waiting.length > 0, (e) =>
-              e.child(
-                h_flex()
-                  .flex_none()
-                  .gap(4)
-                  .items_center()
-                  .child(div().flex_none().child("Blocking"))
-                  .child(issueLinks(`row-blocking-${issue.id}`, waiting, this.links, t, t.accent)),
-              ),
-            ),
-        ),
-      )
+      .children(detailLines([schedule, labelChips(issue, t, { withProject: false }).slice(0, 3), links], t))
       .when(Boolean(issue.assignee), (e) => e.child(this.assignee(issue, t)));
   }
 
