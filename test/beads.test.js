@@ -6,7 +6,7 @@ import { describe, test } from "node:test";
 import { defaults, stubHerdr } from "./support/herdr.js";
 import { createRepository, git, temporaryFolder } from "./support/repository.js";
 import { forgetLookups } from "../mod/lookups.js";
-import { beadsTracker } from "../mod/trackers/beads.js";
+import { beadsPrefix, beadsTracker, initializeBeads } from "../mod/trackers/beads.js";
 import { trackerFor } from "../mod/trackers/index.js";
 import { settingsPath } from "../mod/trackers/setting.js";
 
@@ -357,5 +357,49 @@ describe("Beads tracker labels", () => {
   test("has no list of labels to choose from", async (t) => {
     const { tracker } = await labelTracker(t, []);
     assert.equal(tracker.labels, undefined);
+  });
+});
+
+describe("Beads issue prefix", () => {
+  test("takes the first letter of each word, in lower case, from a folder name", () => {
+    assert.equal(beadsPrefix("astro-escape"), "ae");
+    assert.equal(beadsPrefix("Astro Escape"), "ae");
+    assert.equal(beadsPrefix("my_cool.app"), "mca");
+  });
+
+  test("keeps a single word whole, in lower case", () => {
+    assert.equal(beadsPrefix("Notes"), "notes");
+  });
+
+  test("leaves the prefix to bd init when the name has no letters or digits", () => {
+    assert.equal(beadsPrefix("--__"), null);
+  });
+
+  test("bd init names the database with the main checkout's folder initials", async (t) => {
+    const runs = [];
+    stubHerdr(t, {
+      exec: async (command, args, options) => {
+        runs.push({ command, args, cwd: options.cwd });
+        return { code: 0, stdout: "", stderr: "" };
+      },
+    });
+    const root = join(realpathSync(mkdtempSync(join(tmpdir(), "beads-init-"))), "astro-escape");
+    await initializeBeads(root);
+    assert.deepEqual(runs, [
+      {
+        command: "bd",
+        args: [
+          "init",
+          "--non-interactive",
+          "--quiet",
+          "--skip-agents",
+          "--skip-hooks",
+          "--setup-exclude",
+          "--prefix",
+          "ae",
+        ],
+        cwd: root,
+      },
+    ]);
   });
 });
