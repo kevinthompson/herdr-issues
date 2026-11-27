@@ -20,7 +20,7 @@ export const OTHER_WORK_MODEL = "other";
 const SETTINGS_SECTIONS = [
   { title: "Tracker", keys: ["name", "tracker"] },
   { title: "Approval", keys: ["approval", "onApproval", "waitForChecks", "pushAfterMerge"] },
-  { title: "Worktrees", keys: ["worktreeSetup", "spaceName", "close"] },
+  { title: "Worktrees", keys: ["worktreeSetup", "worktreeCommand", "spaceName", "close"] },
   { title: "Issue sessions", keys: ["workModel", "workEffort", "workPrompt"] },
   { title: "Panel", keys: ["pollSeconds", "updateCheckHours"] },
 ];
@@ -42,6 +42,7 @@ export const REPOSITORY_SECTIONS = sectionsWith([
   "waitForChecks",
   "pushAfterMerge",
   "worktreeSetup",
+  "worktreeCommand",
   "spaceName",
   "close",
   "workModel",
@@ -55,6 +56,7 @@ export const GLOBAL_SECTIONS = sectionsWith([
   "onApproval",
   "waitForChecks",
   "pushAfterMerge",
+  "worktreeCommand",
   "spaceName",
   "close",
   "workModel",

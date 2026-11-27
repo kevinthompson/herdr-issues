@@ -235,6 +235,23 @@ describe("spaceName", () => {
   });
 });
 
+describe("worktreeCommand", () => {
+  test("issues setting prints the entry's over the top level's", async (t) => {
+    const repository = repositoryWith(t, {
+      entry: { worktreeCommand: "agent <issueId>" },
+      topLevel: { worktreeCommand: "other" },
+    });
+    assert.deepEqual(await setting(t, repository, "worktreeCommand"), { code: 0, out: "agent <issueId>", err: "" });
+  });
+
+  test("issues setting prints the top level's without the entry's, and nothing without either", async (t) => {
+    const repository = repositoryWith(t, { topLevel: { worktreeCommand: "other" } });
+    assert.equal((await setting(t, repository, "worktreeCommand")).out, "other");
+    writeSettings({ repos: { [repository]: githubEntry({}) } });
+    assert.deepEqual(await setting(t, repository, "worktreeCommand"), { code: 0, out: "", err: "" });
+  });
+});
+
 describe("a top level that an entry couldn't hold is refused", () => {
   const cases = [
     { key: "close", topLevel: { close: "always" }, message: /issues\.json needs a close of ask, auto/ },
@@ -265,6 +282,7 @@ describe("a top level that an entry couldn't hold is refused", () => {
       message: /issues\.json needs a complete of merged, pull-request-open, pull-request-passing/,
     },
     { key: "close", topLevel: { spaceName: 41 }, message: /issues\.json has a spaceName that isn't text/ },
+    { key: "close", topLevel: { worktreeCommand: [] }, message: /issues\.json has a worktreeCommand that isn't text/ },
   ];
   for (const { key, topLevel, message } of cases) {
     test(`${JSON.stringify(topLevel)}`, async (t) => {

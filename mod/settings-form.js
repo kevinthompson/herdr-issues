@@ -76,6 +76,16 @@ export const spaceNameLabel = (sentence) => ({ title: "Issue space name", senten
  * @param {string} sentence
  * @returns {SettingLabel}
  */
+export const worktreeCommandLabel = (sentence) => ({
+  title: "Issue space command",
+  sentence,
+  tokens: [SPACE_NAME_TOKENS[0]],
+});
+
+/**
+ * @param {string} sentence
+ * @returns {SettingLabel}
+ */
 export const workPromptLabel = (sentence) => ({ title: "Work prompt", sentence, wide: true });
 
 /** @type {AgentQuestion[]} */

@@ -26,14 +26,19 @@ test("a repository's settings open on its entry's values and the top level's pol
   const repository = createRepository(temporaryFolder(t));
   writeSettings({
     pollSeconds: 120,
-    repos: { [repository]: { tracker: "beads", spaceName: "<issueId>!", worktreeSetup: "npm install" } },
+    worktreeCommand: "agent <issueId>",
+    repos: {
+      [repository]: { tracker: "beads", spaceName: "<issueId>!", worktreeSetup: "npm install", worktreeCommand: "x" },
+    },
   });
   assert.deepEqual(await repositorySettings({ root: repository, on: null }), {
     pollSeconds: null,
     spaceName: "<issueId>!",
     worktreeSetup: "npm install",
+    worktreeCommand: "x",
     topLevelPollSeconds: 120,
     topLevelSpaceName: null,
+    topLevelWorktreeCommand: "agent <issueId>",
   });
 });
 
@@ -85,7 +90,7 @@ test("a value the settings would refuse is not written", async (t) => {
   await assert.rejects(saveRepositorySettings(repository, { worktreeSetup: 3 }), /worktreeSetup must be text/);
   await assert.rejects(
     saveRepositorySettings(repository, { merge: "auto" }),
-    /isn't a poll, space name or worktree setup setting/,
+    /isn't a poll, space name or worktree setting/,
   );
   assert.equal(readFileSync(settingsPath(), "utf8"), before);
 });

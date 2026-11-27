@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createRepository, temporaryFolder } from "./support/repository.js";
 import { settingsPath } from "../mod/trackers/setting.js";
+import { worktreeCommandArgv } from "../mod/worktree-command.js";
 
 const issuesCli = fileURLToPath(new URL("../bin/issues", import.meta.url));
 const gitFolder = dirname(spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim());
@@ -31,17 +32,16 @@ esac`,
     writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`);
     chmodSync(join(bin, name), 0o755);
   }
-  const spacesOpened = () =>
+  const newSpaces = () =>
     readFileSync(calls, "utf8")
       .split("\n")
       .filter(Boolean)
       .map((line) => line.split("\t"))
       .filter(([action]) => action === "space.new")
-      .map(([, params]) => {
-        const { folder: opened, name } = JSON.parse(params);
-        return { folder: opened, name };
-      });
-  return { bin, spacesOpened };
+      .map(([, params]) => JSON.parse(params));
+  const spacesOpened = () => newSpaces().map(({ folder: opened, name }) => ({ folder: opened, name }));
+  const tabsOpened = () => newSpaces().map(({ tab, argv, task }) => ({ tab, argv, task }));
+  return { bin, spacesOpened, tabsOpened };
 }
 
 function repository(t, entry) {
@@ -160,4 +160,39 @@ test("issues worktree <id> selects a space already open on the branch without re
   runWorktree(root, bin, ["#7"]);
 
   assert.equal(spacesOpened().length, 1);
+});
+
+test("issues worktree <id> opens the issue's space running the repository's worktreeCommand", (t) => {
+  const root = repository(t, { tracker: "github", repo: "owner/name", worktreeCommand: "agent <issueId>" });
+  const { bin, tabsOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
+  stubGh(bin, "Run it");
+
+  runWorktree(root, bin, ["#7"]);
+
+  assert.deepEqual(tabsOpened(), [
+    { tab: undefined, argv: worktreeCommandArgv("agent <issueId>", "#7"), task: undefined },
+  ]);
+});
+
+test("issues worktree --branch --issue runs the worktreeCommand for the issue, and plain --branch doesn't", (t) => {
+  const root = repository(t, { tracker: "github", repo: "owner/name", worktreeCommand: "agent <issueId>" });
+  const { bin, tabsOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
+
+  runWorktree(root, bin, ["--branch", "7-pass-the-issue", "--issue", "#7"]);
+  openWorktree(root, bin, "plain");
+
+  assert.deepEqual(
+    tabsOpened().map(({ argv }) => argv),
+    [worktreeCommandArgv("agent <issueId>", "#7"), undefined],
+  );
+});
+
+test("issues worktree --claude opens a Claude session in place of the worktreeCommand", (t) => {
+  const root = repository(t, { tracker: "github", repo: "owner/name", worktreeCommand: "agent <issueId>" });
+  const { bin, tabsOpened } = stubApp(t, [{ id: "s1", name: "name", folder: root, tabs: [] }]);
+  stubGh(bin, "Ask it");
+
+  runWorktree(root, bin, ["#7", "--claude", "/issues:work #7"]);
+
+  assert.deepEqual(tabsOpened(), [{ tab: "Claude", argv: ["claude"], task: "/issues:work #7" }]);
 });

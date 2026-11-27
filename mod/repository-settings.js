@@ -6,8 +6,8 @@
 // checked. Approval: whether a session asks for approval of its work, its approval; how the branch then gets into
 // main, its onApproval; only when the onApproval that applies is a pull request, whether the session waits for
 // its checks, its waitForChecks; and only when it is a merge, whether main is pushed after merging, its
-// pushAfterMerge. Worktrees: the command run in each new worktree, its worktreeSetup; the name of
-// each issue's space, its spaceName; and what a finished session does about its worktree, its close. The approval
+// pushAfterMerge. Worktrees: the command run in each new worktree, its worktreeSetup; the command each new issue
+// space runs in its tab, its worktreeCommand; the name of each issue's space, its spaceName; and what a finished session does about its worktree, its close. The approval
 // selects and close each lead with a choice that removes it from the entry, labeled with what applies in its place,
 // such as "Global (Open a pull request)" or "Default (Ask me)", where the default onApproval is a pull request for
 // an origin on GitHub. Issue sessions: the model and effort of the sessions that work its issues, its workModel and
@@ -15,7 +15,7 @@
 // "Global (opus)", or the default; and the text appended to those sessions' system prompt after the global prompt,
 // its workPrompt, in a soft-wrapped textarea several rows tall, where emptying it removes it from the entry. Panel:
 // how often the panel polls its tracker, its pollSeconds, which must be a whole number of at least 10 seconds
-// before it can be saved. Each of worktreeSetup, spaceName and pollSeconds is typed in as name is, with what
+// before it can be saved. Each of worktreeSetup, worktreeCommand, spaceName and pollSeconds is typed in as name is, with what
 // applies without it as the placeholder, naming the global value where one is set. It opens on the entry's own
 // settings, with each
 // select the entry doesn't set on its choice that removes it; an entry's retired merge and complete show as the
@@ -36,6 +36,7 @@ import {
   WORK_PROMPT_ROWS,
   spaceNameLabel,
   workPromptLabel,
+  worktreeCommandLabel,
 } from "./settings-form.js";
 import { TrackerChoice, TRACKERS } from "./tracker-choice.js";
 import {
@@ -72,7 +73,7 @@ import {
 /** @typedef {{ kind: string, team?: string, repo?: string }} CurrentTracker */
 /** @typedef {ApprovalKey | "close"} ApprovalChoiceKey */
 /** @typedef {Partial<Record<ApprovalChoiceKey, string | null>>} ApprovalChoices */
-/** @typedef {"worktreeSetup" | "spaceName" | "pollSeconds"} RepositoryKey */
+/** @typedef {"worktreeSetup" | "worktreeCommand" | "spaceName" | "pollSeconds"} RepositoryKey */
 /** @typedef {Awaited<ReturnType<typeof repositorySettings>>} RepositoryValues */
 
 const TEAM_PICKS = "issues.settingsTeams";
@@ -96,6 +97,9 @@ const REPOSITORY_LABELS = {
     title: "Setup command",
     sentence: "Runs in each new issue worktree, such as npm install. Empty runs nothing.",
   },
+  worktreeCommand: worktreeCommandLabel(
+    "Runs in the tab of each new issue space, such as an agent given the issue. Empty uses the global command, or opens a shell if there isn't one.",
+  ),
   spaceName: spaceNameLabel("Empty uses the global name, or the issue's ID if there isn't one."),
   pollSeconds: {
     title: "Poll interval",
@@ -221,7 +225,7 @@ export class RepositorySettings extends SettingsForm {
     });
   }
 
-  // A field for each of pollSeconds, spaceName and worktreeSetup, opening on the entry's value, with what applies
+  // A field for each of pollSeconds, spaceName, worktreeSetup and worktreeCommand, opening on the entry's value, with what applies
   // without it as the placeholder.
   /**
    * @param {RepositoryValues} repository
@@ -235,6 +239,8 @@ export class RepositorySettings extends SettingsForm {
           : String(DEFAULT_POLL_SECONDS),
       spaceName: repository.topLevelSpaceName != null ? `Global (${repository.topLevelSpaceName})` : "<issueId>",
       worktreeSetup: "No command",
+      worktreeCommand:
+        repository.topLevelWorktreeCommand != null ? `Global (${repository.topLevelWorktreeCommand})` : "No command",
     };
     return /** @type {Record<RepositoryKey, InputStateType>} */ (
       Object.fromEntries(
@@ -377,7 +383,7 @@ export class RepositorySettings extends SettingsForm {
     }
   }
 
-  // Each of pollSeconds, spaceName and worktreeSetup whose field differs from the entry, as its value or null.
+  // Each of pollSeconds, spaceName, worktreeSetup and worktreeCommand whose field differs from the entry, as its value or null.
   repositoryChanges() {
     if (!this.repositoryInputs) return {};
     /** @type {Record<RepositoryKey, string | number | null | undefined>} */
@@ -385,6 +391,7 @@ export class RepositorySettings extends SettingsForm {
       pollSeconds: this.typedPollSeconds().pollSeconds,
       spaceName: this.repositoryInputs.spaceName.value().trim() || null,
       worktreeSetup: this.repositoryInputs.worktreeSetup.value().trim() || null,
+      worktreeCommand: this.repositoryInputs.worktreeCommand.value().trim() || null,
     };
     return Object.fromEntries(
       REPOSITORY_FIELDS.filter((key) => typed[key] !== undefined && typed[key] !== this.savedRepository[key]).map(
