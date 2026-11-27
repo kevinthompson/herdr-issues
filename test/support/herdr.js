@@ -21,6 +21,7 @@ export const defaults = {
   theme: () => ({}),
   settings: () => ({}),
   updates: () => ({ app: { version: "0.0.0" } }),
+  watchFolder: () => Object.assign(new Promise(() => {}), { cancel: () => {} }),
 };
 let current = { ...defaults };
 
@@ -39,8 +40,9 @@ export const props = (...args) => current.props(...args);
 export const theme = (...args) => current.theme(...args);
 export const settings = (...args) => current.settings(...args);
 export const updates = () => current.updates();
+export const watchFolder = (...args) => current.watchFolder(...args);
 
-// Replaces any of exec, spaces, panes, layout, run, shared, setShared, terminals, hc, openOverlay, closeOverlay, props, theme, settings and updates until the test `t` ends.
+// Replaces any of exec, spaces, panes, layout, run, shared, setShared, terminals, hc, openOverlay, closeOverlay, props, theme, settings, updates and watchFolder until the test `t` ends.
 export function stubHerdr(t, replacements) {
   current = { ...defaults, ...replacements };
   t.after(() => {
